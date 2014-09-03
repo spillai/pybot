@@ -178,7 +178,7 @@ def publish_point_cloud(pub_ns, arr, carr, stamp=None, flip_rb=False):
     marker.lifetime = rospy.Duration()
     _publish_marker(marker)
 
-def publish_line_segments(pub_ns, arr1, arr2, c='g'): 
+def publish_line_segments(pub_ns, arr1, arr2, frame_id='camera', stamp=None, c='g', size=0.05): 
     """
     Publish point cloud on:
     pub_ns: Namespace on which the cloud will be published
@@ -194,12 +194,12 @@ def publish_line_segments(pub_ns, arr1, arr2, c='g'):
     # check
     if not arr1.shape == arr2.shape: raise AssertionError    
 
-    marker.header.frame_id = 'sensor_link'
+    marker.header.frame_id = frame_id
     marker.header.stamp = stamp if stamp is not None else rospy.Time.now()
 
     # Point width, and height
-    marker.scale.x = 0.005
-    marker.scale.y = 0.001
+    marker.scale.x = size
+    marker.scale.y = size
     
     marker.color.b = 1.0
     marker.color.a = 1.0
@@ -258,8 +258,8 @@ def publish_pose_list(pub_ns, poses, texts=[], stamp=None, size=0.05, frame_id='
     markers.header.frame_id = frame_id
     markers.header.stamp = stamp if stamp is not None else rospy.Time.now()
     markers.header.seq = seq
-    markers.scale.x = 0.01
-    markers.scale.y = 0.01
+    markers.scale.x = size/20 # 0.01
+    markers.scale.y = size/20 # 0.01
     
     markers.color.a = 1.0
     
