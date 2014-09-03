@@ -1,6 +1,7 @@
-import cv2
+import os, cv2
 import numpy as np
 from collections import namedtuple
+from bot_geometry.rigid_transform import RigidTransform
 
 # Q = [ 1 0 0      -c_x
 #       0 1 0      -c_y
@@ -41,6 +42,11 @@ def kitti_stereo_calib_params(scale=1.0):
     baseline_px = 386.1448 * scale
 
     return get_calib_params(f, f, cx, cy, baseline_px=baseline_px)
+
+def kitti_odometry(fn): 
+    X = (np.fromfile(os.path.expanduser(fn), dtype=np.float64, sep=' ')).reshape(-1,12)
+    return map(lambda p: RigidTransform.from_Rt(p[:3,:3], p[:3,3]), 
+                map(lambda x: x.reshape(3,4), X))
 
 def bumblebee_stereo_calib_params_ming(scale=1.0): 
     fx, fy = 809.53*scale, 809.53*scale
