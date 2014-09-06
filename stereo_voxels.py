@@ -2,9 +2,12 @@ import cv2, time
 import numpy as np
 
 from bot_vision.imshow_utils import imshow_cv, imshow_plt, bar_plt
-from fs_utils import guided_filter
+# from fs_utils import guided_filter
 
 import pyximport; pyximport.install()
+pyximport.install(setup_args={"include_dirs":np.get_include()},
+                  reload_support=True)
+
 import bot_externals.adcensus_stereo
 
 class StereoVoxels: 
@@ -20,6 +23,8 @@ class StereoVoxels:
         cv2.setMouseCallback("disparity_cb", self._on_mouse)
 
     def _on_mouse(self, event, x, y, flags, param):
+        if event != cv2.EVENT_LBUTTONDOWN:
+            return
         pt = (x, y)
         xbin, ybin = self._px_to_bin(x), self._px_to_bin(y)
         print self._disp[y,x], self.disp_vox[ybin,xbin]
@@ -69,12 +74,11 @@ class StereoVoxels:
             tmp = np.ones(shape=(H,W)) * thresh_border
             tmp[:,d:W] = Ir[:,:W-d]
             # cost = np.abs(tmp - Il)
-            # cost = cv2.GaussianBlur(np.abs(tmp - Il), (3,3), 0)
-            cost = guided_filter(src=np.abs(tmp - Il), guidance=Il, radius=guide_r, eps=guide_eps)
+            cost = cv2.GaussianBlur(np.abs(tmp - Il), (3,3), 0)
+            # cost = guided_filter(src=np.abs(tmp - Il), guidance=Il, radius=guide_r, eps=guide_eps)
 
             # Write costs
             disp_vol[:,:,d] = cost
-
 
             # Aggregation of costs
             if self.discretize > 0: 
@@ -105,6 +109,7 @@ class StereoVoxels:
                                                               right_thumb.astype(np.float64), 
                                                               self.disp_vox)
 
+            # WTA disparity estimation
             disp2 = np.argmin(self.disp_vox, axis=2).astype(np.float32)
 
             disp_out = cv2.resize(disp2, (W,H), fx=self.discretize, fy=self.discretize, interpolation=cv2.INTER_NEAREST)
@@ -124,7 +129,7 @@ if __name__ == "__main__":
 
     H, W = left.shape[:2]
 
-    DISCRETIZE = 20
+    DISCRETIZE = 8
     SCALE = 1. / DISCRETIZE
 
     calib_params = kitti_stereo_calib_params(scale=1)
