@@ -9,15 +9,15 @@ from scipy.ndimage.filters import gaussian_filter, sobel
 import numpy as np
 cimport numpy as np
 
-cdef int height, width, disp_max
+cdef int height, width, disp_max, disp_scale
 
-cdef int L1 = 34
-cdef int L2 = 17
+cdef int L1 = 1
+cdef int L2 = 3
 cdef int tau1 = 20
 cdef int tau2 = 6
 
-cdef double pi1 = 1.
-cdef double pi2 = 3.
+cdef double pi1 = 3.
+cdef double pi2 = 5.
 cdef int tau_so = 15
 
 cdef int tau_s = 20
@@ -25,12 +25,13 @@ cdef double tau_h = 0.4
 
 cdef int tau_e = 10 
 
-def init(int h, int w, int d):
-    global height, width, disp_max
+def init(int h, int w, int d, int scale):
+    global height, width, disp_max, disp_scale
 
     height = h
     width = w
     disp_max = d
+    disp_scale = scale
 
 # def ad_vol(np.ndarray[np.float64_t, ndim=3] x0, np.ndarray[np.float64_t, ndim=3] x1):
 #     cdef np.ndarray[np.float64_t, ndim=3] res
@@ -159,7 +160,6 @@ def sgm(np.ndarray[np.float64_t, ndim=2] x0,
         np.ndarray[np.float64_t, ndim=2] x1,
         np.ndarray[np.float64_t, ndim=3] vol):
     cdef np.ndarray[np.float64_t, ndim=3] res, v0, v1, v2, v3
-    # cdef np.ndarray[np.float64_t, ndim=3] res, v0
 
     cdef int i, j, d
     cdef double min_curr, min_prev, P1, P2, D1, D2
@@ -171,11 +171,11 @@ def sgm(np.ndarray[np.float64_t, ndim=2] x0,
         for j in range(width):
             min_curr = INFINITY
             for d in range(disp_max):
-                if j - d - 1 < 0:
+                if j - d / disp_scale - 1 < 0:
                     res[i,j,d] = vol[i,j,d]
                 else:
                     D1 = abs(x0[i,j] - x0[i,j-1])
-                    D2 = abs(x1[i,j-d] - x1[i,j-d-1])
+                    D2 = abs(x1[i,j-d/disp_scale] - x1[i,j-d/disp_scale-1])
                     if   D1 <  tau_so and D2 <  tau_so: P1, P2 = pi1,      pi2
                     elif D1 <  tau_so and D2 >= tau_so: P1, P2 = pi1 / 4,  pi2 / 4
                     elif D1 >= tau_so and D2 <  tau_so: P1, P2 = pi1 / 4,  pi2 / 4
@@ -197,11 +197,11 @@ def sgm(np.ndarray[np.float64_t, ndim=2] x0,
         for j in range(width - 1, -1, -1):
             min_curr = INFINITY
             for d in range(disp_max):
-                if j + 1 >= width or j - d < 0:
+                if j + 1 >= width or j - d / disp_scale < 0:
                     res[i,j,d] = vol[i,j,d]
                 else:
                     D1 = abs(x0[i,j] - x0[i,j+1])
-                    D2 = abs(x1[i,j-d] - x1[i,j-d+1])
+                    D2 = abs(x1[i,j-d/disp_scale] - x1[i,j-d/disp_scale+1])
                     if   D1 <  tau_so and D2 <  tau_so: P1, P2 = pi1, pi2
                     elif D1 <  tau_so and D2 >= tau_so: P1, P2 = pi1 / 4., pi2 / 4.
                     elif D1 >= tau_so and D2 <  tau_so: P1, P2 = pi1 / 4., pi2 / 4.
@@ -223,11 +223,11 @@ def sgm(np.ndarray[np.float64_t, ndim=2] x0,
         for i in range(height):
             min_curr = INFINITY
             for d in range(disp_max):
-                if j - d < 0 or i - 1 < 0:
+                if j - d / disp_scale < 0 or i - 1 < 0:
                     res[i,j,d] = vol[i,j,d]
                 else:
                     D1 = abs(x0[i,j] - x0[i-1,j])
-                    D2 = abs(x1[i,j-d] - x1[i-1,j-d])
+                    D2 = abs(x1[i,j-d/disp_scale] - x1[i-1,j-d/disp_scale])
                     if   D1 <  tau_so and D2 <  tau_so: P1, P2 = pi1, pi2
                     elif D1 <  tau_so and D2 >= tau_so: P1, P2 = pi1 / 4, pi2 / 4
                     elif D1 >= tau_so and D2 <  tau_so: P1, P2 = pi1 / 4, pi2 / 4
@@ -249,11 +249,11 @@ def sgm(np.ndarray[np.float64_t, ndim=2] x0,
         for i in range(height - 1, -1, -1):
             min_curr = INFINITY
             for d in range(disp_max):
-                if j - d < 0 or i + 1 >= height:
+                if j - d / disp_scale < 0 or i + 1 >= height:
                     res[i,j,d] = vol[i,j,d]
                 else:
                     D1 = abs(x0[i,j] - x0[i+1,j])
-                    D2 = abs(x1[i,j-d] - x1[i+1,j-d])
+                    D2 = abs(x1[i,j-d/disp_scale] - x1[i+1,j-d/disp_scale])
                     if   D1 <  tau_so and D2 <  tau_so: P1, P2 = pi1, pi2
                     elif D1 <  tau_so and D2 >= tau_so: P1, P2 = pi1 / 4, pi2 / 4
                     elif D1 >= tau_so and D2 <  tau_so: P1, P2 = pi1 / 4, pi2 / 4
@@ -424,22 +424,22 @@ def sgm(np.ndarray[np.float64_t, ndim=2] x0,
 
 #     return d0_res
 
-# def subpixel_enhancement(np.ndarray[np.int_t, ndim=2] d0,
-#                          np.ndarray[np.float64_t, ndim=3] vol):
-#     cdef np.ndarray[np.float64_t, ndim=2] d0_res
-#     cdef int i, j, d
-#     cdef double cn, cz, cp, denom
+def subpixel_enhancement(np.ndarray[np.int_t, ndim=2] d0,
+                         np.ndarray[np.float64_t, ndim=3] vol):
+    cdef np.ndarray[np.float64_t, ndim=2] d0_res
+    cdef int i, j, d
+    cdef double cn, cz, cp, denom
 
-#     d0_res = np.empty((height, width))
-#     for i in range(height):
-#         for j in range(width):
-#             d = d0[i,j]
-#             d0_res[i,j] = d
-#             if 1 <= d < disp_max - 1:
-#                 cn = vol[d-1,i,j]
-#                 cz = vol[d,i,j]
-#                 cp = vol[d+1,i,j]
-#                 denom = 2 * (cp + cn - 2 * cz)
-#                 if denom > 1e-5:
-#                     d0_res[i,j] = d - min(1, max(-1, (cp - cn) / denom))
-#     return d0_res
+    d0_res = np.empty((height, width))
+    for i in range(height):
+        for j in range(width):
+            d = d0[i,j]
+            d0_res[i,j] = d
+            if 1 <= d < disp_max - 1:
+                cn = vol[i,j,d-1]
+                cz = vol[i,j,d]
+                cp = vol[i,j,d+1]
+                denom = 2 * (cp + cn - 2 * cz)
+                if denom > 1e-5:
+                    d0_res[i,j] = d - min(1, max(-1, (cp - cn) / denom))
+    return d0_res
