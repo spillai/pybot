@@ -124,7 +124,7 @@ if __name__ == "__main__":
 
     H, W = left.shape[:2]
 
-    DISCRETIZE = 20
+    DISCRETIZE = 4
     SCALE = 1. / DISCRETIZE
 
     calib_params = kitti_stereo_calib_params(scale=1)
