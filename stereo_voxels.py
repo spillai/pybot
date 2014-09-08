@@ -1,11 +1,18 @@
 import cv2, time
 import numpy as np
 
+import scipy.ndimage.filters as spfilters 
+
+import bot_vision.color_utils as color_utils 
 from bot_vision.imshow_utils import imshow_cv, imshow_plt, bar_plt
-from fs_utils import guided_filter
+
+# from fs_utils import guided_filter
 
 import pyximport; pyximport.install()
-import bot_externals.adcensus_stereo
+pyximport.install(setup_args={"include_dirs":np.get_include()},
+                  reload_support=True)
+
+from bot_externals.adcensus_stereo import init, sgm, subpixel_enhancement
 
 class StereoVoxels: 
     def __init__(self, calib_params, shape=[480,640], resolution=0.2, discretize=10, ndisparities = 128): 
@@ -20,12 +27,18 @@ class StereoVoxels:
         cv2.setMouseCallback("disparity_cb", self._on_mouse)
 
     def _on_mouse(self, event, x, y, flags, param):
+        if event != cv2.EVENT_LBUTTONDOWN:
+            return
         pt = (x, y)
+        # print self._disp[y,x], self.disp_vox[ybin,xbin]
+
         xbin, ybin = self._px_to_bin(x), self._px_to_bin(y)
-        print self._disp[y,x], self.disp_vox[ybin,xbin]
         bar_plt('label_costs', self.disp_vox[ybin,xbin])
+        # bar_plt('intensities_left', self._left[y,x:x+self.ndisparities])
+        # bar_plt('intensities_right', self._right[y,x:x+self.ndisparities])
         
     def compute(self, left, right): 
+        self._left, self._right = left, right
         self._disp = self._stereo_disparity(left, right)
         return self._disp
 
@@ -53,28 +66,32 @@ class StereoVoxels:
         
         # Load floating point images
         H,W = left.shape[:2]
-        Il, Ir = left / 255.0, right / 255.0
+        Il, Ir = (left / 255.0).astype(np.float32), (right / 255.0).astype(np.float32)
 
         # For each disparity
         if self.discretize > 0: 
-            self.disp_vox = np.ones(shape=(self._max_ybin, self._max_xbin, self.ndisparities), dtype=np.float64) * thresh_border
+            self.disp_vox = np.zeros(shape=(self._max_ybin, self._max_xbin, self.ndisparities), dtype=np.float64)
             # self.costs_vox = np.ones(shape=(self._max_ybin, self._max_xbin, 
             #                                 self.discretize, self.discretize, 
                                             # self.ndisparities)) * thresh_border
             # print self.costs_vox.shape
-        disp_vol = np.ones(shape=(H, W, self.ndisparities)) * thresh_border
+
+        st = time.time()
+        disp_vol = np.zeros(shape=(H, W, self.ndisparities)) * thresh_border
         for d in range(self.ndisparities): 
 
             # Truncated SAD 
-            tmp = np.ones(shape=(H,W)) * thresh_border
+            tmp = np.zeros(shape=(H,W), dtype=np.float32) * thresh_border
             tmp[:,d:W] = Ir[:,:W-d]
             # cost = np.abs(tmp - Il)
             # cost = cv2.GaussianBlur(np.abs(tmp - Il), (3,3), 0)
-            cost = guided_filter(src=np.abs(tmp - Il), guidance=Il, radius=guide_r, eps=guide_eps)
+            # cost = cv2.medianBlur(np.abs(tmp - Il), 5)
+            cost = cv2.bilateralFilter(np.abs(tmp - Il), 5, 5*2, 5/2)
+            # cost = guided_filter(src=np.abs(tmp - Il), guidance=Il, radius=guide_r, eps=guide_eps)
 
             # Write costs
             disp_vol[:,:,d] = cost
-
+            disp_vol[:,:self.ndisparities,d] = 0
 
             # Aggregation of costs
             if self.discretize > 0: 
@@ -86,29 +103,56 @@ class StereoVoxels:
 
                 # Write back to bins
                 self.disp_vox[ybin,xbin,d] = id_costs
+                self.disp_vox[:,:self.ndisparities/self.discretize,d] = 0
 
-                
-
+        print 'Time taken for disp range %4.3f ms' % ((time.time() - st) * 1e3)
+               
+        # # Zero out negative disparities
+        # disp_vol[:,:self.ndisparities,:] = 0
+        # self.disp_vox[:,:self.ndisparities/self.discretize,:] = 0
             
         # Disparity image (WTA)
         disp = np.argmin(disp_vol, axis=2)
+
+        # Subpixel refinement
+        disp = subpixel_enhancement(disp, self.disp_vox)
+
 
         # Compute voxel-mapped stereo
         if self.discretize > 0: 
 
             # SGM
+            st = time.time()
             h_, w_, d_ = self.disp_vox.shape[:3]
             left_thumb = cv2.resize(left, (w_,h_))    
-            right_thumb = cv2.resize(left, (w_,h_))
-            bot_externals.adcensus_stereo.init(h_, w_, d_)
-            self.disp_vox = bot_externals.adcensus_stereo.sgm(left_thumb.astype(np.float64), 
-                                                              right_thumb.astype(np.float64), 
-                                                              self.disp_vox)
+            right_thumb = cv2.resize(right, (w_,h_))
+            init(h_, w_, d_, self.discretize)
+            self.disp_vox = sgm(left_thumb.astype(np.float64), 
+                                right_thumb.astype(np.float64), 
+                                self.disp_vox)
+            print 'Time taken for sgm %4.3f ms' % ((time.time() - st) * 1e3)
+            
+            # 3-D Median filter
+            # self.disp_vox = spfilters.median_filter(self.disp_vox, size=3)
 
-            disp2 = np.argmin(self.disp_vox, axis=2).astype(np.float32)
+            imshow_cv("test_disp", self.disp_vox[:,:,5])
 
-            disp_out = cv2.resize(disp2, (W,H), fx=self.discretize, fy=self.discretize, interpolation=cv2.INTER_NEAREST)
-            imshow_cv("disparity_cb", disp_out.astype(np.float32) / 128)
+            # WTA disparity estimation
+            disp2 = np.argmin(self.disp_vox, axis=2)# .astype(np.float32)
+
+            # Subpixel refinement
+            disp2 = subpixel_enhancement(disp2, self.disp_vox)
+
+            # Re-scale disparity image
+            disp_out = cv2.resize(disp2.astype(np.float32), (W,H), 
+                                  fx=self.discretize, 
+                                  fy=self.discretize, 
+                                  interpolation=cv2.INTER_NEAREST)
+
+            
+            imshow_cv("disparity_cb", 
+                      color_utils.colormap(disp_out.astype(np.float32) / 128))
+            
             return disp_out.astype(np.float32) / 128
 
         return disp.astype(np.float32) / 128
@@ -121,6 +165,9 @@ if __name__ == "__main__":
 
     left = cv2.imread(os.path.expanduser('~/data/dataset/sequences/08/image_0/000000.png'), 0)
     right = cv2.imread(os.path.expanduser('~/data/dataset/sequences/08/image_1/000000.png'), 0)
+
+    # left = cv2.resize(left, None, fx=0.5, fy=0.5, interpolation=cv2.INTER_AREA)    
+    # right = cv2.resize(right, None, fx=0.5, fy=0.5, interpolation=cv2.INTER_AREA)    
 
     H, W = left.shape[:2]
 
