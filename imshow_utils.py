@@ -1,9 +1,10 @@
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
+from collections import OrderedDict
 
 global figures
-figures = {}
+figures = OrderedDict()
 
 def imshow_plt(label, im, block=True):
     global figures
@@ -19,11 +20,14 @@ def imshow_plt(label, im, block=True):
 
 def bar_plt(label, ys, block=False):
     global figures
-    if label not in figures: 
+    if label not in figures:
         figures[label] = plt.bar(np.arange(len(ys)), ys, align='center')
+        plt.title(label)
         # plt.tight_layout()
         # plt.axis('off')
-        
+
+    inds, = np.where([key == label for key in figures.keys()])
+    plt.figure(inds[0] + 1)
     for rect, y in zip(figures[label], ys): 
         rect.set_height(y)
 
