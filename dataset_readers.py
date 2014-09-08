@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 import os, fnmatch, time
 
-from fs_utils import read_velodyne_pc
+from itertools import izip, imap
 from collections import defaultdict, namedtuple
 
 def read_dir(directory, pattern, recursive=True): 
@@ -64,6 +64,11 @@ class DatasetReader:
 
 class VelodyneDatasetReader(DatasetReader): 
     def __init__(self, **kwargs): 
+        try: 
+            from fs_utils import read_velodyne_pc
+        except: 
+            raise RuntimeError('read_velodyne_pc missing in fs_utils. Compile it first!')
+
         if 'process_cb' in kwargs: 
             raise RuntimeError('VelodyneDatasetReader does not support defining a process_cb')
         DatasetReader.__init__(self, process_cb=lambda fn: read_velodyne_pc(fn), **kwargs)
@@ -80,7 +85,6 @@ class ImageDatasetReader(DatasetReader):
         DatasetReader.__init__(self, process_cb=lambda fn: cv2.imread(fn, -1), **kwargs)
         # self.iterframes = self.iteritems
 
-from itertools import izip, imap
 class KITTIStereoDatasetReader: 
     def __init__(self, directory='', 
                  left_template='image_0/%06i.png', 
