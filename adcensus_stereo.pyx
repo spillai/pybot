@@ -169,8 +169,8 @@ def sgm(np.ndarray[np.float64_t, ndim=2] x0,
     cdef double min_curr, min_prev, P1, P2, D1, D2
     
     # left-right
-    res = np.empty_like(vol)
     min_prev = 0
+    res = np.empty_like(vol)
     for i in range(height):
         for j in range(width):
             min_curr = INFINITY
@@ -196,6 +196,7 @@ def sgm(np.ndarray[np.float64_t, ndim=2] x0,
     v0 = res
 
     # right-left
+    min_prev = 0
     res = np.empty_like(vol)
     for i in range(height):
         for j in range(width - 1, -1, -1):
@@ -222,6 +223,7 @@ def sgm(np.ndarray[np.float64_t, ndim=2] x0,
     v1 = res
 
     # up-down
+    min_prev = 0
     res = np.empty_like(vol)
     for j in range(width):
         for i in range(height):
@@ -248,6 +250,7 @@ def sgm(np.ndarray[np.float64_t, ndim=2] x0,
     v2 = res
 
     # down-up
+    min_prev = 0
     res = np.empty_like(vol)
     for j in range(width):
         for i in range(height - 1, -1, -1):
