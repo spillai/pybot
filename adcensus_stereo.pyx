@@ -9,21 +9,23 @@ from scipy.ndimage.filters import gaussian_filter, sobel
 import numpy as np
 cimport numpy as np
 
-cdef int height, width, disp_max, disp_scale
+cdef int height, width, disp_scale
+cdef int disp_max = 64
 
 cdef int L1 = 1
 cdef int L2 = 3
 cdef int tau1 = 20
 cdef int tau2 = 6
 
-cdef double pi1 = 3.
-cdef double pi2 = 5.
+cdef double pi1 = 1.
+cdef double pi2 = 3.
 cdef int tau_so = 15
 
 cdef int tau_s = 20
 cdef double tau_h = 0.4
 
 cdef int tau_e = 10 
+
 
 def init(int h, int w, int d, int scale):
     global height, width, disp_max, disp_scale
@@ -33,21 +35,23 @@ def init(int h, int w, int d, int scale):
     disp_max = d
     disp_scale = scale
 
-# def ad_vol(np.ndarray[np.float64_t, ndim=3] x0, np.ndarray[np.float64_t, ndim=3] x1):
-#     cdef np.ndarray[np.float64_t, ndim=3] res
-#     cdef int d, i, j, c
+def ad_vol(np.ndarray[np.float32_t, ndim=2] x0, np.ndarray[np.float32_t, ndim=2] x1):
+    cdef np.ndarray[np.float64_t, ndim=3] res
+    cdef int d, i, j, c
 
-#     res = np.zeros((disp_max, height, width))
-#     for d in range(disp_max):
-#         for i in range(height):
-#             for j in range(width):
-#                 if j - d < 0:
-#                     res[d,i,j] = INFINITY
-#                 else:
-#                     for c in range(3):
-#                         res[d,i,j] += abs(x0[i,j,c] - x1[i,j-d,c])
-#                     res[d,i,j] /= 3
-#     return res
+    H = x0.shape[0]
+    W = x0.shape[1]
+    print H, W
+    res = np.zeros((H, W, disp_max))
+    for d in range(disp_max):
+        for i in range(H):
+            for j in range(W):
+                if j - d < 0:
+                    res[i,j,d] = INFINITY
+                else:
+                    res[i,j,d] += abs(x0[i,j] - x1[i,j-d])
+                    res[i,j,d] /= 3
+    return res
 
 # def census_transform(np.ndarray[np.float64_t, ndim=3] x):
 #     cdef np.ndarray[np.int_t, ndim=3] cen
@@ -388,41 +392,41 @@ def sgm(np.ndarray[np.float64_t, ndim=2] x0,
 #                 d0_res[i,j] = min_d
 #     return d0_res
 
-# def depth_discontinuity_adjustment(np.ndarray[np.int_t, ndim=2] d0,
-#                                    np.ndarray[np.float64_t, ndim=3] vol):
-#     cdef np.ndarray[np.int_t, ndim=2] d0_res, d0s
-#     cdef int i, j, d
+def depth_discontinuity_adjustment(np.ndarray[np.int_t, ndim=2] d0,
+                                   np.ndarray[np.float64_t, ndim=3] vol):
+    cdef np.ndarray[np.int_t, ndim=2] d0_res, d0s
+    cdef int i, j, d
 
-#     # horizontal
-#     d0_res = np.empty_like(d0)
-#     d0s = sobel(d0, 0)
-#     for i in range(height):
-#         for j in range(width):
-#             d0_res[i,j] = d0[i,j]
-#             if d0s[i,j] > tau_e and 1 <= j < width - 1:
-#                 d = d0[i,j]
-#                 if vol[d0[i,j-1],i,j] < vol[d,i,j]:
-#                     d = d0[i,j-1]
-#                 if vol[d0[i,j+1],i,j] < vol[d,i,j]:
-#                     d = d0[i,j+1]
-#                 d0_res[i,j]= d
+    # horizontal
+    d0_res = np.empty_like(d0)
+    d0s = sobel(d0, 0)
+    for i in range(height):
+        for j in range(width):
+            d0_res[i,j] = d0[i,j]
+            if d0s[i,j] > tau_e and 1 <= j < width - 1:
+                d = d0[i,j]
+                if vol[i,j,d0[i,j-1]] < vol[i,j,d]:
+                    d = d0[i,j-1]
+                if vol[i,j,d0[i,j+1]] < vol[i,j,d]:
+                    d = d0[i,j+1]
+                d0_res[i,j]= d
 
-#     # vertical
-#     d0 = d0_res
-#     d0_res = np.empty_like(d0)
-#     d0s = sobel(d0, 1)
-#     for i in range(height):
-#         for j in range(width):
-#             d0_res[i,j] = d0[i,j]
-#             if d0s[i,j] > tau_e and 1 <= i < height - 1:
-#                 d = d0[i,j]
-#                 if vol[d0[i-1,j],i,j] < vol[d,i,j]:
-#                     d = d0[i-1,j]
-#                 if vol[d0[i+1,j],i,j] < vol[d,i,j]:
-#                     d = d0[i+1,j]
-#                 d0_res[i,j]= d
+    # vertical
+    d0 = d0_res
+    d0_res = np.empty_like(d0)
+    d0s = sobel(d0, 1)
+    for i in range(height):
+        for j in range(width):
+            d0_res[i,j] = d0[i,j]
+            if d0s[i,j] > tau_e and 1 <= i < height - 1:
+                d = d0[i,j]
+                if vol[i,j,d0[i-1,j]] < vol[i,j,d]:
+                    d = d0[i-1,j]
+                if vol[i,j,d0[i+1,j]] < vol[i,j,d]:
+                    d = d0[i+1,j]
+                d0_res[i,j]= d
 
-#     return d0_res
+    return d0_res
 
 def subpixel_enhancement(np.ndarray[np.int_t, ndim=2] d0,
                          np.ndarray[np.float64_t, ndim=3] vol):
