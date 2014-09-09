@@ -81,8 +81,8 @@ class StereoVoxels:
         # ================================================================
         st = time.time()
         # disp = cv2.StereoBM(cv2.STEREO_BM_PREFILTER_XSOBEL, 64, 11).compute(left, right) / 16.0
-        cost = StereoBMCustom(discretize=1, preset=cv2.STEREO_BM_BASIC_PRESET, 
-                              ndisparities=64, SAD_window_size=21).process(left, right)
+        cost = StereoBMCustom(discretize=8, preset=cv2.STEREO_BM_BASIC_PRESET, 
+                              ndisparities=64, SAD_window_size=5).process(left, right)
         # disp_vol = CostVolumeStereo(discretize=1, 
         #                             cost_volume_filtering='',
         #                             gamma=1.0, guide_r=5, guide_eps=0.0001,
@@ -90,11 +90,11 @@ class StereoVoxels:
         #                             median_post_processing=False, 
         #                             interpolate_disparities=True).compute(Il, Ir)
 
-        # disp = np.argmin(cost, axis=2)
+        disp = np.argmin(cost, axis=2)
         print 'Time taken for costvolume disp range %4.3f ms' % ((time.time() - st) * 1e3)
         # print cost.shape
-        imshow_cv("test_disp", cost[:,:,20] / (128 * 255))
-        cv2.waitKey(0)
+        # imshow_cv("test_disp", cost[:,:,20] / (128 * 255))
+        # cv2.waitKey(0)
 
         
         # ================================================================
