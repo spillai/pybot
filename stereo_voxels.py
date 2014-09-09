@@ -6,13 +6,15 @@ import scipy.ndimage.filters as spfilters
 import bot_vision.color_utils as color_utils 
 from bot_vision.imshow_utils import imshow_cv, imshow_plt, bar_plt
 
-# from fs_utils import guided_filter
+from bot_vision.stereo_utils import StereoBM
+from fs_utils import guided_filter, cSGM, CostVolumeStereo, StereoBMCustom
 
 import pyximport; pyximport.install()
 pyximport.install(setup_args={"include_dirs":np.get_include()},
                   reload_support=True)
 
-from bot_externals.adcensus_stereo import init, sgm, subpixel_enhancement
+from bot_externals.adcensus_stereo import init, ad_vol, sgm, \
+    depth_discontinuity_adjustment, subpixel_enhancement
 
 class StereoVoxels: 
     def __init__(self, calib_params, shape=[480,640], resolution=0.2, discretize=10, ndisparities = 128): 
@@ -76,84 +78,124 @@ class StereoVoxels:
                                             # self.ndisparities)) * thresh_border
             # print self.costs_vox.shape
 
+        # ================================================================
         st = time.time()
-        disp_vol = np.zeros(shape=(H, W, self.ndisparities)) * thresh_border
-        for d in range(self.ndisparities): 
+        # disp = cv2.StereoBM(cv2.STEREO_BM_PREFILTER_XSOBEL, 64, 11).compute(left, right) / 16.0
+        cost = StereoBMCustom(discretize=1, preset=cv2.STEREO_BM_BASIC_PRESET, 
+                              ndisparities=64, SAD_window_size=21).process(left, right)
+        # disp_vol = CostVolumeStereo(discretize=1, 
+        #                             cost_volume_filtering='',
+        #                             gamma=1.0, guide_r=5, guide_eps=0.0001,
+        #                             SAD_window_size=1, 
+        #                             median_post_processing=False, 
+        #                             interpolate_disparities=True).compute(Il, Ir)
 
-            # Truncated SAD 
-            tmp = np.zeros(shape=(H,W), dtype=np.float32) * thresh_border
-            tmp[:,d:W] = Ir[:,:W-d]
-            # cost = np.abs(tmp - Il)
-            # cost = cv2.GaussianBlur(np.abs(tmp - Il), (3,3), 0)
-            # cost = cv2.medianBlur(np.abs(tmp - Il), 5)
-            cost = cv2.bilateralFilter(np.abs(tmp - Il), 5, 5*2, 5/2)
-            # cost = guided_filter(src=np.abs(tmp - Il), guidance=Il, radius=guide_r, eps=guide_eps)
+        # disp = np.argmin(cost, axis=2)
+        print 'Time taken for costvolume disp range %4.3f ms' % ((time.time() - st) * 1e3)
+        # print cost.shape
+        imshow_cv("test_disp", cost[:,:,20] / (128 * 255))
+        cv2.waitKey(0)
 
-            # Write costs
-            disp_vol[:,:,d] = cost
-            disp_vol[:,:self.ndisparities,d] = 0
+        
+        # ================================================================
+        st = time.time()
+        # disp_vol = np.zeros(shape=(H, W, self.ndisparities)) * thresh_border
 
-            # Aggregation of costs
-            if self.discretize > 0: 
-                
-                # Option A. Sum the costs for each bin
-                ids = np.unique(self._xyids.reshape(-1))
-                id_costs = np.bincount(self._xyids.reshape(-1), weights=cost.reshape(-1))
-                xbin, ybin = self._ids_to_bin(ids, step=self._max_xbin)
+        # # Pre-process mapping
+        # ids = np.unique(self._xyids.reshape(-1))
+        # xbin, ybin = self._ids_to_bin(ids, step=self._max_xbin)
 
-                # Write back to bins
-                self.disp_vox[ybin,xbin,d] = id_costs
-                self.disp_vox[:,:self.ndisparities/self.discretize,d] = 0
+        # for d in range(self.ndisparities): 
 
-        print 'Time taken for disp range %4.3f ms' % ((time.time() - st) * 1e3)
+        #     # Truncated SAD 
+        #     tmp = np.zeros(shape=(H,W), dtype=np.float32) * thresh_border
+        #     tmp[:,d:W] = Ir[:,:W-d]
+        #     cost = np.abs(tmp - Il)
+        #     # cost = cv2.GaussianBlur(np.abs(tmp - Il), (3,3), 0)
+        #     # cost = cv2.medianBlur(np.abs(tmp - Il), 5)
+        #     cost = cv2.bilateralFilter(np.abs(tmp - Il), 5, 5*2, 5/2)
+        #     # cost = guided_filter(src=np.abs(tmp - Il), guidance=Il, radius=guide_r, eps=guide_eps)
+
+        #     # Write costs
+        #     disp_vol[:,:,d] = cost
+        #     disp_vol[:,:self.ndisparities,d] = 0
+
+        #     # Aggregation of costs
+        #     if self.discretize >= 1: 
+
+        #         # Option A. Sum the costs for each bin
+        #         id_costs = np.bincount(self._xyids.reshape(-1), weights=cost.reshape(-1))
+        #         self.disp_vox[ybin,xbin,d] = id_costs
+        #         self.disp_vox[:,:self.ndisparities/self.discretize,d] = 0
+
+        # print 'Time taken for disp range %4.3f ms' % ((time.time() - st) * 1e3)
                
         # # Zero out negative disparities
         # disp_vol[:,:self.ndisparities,:] = 0
         # self.disp_vox[:,:self.ndisparities/self.discretize,:] = 0
             
         # Disparity image (WTA)
-        disp = np.argmin(disp_vol, axis=2)
+        # disp = np.argmin(disp_vol, axis=2)
+
+        # Depth discontinuity adjustment
+        # disp = depth_discontinuity_adjustment(disp, self.disp_vox)
 
         # Subpixel refinement
-        disp = subpixel_enhancement(disp, self.disp_vox)
+        # disp = subpixel_enhancement(disp, self.disp_vox)
 
 
-        # Compute voxel-mapped stereo
-        if self.discretize > 0: 
+        # Re-scale disparity image
+        disp_out = cv2.resize(disp.astype(np.float32), (W,H), 
+                              fx=self.discretize, 
+                              fy=self.discretize, 
+                              interpolation=cv2.INTER_NEAREST)
 
-            # SGM
-            st = time.time()
-            h_, w_, d_ = self.disp_vox.shape[:3]
-            left_thumb = cv2.resize(left, (w_,h_))    
-            right_thumb = cv2.resize(right, (w_,h_))
-            init(h_, w_, d_, self.discretize)
-            self.disp_vox = sgm(left_thumb.astype(np.float64), 
-                                right_thumb.astype(np.float64), 
-                                self.disp_vox)
-            print 'Time taken for sgm %4.3f ms' % ((time.time() - st) * 1e3)
+
+        # # ================================================================
+        # # Compute voxel-mapped stereo
+        # if self.discretize >= 1: 
+
+        #     # SGM
+        #     st = time.time()
+        #     h_, w_, d_ = self.disp_vox.shape[:3]
+        #     left_thumb = cv2.resize(left, (w_,h_))    
+        #     right_thumb = cv2.resize(right, (w_,h_))
+        #     init(h_, w_, d_, self.discretize)
+
+        #     print 'Before: ', self.disp_vox.shape
+        #     self.disp_vox = cSGM(left_thumb.astype(np.float64), 
+        #                         right_thumb.astype(np.float64), 
+        #                          self.disp_vox, self.discretize)
+        #     print 'Time taken for sgm %4.3f ms' % ((time.time() - st) * 1e3)
             
-            # 3-D Median filter
-            # self.disp_vox = spfilters.median_filter(self.disp_vox, size=3)
+        #     # 3-D Median filter
+        #     # self.disp_vox = spfilters.median_filter(self.disp_vox, size=3)
+        #     print self.disp_vox.shape
+        #     imshow_cv("test_disp", self.disp_vox[:,:,5])
 
-            imshow_cv("test_disp", self.disp_vox[:,:,5])
+        #     # WTA disparity estimation
+        #     disp2 = np.argmin(self.disp_vox, axis=2)
 
-            # WTA disparity estimation
-            disp2 = np.argmin(self.disp_vox, axis=2)# .astype(np.float32)
+        #     # # Depth discontinuity adjustment
+        #     # disp2 = depth_discontinuity_adjustment(disp2, self.disp_vox)
 
-            # Subpixel refinement
-            disp2 = subpixel_enhancement(disp2, self.disp_vox)
+        #     # Subpixel refinement
+        #     # disp2 = subpixel_enhancement(disp2, self.disp_vox)
 
-            # Re-scale disparity image
-            disp_out = cv2.resize(disp2.astype(np.float32), (W,H), 
-                                  fx=self.discretize, 
-                                  fy=self.discretize, 
-                                  interpolation=cv2.INTER_NEAREST)
+        #     # Re-scale disparity image
+        #     disp_out = cv2.resize(disp2.astype(np.float32), (W,H), 
+        #                           fx=self.discretize, 
+        #                           fy=self.discretize, 
+        #                           interpolation=cv2.INTER_NEAREST)
 
             
-            imshow_cv("disparity_cb", 
-                      color_utils.colormap(disp_out.astype(np.float32) / 128))
+        #     imshow_cv("disparity_cb", 
+        #               color_utils.colormap(disp_out.astype(np.float32) / 128))
             
-            return disp_out.astype(np.float32) / 128
+        #     return disp_out.astype(np.float32) / 128
+
+        imshow_cv("disparity_cb", 
+                  color_utils.colormap(disp_out.astype(np.float32) / 128))
 
         return disp.astype(np.float32) / 128
             
@@ -171,7 +213,7 @@ if __name__ == "__main__":
 
     H, W = left.shape[:2]
 
-    DISCRETIZE = 4
+    DISCRETIZE = 8
     SCALE = 1. / DISCRETIZE
 
     calib_params = kitti_stereo_calib_params(scale=1)
