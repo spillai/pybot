@@ -7,7 +7,7 @@ import bot_vision.color_utils as color_utils
 from bot_vision.imshow_utils import imshow_cv, imshow_plt, bar_plt
 
 from bot_vision.stereo_utils import StereoBM
-from fs_utils import guided_filter, cSGM, CostVolumeStereo, StereoBMCustom
+from fs_utils import guided_filter, CostVolumeStereo, StereoBMCustom
 
 import pyximport; pyximport.install()
 pyximport.install(setup_args={"include_dirs":np.get_include()},
@@ -81,8 +81,13 @@ class StereoVoxels:
         # ================================================================
         st = time.time()
         # disp = cv2.StereoBM(cv2.STEREO_BM_PREFILTER_XSOBEL, 64, 11).compute(left, right) / 16.0
-        cost = StereoBMCustom(discretize=8, preset=cv2.STEREO_BM_BASIC_PRESET, 
-                              ndisparities=64, SAD_window_size=5).process(left, right)
+        self.disp_vox = StereoBMCustom(discretize=self.discretize, 
+                                       preset=cv2.STEREO_BM_BASIC_PRESET, 
+                                       ndisparities=64, 
+                                       SAD_window_size=11).process(left, right) / (11 * 11 * self.discretize * self.discretize)
+
+        # self.disp_vox[self.disp_vox > 1000] = 1000
+
         # disp_vol = CostVolumeStereo(discretize=1, 
         #                             cost_volume_filtering='',
         #                             gamma=1.0, guide_r=5, guide_eps=0.0001,
@@ -90,7 +95,7 @@ class StereoVoxels:
         #                             median_post_processing=False, 
         #                             interpolate_disparities=True).compute(Il, Ir)
 
-        disp = np.argmin(cost, axis=2)
+        disp = np.argmin(self.disp_vox, axis=2)
         print 'Time taken for costvolume disp range %4.3f ms' % ((time.time() - st) * 1e3)
         # print cost.shape
         # imshow_cv("test_disp", cost[:,:,20] / (128 * 255))
@@ -151,48 +156,45 @@ class StereoVoxels:
                               interpolation=cv2.INTER_NEAREST)
 
 
-        # # ================================================================
-        # # Compute voxel-mapped stereo
-        # if self.discretize >= 1: 
+        # ================================================================
+        # Compute voxel-mapped stereo
+        if False: # self.discretize >= 1: 
 
-        #     # SGM
-        #     st = time.time()
-        #     h_, w_, d_ = self.disp_vox.shape[:3]
-        #     left_thumb = cv2.resize(left, (w_,h_))    
-        #     right_thumb = cv2.resize(right, (w_,h_))
-        #     init(h_, w_, d_, self.discretize)
+            # SGM
+            st = time.time()
+            h_, w_, d_ = self.disp_vox.shape[:3]
+            left_thumb = cv2.resize(left, (w_,h_))    
+            right_thumb = cv2.resize(right, (w_,h_))
+            # init(h_, w_, d_, self.discretize)
 
-        #     print 'Before: ', self.disp_vox.shape
-        #     self.disp_vox = cSGM(left_thumb.astype(np.float64), 
-        #                         right_thumb.astype(np.float64), 
-        #                          self.disp_vox, self.discretize)
-        #     print 'Time taken for sgm %4.3f ms' % ((time.time() - st) * 1e3)
+            print 'Before: ', self.disp_vox.shape
+            self.disp_vox = cSGM(left_thumb, right_thumb, self.disp_vox.astype(np.float64), self.discretize)
+            print 'Time taken for sgm %4.3f ms' % ((time.time() - st) * 1e3)
             
-        #     # 3-D Median filter
-        #     # self.disp_vox = spfilters.median_filter(self.disp_vox, size=3)
-        #     print self.disp_vox.shape
-        #     imshow_cv("test_disp", self.disp_vox[:,:,5])
+            # 3-D Median filter
+            # self.disp_vox = spfilters.median_filter(self.disp_vox, size=3)
+            # imshow_cv("test_disp", self.disp_vox[:,:,5])
 
-        #     # WTA disparity estimation
-        #     disp2 = np.argmin(self.disp_vox, axis=2)
+            # WTA disparity estimation
+            disp2 = np.argmin(self.disp_vox, axis=2)
 
-        #     # # Depth discontinuity adjustment
-        #     # disp2 = depth_discontinuity_adjustment(disp2, self.disp_vox)
+            # # Depth discontinuity adjustment
+            # disp2 = depth_discontinuity_adjustment(disp2, self.disp_vox)
 
-        #     # Subpixel refinement
-        #     # disp2 = subpixel_enhancement(disp2, self.disp_vox)
+            # Subpixel refinement
+            # disp2 = subpixel_enhancement(disp2, self.disp_vox)
 
-        #     # Re-scale disparity image
-        #     disp_out = cv2.resize(disp2.astype(np.float32), (W,H), 
-        #                           fx=self.discretize, 
-        #                           fy=self.discretize, 
-        #                           interpolation=cv2.INTER_NEAREST)
+            # Re-scale disparity image
+            disp_out = cv2.resize(disp2.astype(np.float32), (W,H), 
+                                  fx=self.discretize, 
+                                  fy=self.discretize, 
+                                  interpolation=cv2.INTER_NEAREST)
 
             
-        #     imshow_cv("disparity_cb", 
-        #               color_utils.colormap(disp_out.astype(np.float32) / 128))
+            imshow_cv("disparity_cb", 
+                      color_utils.colormap(disp_out.astype(np.float32) / 128))
             
-        #     return disp_out.astype(np.float32) / 128
+            return disp_out.astype(np.float32) / 128
 
         imshow_cv("disparity_cb", 
                   color_utils.colormap(disp_out.astype(np.float32) / 128))
@@ -213,7 +215,7 @@ if __name__ == "__main__":
 
     H, W = left.shape[:2]
 
-    DISCRETIZE = 8
+    DISCRETIZE = 2
     SCALE = 1. / DISCRETIZE
 
     calib_params = kitti_stereo_calib_params(scale=1)

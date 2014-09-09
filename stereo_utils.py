@@ -2,9 +2,8 @@ import cv2, time
 import numpy as np
 from collections import deque
 
-from fs_utils import StereoELAS# , OrderedCostVolumeStereo
+from fs_utils import StereoELAS, StereoBMCustom# , OrderedCostVolumeStereo
 # from fs_utils import fast_cost_volume_filtering, ordered_row_disparity
-
 from bot_vision.imshow_utils import imshow_cv
 
 class StereoSGBM: 
@@ -51,6 +50,27 @@ class StereoBM:
 
     def compute(self, left, right): 
         return self.bm.compute(left, right).astype(np.float32) / 16.0
+
+class StereoBMDiscretized: 
+    def __init__(self, discretize=1): 
+        self.discretize = discretize
+
+        # Initilize stereo block matching
+        self.bm = StereoBMCustom(discretize=discretize, preset=cv2.STEREO_BM_BASIC_PRESET, 
+                                 ndisparities=64, SAD_window_size=3)
+
+    def compute(self, left, right): 
+        cost = (self.bm.process(left, right)).astype(np.float32) # / 16.0
+        disp = np.argmin(cost, axis=2)
+
+        # Re-scale disparity image
+        disp_out = cv2.resize(disp.astype(np.float32), (left.shape[1],left.shape[0]), 
+                              fx=self.discretize, 
+                              fy=self.discretize, 
+                              interpolation=cv2.INTER_NEAREST)
+
+        return disp_out
+
 
 # ================================
 # Ordered stereo disparity matching
