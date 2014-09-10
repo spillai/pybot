@@ -61,7 +61,10 @@ class StereoBMDiscretized:
 
     def compute(self, left, right): 
         cost = (self.bm.process(left, right)).astype(np.float32) # / 16.0
-        disp = np.argmin(cost, axis=2)
+        disp = np.argmin(cost, axis=2).astype(np.float32)
+
+        disp = cv2.medianBlur(disp, 3)
+        # disp = cv2.bilateralFilter(disp, 5, 5*2, 5/2)
 
         # Re-scale disparity image
         disp_out = cv2.resize(disp.astype(np.float32), (left.shape[1],left.shape[0]), 
