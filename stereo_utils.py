@@ -56,12 +56,14 @@ class StereoBMDiscretized:
         self.discretize = discretize
 
         # Initilize stereo block matching
-        self.bm = StereoBMCustom(discretize=discretize, preset=cv2.STEREO_BM_BASIC_PRESET, 
+        self.bm = StereoBMCustom(discretize=discretize, 
+                                 cost_method=0,
+                                 preset=cv2.STEREO_BM_BASIC_PRESET, 
                                  ndisparities=64, SAD_window_size=3)
 
     def compute(self, left, right): 
-        cost = (self.bm.process(left, right)).astype(np.float32) # / 16.0
-        disp = np.argmin(cost, axis=2).astype(np.float32)
+        disp = (self.bm.process(left, right)).astype(np.float32)
+        # disp = np.argmin(cost, axis=2).astype(np.float32)
 
         disp = cv2.medianBlur(disp, 3)
         # disp = cv2.bilateralFilter(disp, 5, 5*2, 5/2)
