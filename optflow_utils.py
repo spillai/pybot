@@ -1,6 +1,25 @@
 import cv2
 import numpy as np
 
+def dense_optical_flow(im1, im2, pyr_scale=0.5, levels=3, winsize=15, iterations=5, poly_n=1.2, poly_sigma=0): 
+    return cv2.calcOpticalFlowFarneback(im1, im2, pyr_scale, levels, winsize, iterations, poly_n, poly_sigma)
+
+def sparse_optical_flow(im1, im2, pts, fb_threshold=0, 
+                        window_size=15, max_level=2, 
+                        criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.03)): 
+    p1, st, err = cv2.calcOpticalFlowPyrLK(im1, im2, pts, None, 
+                                           winSize=(window_size, window_size), 
+                                           maxLevel=max_level, criteria=criteria )
+
+    # if fb_threshold > 0:     
+    #     p0r, st, err = cv2.calcOpticalFlowPyrLK(im2, im1, p1, None, 
+    #                                        winSize=(window_size, window_size), 
+    #                                        maxLevel=max_level, criteria=criteria)
+    #     d = abs(p0-p0r).reshape(-1, 2).max(-1)
+    #     good = d < fb_threshold
+
+    return p1, st, err
+
 def draw_flow(img, flow, step=16):
     h, w = img.shape[:2]
     y, x = np.mgrid[step/2:h:step, step/2:w:step].reshape(2,-1)
