@@ -3,7 +3,7 @@ This implements a templated estimator/filter factory design pattern for rapid
 filter instantiation and chaining
 """
 # Author: Sudeep Pillai
-# Licence: BSD
+# Licence: TODO
 
 def make_estimator(**kwargs): 
     # Extract the transform and fit callbacks for the estimator
