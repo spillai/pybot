@@ -1,18 +1,11 @@
-import cv2
-import numpy as np
-from sklearn.pipeline import Pipeline, FeatureUnion
-from sklearn.base import BaseEstimator, TransformerMixin
-
-import bot_vision.image_utils as image_utils
-import bot_vision.stereo_utils as stereo_utils
-# def make_base_estimator(**kwargs):
-#     name = kwargs.pop('name', None)
-#     if not isinstance(name, str): 
-#         raise AttributeError('make_estimator requires name to be set!')
-#     return type(name, (BaseEstimator,), dict(**kwargs))
+"""
+This implements a templated estimator/filter factory design pattern for rapid 
+filter instantiation and chaining
+"""
+# Author: Sudeep Pillai
+# Licence: BSD
 
 def make_estimator(**kwargs): 
-
     # Extract the transform and fit callbacks for the estimator
     transform_cb = kwargs.pop('transform_cb', None)
     fit_cb = kwargs.pop('fit_cb', None)
@@ -46,15 +39,29 @@ def make_estimator(**kwargs):
     return TemplatedEstimator
 
 
-def ImageResizeFilter(**kwargs): 
-    return make_estimator(name='ImageResizeFilter', transform_cb=image_utils.im_resize, **kwargs)()
+# def make_base_estimator(**kwargs):
+#     name = kwargs.pop('name', None)
+#     if not isinstance(name, str): 
+#         raise AttributeError('make_estimator requires name to be set!')
+#     return type(name, (BaseEstimator,), dict(**kwargs))
 
-def SGBMFilter(**kwargs): 
-    return make_estimator(name='SGBMFilter', transform_cb=stereo_utils.StereoSGBM().compute, **kwargs)()
 
 if __name__ == "__main__": 
 
-    import os
+    import os, cv2
+    import cv2
+    import numpy as np
+    from sklearn.pipeline import Pipeline, FeatureUnion
+
+    import bot_vision.image_utils as image_utils
+    import bot_vision.stereo_utils as stereo_utils
+
+
+    def ImageResizeFilter(**kwargs): 
+        return make_estimator(name='ImageResizeFilter', transform_cb=image_utils.im_resize, **kwargs)()
+
+    def SGBMFilter(**kwargs): 
+        return make_estimator(name='SGBMFilter', transform_cb=stereo_utils.StereoSGBM().compute, **kwargs)()
 
     pp = Pipeline([('image_resize_down', ImageResizeFilter(scale=0.5)), 
                    ('image_resize_up', ImageResizeFilter(scale=4.0))])
