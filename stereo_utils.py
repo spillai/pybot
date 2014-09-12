@@ -52,10 +52,10 @@ class StereoBM:
         return self.bm.compute(left, right).astype(np.float32) / 16.0
 
 class StereoSGBMDiscretized: 
-    def __init__(self, discretize=1): 
+    def __init__(self, discretize=1, custom=True): 
         self.discretize = discretize
 
-        if discretize > 1: 
+        if discretize >= 1 and custom: 
             # Initilize stereo block matching
             self.stereo = StereoBMCustom(discretize=discretize, 
                                          cost_method=0,
