@@ -7,7 +7,7 @@ from bot_geometry.rigid_transform import RigidTransform
 #       0 1 0      -c_y
 #       0 0 0      f
 #       0 0 -1/T_x (c_x - c_x')/T_x ]')]
-CalibParams = namedtuple('CalibParams', ['R0', 'R1', 'P0', 'P1', 'Q', 'T0', 'T1', 'f', 'cx', 'cy', 'baseline'])
+CalibParams = namedtuple('CalibParams', ['R0', 'R1', 'P0', 'P1', 'Q', 'T0', 'T1', 'fx', 'fy', 'cx', 'cy', 'baseline'])
 def get_calib_params(fx, fy, cx, cy, baseline=None, baseline_px=None): 
     assert(baseline is not None or baseline_px is not None)
     if baseline is not None: 
@@ -33,7 +33,7 @@ def get_calib_params(fx, fy, cx, cy, baseline=None, baseline_px=None):
                     [0, 0, 0, -fx], 
                     [0, 0, q43,0]])
 
-    return CalibParams(R0, R1, P0, P1, Q, T0, T1, fx, cx, cy, baseline)
+    return CalibParams(R0, R1, P0, P1, Q, T0, T1, fx, fy, cx, cy, baseline)
     
 
 def kitti_stereo_calib_params(scale=1.0): 
@@ -43,10 +43,17 @@ def kitti_stereo_calib_params(scale=1.0):
 
     return get_calib_params(f, f, cx, cy, baseline_px=baseline_px)
 
-def kitti_odometry(fn): 
+def kitti_load_poses(fn): 
     X = (np.fromfile(os.path.expanduser(fn), dtype=np.float64, sep=' ')).reshape(-1,12)
     return map(lambda p: RigidTransform.from_Rt(p[:3,:3], p[:3,3]), 
                 map(lambda x: x.reshape(3,4), X))
+
+def kitti_poses_to_str(poses): 
+    return "\r\n".join(map(lambda x: " ".join(map(str, 
+                                                  (x.to_homogeneous_matrix()[:3,:4]).flatten())), poses))
+
+def kitti_poses_to_mat(poses): 
+    return np.vstack(map(lambda x: (x.to_homogeneous_matrix()[:3,:4]).flatten(), poses)).astype(np.float64)
 
 def bumblebee_stereo_calib_params_ming(scale=1.0): 
     fx, fy = 809.53*scale, 809.53*scale
