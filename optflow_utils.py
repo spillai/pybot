@@ -1,8 +1,15 @@
 import cv2
 import numpy as np
 
-def dense_optical_flow(im1, im2, pyr_scale=0.5, levels=3, winsize=15, iterations=5, poly_n=1.2, poly_sigma=0): 
-    return cv2.calcOpticalFlowFarneback(im1, im2, pyr_scale, levels, winsize, iterations, poly_n, poly_sigma)
+def dense_optical_flow(im1, im2, pyr_scale=0.5, levels=3, winsize=15, 
+                       iterations=5, poly_n=1.2, poly_sigma=0): 
+    return cv2.calcOpticalFlowFarneback(im1, im2, pyr_scale, levels, winsize, 3, 
+                                        iterations, poly_n, poly_sigma)
+
+def dense_optical_flow_sf(im1, im2, layers=3, averaging_block_size=2, max_flow=4): 
+    flow = np.zeros((im1.shape[0], im1.shape[1], 2))
+    cv2.calcOpticalFlowSF(im1, im2, flow, layers, averaging_block_size, max_flow)
+    return flow
 
 def sparse_optical_flow(im1, im2, pts, fb_threshold=0, 
                         window_size=15, max_level=2, 
@@ -33,7 +40,7 @@ def draw_flow(img, flow, step=16):
         cv2.circle(vis, (x1, y1), 1, (0, 255, 0), -1)
     return vis
 
-def draw_hsv(flow):
+def draw_hsv(flow, scale=2):
     h, w = flow.shape[:2]
     fx, fy = flow[:,:,0], flow[:,:,1]
     ang = np.arctan2(fy, fx) + np.pi
@@ -41,7 +48,7 @@ def draw_hsv(flow):
     hsv = np.zeros((h, w, 3), np.uint8)
     hsv[...,0] = ang*(180/np.pi/2)
     hsv[...,1] = 255
-    hsv[...,2] = np.minimum(v*4, 255)
+    hsv[...,2] = np.minimum(v*4*scale, 255)
     bgr = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
     return bgr
 

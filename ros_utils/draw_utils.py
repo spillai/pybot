@@ -22,6 +22,10 @@ from sensor_msgs.msg import PointCloud2, PointField
 # Octomap msgs
 import octomap_msgs.msg as octo_msg
 
+# Asynchronous decorator
+from copy import deepcopy
+from bot_utils.async_utils import run_async
+
 class VisualizationMsgsPub: 
     # Init publisher
     marker_pub_ = rospy.Publisher('viz_msgs_marker_publisher', Marker, latch=False)
@@ -240,11 +244,13 @@ def publish_pose(pose, stamp=None, frame_id='camera'):
 
     _publish_pose(msg)
 
-def publish_pose_list(pub_ns, poses, texts=[], stamp=None, size=0.05, frame_id='camera', seq=1):
+@run_async
+def publish_pose_list(pub_ns, _poses, texts=[], stamp=None, size=0.05, frame_id='camera', seq=1):
     """
     Publish Pose List on:
     pub_channel: Channel on which the cloud will be published
     """
+    poses = deepcopy(_poses)
     if not len(poses): return 
     arrs = np.vstack([pose.to_homogeneous_matrix()[:3,:3].T.reshape((1,9)) for pose in poses]) * size
     arrX = np.vstack([pose.tvec.reshape((1,3)) for pose in poses])

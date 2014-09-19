@@ -3,6 +3,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 from collections import OrderedDict
 
+# from copy import deepcopy
+# from bot_utils.async_utils import run_async
+
 global figures
 figures = OrderedDict()
 
@@ -27,7 +30,6 @@ def bar_plt(label, ys, block=False):
         # plt.axis('off')
 
     inds, = np.where([key == label for key in figures.keys()])
-    plt.figure(inds[0] + 1)
     for rect, y in zip(figures[label], ys): 
         rect.set_height(y)
 
