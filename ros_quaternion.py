@@ -21,17 +21,17 @@ class Quaternion:
         if abs(norm - 1) > 1e-2:
             self.q /= norm
 
-    @staticmethod
-    def identity():
-        return Quaternion()
+    @classmethod
+    def identity(cls):
+        return cls()
 
-    @staticmethod
-    def from_wxyz(q): 
-        return Quaternion(np.roll(q, shift=-1))
+    @classmethod
+    def from_wxyz(cls, q): 
+        return cls(np.roll(q, shift=-1))
 
-    @staticmethod
-    def from_xyzw(q): 
-        return Quaternion(q)
+    @classmethod
+    def from_xyzw(cls, q): 
+        return cls(q)
 
     def to_wxyz(self): 
         q = np.roll(self.q, shift=1)
@@ -85,22 +85,22 @@ class Quaternion:
     def inverse(self):
         return Quaternion(tf.quaternion_inverse(self.q))
 
-    @staticmethod
-    def from_roll_pitch_yaw (roll, pitch, yaw, axes='rxyz'):
-        return Quaternion(tf.quaternion_from_euler(roll, pitch, yaw, axes=axes))
+    @classmethod
+    def from_roll_pitch_yaw (cls, roll, pitch, yaw, axes='rxyz'):
+        return cls(tf.quaternion_from_euler(roll, pitch, yaw, axes=axes))
 
-    @staticmethod
-    def from_rpy (rpy, axes='rxyz'):
-        return Quaternion.from_roll_pitch_yaw(rpy[0], rpy[1], rpy[2], axes=axes)
+    @classmethod
+    def from_rpy (cls, rpy, axes='rxyz'):
+        return cls.from_roll_pitch_yaw(rpy[0], rpy[1], rpy[2], axes=axes)
 
-    @staticmethod
-    def from_angle_axis(theta, axis):
+    @classmethod
+    def from_angle_axis(cls, theta, axis):
         x, y, z = axis
         norm = math.sqrt(x*x + y*y + z*z)
         if 0 == norm:
-            return Quaternion([0, 0, 0, 1])
+            return cls([0, 0, 0, 1])
         t = math.sin(theta/2) / norm;
-        return Quaternion([x*t, y*t, z*t, math.cos(theta/2)])
+        return cls([x*t, y*t, z*t, math.cos(theta/2)])
 
     def to_roll_pitch_yaw (self, axes='rxyz'):
         return np.array(tf.euler_from_quaternion(self.q, axes=axes))
@@ -115,13 +115,13 @@ class Quaternion:
             axis = np.array(q[1:4]) / math.sin(halftheta)
             return theta, axis
 
-    @staticmethod
-    def from_matrix(matrix):
+    @classmethod
+    def from_matrix(cls, matrix):
         return tf.quaternion_from_matrix(matrix)
 
-    @staticmethod
-    def from_homogenous_matrix(matrix):
-        return Quaternion.from_matrix(matrix)
+    @classmethod
+    def from_homogenous_matrix(cls, matrix):
+        return cls.from_matrix(matrix)
 
     def to_matrix(self):
         return tf.quaternion_matrix(self.q)[:3,:3]

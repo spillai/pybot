@@ -10,7 +10,8 @@ def normalize_vec(v):
 # Construct a reference frame with two vectors
 # TODO: checks for degenerate cases
 def tf_construct(vec1,vec2): 
-    """Align vx along v1, and construct [vx,vy,vz] as follows: 
+    """
+    Align vx along v1, and construct [vx,vy,vz] as follows: 
     vx = v1
     vz = v1 x v2
     vy = vz x vx
@@ -43,16 +44,20 @@ def tf_construct_3pt(p1, p2, p3, origin=None):
         return RigidTransform.from_Rt(R, origin)
 
 def tf_compose(R, t): 
-    """ Construct [R t; 0 1] transformation matrix from R and t """
+    """ 
+    Construct [R t; 0 1] transformation matrix from R and t 
+    """
     T = np.eye(4);
     T[:3,:3] = R.copy()
     T[:3,3] = t.copy()
     return T
     
 
-# Quaternion quat within this class is interpreted as xyzw, 
-# similar to ros_quaternion.py file
 class RigidTransform(object):
+    """
+    Quaternion quat within this class is interpreted as xyzw, 
+    similar to ros_quaternion.py file
+    """
     def __init__(self, xyzw=[0.,0.,0.,1.], tvec=[0.,0.,0.]):
         self.quat = Quaternion(xyzw)
         self.tvec = np.array(tvec)
@@ -132,33 +137,33 @@ class RigidTransform(object):
             assert(v.ndim == 1 or (v.ndim == 2 and v.shape[0] == 1))
             return self.quat.rotate(v)
 
-    @staticmethod
-    def from_bot_core_pose_t(pose): 
-        return RigidTransform(Quaternion.from_wxyz(pose.orientation), pose.pos)
+    @classmethod
+    def from_bot_core_pose_t(cls, pose): 
+        return cls(Quaternion.from_wxyz(pose.orientation), pose.pos)
 
-    @staticmethod
-    def from_roll_pitch_yaw_x_y_z(r, p, yaw, x, y, z, axes='rxyz'):
+    @classmethod
+    def from_roll_pitch_yaw_x_y_z(cls, r, p, yaw, x, y, z, axes='rxyz'):
         q = Quaternion.from_roll_pitch_yaw(r, p, yaw, axes=axes)
-        return RigidTransform(q, (x, y, z))
+        return cls(q, (x, y, z))
 
-    @staticmethod
-    def from_Rt(R, t):
+    @classmethod
+    def from_Rt(cls, R, t):
         T = np.eye(4)
         T[:3,:3] = R.copy();
-        return RigidTransform(Quaternion.from_homogenous_matrix(T), t)
+        return cls(Quaternion.from_homogenous_matrix(T), t)
 
-    @staticmethod
-    def from_homogenous_matrix(T):
-        return RigidTransform(Quaternion.from_homogenous_matrix(T), T[:3,3])
+    @classmethod
+    def from_homogenous_matrix(cls, T):
+        return cls(Quaternion.from_homogenous_matrix(T), T[:3,3])
 
-    @staticmethod
-    def from_triad(pos, v1, v2):
+    @classmethod
+    def from_triad(cls, pos, v1, v2):
         # print v1, v2, type(v1)
         return RigidTransform.from_homogenous_matrix(tf_compose(tf_construct(v1, v2), pos))
 
-    @staticmethod
-    def from_angle_axis(angle, axis, tvec): 
-        return RigidTransform(Quaternion.from_angle_axis(angle, axis), tvec)
+    @classmethod
+    def from_angle_axis(cls, angle, axis, tvec): 
+        return cls(Quaternion.from_angle_axis(angle, axis), tvec)
 
     def wxyz(self):
         return self.quat.to_wxyz()
@@ -169,9 +174,9 @@ class RigidTransform(object):
     def translation(self):
         return self.tvec
 
-    @staticmethod
-    def identity():
-        return RigidTransform()
+    @classmethod
+    def identity(cls):
+        return cls()
 
 # class Pose(RigidTransform): 
 #     def __init__(self, pid, rotation_quat, translation_vec):
@@ -182,27 +187,27 @@ class RigidTransform(object):
 #         return 'Pose ID: %i, quat: %s, rpy: %s tvec: %s' % (self.id, 
 #                                                             self.quat, self.quat.to_roll_pitch_yaw(), self.tvec)
 
-#     @staticmethod
-#     def from_triad(pid, pos, v1, v2):
+#     @classmethod
+#     def from_triad(cls, pid, pos, v1, v2):
 #         rt = RigidTransform.from_triad(pos,v1,v2)
-#         return Pose(pid, rt.quat, rt.tvec)
+#         return cls(pid, rt.quat, rt.tvec)
 
-#     @staticmethod
-#     def from_rigid_transform(pid, rt):
+#     @classmethod
+#     def from_rigid_transform(cls, pid, rt):
 #         # Quat: [x y z w]
-#         return Pose(pid, rt.quat, rt.tvec)
+#         return cls(pid, rt.quat, rt.tvec)
 
-#     # @staticmethod
-#     # def from_vec(pid, vec):
+#     # @classmethod
+#     # def from_vec(cls, pid, vec):
 #     #     # print vec[-4:], vec[:3]
-#     #     return Pose(pid, vec[-4:], vec[:3])
+#     #     return cls(pid, vec[-4:], vec[:3])
         
 #     # def to_vec(self):
 #     #     return np.hstack([self.tvec, self.quat.q])
 
 
 import random
-def make_random_transform(t):
+def make_random_transform(t=1):
     q_wxyz = [ random.random(), random.random(), random.random(), random.random() ]
     qmag = np.sqrt(sum([x*x for x in q_wxyz]))
     q_wxyz = [ x / qmag for x in q_wxyz ]
