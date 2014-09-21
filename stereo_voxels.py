@@ -85,7 +85,7 @@ class StereoVoxels:
 
         # self.disp_vox[self.disp_vox > 1000] = 1000
 
-            print self.disp_vox.shape
+        print self.disp_vox.shape
 
         # # ================================================================
         # st = time.time()
