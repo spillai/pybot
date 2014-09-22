@@ -6,6 +6,11 @@ from itertools import izip, imap
 from collections import defaultdict, namedtuple
 
 def read_dir(directory, pattern, recursive=True): 
+    """
+    Recursively read a directory and return a dictionary tree 
+    that match file pattern. 
+    """
+
     # Get directory, and filename pattern
     directory = os.path.expanduser(directory)
 
@@ -57,12 +62,18 @@ class DatasetReader:
         for fno in fnos: 
             yield self.process_cb(self.files[fno])
 
-# Velodyne reader
-# from fs_utils import read_velodyne_pc
-# reader = DatasetReader(process_cb=lambda fn: read_velodyne_pc(fn), ...)
-# reader = DatasetReader(process_cb=lambda fn: read_velodyne_pc(fn), template='data_%i.txt', start_idx=1, max_files=10000)
 
 class VelodyneDatasetReader(DatasetReader): 
+    """
+    Velodyne reader
+    
+    >> from fs_utils import read_velodyne_pc
+    >> reader = DatasetReader(process_cb=lambda fn: read_velodyne_pc(fn), ...)
+    >> reader = DatasetReader(process_cb=lambda fn: read_velodyne_pc(fn), 
+                    template='data_%i.txt', start_idx=1, max_files=10000)
+    """
+
+
     def __init__(self, **kwargs): 
         try: 
             from fs_utils import read_velodyne_pc
@@ -73,12 +84,16 @@ class VelodyneDatasetReader(DatasetReader):
             raise RuntimeError('VelodyneDatasetReader does not support defining a process_cb')
         DatasetReader.__init__(self, process_cb=lambda fn: read_velodyne_pc(fn), **kwargs)
 
-# ImageDatasetReader
-# import cv2
-# reader = DatasetReader(process_cb=lambda fn: cv2.imread(fn, 0), ...)
-# reader = DatasetReader(process_cb=lambda fn: cv2.imread(fn, 0), template='data_%i.txt', start_idx=1, max_files=10000)
-
 class ImageDatasetReader(DatasetReader): 
+    """
+    ImageDatasetReader
+
+    >> import cv2
+    >> reader = DatasetReader(process_cb=lambda fn: cv2.imread(fn, 0), ...)
+    >> reader = DatasetReader(process_cb=lambda fn: cv2.imread(fn, 0), 
+                    template='data_%i.txt', start_idx=1, max_files=10000)
+    """
+
     def __init__(self, **kwargs): 
         if 'process_cb' in kwargs: 
             raise RuntimeError('ImageDatasetReader does not support defining a process_cb')
@@ -86,6 +101,10 @@ class ImageDatasetReader(DatasetReader):
         # self.iterframes = self.iteritems
 
 class KITTIStereoDatasetReader: 
+    """
+    KITTISTereoDatasetReader: ImageDatasetReader + VelodyneDatasetReader
+    """
+
     def __init__(self, directory='', 
                  left_template='image_0/%06i.png', 
                  right_template='image_1/%06i.png', 
@@ -114,6 +133,10 @@ class KITTIStereoDatasetReader:
                                                          self.velodyne.iteritems())
 
 class StereoDatasetReader: 
+    """
+    KITTISTereoDatasetReader: ImageDatasetReader (left) + ImageDatasetReader (right)
+    """
+
     def __init__(self, directory='', 
                  left_template='image_0/%06i.png', 
                  right_template='image_1/%06i.png', 

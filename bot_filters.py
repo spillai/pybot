@@ -45,19 +45,13 @@ def make_estimator(name, fit_cb=None, transform_cb=None, base=object, estimator_
                 
     return TemplatedEstimator
 
-def get_estimator(func, **estimator_kwargs): 
+def get_estimator(func, **kwargs): 
     """
     This function provides a simple way to create scikit-learn compatible estimators
     from existing utility functions / cv operations
     """
-
-    # from functools import wraps
-    
-    # @wraps(func)
-    # def register_estimator(*args, **kwargs): 
     return make_estimator(name=''.join(['regfilter_', func.func_name]), 
-                          transform_cb=func, estimator_kwargs=estimator_kwargs)()
-    # return register_estimator()
+                          transform_cb=func, estimator_kwargs=kwargs)()
 
 if __name__ == "__main__": 
 
