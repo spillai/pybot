@@ -5,7 +5,28 @@ filter instantiation and chaining
 # Author: Sudeep Pillai
 # Licence: TODO
 
-def make_estimator(name, fit_cb=None, transform_cb=None, base=object, estimator_kwargs={}): 
+from functools import wraps
+
+# class FilterRegistry: 
+#     def __init__(self): 
+#         pass
+        
+#     @classmethod
+#     def register(cls, func): 
+
+#         @wraps(func)
+#         def wrapped(*args, **kwargs): 
+#             # module = __import__(__name__)
+#             setattr(cls, ''.join(['regfilter_', func.func_name]), 
+#                     make_estimator(name=''.join(['regfilter_', func.func_name]), 
+#                                    transform_cb=func, estimator_kwargs=kwargs))
+#             print 'setting cls'
+#             return func
+#         return wrapped
+
+        
+
+def make_estimator(name, fit_cb=None, transform_cb=None, base=object): 
     """
     Templated estimator/filter designed to work with the scikit-learn pipline; 
     This class is mostly meant to enable rapid prototyping with existing functions, 
@@ -26,19 +47,19 @@ def make_estimator(name, fit_cb=None, transform_cb=None, base=object, estimator_
     class TemplatedEstimator(base): 
         estimator_name = name
 
-        def __init__(self):
-            pass
+        def __init__(self, **kwargs):
+            self.kwargs = kwargs
 
         if transform_cb is not None: 
             def transform(self, *args): 
-                return transform_cb(*args, **estimator_kwargs)
+                return transform_cb(*args, **self.kwargs)
         else: 
             def transform(self, *args): 
                 return self
 
         if fit_cb is not None: 
             def fit(self, X): 
-                return fit_cb(X, **estimator_kwargs)
+                return fit_cb(X, **self.kwargs)
         else: 
             def fit(self, *args): 
                 return self
@@ -51,7 +72,36 @@ def get_estimator(func, **kwargs):
     from existing utility functions / cv operations
     """
     return make_estimator(name=''.join(['regfilter_', func.func_name]), 
-                          transform_cb=func, estimator_kwargs=kwargs)()
+                          transform_cb=func)(**kwargs)
+
+# def register_estimator(func): 
+
+#     @wraps(func)
+#     def wrapped_estimator(*args, **kwargs): 
+#         module = __import__(__name__)
+#         setattr(module, ''.join(['regfilter_', func.func_name]), 
+#                 make_estimator(name=''.join(['regfilter_', func.func_name]), 
+#                                transform_cb=func, estimator_kwargs=kwargs))
+
+#         print 'setting module', module
+#         return func
+#     return wrapped_estimator
+
+# import cv2, os.path
+
+
+def im_read_filter(fn): 
+    return cv2.imread(os.path.expanduser(fn))
+
+
+# One-time registry
+filters = [ 'im_read_filter' ]
+for name in filters: 
+    module = __import__(__name__)
+
+    print 'Registering %s' % name
+    fname = ''.join(['regfilter_', name])
+    setattr(module, fname, make_estimator(name=fname, transform_cb=getattr(module, name)))
 
 if __name__ == "__main__": 
 
@@ -62,22 +112,26 @@ if __name__ == "__main__":
 
     import bot_vision.image_utils as image_utils
     import bot_vision.stereo_utils as stereo_utils
-
-    def im_read_filter(fn): 
-        return cv2.imread(os.path.expanduser(fn))
-
     
     fn = '/home/spillai/data/dataset/sequences/01/image_0/000000.png'
     print 'im_read_filter: Reading image '
     im1 = im_read_filter(fn)
+    print type(im1)
 
     print 'Estimator::im_read_filter: Reading image'
     est = get_estimator(im_read_filter)
     im2 = est.transform(fn)
+    print type(im2)
 
     print 'Estimator::im_resize: Resizing image with args scale=0.5'
     est = get_estimator(image_utils.im_resize, scale=0.5)
     im3 = est.transform(im1)
+    print type(im3)
+
+    print 'Registered Estimator::im_read: Reading image'
+    est = regfilter_im_read_filter()
+    im4 = est.transform(fn)
+    print type(im4)
 
 
     # def ImageResizeFilter(**kwargs): 
