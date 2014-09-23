@@ -7,25 +7,6 @@ filter instantiation and chaining
 
 from functools import wraps
 
-# class FilterRegistry: 
-#     def __init__(self): 
-#         pass
-        
-#     @classmethod
-#     def register(cls, func): 
-
-#         @wraps(func)
-#         def wrapped(*args, **kwargs): 
-#             # module = __import__(__name__)
-#             setattr(cls, ''.join(['regfilter_', func.func_name]), 
-#                     make_estimator(name=''.join(['regfilter_', func.func_name]), 
-#                                    transform_cb=func, estimator_kwargs=kwargs))
-#             print 'setting cls'
-#             return func
-#         return wrapped
-
-        
-
 def make_estimator(name, fit_cb=None, transform_cb=None, base=object): 
     """
     Templated estimator/filter designed to work with the scikit-learn pipline; 
