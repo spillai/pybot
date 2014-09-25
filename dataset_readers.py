@@ -122,6 +122,10 @@ class KITTIStereoDatasetReader(object):
 
         from bot_utils.kitti_helpers import kitti_stereo_calib_params, kitti_load_poses
 
+        # Set args
+        self.sequence = sequence
+        self.scale = scale
+
         # Get calib
         self.calib = kitti_stereo_calib_params(scale=scale)
 
