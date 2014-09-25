@@ -26,6 +26,26 @@ import octomap_msgs.msg as octo_msg
 from copy import deepcopy
 from bot_utils.async_utils import run_async
 
+
+global viz_pub_
+viz_pub_ = None
+
+def init(): 
+    """
+    Init ros modules for viz
+    """
+    try: 
+        # Initialize node
+        import rospy
+        rospy.init_node('bot_vision_draw_utils_node', anonymous=True, disable_signals=True)
+
+        global viz_pub_
+        viz_pub_ = VisualizationMsgsPub()
+        print 'Inited ROS node'
+    except: 
+        pass
+
+
 class VisualizationMsgsPub: 
     # Init publisher
     marker_pub_ = rospy.Publisher('viz_msgs_marker_publisher', Marker, latch=False)
@@ -43,8 +63,6 @@ class VisualizationMsgsPub:
             self.pc_map[ns] = rospy.Publisher(ns, PointCloud2, latch=False)
         return self.pc_map[ns]
 
-global viz_pub_
-viz_pub_ = VisualizationMsgsPub()
 
 def reshape_arr(arr):
     # if 3 dimensional (i.e. organized pt cloud), reshape to Nx3
