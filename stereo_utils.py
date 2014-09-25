@@ -4,6 +4,8 @@ from collections import deque
 
 from fs_utils import StereoELAS, StereoBMCustom# , OrderedCostVolumeStereo
 # from fs_utils import fast_cost_volume_filtering, ordered_row_disparity
+
+from bot_vision.image_utils import im_resize, gaussian_blur
 from bot_vision.imshow_utils import imshow_cv
 
 class StereoSGBM: 
@@ -52,26 +54,24 @@ class StereoBM:
         return self.bm.compute(left, right).astype(np.float32) / 16.0
 
 class StereoSGBMDiscretized: 
-    def __init__(self, discretize=1, custom=True): 
+    def __init__(self, discretize=1, do_sgm=True): 
         self.discretize = discretize
-
-        if discretize >= 1 and custom: 
+        if discretize > 1: 
             # Initilize stereo block matching
             self.stereo = StereoBMCustom(discretize=discretize, 
-                                         cost_method=0,
+                                         do_sgm=do_sgm,
                                          preset=cv2.STEREO_BM_BASIC_PRESET, 
-                                         ndisparities=64, SAD_window_size=3)
+                                         ndisparities=64, SAD_window_size=5)
+
+            # self.stereo = StereoBM() # **self.params)
+            # self.stereo.process = lambda l,r: self.stereo.compute(l,r)
         else: 
-            # Initilize stereo semi-global block matching
-            self.stereo = StereoSGBM()
-            self.stereo.process = lambda l,r: self.stereo.compute(l,r)
+            raise RuntimeError("Discretization less than 1 not supported!")
 
     def compute(self, left, right): 
-        disp = (self.stereo.process(left, right)).astype(np.float32)
-        # disp = np.argmin(cost, axis=2).astype(np.float32)
-
+        # Compute stereo disparity
+        disp = (self.stereo.process(left, right)).astype(np.float32) / 16
         disp = cv2.medianBlur(disp, 3)
-        # disp = cv2.bilateralFilter(disp, 5, 5*2, 5/2)
 
         # Re-scale disparity image
         disp_out = cv2.resize(disp.astype(np.float32), (left.shape[1],left.shape[0]), 
@@ -152,6 +152,9 @@ class StereoReconstruction(object):
         self.calib_params = calib_params
         print 'INIT STEREO RECONSTRUCTION'
 
+    def disparity_from_plane(self, rows, height): 
+        Z = height * self.calib_params.fy  /  (np.arange(rows) - self.calib_params.cy + 1e-9)
+        return self.calib_params.fx * self.calib_params.baseline / Z 
 
     def reconstruct(self, disp): 
         """
