@@ -32,7 +32,7 @@ def read_dir(directory, pattern, recursive=True):
             return matches
     return fn_map
 
-class DatasetReader: 
+class DatasetReader(object): 
     """
     Simple Dataset Reader
     Refer to this class and ImageDatasetWriter for input/output
@@ -95,36 +95,62 @@ class ImageDatasetReader(DatasetReader):
     """
 
     def __init__(self, **kwargs): 
+        from bot_vision.image_utils import im_resize
         if 'process_cb' in kwargs: 
             raise RuntimeError('ImageDatasetReader does not support defining a process_cb')
-        DatasetReader.__init__(self, process_cb=lambda fn: cv2.imread(fn, -1), **kwargs)
-        # self.iterframes = self.iteritems
 
-class KITTIStereoDatasetReader: 
+        if 'scale' in kwargs: 
+            scale = kwargs.pop('scale', 1.0)
+            if scale < 1: 
+                DatasetReader.__init__(self, 
+                                       process_cb=lambda fn: 
+                                       im_resize(cv2.imread(fn, -1), scale), **kwargs)
+                return 
+        DatasetReader.__init__(self, process_cb=lambda fn: cv2.imread(fn, -1), **kwargs)
+
+class KITTIStereoDatasetReader(object): 
     """
-    KITTISTereoDatasetReader: ImageDatasetReader + VelodyneDatasetReader
+    KITTISTereoDatasetReader: ImageDatasetReader + VelodyneDatasetReader + Calib
     """
 
     def __init__(self, directory='', 
+                 sequence='', 
                  left_template='image_0/%06i.png', 
                  right_template='image_1/%06i.png', 
                  velodyne_template='velodyne/%06i.bin',
-                 start_idx=0, max_files=10000): 
+                 start_idx=0, max_files=10000, scale=1.0): 
 
+        from bot_utils.kitti_helpers import kitti_stereo_calib_params, kitti_load_poses
+
+        # Get calib
+        self.calib = kitti_stereo_calib_params(scale=scale)
+
+        # Read poses
+        try: 
+            pose_fn = os.path.join(os.path.expanduser(directory), 'poses', ''.join([sequence, '.txt']))
+            self.poses = kitti_load_poses(fn=pose_fn)
+        except: 
+            pass
+
+        # Read images
+        seq_directory = os.path.join(os.path.expanduser(directory), 'sequences', sequence)
         self.left = ImageDatasetReader(
-            template=os.path.join(os.path.expanduser(directory),left_template), 
-            start_idx=start_idx, max_files=max_files
+            template=os.path.join(seq_directory,left_template), 
+            start_idx=start_idx, max_files=max_files, scale=scale
         )
 
         self.right = ImageDatasetReader(
-            template=os.path.join(os.path.expanduser(directory),right_template), 
+            template=os.path.join(seq_directory,right_template), 
+            start_idx=start_idx, max_files=max_files, scale=scale
+        )
+
+        # Read velodyne
+        self.velodyne = VelodyneDatasetReader(
+            template=os.path.join(seq_directory,velodyne_template), 
             start_idx=start_idx, max_files=max_files
         )
 
-        self.velodyne = VelodyneDatasetReader(
-            template=os.path.join(os.path.expanduser(directory),velodyne_template), 
-            start_idx=start_idx, max_files=max_files
-        )
+        print 'Initialized stereo dataset reader with %f scale' % scale
 
         self.iter_stereo_frames = lambda : izip(self.left.iteritems(), self.right.iteritems())
         self.iter_velodyne_frames = lambda : self.velodyne.iteritems()
@@ -132,7 +158,7 @@ class KITTIStereoDatasetReader:
                                                          self.right.iteritems(), 
                                                          self.velodyne.iteritems())
 
-class StereoDatasetReader: 
+class StereoDatasetReader(object): 
     """
     KITTISTereoDatasetReader: ImageDatasetReader (left) + ImageDatasetReader (right)
     """
@@ -159,7 +185,7 @@ class StereoDatasetReader:
 
     
         
-class RGBDDatasetReaderUW:
+class RGBDDatasetReaderUW(object):
     """
     RGB-D Dataset reader 
     http://rgbd-dataset.cs.washington.edu/dataset.html
