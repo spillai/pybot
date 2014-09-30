@@ -1,9 +1,10 @@
 import cv2
 import numpy as np
+from bot_vision.image_utils import to_gray, to_color
 
 def dense_optical_flow(im1, im2, pyr_scale=0.5, levels=3, winsize=15, 
                        iterations=5, poly_n=1.2, poly_sigma=0): 
-    return cv2.calcOpticalFlowFarneback(im1, im2, pyr_scale, levels, winsize, 3, 
+    return cv2.calcOpticalFlowFarneback(to_gray(im1), to_gray(im2), pyr_scale, levels, winsize, 3, 
                                         iterations, poly_n, poly_sigma)
 
 def dense_optical_flow_sf(im1, im2, layers=3, averaging_block_size=2, max_flow=4): 
