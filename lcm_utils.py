@@ -62,7 +62,8 @@ class KinectDecoder(object):
 
 class LCMLogReader(object): 
     def __init__(self, filename=None, decoder=None):
-        if filename is None or not os.path.exists(filename):
+        filename = os.path.expanduser(filename)
+        if filename is None or not os.path.exists(os.path.expanduser(filename)):
             raise Exception('Invalid Filename: %s' % filename)
         print 'Kinect Reader: Opening file', filename        
 
@@ -75,15 +76,19 @@ class LCMLogReader(object):
         self._log = lcm.EventLog(self.filename, "r")
 
     def iter_frames(self, every_k_frames=1):
+        idx = 0
         for ev in self._log: 
             if ev.channel == self.decoder.channel: 
-                yield self.decoder.decode(ev.data)
+                idx += 1
+                if idx % every_k_frames == 0: 
+                    yield self.decoder.decode(ev.data)
+                    
         
 
 if __name__ == "__main__": 
     import os.path
 
-    log = LCMLogReader(filename='/home/spillai/data/2014_06_14_articulation_multibody/lcmlog-2014-06-14.01', 
+    log = LCMLogReader(filename='~/data/2014_06_14_articulation_multibody/lcmlog-2014-06-14.05', 
                  decoder=KinectDecoder())
     for frame in log.iter_frames(): 
         imshow_cv('frame', frame.img)
