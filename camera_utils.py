@@ -6,6 +6,15 @@ from scipy import linalg
 
 from bot_geometry.rigid_transform import Quaternion, RigidTransform
 
+def construct_K(fx, fy, cx, cy): 
+    """
+    Create camera intrinsics from focal lengths and focal centers
+    """
+    K = npm.eye(3)
+    K[0,0], K[1,1] = fx, fy
+    K[0,2], K[1,2] = cx, cy
+    return K
+
 class CameraIntrinsic(object): 
     def __init__(self, K, D=np.zeros(4, dtype=np.float64)): 
         """
@@ -24,18 +33,8 @@ class CameraIntrinsic(object):
         return cls.from_calib_params(500., 500., 320., 240.)
 
     @classmethod
-    def _construct_K(cls, fx, fy, cx, cy): 
-        """
-        Create camera intrinsics from focal lengths and focal centers
-        """
-        K = npm.eye(3)
-        K[0,0], K[1,1] = fx, fy
-        K[0,2], K[1,2] = cx, cy
-        return K
-
-    @classmethod
     def from_calib_params(cls, fx, fy, cx, cy): 
-        return cls(cls._construct_K(fx, fy, cx, cy))
+        return cls(construct_K(fx, fy, cx, cy))
 
 class CameraExtrinsic(RigidTransform): 
     def __init__(self, R, t):
@@ -49,11 +48,18 @@ class CameraExtrinsic(RigidTransform):
         RigidTransform.__init__(self, xyzw=p.quat.to_xyzw(), tvec=p.tvec)
 
     @classmethod
-    def simluate(cls): 
+    def identity(cls): 
         """
         Simulate a camera at identity
         """
         return cls(npm.eye(3), npm.zeros(3))
+
+    @classmethod
+    def simulate(cls): 
+        """
+        Simulate a camera at identity
+        """
+        return cls.identity()
 
 class Camera(CameraIntrinsic, CameraExtrinsic): 
     def __init__(self, K, R, t, D=np.zeros(4, dtype=np.float64)): 
@@ -62,6 +68,13 @@ class Camera(CameraIntrinsic, CameraExtrinsic):
 
         Rt = self.to_homogeneous_matrix()[:3]
         self.P = self.K * Rt     # Projection matrix
+
+    @classmethod
+    def simulate(cls): 
+        """
+        Simulate camera intrinsics and extrinsics
+        """
+        return cls.from_intrinsics_extrinsics(CameraIntrinsic.simluate(), CameraExtrinsic.simulate())
 
     @classmethod
     def from_intrinsics_extrinsics(cls, intrinsic, extrinsic): 
@@ -90,6 +103,34 @@ class Camera(CameraIntrinsic, CameraExtrinsic):
         if self.cx is None: 
             raise AssertionError('cx, cy is not set')
         return npm.matrix([self.cx, self.cy])
+
+class DepthCamera(CameraIntrinsic): 
+    def __init__(self, K, shape=(480,640), skip=1, D=np.zeros(4, dtype=np.float64)):
+        CameraIntrinsic.__init__(self, K, D)
+
+        # Retain image shape
+        self.shape = shape
+        self.skip = skip
+
+        # Construct mesh for quick reconstruction
+        self._build_mesh(shape=shape)
+        
+    def _build_mesh(self, shape): 
+        H, W = shape
+        xs,ys = np.arange(0,W), np.arange(0,H);
+        fx_inv = 1.0 / self.fx;
+
+        self.xs = (xs-self.cx) * fx_inv
+        self.xs = self.xs[::self.skip] # skip pixels
+        self.ys = (ys-self.cy) * fx_inv
+        self.ys = self.ys[::self.skip] # skip pixels
+
+        self.xs, self.ys = np.meshgrid(self.xs, self.ys);
+
+    def reconstruct(self, depth): 
+        assert(depth.shape == self.xs.shape)
+        return np.dstack([self.xs * depth, self.ys * depth, depth])
+
 
 def compute_fundamental(x1, x2, method=cv2.FM_RANSAC): 
     """

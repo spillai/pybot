@@ -31,6 +31,9 @@ class StereoSGBM:
         # Initilize stereo semi-global block matching
         self.sgbm = cv2.StereoSGBM(**self.params)
 
+        # Re-map process
+        self.process = self.compute
+
     def compute(self, left, right): 
         return self.sgbm.compute(left, right).astype(np.float32) / 16.0
 
@@ -49,6 +52,8 @@ class StereoBM:
 
         # Initilize stereo block matching
         self.bm = cv2.StereoBM(cv2.STEREO_BM_BASIC_PRESET, 128, 11) # **self.params)
+
+        self.process = self.compute
 
     def compute(self, left, right): 
         return self.bm.compute(left, right).astype(np.float32) / 16.0
@@ -148,26 +153,29 @@ class OrderedStereoBM(object):
 
 # Class for stereo reconstruction
 class StereoReconstruction(object): 
-    def __init__(self, calib_params=None):
-        self.calib_params = calib_params
+    def __init__(self, calib=None):
+        self.calib = calib
         print 'INIT STEREO RECONSTRUCTION'
 
     def disparity_from_plane(self, rows, height): 
-        Z = height * self.calib_params.fy  /  (np.arange(rows) - self.calib_params.cy + 1e-9)
-        return self.calib_params.fx * self.calib_params.baseline / Z 
+        Z = height * self.calib.fy  /  (np.arange(rows) - self.calib.cy + 1e-9)
+        return self.calib.fx * self.calib.baseline / Z 
+
+    def depth_from_disparity(self, disp): 
+        return self.calib.fx * self.calib.baseline / disp
 
     def reconstruct(self, disp): 
         """
         Reproject to 3D with calib params
         """
-        X = cv2.reprojectImageTo3D(disp, self.calib_params.Q)
+        X = cv2.reprojectImageTo3D(disp, self.calib.Q)
         return X
 
     def reconstruct_with_texture(self, disp, sample=1): 
         """
         Reproject to 3D with calib params and texture mapped
         """
-        X = cv2.reprojectImageTo3D(disp, self.calib_params.Q)
+        X = cv2.reprojectImageTo3D(disp, self.calib.Q)
         im_pub, X_pub = np.copy(left_im[::sample,::sample]).reshape(-1,3 if left_im.ndim == 3 else 1), \
                         np.copy(X[::sample,::sample]).reshape(-1,3)
         return im_pub, X_pub
