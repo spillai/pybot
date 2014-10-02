@@ -7,7 +7,7 @@ def init():
 def publish_line_segments(*args, **kwargs): 
     pass
 
-def publish_point_cloud(*args, **kwargs): 
+def publish_cloud(*args, **kwargs): 
     pass
 
 def publish_pose_list(*args, **kwargs): 

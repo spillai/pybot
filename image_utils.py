@@ -24,14 +24,3 @@ def gaussian_blur(im, size=3):
 
 def median_blur(im, size=3): 
     return cv2.medianBlur(im, size)
-
-# def bilateral_filter(im, size=3): 
-#     return cv2.GaussianBlur(im, (size,size), 0)
-
-# def im_blur(im, size=3, method='gaussian'): 
-#     if method == 'gaussian': 
-#         return cv2.GaussianBlur(im, (size, size), 0)
-#     elif method == 'median': 
-#         return cv2.medianBlur(im, size)
-#     elif method == 'bilateral': 
-#         return cv2.bilateralFilter(im, size, size*2, size/2)    

@@ -3,9 +3,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 from collections import OrderedDict
 
-# from copy import deepcopy
-# from bot_utils.async_utils import run_async
-
 global figures
 figures = OrderedDict()
 
