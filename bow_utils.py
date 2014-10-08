@@ -1,33 +1,49 @@
-import cv2
+import cv2, time
 import numpy as np
 from scipy.cluster.vq import vq, kmeans2
+from sklearn.cluster import KMeans, MiniBatchKMeans
 
 class BOWVectorizer(object): 
     def __init__(self, K=100, method='vq', norm_method='square-rooting'): 
         self.K = K
         self.method = method
         self.norm_method = norm_method
+        self.km = MiniBatchKMeans(n_clusters=self.K, compute_labels=False)
 
     def build(self, data): 
         """
         Build [K x D] codebook/vocabulary from data
         """
-        self.codebook, self.labels = kmeans2(data, self.K)
-        return self.codebook, self.labels
+        st = time.time()
+
+        # Scipy: 1x
+        # self.codebook, self.labels = kmeans2(data, self.K)
+
+        # Scikit-learn: 2x
+        km = MiniBatchKMeans(n_clusters=self.K, compute_labels=False, batch_size=5000, verbose=True).fit(data)
+        # km = KMeans(n_clusters=self.K, n_jobs=4, tol=0.01, verbose=True).fit(data)
+        self.codebook = km.cluster_centers_
+
+        # # Opencv: 1x
+        # ret, labels, self.codebook = cv2.kmeans(data, self.K, 
+        #                                         criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_MAX_ITER, 1, 10), 
+        #                                         attempts=10, flags=cv2.KMEANS_PP_CENTERS)
+        print 'Vocab construction from data %s => codebook %s took %5.3f s' % (data.shape, self.codebook.shape, 
+                                                                               time.time() - st)
+        return self.codebook
 
     def vectorize(self, data): 
         """
         Transform the [N x D] data to [N x 1] where n_i \in {1, ... , K}
         returns the cluster indices
         """
-
         if self.method == 'vq': 
             code, dist = vq(data, self.codebook)
-            return code
         elif self.method == 'vlad': 
-            return self.vlad(data)
+            code = self.vlad(data)
         else: 
             raise NotImplementedError('Unknown method')
+        return code
 
     def vlad(self, data): 
         """
