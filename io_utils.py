@@ -8,6 +8,8 @@ def mkdir_p(path):
     except : 
         pass 
 
+def path_exists(path): 
+    return os.path.exists(os.path.expanduser(path))
 
 # OSError as exc: # Python >2.5
 #         if exc.errno == errno.EEXIST and os.path.isdir(path):
