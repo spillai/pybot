@@ -3,7 +3,7 @@ import numpy as np
 from scipy.cluster.vq import vq, kmeans2
 
 class BOWVectorizer(object): 
-    def __init__(self, K, method='vq', norm_method='component-wise-l2'): 
+    def __init__(self, K=100, method='vq', norm_method='square-rooting'): 
         self.K = K
         self.method = method
         self.norm_method = norm_method
@@ -60,14 +60,16 @@ class BOWVectorizer(object):
             residuals = np.sign(residuals) * np.sqrt(np.abs(residuals))
 
         else: 
-            raise NotImplementedError('VLAD normalization_method not implemented')
+            import warnings
+            raise warnings.warn('VLAD un-normalized')
+            # raise NotImplementedError('VLAD normalization_method not implemented')
             
         # Vectorize [1 x (KD)]
         return residuals.ravel()
 
 class BOWTrainer(object): 
-    def __init__(self, K=200, method='vq'): 
-        self.vectorizer = BOWVectorizer(K=K, method=method)
+    def __init__(self, **kwargs): 
+        self.vectorizer = BOWVectorizer(**kwargs)
         # self.data = []
 
     # def add(self, data): 
@@ -96,6 +98,7 @@ class BOWTrainer(object):
         """
         Project the descriptions on to the codebook/vocabulary, 
         returning the all the words in the description
+        [N x D] => [1 x N] where n_i \in {1, ... , K}
         """
         return self.vectorizer.vectorize(data)
         
@@ -103,6 +106,7 @@ class BOWTrainer(object):
         """
         Project the descriptions on to the codebook/vocabulary, 
         returning the histogram of words
+        [N x 1] => [1 x K] histogram
         """
         word_hist, bin_edges = np.histogram(self.get_words(data), 
                                             bins=np.arange(self.vectorizer.K), normed=True)
