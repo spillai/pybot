@@ -5,7 +5,7 @@ import os, fnmatch, time
 from itertools import izip, imap
 from collections import defaultdict, namedtuple
 
-def read_dir(directory, pattern, recursive=True): 
+def read_dir(directory, pattern='*.png', recursive=True): 
     """
     Recursively read a directory and return a dictionary tree 
     that match file pattern. 
@@ -27,7 +27,7 @@ def read_dir(directory, pattern, recursive=True):
         if not len(matches): continue
 
         if recursive: 
-            fn_map[root] = matches
+            fn_map[os.path.basename(root)] = matches
         else: 
             return matches
     return fn_map
@@ -186,8 +186,6 @@ class StereoDatasetReader(object):
 #     def split_stereo(self, im): 
 #          h = im.shape[0]/2
 #          return im[:h], im[h:]
-
-    
         
 class RGBDDatasetReaderUW(object):
     """
