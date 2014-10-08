@@ -21,9 +21,10 @@ class BOWVectorizer(object):
         returns the cluster indices
         """
 
-        if method == 'vq': 
-            return vq(data, self.codebook)
-        elif method == 'vlad': 
+        if self.method == 'vq': 
+            code, dist = vq(data, self.codebook)
+            return code
+        elif self.method == 'vlad': 
             return self.vlad(data)
         else: 
             raise NotImplementedError('Unknown method')
@@ -31,8 +32,8 @@ class BOWVectorizer(object):
     def vlad(self, data): 
         """
         Aggregating local descriptors into a compact image representation
-        Hervé Jégou, Matthijs Douze, Cordelia Schmid and Patrick Pérez
-        Proc. IEEE CVPR‘10, June, 2010.
+        Herve Jegou, Matthijs Douze, Cordelia Schmid and Patrick Perez
+        Proc. IEEE CVPR 10, June, 2010.
         """
         residuals = np.zeros(self.codebook.shape)
         codes, dist = vq(data, self.codebook)
@@ -65,17 +66,26 @@ class BOWVectorizer(object):
         return residuals.ravel()
 
 class BOWTrainer(object): 
-    def __init__(self, K=200, method='kmeans'): 
+    def __init__(self, K=200, method='vq'): 
         self.vectorizer = BOWVectorizer(K=K, method=method)
-        self.data = []
+        # self.data = []
 
-    def add(self, data): 
-        """
-        Accumuate the descriptions for codebook/vocabulary construction
-        """
-        self.data.append(data)
+    # def add(self, data): 
+    #     """
+    #     Accumuate the descriptions for codebook/vocabulary construction
+    #     """
+    #     self.data.append(data)
 
-    def cluster(self, data): 
+
+    # def build(self): 
+    #     """
+    #     Build a codebook/vocabulary from data
+    #     """
+    #     assert(len(self.data) > 0)
+    #     return self.vectorizer.build(np.vstack(self.data))
+
+
+    def build(self, data): 
         """
         Build a codebook/vocabulary from data
         """
@@ -87,8 +97,7 @@ class BOWTrainer(object):
         Project the descriptions on to the codebook/vocabulary, 
         returning the all the words in the description
         """
-        code, dist = self.vectorizer.vectorize(data)
-        return code
+        return self.vectorizer.vectorize(data)
         
     def project(self, data): 
         """
@@ -98,4 +107,3 @@ class BOWTrainer(object):
         word_hist, bin_edges = np.histogram(self.get_words(data), 
                                             bins=np.arange(self.vectorizer.K), normed=True)
         return word_hist
-
