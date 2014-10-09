@@ -22,7 +22,8 @@ class BOWVectorizer(object):
 
         # Scikit-learn: 2x
         km = MiniBatchKMeans(n_clusters=self.K, init='k-means++', 
-                             compute_labels=False, batch_size=1000, max_iter=150, verbose=True).fit(data)
+                             compute_labels=False, batch_size=1000, max_iter=150, max_no_improvement=30, 
+                             verbose=False).fit(data)
         # km = KMeans(n_clusters=self.K, n_jobs=4, tol=0.01, verbose=True).fit(data)
         self.codebook = km.cluster_centers_
 
@@ -30,8 +31,10 @@ class BOWVectorizer(object):
         # ret, labels, self.codebook = cv2.kmeans(data, self.K, 
         #                                         criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_MAX_ITER, 1, 10), 
         #                                         attempts=10, flags=cv2.KMEANS_PP_CENTERS)
-        print 'Vocab construction from data %s => codebook %s took %5.3f s' % (data.shape, self.codebook.shape, 
-                                                                               time.time() - st)
+        print 'Vocab construction from data %s (%s KB, %s) => codebook %s took %5.3f s' % (data.shape, 
+                                                                                           data.nbytes / 1024, data.dtype,
+                                                                                           self.codebook.shape, 
+                                                                                           time.time() - st)
 
         # Index codebook for quick querying
         st = time.time()
@@ -40,37 +43,44 @@ class BOWVectorizer(object):
 
         return self.codebook
 
-    def vectorize(self, data): 
+    def get_code(self, data): 
         """
         Transform the [N x D] data to [N x 1] where n_i \in {1, ... , K}
         returns the cluster indices
         """
-        if self.method == 'vq': 
-            if self.quantizer == 'vq': 
-                code, dist = vq(data, self.codebook)
-            elif self.quantizer == 'kdtree': 
-                dist, code = self.index.query(data, k=1)
-            else: 
-                raise NotImplementedError('Quantizer %s not implemented. Use vq or kdtree!' % self.quantizer)
-        elif self.method == 'vlad': 
-            code = self.vlad(data)
+        if self.quantizer == 'vq': 
+            code, dist = vq(data, self.codebook)
+        elif self.quantizer == 'kdtree': 
+            dist, code = self.index.query(data, k=1)
         else: 
-            raise NotImplementedError('Codebook generation method %s not implemented. Use vq or vlad!' % self.method)
+            raise NotImplementedError('Quantizer %s not implemented. Use vq or kdtree!' % self.quantizer)
+
         return code
 
-    def vlad(self, data): 
+    def get_histogram(self, data): 
+        """
+        Project the descriptions on to the codebook/vocabulary, 
+        returning the histogram of words
+        [N x 1] => [1 x K] histogram
+        """
+        if self.method == 'vq': 
+            code = self.get_code(data)
+            code_hist, bin_edges = np.histogram(code, bins=np.arange(self.K))
+        elif self.method == 'vlad': 
+            code = self.get_code(data)
+            code_hist = self.vlad(data, code)
+        else: 
+            raise NotImplementedError('Histogram method %s not implemented. Use vq or vlad!' % self.method)            
+
+        return code_hist
+
+    def vlad(self, data, code): 
         """
         Aggregating local descriptors into a compact image representation
         Herve Jegou, Matthijs Douze, Cordelia Schmid and Patrick Perez
         Proc. IEEE CVPR 10, June, 2010.
         """
         residuals = np.zeros(self.codebook.shape)
-        if self.quantizer == 'kdtree': 
-            dist, code = self.index.query(data, k=1)
-        elif self.quantizer == 'vq': 
-            code, dist = vq(data, self.codebook)
-        else: 
-            raise NotImplementedError('Quantizer %s not implemented. Use vq or kdtree!' % quantizer)
 
         # Accumulate residuals [K x D]
         for cidx, c in enumerate(code):
@@ -91,12 +101,12 @@ class BOWVectorizer(object):
 
         # Square rooting
         elif self.norm_method == 'square-rooting': 
-            residuals = np.sign(residuals) * np.sqrt(np.abs(residuals))
+            residuals = np.sign(residuals) * np.sqrt(np.fabs(residuals))
 
-        else: 
-            import warnings
-            raise warnings.warn('VLAD un-normalized')
-            # raise NotImplementedError('VLAD normalization_method not implemented')
+        # else: 
+        #     import warnings
+        #     raise warnings.warn('VLAD un-normalized')
+        #     # raise NotImplementedError('VLAD normalization_method not implemented')
             
         # Vectorize [1 x (KD)]
         return residuals.ravel()
@@ -133,14 +143,6 @@ class BOWTrainer(object):
         """
         assert(len(data) > 0)
         return self.vectorizer.build(np.vstack(data))
-
-    def get_words(self, data): 
-        """
-        Project the descriptions on to the codebook/vocabulary, 
-        returning the all the words in the description
-        [N x D] => [1 x N] where n_i \in {1, ... , K}
-        """
-        return self.vectorizer.vectorize(data)
         
     def project(self, data): 
         """
@@ -148,6 +150,4 @@ class BOWTrainer(object):
         returning the histogram of words
         [N x 1] => [1 x K] histogram
         """
-        word_hist, bin_edges = np.histogram(self.get_words(data), 
-                                            bins=np.arange(self.vectorizer.K), normed=True)
-        return word_hist
+        return self.vectorizer.get_histogram(data)

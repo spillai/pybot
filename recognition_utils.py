@@ -3,17 +3,60 @@ import cv2, os, time, random
 
 from sklearn.linear_model import SGDClassifier
 from sklearn.neighbors import KNeighborsClassifier
+
+from sklearn.cross_validation import cross_val_score
+from sklearn.ensemble import ExtraTreesClassifier, RandomForestClassifier
 from sklearn.svm import LinearSVC
 from sklearn.multiclass import OneVsRestClassifier
 from sklearn.cross_validation import train_test_split
 from sklearn.externals import joblib
 
+from bot_vision.image_utils import im_resize
+from bot_utils.io_utils import memory_usage_psutil
 from bot_utils.db_utils import AttrDict, AttrDictDB
 from bot_vision.bow_utils import BOWTrainer
-from bot_vision.descriptor_utils import ImageDescription
 
 import bot_utils.io_utils as io_utils
 import sklearn.metrics as metrics
+
+
+class ImageDescription(object): 
+    def __init__(self, descriptor='SIFT', dense=True, step=4, levels=4, scale=2.0): 
+        self.dense = dense
+        self.step = step
+        self.levels = levels
+        self.scale = scale
+
+        if dense: 
+            # self.detector = cv2.PyramidAdaptedFeatureDetector(, maxLevel=levels)
+            self.detector = cv2.FeatureDetector_create('Dense')
+            self.detector.setInt('initXyStep', step)
+            self.detector.setDouble('featureScaleMul', 2.0)
+            self.detector.setInt('featureScaleLevels', levels)
+            self.detector.setBool('varyImgBoundWithScale', False)
+            self.detector.setBool('varyXyStepWithScale', True)
+
+        else: 
+            self.detector = cv2.FeatureDetector_create('FAST')
+
+        self.extractor = cv2.DescriptorExtractor_create(descriptor)
+
+        # self.matcher = cv2.DescriptorMatcher_create("FlannBased")
+
+    # def set_vocabulary(self, vocab): 
+    #     self.matcher.add(vocab)
+
+    def describe(self, im): 
+        """
+        Computes dense/sparse features on an image and describes 
+        these keypoints using a feature descriptor
+        returns 
+           kpts: [cv2.KeyPoint, ... ] 
+           desc: [N x D]
+        """
+        kpts = self.detector.detect(im)
+        kpts, desc = self.extractor.compute(im, kpts)
+        return desc.astype(np.uint8)
 
 class ImageClassifier(object): 
     """
@@ -34,6 +77,7 @@ class ImageClassifier(object):
         # Save dataset
         self.dataset = dataset
         self.cache_args = cache_args
+        print 'Memory usage at __init__ start %5.2f MB' % (memory_usage_psutil())
 
         # Bag-of-words VLAD/VQ
         if cache_args.overwrite or not io_utils.path_exists(cache_args.clf_path): 
@@ -64,11 +108,17 @@ class ImageClassifier(object):
         self.clf_pretrained = False
         if not io_utils.path_exists(cache_args.clf_path) or cache_args.overwrite: 
             print 'Building Classifier'
-            self.clf = OneVsRestClassifier(KNeighborsClassifier(n_neighbors=10), n_jobs=1)
+            # self._clf = KNeighborsClassifier(n_neighbors=10)
+            self._clf = LinearSVC()
+            self.clf = OneVsRestClassifier(self._clf, n_jobs=1)
+            # self.clf = ExtraTreesClassifier(n_estimators=10, 
+            #                                 max_depth=3, min_samples_split=1, random_state=0)
         else: 
             print 'Loading Classifier'
             self.clf = joblib.load(cache_args.clf_path)
             self.clf_pretrained = True
+
+        print 'Memory usage at __init__ completed %5.2f MB' % (memory_usage_psutil())
 
     def train(self): 
         if self.clf_pretrained: 
@@ -76,32 +126,41 @@ class ImageClassifier(object):
 
         st = time.time()
 
-        # Extract features
-        train_desc = [ self.image_descriptor.describe(cv2.imread(x_t)) for x_t in self.X_train ]
+        print 'Memory usage at pre-train %5.2f MB' % (memory_usage_psutil())
 
+        # Extract features
+        train_desc = [self.image_descriptor.describe(cv2.imread(x_t)) for x_t in self.X_train]
         print 'Descriptor extraction took %5.3f s' % (time.time() - st)    
+
+        print 'Memory usage at post-describe %5.2f MB' % (memory_usage_psutil())
 
         # Build BOW
         self.bow.build(train_desc)
+        print 'Codebook: %s' % ('GOOD' if np.isfinite(self.bow.vectorizer.codebook).all() else 'BAD')
+
+        print 'Memory usage at post-bow-build %5.2f MB' % (memory_usage_psutil())
 
         # Histogram of trained features
-        train_target = self.y_train
+        train_target = np.array(self.y_train)
         train_histogram = np.vstack([self.bow.project(desc) for desc in train_desc])
 
-        # Train one-vs-all classifier
+        print 'Memory usage at post-project %5.2f MB' % (memory_usage_psutil())
+
+        # Train/Predict one-vs-all classifier
         self.clf.fit(train_histogram, train_target)
-
-        # Save to DB
-        joblib.dump(self.bow, self.cache_args.vocab_path)
-        joblib.dump(self.clf, self.cache_args.clf_path)
-
-        # Predict for accuracy report
         pred_target = self.clf.predict(train_histogram)
-        # print ' Train:\n', np.vstack([train_target, pred_target])        
+
+        print 'Memory usage at post-fit %5.2f MB' % (memory_usage_psutil())
+
+        # # Save to DB
+        # joblib.dump(self.bow, self.cache_args.vocab_path)
+        # joblib.dump(self.clf, self.cache_args.clf_path)
+
         print ' Accuracy score (Training): %4.3f' % (metrics.accuracy_score(train_target, pred_target))
         print ' Report (Training):\n %s' % (metrics.classification_report(train_target, pred_target, 
                                                                           target_names=self.dataset.target_names))
 
+        print 'Memory usage at post-predict %5.2f MB' % (memory_usage_psutil())
         print 'Training took %5.3f s' % (time.time() - st)
         return
 
