@@ -1,6 +1,7 @@
-import cv, cv2
+import cv2
 import argparse, os
 import numpy as np
+import psutil
 
 def mkdir_p(path):
     try:
@@ -10,6 +11,12 @@ def mkdir_p(path):
 
 def path_exists(path): 
     return os.path.exists(os.path.expanduser(path))
+
+def memory_usage_psutil():
+    # return the memory usage in MB
+    process = psutil.Process(os.getpid())
+    mem = process.get_memory_info()[0] / float(2 ** 20)
+    return mem
 
 # OSError as exc: # Python >2.5
 #         if exc.errno == errno.EEXIST and os.path.isdir(path):
