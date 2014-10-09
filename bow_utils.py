@@ -1,14 +1,15 @@
 import cv2, time
 import numpy as np
 from scipy.cluster.vq import vq, kmeans2
+
+from scipy.spatial import cKDTree
 from sklearn.cluster import KMeans, MiniBatchKMeans
 
 class BOWVectorizer(object): 
-    def __init__(self, K=100, method='vq', norm_method='square-rooting'): 
+    def __init__(self, K=100, method='vq', quantizer='kdtree', norm_method='square-rooting'): 
         self.K = K
-        self.method = method
+        self.method, self.quantizer = method, quantizer
         self.norm_method = norm_method
-        self.km = MiniBatchKMeans(n_clusters=self.K, compute_labels=False)
 
     def build(self, data): 
         """
@@ -20,7 +21,8 @@ class BOWVectorizer(object):
         # self.codebook, self.labels = kmeans2(data, self.K)
 
         # Scikit-learn: 2x
-        km = MiniBatchKMeans(n_clusters=self.K, compute_labels=False, batch_size=5000, verbose=True).fit(data)
+        km = MiniBatchKMeans(n_clusters=self.K, init='k-means++', 
+                             compute_labels=False, batch_size=1000, max_iter=150, verbose=True).fit(data)
         # km = KMeans(n_clusters=self.K, n_jobs=4, tol=0.01, verbose=True).fit(data)
         self.codebook = km.cluster_centers_
 
@@ -30,6 +32,12 @@ class BOWVectorizer(object):
         #                                         attempts=10, flags=cv2.KMEANS_PP_CENTERS)
         print 'Vocab construction from data %s => codebook %s took %5.3f s' % (data.shape, self.codebook.shape, 
                                                                                time.time() - st)
+
+        # Index codebook for quick querying
+        st = time.time()
+        self.index = cKDTree(self.codebook)
+        print 'Indexing codebook %s took %5.3f s' % (self.codebook.shape, time.time() - st)
+
         return self.codebook
 
     def vectorize(self, data): 
@@ -38,11 +46,16 @@ class BOWVectorizer(object):
         returns the cluster indices
         """
         if self.method == 'vq': 
-            code, dist = vq(data, self.codebook)
+            if self.quantizer == 'vq': 
+                code, dist = vq(data, self.codebook)
+            elif self.quantizer == 'kdtree': 
+                dist, code = self.index.query(data, k=1)
+            else: 
+                raise NotImplementedError('Quantizer %s not implemented. Use vq or kdtree!' % self.quantizer)
         elif self.method == 'vlad': 
             code = self.vlad(data)
         else: 
-            raise NotImplementedError('Unknown method')
+            raise NotImplementedError('Codebook generation method %s not implemented. Use vq or vlad!' % self.method)
         return code
 
     def vlad(self, data): 
@@ -52,10 +65,15 @@ class BOWVectorizer(object):
         Proc. IEEE CVPR 10, June, 2010.
         """
         residuals = np.zeros(self.codebook.shape)
-        codes, dist = vq(data, self.codebook)
+        if self.quantizer == 'kdtree': 
+            dist, code = self.index.query(data, k=1)
+        elif self.quantizer == 'vq': 
+            code, dist = vq(data, self.codebook)
+        else: 
+            raise NotImplementedError('Quantizer %s not implemented. Use vq or kdtree!' % quantizer)
 
         # Accumulate residuals [K x D]
-        for cidx, c in enumerate(codes):
+        for cidx, c in enumerate(code):
             residuals[c] += data[cidx] - self.codebook[c]
        
         # Normalize
@@ -101,6 +119,12 @@ class BOWTrainer(object):
     #     """
     #     assert(len(self.data) > 0)
     #     return self.vectorizer.build(np.vstack(self.data))
+
+    def load(self, path): 
+        pass
+
+    def save(self, path): 
+        pass
 
 
     def build(self, data): 
