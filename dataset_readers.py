@@ -278,6 +278,8 @@ class Caltech101DatasetReader(object):
             inds = np.random.randint(len(self._class_names), size=num_targets)
             targets = self._class_names[inds]            
 
+        print 'Classes: %i' % len(targets)
+
         self.data, self.target = [], []
         for key, files in self._dataset.iteritems(): 
             if (targets is not None and key not in targets) or key in blacklist: 
