@@ -26,6 +26,9 @@ class MethodDecorator(object):
 
 @MethodDecorator(func='to_polygon', methods=('intersection', 'union'))
 class Polygon(sg.Polygon): 
+    """
+    Accessible attributes: area, 
+    """
     def __init__(self, pts=None, pg=None): 
         assert(pts is not None or pg is not None)
         if pg is not None: 
@@ -41,8 +44,36 @@ class Polygon(sg.Polygon):
     def pts(self): 
         return np.array(self.exterior.coords)
 
-class Box(sg.box): 
-    def __init__(self, bounds=None, box=None):
+    @property
+    def center(self):
+        return np.array([self.centroid.x, self.centroid.y])
+
+    @property
+    def width(self): 
+        return self.bounds[2]-self.bounds[0]
+
+    @property
+    def height(self): 
+        return self.bounds[2]-self.bounds[0]
+
+    def percentoverlap(self, other): 
+        return self.intersection(other).area / self.union(other).area
+
+    def contains(self, pt):
+        return sg.Point(pt[0], pt[1])
+
+    def resize(self, xratio, yratio = None):
+        if yratio is None:
+            yratio = xratio
+
+        c, pts = self.center, self.pts
+        dv = pts - c
+        mag = np.linalg.norm(dv, axis=1)
+        return Polygon(np.hstack([c[0] + dv[:,0] * mag * xratio, 
+                                  c[0] + dv[:,0] * mag * xratio]))
+
+class Box(Polygon): 
+    def __init__(self, bounds=None, box=None): 
         assert(bounds is not None or box is not None)
         if box is not None: 
             sg.box.__init__(self, box)
@@ -50,6 +81,12 @@ class Box(sg.box):
             if type(bounds) == np.ndarray: 
                 bounds = bounds.tolist()
             sg.box.__init__(self, bounds)
+
+    @property
+    def size(self):
+        return self.width, self.height
+
+
 
     @classmethod
     def from_pts(cls, pts): 
