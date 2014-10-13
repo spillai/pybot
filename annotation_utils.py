@@ -11,7 +11,7 @@ def reduce_funcs(*funcs):
 class MethodDecorator(object):
     """
     Decorates class methods with wrapped methods. 
-    Apply func=to_polygon to each of the methods intersection, union etc. 
+    Apply func=to_polygon to each of the methods [intersection, union] etc. 
     such that the returned value is chained resulting in to_polygon(intersection(x))
     """
     def __init__(self, func, methods):
@@ -27,7 +27,7 @@ class MethodDecorator(object):
 @MethodDecorator(func='to_polygon', methods=('intersection', 'union'))
 class Polygon(sg.Polygon): 
     """
-    Accessible attributes: area, 
+    Accessible attributes: area etc.
     """
     def __init__(self, pts=None, pg=None): 
         assert(pts is not None or pg is not None)
@@ -56,6 +56,10 @@ class Polygon(sg.Polygon):
     def height(self): 
         return self.bounds[2]-self.bounds[0]
 
+    @property
+    def size(self):
+        return self.width, self.height
+
     def percentoverlap(self, other): 
         return self.intersection(other).area / self.union(other).area
 
@@ -65,7 +69,6 @@ class Polygon(sg.Polygon):
     def resize(self, xratio, yratio = None):
         if yratio is None:
             yratio = xratio
-
         c, pts = self.center, self.pts
         dv = pts - c
         mag = np.linalg.norm(dv, axis=1)
@@ -82,12 +85,6 @@ class Box(Polygon):
                 bounds = bounds.tolist()
             sg.box.__init__(self, bounds)
 
-    @property
-    def size(self):
-        return self.width, self.height
-
-
-
     @classmethod
     def from_pts(cls, pts): 
         xmin, xmax = np.min(pts[:,0]), np.max(pts[:,0])
@@ -95,9 +92,10 @@ class Box(Polygon):
         return cls(bounds=[xmin, ymin, xmax, ymax])
 
 if __name__ == "__main__": 
-    pts = np.array([[0,0], [0,1], [1,1], [1,0]])
+    pts = np.array([[0,0], [0,1], [1,1], [1.5, 0.5], [1,0]])
     pts2 = np.array([[0.5,0.5], [0.5,1.5], [1.5,1.5], [1.5,0.5]])
     a = Polygon(pts)
+    print a.width
     b = Polygon(pts2)
 
     print a.pts
