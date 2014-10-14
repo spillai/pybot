@@ -31,10 +31,20 @@ class AttrDict(dict):
 
 #     print dir(a)
 #     a['test'] = 'test'
-
-
-
 #     a.close()
+
+# class AttrDB(shelve.DbfilenameShelf): 
+#     def __init__(self, *args, **kwargs): 
+#         shelve.DbfilenameShelf.__init__(self, *args, **kwargs)
+#         self.__getattr__ = self.__getitem__
+#         self.__setattr__ = self.__setitem__        
+
+# def persistent_db(*args, **kwargs): 
+#     import shelve
+#     d = shelve.open(*args, **kwargs)
+#     d.__getattr__ = d.__getitem__
+#     d.__setattr__ = d.__setitem__
+#     return d
 
 class AttrDictDB(object):
     # Set up tables first and then flush
@@ -67,6 +77,8 @@ class AttrDictDB(object):
             self.__getattr__ = self.data.__getitem__
             self.__getitem__ = self.data.__getitem__
 
+        self.__setattr__ = self.data.__setitem__
+        self.__setitem__ = self.data.__setitem__
 
     def __del__(self): 
         self.h5f.close()
