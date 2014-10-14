@@ -1,3 +1,4 @@
+import cv2
 import numpy as np
 import shapely.geometry as sg
 
@@ -90,6 +91,56 @@ class Box(Polygon):
         xmin, xmax = np.min(pts[:,0]), np.max(pts[:,0])
         ymin, ymax = np.min(pts[:,1]), np.max(pts[:,1])
         return cls(bounds=[xmin, ymin, xmax, ymax])
+
+class Annotator(object): 
+    def __init__(self, im, name): 
+        win_name = "Annotator - %s" % name
+        cv2.namedWindow(win_name)
+        cv2.setMouseCallback(win_name, self._on_mouse)
+        self._print_hotkeys()
+
+        self.name = name
+        self.reset()
+
+    def _print_hotkeys(self): 
+        print '''
+        Annotator: 
+        \tr - reset
+        \tn - next id
+        \tp - previous id
+        \ts - save
+        \tEsc - quit
+        '''
+
+    def _on_mouse(self, event, x, y, flags, param):
+        if event != cv2.EVENT_LBUTTONDOWN:
+            return
+        pt = np.array([[x, y]], dtype=np.int)
+        if self.pt_id in self.pts_map: 
+            self.pts_map[self.pt_id] = np.vstack([self.pts_map[self.pt_id], pt])
+        else: 
+            self.pts_map[self.pt_id] = pt
+
+    def reset(self): 
+        self.pts_map = {}
+        self.pt_id = 0
+        
+
+    def run(self): 
+        while True:
+            ch = 0xFF & cv2.waitKey(1)
+            if ch == ord('r'):
+                self.reset()
+            elif ch == ord('n'): 
+                self.pt_id += 1
+            elif ch == ord('p'): 
+                self.pt_id -= 1
+            elif ch == ord('s'): 
+                print 'Saving to %s' % self.name
+                pass
+                # savemat
+            elif ch == ord('q') or ch == 27: 
+                break
 
 if __name__ == "__main__": 
     pts = np.array([[0,0], [0,1], [1,1], [1.5, 0.5], [1,0]])
