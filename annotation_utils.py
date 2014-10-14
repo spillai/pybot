@@ -124,7 +124,6 @@ class Annotator(object):
     def reset(self): 
         self.pts_map = {}
         self.pt_id = 0
-        
 
     def run(self): 
         while True:
