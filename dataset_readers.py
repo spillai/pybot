@@ -67,7 +67,7 @@ class VelodyneDatasetReader(DatasetReader):
     """
     Velodyne reader
     
-    >> from fs_utils import read_velodyne_pc
+    >> from pybot_vision import read_velodyne_pc
     >> reader = DatasetReader(process_cb=lambda fn: read_velodyne_pc(fn), ...)
     >> reader = DatasetReader(process_cb=lambda fn: read_velodyne_pc(fn), 
                     template='data_%i.txt', start_idx=1, max_files=10000)
@@ -76,9 +76,9 @@ class VelodyneDatasetReader(DatasetReader):
 
     def __init__(self, **kwargs): 
         try: 
-            from fs_utils import read_velodyne_pc
+            from pybot_vision import read_velodyne_pc
         except: 
-            raise RuntimeError('read_velodyne_pc missing in fs_utils. Compile it first!')
+            raise RuntimeError('read_velodyne_pc missing in pybot_vision. Compile it first!')
 
         if 'process_cb' in kwargs: 
             raise RuntimeError('VelodyneDatasetReader does not support defining a process_cb')
