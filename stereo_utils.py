@@ -2,7 +2,8 @@ import cv2, time
 import numpy as np
 from collections import deque
 
-from pybot_externals import StereoELAS, StereoBMCustom# , OrderedCostVolumeStereo
+from pybot_vision import StereoBMCustom
+from pybot_externals import StereoELAS # , OrderedCostVolumeStereo
 # from pybot_externals import fast_cost_volume_filtering, ordered_row_disparity
 
 from bot_vision.image_utils import im_resize, gaussian_blur
