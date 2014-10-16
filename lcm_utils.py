@@ -1,8 +1,6 @@
 #!/usr/bin/python
 import numpy as np
 import cv2, os.path, lcm, zlib
-
-from PIL import Image
 from collections import OrderedDict
 
 from bot_utils.db_utils import AttrDict
