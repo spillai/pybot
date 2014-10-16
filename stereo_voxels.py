@@ -7,7 +7,7 @@ import bot_vision.color_utils as color_utils
 from bot_vision.imshow_utils import imshow_cv, imshow_plt, bar_plt
 
 # from bot_vision.stereo_utils import StereoBM
-# from fs_utils import CostVolumeStereo, StereoBMCustom
+# from pybot_externals import CostVolumeStereo, StereoBMCustom
 
 import pyximport; pyximport.install()
 pyximport.install(setup_args={"include_dirs":np.get_include()},
