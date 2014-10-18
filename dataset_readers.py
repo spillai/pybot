@@ -56,12 +56,21 @@ class DatasetReader(object):
     @staticmethod
     def from_filenames(process_cb, files): 
         return DatasetReader(process_cb=process_cb, files=files)
-
-    def iteritems(self, every_k_frames=1):
-        fnos = np.arange(0, len(self.files)-1, every_k_frames).astype(int)
+        
+    def iteritems(self, every_k_frames=1, reverse=False):
+        fnos = np.arange(0, len(self.files), every_k_frames).astype(int)
+        if reverse: 
+            fnos = fnos[::-1]
         for fno in fnos: 
             yield self.process_cb(self.files[fno])
 
+    @property
+    def length(self): 
+        return len(self.files)
+
+    @property
+    def frames(self): 
+        return self.iteritems()
 
 class VelodyneDatasetReader(DatasetReader): 
     """
@@ -156,11 +165,25 @@ class KITTIStereoDatasetReader(object):
 
         print 'Initialized stereo dataset reader with %f scale' % scale
 
-        self.iter_stereo_frames = lambda : izip(self.left.iteritems(), self.right.iteritems())
-        self.iter_velodyne_frames = lambda : self.velodyne.iteritems()
-        self.iter_stereo_velodyne_frames = lambda : izip(self.left.iteritems(), 
-                                                         self.right.iteritems(), 
-                                                         self.velodyne.iteritems())
+        
+    def iter_stereo_frames(self, *args, **kwargs): 
+        return izip(self.left.iteritems(*args, **kwargs), self.right.iteritems(*args, **kwargs))
+
+    def iter_velodyne_frames(self, *args, **kwargs):         
+        return self.velodyne.iteritems(*args, **kwargs)
+
+    def iter_stereo_velodyne_frames(self, *args, **kwargs):         
+        return izip(self.left.iteritems(*args, **kwargs), 
+                    self.right.iteritems(*args, **kwargs), 
+                    self.velodyne.iteritems(*args, **kwargs))
+
+    def stereo_frames(self): 
+        return self.iter_stereo_frames()
+
+    @property
+    def velodyne_frames(self): 
+        return self.iter_velodyne_frames()
+
 
 class StereoDatasetReader(object): 
     """

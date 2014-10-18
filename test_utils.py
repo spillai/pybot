@@ -2,13 +2,13 @@
 from bot_vision.image_utils import to_color, to_gray
 from bot_utils.dataset_readers import KITTIStereoDatasetReader
 
-def test_dataset(color=False, scale=1.0): 
+def test_dataset(color=False, **kwargs): 
     if color: 
         return KITTIStereoDatasetReader(directory='~/data/dataset/', sequence='08', 
                                         left_template='image_2/%06i.png', right_template='image_3/%06i.png', 
-                                        start_idx=0, scale=scale)
+                                        start_idx=0, **kwargs)
     else: 
-        return KITTIStereoDatasetReader(directory='~/data/dataset/', sequence='08', start_idx=0, scale=scale)
+        return KITTIStereoDatasetReader(directory='~/data/dataset/', sequence='08', start_idx=0, **kwargs)
 
 def test_image(color=True, scale=1.0, stereo=False): 
     for l,r in test_dataset(color=True).iter_stereo_frames(): 
@@ -19,8 +19,8 @@ def test_image(color=True, scale=1.0, stereo=False):
             r = to_color(r) if color else to_gray(r)
             return l,r
 
-def test_video(color=True, scale=1.0, stereo=False): 
-    for l,r in test_dataset(color=True).iter_stereo_frames(): 
+def test_video(color=True, stereo=False, **kwargs): 
+    for l,r in test_dataset(color=True, **kwargs).iter_stereo_frames(): 
         l = to_color(l) if color else to_gray(l)
         if not stereo: 
             yield l
