@@ -1,0 +1,249 @@
+import numpy as np
+import cv2, time, os.path, logging
+
+from collections import defaultdict, deque
+from bot_vision.color_utils import colormap
+from bot_utils.db_utils import AttrDict
+
+# class Track(object): 
+#     def __init__(self, shape, ids, pts): 
+#         self.ids = np.arange(len(pts))
+#         self.pts = pts
+        
+#     @classmethod
+#     def from_track(cls, shape, track): 
+#         valid = finite_and_within_bounds(track.pts, shape)
+#         self.ids = track.ids[valid]
+#         self.pts = track.pts[valid]
+
+def finite_and_within_bounds(xys, shape): 
+    H, W = shape[:2]
+    if not len(xys): 
+        return np.array([])
+    return np.bitwise_and(np.isfinite(xys).all(axis=1), 
+                          reduce(lambda x,y: np.bitwise_and(x,y), [xys[:,0] >= 0, xys[:,0] < W, 
+                                                                   xys[:,1] >= 0, xys[:,1] < H]))
+    
+
+class TrackManager(object): 
+    def __init__(self, maxlen=20): 
+        self.maxlen = maxlen
+        self.reset()
+
+    def reset(self): 
+        self.idx = 0
+        self._ids, self._pts = np.array([]), np.array([])
+        self.tracks_ts = dict()
+        self.tracks = defaultdict(lambda: deque(maxlen=self.maxlen))
+
+    def add(self, pts, ids=None, prune=True): 
+        # Add only if valid and non-zero
+        if not len(pts): 
+            # self._ids = np.array([])
+            # self._pts = np.array([])
+            return
+
+        # Retain valid points
+        valid = np.isfinite(pts).all(axis=1)
+        pts = pts[valid]
+
+        # ID valid points
+        max_id = np.max(self._ids) + 1 if len(self._ids) else 0
+        tids = np.arange(len(pts), dtype=np.int64) + max_id if ids is None else ids[valid]
+        
+        # print max_id, tids, valid
+
+        # Debug
+        if prune: 
+            print len(ids), len(ids[valid]), len(ids)-len(ids[valid])
+
+        # Add pts to track
+        for tid, pt in zip(tids, pts): 
+            self.tracks[tid].append(pt)
+            self.tracks_ts[tid] = self.idx
+
+        # If features are propagated
+        if prune: 
+            self.prune()
+            self.idx += 1
+
+        # Keep pts and ids up to date
+        self._ids = np.array(self.tracks.keys())
+        try: 
+            self._pts = np.vstack([ track[-1] for track in self.tracks.itervalues() ])
+        except: 
+            self._pts = np.array([])
+
+        print 'tracks; ', len(self.tracks), len(self._ids)
+
+    def prune(self): 
+        # Remove tracks that are not most recent
+        # count = 0
+        for tid, val in self.tracks_ts.items(): 
+            if val < self.idx: 
+                del self.tracks[tid]
+                del self.tracks_ts[tid]
+                # count += 1
+        # print 'Total pruned: ', count
+
+    @property
+    def pts(self): 
+        return self._pts
+        
+    @property
+    def ids(self): 
+        return self._ids
+
+
+
+class FeatureDetector(object): 
+    """
+    Feature Detector class that allows for fast switching between
+    several popular feature detection methods. 
+
+    Also, you can request for variable pyramid levels of detection, 
+    and perform subpixel on the detected keypoints
+    """
+
+    default_detector_params = AttrDict(levels=4, subpixel=False)
+    fast_detector_params = AttrDict(default_detector_params, 
+                                    type='fast', params=AttrDict( threshold=10, nonmaxSuppression=True ))
+    gftt_detector_params = AttrDict(default_detector_params, 
+                                    type='gftt', params=AttrDict( maxCorners = 1000, qualityLevel = 0.04, 
+                                                                  minDistance = 5, blockSize = 5 ))
+    def __init__(self, params=default_detector_params): 
+        # FeatureDetector params
+        self.params = params
+
+        # Feature Detector, Descriptor setup
+        if self.params.type == 'gftt': 
+            self.detector = cv2.PyramidAdaptedFeatureDetector(
+                detector=cv2.GFTTDetector(**self.params.params),  
+                maxLevel=self.params.levels
+            )
+        elif self.params.type == 'fast': 
+            
+            self.detector = cv2.PyramidAdaptedFeatureDetector(
+                detector=cv2.FastFeatureDetector(**self.params.params),  
+                maxLevel=self.params.levels
+            )
+        else: 
+            raise RuntimeError('Unknown detector_type: %s! Use fast or gftt' % self.params.type)
+
+    def process(self, im, mask=None): 
+        if im.ndim != 2: 
+            raise RuntimeError('Cannot process color image')
+
+        # Detect features 
+        kpts = self.detector.detect(im, mask=mask)
+        pts = np.float32([ kp.pt for kp in kpts ]).reshape(-1,2)
+        
+        # Perform sub-pixel if necessary
+        if self.params.subpixel: self.perform_subpixel(im, pts)
+
+        return pts
+
+    def subpixel_pts(self, im, pts): 
+        """Perform subpixel refinement"""
+        term = ( cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_COUNT, 30, 0.1 )
+        cv2.cornerSubPix(im, pts, (10, 10), (-1, -1), term)
+        return
+
+
+class OpticalFlowTracker(object): 
+    """
+    General-purpose optical flow tracker class that allows for fast switching between
+    sparse/dense tracking. 
+
+    Also, you can request for variable pyramid levels of tracking, 
+    and perform subpixel on the tracked keypoints
+    """
+
+    default_flow_params = AttrDict(levels=4, fb_check=True)
+    klt_flow_params = AttrDict( default_flow_params, type='lk', 
+                                params=AttrDict(winSize=(5,5), maxLevel=default_flow_params.levels ))
+    farneback_flow_params = AttrDict( default_flow_params, type='dense', 
+                                      params=AttrDict( pyr_scale=0.5, levels=default_flow_params.levels, winsize=15, 
+                                                       iterations=3, poly_n=7, poly_sigma=1.5, flags=0 ))
+
+    def __init__(self, params=klt_flow_params): 
+        # FeatureDetector params
+        self.params = params
+        
+        if self.params.type == 'lk': 
+            self.track = self.sparse_track
+        elif self.params.type == 'dense': 
+            self.track = self.dense_track
+        else: 
+            raise RuntimeError('Unknown tracking type: %s! Use lk or dense' % self.params.type)
+
+    def dense_track(self, im0, im1, p0): 
+        if p0 is None or not len(p0): 
+            return np.array([])
+
+        fflow = cv2.calcOpticalFlowFarneback(im0, im1, **self.params.params)
+        fflow = cv2.medianBlur(fflow, 5)
+
+        # Initialize forward flow and propagated points
+        p1 = np.ones(shape=p0.shape) * np.nan
+        flow_p0 = np.ones(shape=p0.shape) * np.nan
+        flow_good = np.ones(shape=p0.shape, dtype=bool)
+
+        # Check finite value for pts, and within image bounds
+        valid0 = finite_and_within_bounds(p0, im0.shape)
+
+        # Determine finite flow at points
+        xys0 = p0[valid0].astype(int)
+        flow_p0[valid0] = fflow[xys0[:,1], xys0[:,0]]
+        
+        # Propagate
+        p1 = p0 + flow_p0
+
+        # FWD-BWD check
+        if self.params.fb_check: 
+            # Initialize reverse flow and propagated points
+            p0r = np.ones(shape=p0.shape) * np.nan
+            flow_p1 = np.ones(shape=p0.shape) * np.nan
+
+            rflow = cv2.calcOpticalFlowFarneback(im1, im0, **self.params.params)
+            rflow = cv2.medianBlur(rflow, 5)
+
+            # Check finite value for pts, and within image bounds
+            valid1 = finite_and_within_bounds(p1, im0.shape)
+
+            # Determine finite flow at points
+            xys1 = p1[valid1].astype(int)
+            flow_p1[valid1] = rflow[xys1[:,1], xys1[:,0]]
+            
+            # Check diff
+            p0r = p1 + flow_p1
+            fb_good = (np.fabs(p0r-p0) < 2).all(axis=1)
+
+            # Set only good flow 
+            flow_p0[~fb_good] = np.nan
+            p1 = p0 + flow_p0
+
+        return p1
+
+    def sparse_track(self, im0, im1, p0): 
+        """
+        Main tracking method using either sparse/dense optical flow
+        """
+        if p0 is None or not len(p0): 
+            return np.array([])
+
+        # Forward flow
+        p1, st1, err1 = cv2.calcOpticalFlowPyrLK(im0, im1, p0, None, **self.params.params)
+        p1[st1 == 0] = np.nan
+
+        if self.params.fb_check: 
+            # Backward flow
+            p0r, st0, err0 = cv2.calcOpticalFlowPyrLK(im1, im0, p1, None, **self.params.params)
+            p0r[st0 == 0] = np.nan
+
+            # Set only good
+            fb_good = (np.fabs(p0r-p0) < 2).all(axis=1)
+            p1[~fb_good] = np.nan
+
+        return p1
+

@@ -13,29 +13,158 @@ b. Gating of flows
 
 import cv2, time, os.path
 import numpy as np
-np.set_printoptions(precision=2, suppress=True, threshold='nan', linewidth=160)
 
-from collections import namedtuple
-from sklearn.neighbors import BallTree
-from utils.db_utils import AttrDict
+from collections import namedtuple, deque
+# from sklearn.neighbors import BallTree
+from bot_utils.db_utils import AttrDict
 
-from utils.data_containers import Feature3DData
-from utils.optflow_utils import draw_flow, draw_hsv
-from klt import BaseKLT, StandardKLT
+# from utils.data_containers import Feature3DData
+# from utils.optflow_utils import draw_flow, draw_hsv
+# import utils.draw_utils as draw_utils
 
-import utils.draw_utils as draw_utils
+from .base_klt import BaseKLT
+from bot_vision.imshow_utils import imshow_cv
+from bot_vision.image_utils import to_color, to_gray, gaussian_blur
+from bot_utils.plot_utils import colormap
+
+from bot_utils.itertools_recipes import pairwise
+
+class FwdBwdKLT2(BaseKLT): 
+    """
+    Offline KLT Tracker using full information    
+    """
+    def __init__(self, dataset, *args, **kwargs):
+        BaseKLT.__init__(self, *args, **kwargs)
+
+        # Copy frame iterator
+        self.frames = dataset.iteritems
+        self.nframes = dataset.length
+
+        # Process frames provided
+        st = time.time()
+        self.run()
+        self.log.info('Processed %i frames in %f s' % (self.nframes, time.time() - st))
+
+
+    def draw_tracks(self, tpts, im): 
+        T, N = tpts.shape[:2]
+        for tid in np.arange(N): 
+            pts = tpts[:,tid,:]
+            valid = np.isfinite(pts).all(axis=1)
+            pts = pts[valid]
+            cv2.polylines(im,[np.vstack(pts).astype(np.int32)], False, 
+                              tuple(map(int, colormap(tid % 20 / 20.0).ravel())), 
+                              thickness=1, lineType=cv2.CV_AA)
+
+    def run(self): 
+
+        # Store fwd/bwd features
+        T = self.nframes
+        ims = deque(maxlen=2)
+
+        # I. FWD-Flow Extraction
+        print 'Forward flow ====================================> '
+        for tidx, im in enumerate(self.frames()): 
+            ims.append(im)
+
+            # 1. Detect/Track
+            if len(ims) != 2: 
+                # a. Feature Extraction with first frame
+                pts = self.detector.process(ims[-1], mask=None)
+                ids = None
+                prune = False
+
+                # b. Initialize data matrix (T x N x 2)
+                N = len(pts)
+                self.fpts = (np.empty(shape=(T, N, 2)) * np.nan).astype(np.float32)
+                self.bpts = (np.empty(shape=(T, N, 2)) * np.nan).astype(np.float32)
+
+            else: 
+                # a. Track object
+                ids, ppts = self.tm.ids, self.tm.pts
+                pts = self.tracker.track(ims[-2], ims[-1], ppts)
+                prune = True
+
+            # 2. Add tracks
+            self.tm.add(pts, ids=ids, prune=prune)
+
+            # 3. Save forward flow features
+            try: 
+                ids, pts = self.tm.ids, self.tm.pts
+                self.fpts[tidx,ids,:] = pts
+            except: 
+                pass
+
+        fvis = to_color(im)
+        self.draw_tracks(self.fpts, fvis)
+        imshow_cv('f', fvis)
+
+        # I. BWD-Flow Extraction
+        print 'Backward flow ====================================> '
+        detected = set([])
+        ims = deque(maxlen=2)
+        self.tm.reset()
+        for _tidx, im in enumerate(self.frames(reverse=True)): 
+            tidx = T-1-_tidx
+            ims.append(im)
+
+            # Only look at pairs
+            if len(ims) != 2: 
+                continue
+
+            # 1. Identify track and detect ids, points
+            # Detect when only latter frame is finite
+            detect_ids_, = np.where(np.isfinite(self.fpts[tidx+1,:,0]))
+
+            # Detect when both frames are finite (the latter detection is finicky)
+            # detect_ids_, = np.where(np.bitwise_and(np.isfinite(self.fpts[tidx,:,0]), 
+            #                                        np.isfinite(self.fpts[tidx+1,:,0])))
+
+            # Only add detections if not previously detected
+            detect_ids = np.array(list(set(detect_ids_) - detected))
+            detect_pts = self.fpts[tidx, detect_ids]
+            detected.update(detect_ids)
+
+            # 2. Add to tracker and save
+            if len(detect_ids): 
+                self.tm.add(detect_pts, ids=detect_ids, prune=False)
+                ids, pts = self.tm.ids, self.tm.pts
+                print 'tm: %i' % len(self.tm.ids)
+                self.bpts[tidx,ids,:] = pts
+
+            # 3. Track existing features
+            # Look for detections followed by un-tracked feature
+            track_ids, = np.where(np.isfinite(self.bpts[tidx+1,:,0]))
+            track_ppts = self.bpts[tidx+1, track_ids]
+            track_pts = self.tracker.track(ims[-2], ims[-1], track_ppts)
+            if len(track_ids): 
+                self.tm.add(track_pts, ids=track_ids, prune=True)
+                ids, pts = self.tm.ids, self.tm.pts
+                print 'tm: %i' % len(self.tm.ids)
+                self.bpts[tidx,ids,:] = pts
+
+            # print 'detect: %i' % (len(detect_ids))
+            print 'tidx: %i, detect: %i track: %i' % (tidx, len(detect_ids), len(track_ids))
+
+        # II. BWD-Flow Extraction
+        bvis = to_color(im)
+        self.draw_tracks(self.bpts, bvis)
+        imshow_cv('b', bvis)
+        imshow_cv('fb', fvis/2 + bvis/2)
+        cv2.waitKey(0)
+
 
 class OfflineKLT(BaseKLT): 
-    # OfflineKLT params
+
     oklt_params_ = AttrDict( err_th = 1.0 )
     flow_info = namedtuple('flow_info', ['flow', 'status', 'err'])
 
     def __init__(self, images, oklt_params=oklt_params_, **kwargs):
         BaseKLT.__init__(self, **kwargs)
 
-        # OKLT Params
-        self.oklt_params = oklt_params
-        self.log.debug('Offline KLT Params: %s' % oklt_params)
+        # # OKLT Params
+        # self.oklt_params = oklt_params
+        # self.log.debug('Offline KLT Params: %s' % oklt_params)
 
         # Images indexed
         self.images = map(lambda x: self.preprocess_im(x), images)
@@ -104,77 +233,77 @@ class OfflineKLT(BaseKLT):
         # Retain flow info 
         return AttrDict(flow=p1-p0init, inds=inds, err=fberr)
 
-class OfflineStandardKLT(OfflineKLT):
-    def __init__(self, *args, **kwargs):
-        OfflineKLT.__init__(self, *args, **kwargs)
+# class OfflineStandardKLT(OfflineKLT):
+#     def __init__(self, *args, **kwargs):
+#         OfflineKLT.__init__(self, *args, **kwargs)
 
-        # Process frames provided
-        st = time.time()
-        self.run()
-        self.log.debug('Processed %i frames in %f s' % (len(self.images), time.time() - st))
+#         # Process frames provided
+#         st = time.time()
+#         self.run()
+#         self.log.debug('Processed %i frames in %f s' % (len(self.images), time.time() - st))
 
-    def run(self): 
-        # 1. Feature Extraction with first frame
-        pts = self.process_im(self.images[0], mask=None)
+#     def run(self): 
+#         # 1. Feature Extraction with first frame
+#         pts = self.process_im(self.images[0], mask=None)
 
-        # 2. Initialize data matrix (T x N x 2)
-        T, N = len(self.images), len(pts)
-        self.pts = (np.empty(shape=(T, N, 2)) * np.nan).astype(np.float32)
+#         # 2. Initialize data matrix (T x N x 2)
+#         T, N = len(self.images), len(pts)
+#         self.pts = (np.empty(shape=(T, N, 2)) * np.nan).astype(np.float32)
 
-        # Init forward features
-        self.pts[0] = pts
+#         # Init forward features
+#         self.pts[0] = pts
 
-        # 3. FWD/BWD-Flow Extraction: For (1,2), (2,3), ....
-        finds = np.arange(0, T)
-        pair_inds = zip(finds[:-1], finds[1:])
-        self.log.debug('Forward flow ========> %s ' % pair_inds)
-        for (idx0,idx1) in pair_inds: 
-            # FWD-flow: f_flow[1] = lk(1,2)
-            if self.oklt_params.FB_check: 
-                fflow0 = self.fblk(self.pts[idx0], idx0, idx1)
-            else: 
-                fflow0 = self.flk(self.pts[idx0], idx0, idx1)
+#         # 3. FWD/BWD-Flow Extraction: For (1,2), (2,3), ....
+#         finds = np.arange(0, T)
+#         pair_inds = zip(finds[:-1], finds[1:])
+#         self.log.debug('Forward flow ========> %s ' % pair_inds)
+#         for (idx0,idx1) in pair_inds: 
+#             # FWD-flow: f_flow[1] = lk(1,2)
+#             if self.oklt_params.FB_check: 
+#                 fflow0 = self.fblk(self.pts[idx0], idx0, idx1)
+#             else: 
+#                 fflow0 = self.flk(self.pts[idx0], idx0, idx1)
             
-            # Apply forward predictions for valid flow regions
-            self.pts[idx1,fflow0.inds] = \
-                self.pts[idx0,fflow0.inds] + fflow0.flow[fflow0.inds]
+#             # Apply forward predictions for valid flow regions
+#             self.pts[idx1,fflow0.inds] = \
+#                 self.pts[idx0,fflow0.inds] + fflow0.flow[fflow0.inds]
 
-    def get_feature_data(self, Xs, Ns=None): 
-        T, N, _ = self.pts.shape
+#     def get_feature_data(self, Xs, Ns=None): 
+#         T, N, _ = self.pts.shape
 
-        # Create feature data container
-        data = Feature3DData.empty(N, T)
+#         # Create feature data container
+#         data = Feature3DData.empty(N, T)
 
-        # Retrieve 3D
-        for tidx,pts in enumerate(self.pts): 
-            # Find valid inds that are finite
-            ninds = np.where(np.isfinite(pts).all(axis=1))[0]
-            xys = pts[ninds].astype(int)
+#         # Retrieve 3D
+#         for tidx,pts in enumerate(self.pts): 
+#             # Find valid inds that are finite
+#             ninds = np.where(np.isfinite(pts).all(axis=1))[0]
+#             xys = pts[ninds].astype(int)
 
-            # Copy 2D data
-            data.xy[ninds,tidx] = pts[ninds]
+#             # Copy 2D data
+#             data.xy[ninds,tidx] = pts[ninds]
 
-            try: 
-                # Copy 3D data
-                data.xyz[ninds,tidx] = Xs[tidx][xys[:,1],xys[:,0],:]
+#             try: 
+#                 # Copy 3D data
+#                 data.xyz[ninds,tidx] = Xs[tidx][xys[:,1],xys[:,0],:]
 
-                # Copy Normals data
-                if Ns is not None: 
-                    data.normal[ninds,tidx] = Ns[tidx][xys[:,1],xys[:,0],:]
+#                 # Copy Normals data
+#                 if Ns is not None: 
+#                     data.normal[ninds,tidx] = Ns[tidx][xys[:,1],xys[:,0],:]
 
-                ninds_ = ninds[np.isfinite(data.xyz[ninds,tidx]).all(axis=1) &
-                               np.isfinite(data.normal[ninds,tidx]).all(axis=1)]
-                data.idx[ninds_,tidx] = 1
-            except IndexError: 
-                pass
+#                 ninds_ = ninds[np.isfinite(data.xyz[ninds,tidx]).all(axis=1) &
+#                                np.isfinite(data.normal[ninds,tidx]).all(axis=1)]
+#                 data.idx[ninds_,tidx] = 1
+#             except IndexError: 
+#                 pass
 
-            # # Mark outliers
-            # outliers = ninds[np.where((np.fabs(self.fpts[tidx, ninds] - 
-            #                                    self.bpts[tidx, ninds]) > 1.0).any(axis=1))[0]]
-            # data.idx[outliers,tidx] = -1
+#             # # Mark outliers
+#             # outliers = ninds[np.where((np.fabs(self.fpts[tidx, ninds] - 
+#             #                                    self.bpts[tidx, ninds]) > 1.0).any(axis=1))[0]]
+#             # data.idx[outliers,tidx] = -1
 
-        draw_utils.publish_point_cloud('tracks3d', data.xyz.reshape(-1,3), c='b')
-        return data 
+#         draw_utils.publish_point_cloud('tracks3d', data.xyz.reshape(-1,3), c='b')
+#         return data 
 
     
 
@@ -193,7 +322,7 @@ class FwdBwdKLT(OfflineKLT):
     def run(self): 
         # 1. Feature Extraction with first frame
         pts = self.process_im(self.images[0], mask=None)
-
+ 
         # 2. Initialize data matrix (T x N x 2)
         T, N = len(self.images), len(pts)
         self.fpts = (np.empty(shape=(T, N, 2)) * np.nan).astype(np.float32)
