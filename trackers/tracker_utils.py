@@ -53,9 +53,9 @@ class TrackManager(object):
         
         # print max_id, tids, valid
 
-        # Debug
-        if prune: 
-            print len(ids), len(ids[valid]), len(ids)-len(ids[valid])
+        # # Debug
+        # if prune: 
+        #     print len(ids), len(ids[valid]), len(ids)-len(ids[valid])
 
         # Add pts to track
         for tid, pt in zip(tids, pts): 
@@ -74,7 +74,7 @@ class TrackManager(object):
         except: 
             self._pts = np.array([])
 
-        print 'tracks; ', len(self.tracks), len(self._ids)
+        # print 'tracks; ', len(self.tracks), len(self._ids)
 
     def prune(self): 
         # Remove tracks that are not most recent

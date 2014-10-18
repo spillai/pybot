@@ -56,6 +56,23 @@ class FwdBwdKLT2(BaseKLT):
                               tuple(map(int, colormap(tid % 20 / 20.0).ravel())), 
                               thickness=1, lineType=cv2.CV_AA)
 
+            
+    def draw_good_tracks(self, im): 
+        T, N = self.fpts.shape[:2]
+        assert(self.fpts.shape == self.bpts.shape)
+        errs = np.nanmean(np.linalg.norm(self.fpts - self.bpts, axis=2), axis=0)
+        counts = np.sum(np.bitwise_and(np.isfinite(self.fpts[:,:,0]), np.isfinite(self.bpts[:,:,0])), axis=0)
+
+        for err, count, tid in zip(errs, counts, np.arange(N)): 
+            pts = self.fpts[:,tid,:]
+            valid = np.isfinite(pts).all(axis=1)
+            pts = pts[valid]
+            cv2.polylines(im,[np.vstack(pts).astype(np.int32)], False, 
+                              tuple(map(int, colormap(err/10).ravel())), 
+                              thickness=1 if count < 5 else 2, lineType=cv2.CV_AA)
+    
+        
+
     def run(self): 
 
         # Store fwd/bwd features
@@ -120,39 +137,43 @@ class FwdBwdKLT2(BaseKLT):
             # detect_ids_, = np.where(np.bitwise_and(np.isfinite(self.fpts[tidx,:,0]), 
             #                                        np.isfinite(self.fpts[tidx+1,:,0])))
 
+            # 2. Add to tracker and save
             # Only add detections if not previously detected
             detect_ids = np.array(list(set(detect_ids_) - detected))
-            detect_pts = self.fpts[tidx, detect_ids]
             detected.update(detect_ids)
-
-            # 2. Add to tracker and save
             if len(detect_ids): 
+                detect_pts = self.fpts[tidx, detect_ids]
                 self.tm.add(detect_pts, ids=detect_ids, prune=False)
+
                 ids, pts = self.tm.ids, self.tm.pts
-                print 'tm: %i' % len(self.tm.ids)
+                # print 'tm: %i' % len(self.tm.ids)
                 self.bpts[tidx,ids,:] = pts
 
             # 3. Track existing features
             # Look for detections followed by un-tracked feature
             track_ids, = np.where(np.isfinite(self.bpts[tidx+1,:,0]))
-            track_ppts = self.bpts[tidx+1, track_ids]
-            track_pts = self.tracker.track(ims[-2], ims[-1], track_ppts)
             if len(track_ids): 
+                track_ppts = self.bpts[tidx+1, track_ids]
+                track_pts = self.tracker.track(ims[-2], ims[-1], track_ppts)
+
                 self.tm.add(track_pts, ids=track_ids, prune=True)
                 ids, pts = self.tm.ids, self.tm.pts
-                print 'tm: %i' % len(self.tm.ids)
+                # print 'tm: %i' % len(self.tm.ids)
                 self.bpts[tidx,ids,:] = pts
 
             # print 'detect: %i' % (len(detect_ids))
-            print 'tidx: %i, detect: %i track: %i' % (tidx, len(detect_ids), len(track_ids))
+            # print 'tidx: %i, detect: %i track: %i' % (tidx, len(detect_ids), len(track_ids))
 
         # II. BWD-Flow Extraction
         bvis = to_color(im)
         self.draw_tracks(self.bpts, bvis)
         imshow_cv('b', bvis)
         imshow_cv('fb', fvis/2 + bvis/2)
-        cv2.waitKey(0)
 
+        errvis = to_color(im)
+        self.draw_good_tracks(errvis)
+        imshow_cv('err', errvis)
+        cv2.waitKey(0)
 
 class OfflineKLT(BaseKLT): 
 
