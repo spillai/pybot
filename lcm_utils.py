@@ -14,7 +14,6 @@ from kinect.depth_msg_t import depth_msg_t
 class KinectDecoder(object): 
     def __init__(self, channel='KINECT_FRAME', scale=1., 
                  extract_rgb=True, extract_depth=True, extract_X=True):
-        
         self.channel = channel
         self.skip = int(1.0 / scale);
         
@@ -81,17 +80,22 @@ class LCMLogReader(object):
                 if idx % every_k_frames == 0: 
                     yield self.decoder.decode(ev.data)
 
-def KinectLCMLogReader(filename=None): 
-    return LCMLogReader(filename=filename, decoder=KinectDecoder())        
+def KinectLCMLogReader(filename=None, **kwargs): 
+    print kwargs
+    return LCMLogReader(filename=filename, decoder=KinectDecoder(**kwargs))        
 
 if __name__ == "__main__": 
     import os.path
+    from pybot_pcl import compute_normals
 
-    log = LCMLogReader(filename='~/data/2014_06_14_articulation_multibody/lcmlog-2014-06-14.05', 
-                 decoder=KinectDecoder())
+    log = KinectLCMLogReader(filename='~/data/2014_06_14_articulation_multibody/lcmlog-2014-06-14.05')
     for frame in log.iter_frames(): 
         imshow_cv('frame', frame.img)
         imshow_cv('depth', frame.depth / 15)
+
+
+    
+        imshow_cv('normals', )
 
 
         # # Build Index
