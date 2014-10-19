@@ -58,10 +58,6 @@ class BaseKLT(object):
 
         # Track Manager
         self.tm = TrackManager(maxlen=10)
-        
-    # # Pre process with graying, and gaussian blur
-    # def preprocess_im(self, im): 
-    #     return cv2.GaussianBlur(to_gray(im), (3, 3), 0)        
 
     def draw_tracks(self, im): 
         for tid, pts in self.tm.tracks.iteritems(): 
@@ -78,6 +74,8 @@ class BaseKLT(object):
         colors = colormap(np.float32(self.tm.ids % 20) / 20)
         for col, pt in zip(colors, self.tm.pts[valid]): 
             cv2.circle(out, tuple(map(int, pt)), 3, col, -1, lineType=cv2.CV_AA)
+
+
 
 
 class OpenCVKLT(BaseKLT): 

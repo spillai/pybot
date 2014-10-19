@@ -5,17 +5,6 @@ from collections import defaultdict, deque
 from bot_vision.color_utils import colormap
 from bot_utils.db_utils import AttrDict
 
-# class Track(object): 
-#     def __init__(self, shape, ids, pts): 
-#         self.ids = np.arange(len(pts))
-#         self.pts = pts
-        
-#     @classmethod
-#     def from_track(cls, shape, track): 
-#         valid = finite_and_within_bounds(track.pts, shape)
-#         self.ids = track.ids[valid]
-#         self.pts = track.pts[valid]
-
 def finite_and_within_bounds(xys, shape): 
     H, W = shape[:2]
     if not len(xys): 
@@ -23,7 +12,6 @@ def finite_and_within_bounds(xys, shape):
     return np.bitwise_and(np.isfinite(xys).all(axis=1), 
                           reduce(lambda x,y: np.bitwise_and(x,y), [xys[:,0] >= 0, xys[:,0] < W, 
                                                                    xys[:,1] >= 0, xys[:,1] < H]))
-    
 
 class TrackManager(object): 
     def __init__(self, maxlen=20): 
@@ -39,8 +27,6 @@ class TrackManager(object):
     def add(self, pts, ids=None, prune=True): 
         # Add only if valid and non-zero
         if not len(pts): 
-            # self._ids = np.array([])
-            # self._pts = np.array([])
             return
 
         # Retain valid points
@@ -51,12 +37,6 @@ class TrackManager(object):
         max_id = np.max(self._ids) + 1 if len(self._ids) else 0
         tids = np.arange(len(pts), dtype=np.int64) + max_id if ids is None else ids[valid]
         
-        # print max_id, tids, valid
-
-        # # Debug
-        # if prune: 
-        #     print len(ids), len(ids[valid]), len(ids)-len(ids[valid])
-
         # Add pts to track
         for tid, pt in zip(tids, pts): 
             self.tracks[tid].append(pt)
@@ -74,8 +54,6 @@ class TrackManager(object):
         except: 
             self._pts = np.array([])
 
-        # print 'tracks; ', len(self.tracks), len(self._ids)
-
     def prune(self): 
         # Remove tracks that are not most recent
         # count = 0
@@ -89,11 +67,15 @@ class TrackManager(object):
     @property
     def pts(self): 
         return self._pts
+
+    @property
+    def pts3d(self): 
+        return self._pts3d
+
         
     @property
     def ids(self): 
         return self._ids
-
 
 
 class FeatureDetector(object): 
