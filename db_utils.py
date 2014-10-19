@@ -2,12 +2,27 @@
 import time, logging, cPickle, shelve
 import tables as tb
 import numpy as np
+import json
+
+def load_dict(fn): 
+    return json.load(open(fn, 'r'))
+
+def save_dict(fn, d): 
+    with open(fn, 'w') as fp:
+        json.dump(d, fp, sort_keys=True, indent=4, separators=(',', ':'))
 
 class AttrDict(dict):
     def __init__(self, *args, **kwargs):
         super(AttrDict, self).__init__(*args, **kwargs)
         self.__dict__ = self
 
+    @staticmethod
+    def load(fn): 
+        return AttrDict(load_dict(fn))
+
+    def save(self, fn): 
+        save_dict(fn, self.__dict__)
+        
 # class AttrDictDB(dict): 
 #     def __init__(self, *args, **kwargs): 
 #         super(AttrDict, self).__init__(*args, **kwargs)
