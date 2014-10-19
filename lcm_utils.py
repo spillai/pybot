@@ -80,8 +80,9 @@ class LCMLogReader(object):
                 idx += 1
                 if idx % every_k_frames == 0: 
                     yield self.decoder.decode(ev.data)
-                    
-        
+
+def KinectLCMLogReader(filename=None): 
+    return LCMLogReader(filename=filename, decoder=KinectDecoder())        
 
 if __name__ == "__main__": 
     import os.path
