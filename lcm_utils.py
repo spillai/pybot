@@ -11,7 +11,9 @@ from kinect.frame_msg_t import frame_msg_t
 from kinect.image_msg_t import image_msg_t
 from kinect.depth_msg_t import depth_msg_t
 
+
 class KinectDecoder(object): 
+    kinect_params = AttrDict(fx=576.09757860, fy=576.09757860, cx=319.50, cy=239.50)
     def __init__(self, channel='KINECT_FRAME', scale=1., 
                  extract_rgb=True, extract_depth=True, extract_X=True):
         self.channel = channel
@@ -23,9 +25,8 @@ class KinectDecoder(object):
         self.extract_X = extract_X
 
         if self.extract_X: 
-            fx = 576.09757860
-            K = construct_K(fx=fx, fy=fx, cx=319.50, cy=239.50)
-            self.camera = DepthCamera(K=K, shape=(480,640))
+            K = construct_K(**KinectDecoder.kinect_params)
+            self.camera = DepthCamera(K=K, shape=(480,640), skip=self.skip)
 
     def decode(self, data):
         img, depth, X = [None] * 3
@@ -36,6 +37,8 @@ class KinectDecoder(object):
             depth = self.decode_depth(frame)
             if self.extract_X: 
                 X = self.camera.reconstruct(depth)
+
+        # return AttrDict(timestamp=frame.timestamp) 
         return AttrDict(timestamp=frame.timestamp, img=img, depth=depth, X=X)
 
     def decode_rgb(self, data): 
