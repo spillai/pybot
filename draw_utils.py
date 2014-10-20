@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 # Helper functions for plotting
+import matplotlib.pylab as plt
+from matplotlib.colors import colorConverter
 
 print 'Importing dummy draw_utils'
 

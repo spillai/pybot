@@ -24,23 +24,28 @@ from bot_utils.db_utils import AttrDict
 
 from .base_klt import BaseKLT
 from bot_vision.imshow_utils import imshow_cv
-from bot_vision.image_utils import to_color, to_gray, gaussian_blur
+from bot_vision.image_utils import to_color, to_gray, gaussian_blur, im_mosaic
 from bot_utils.plot_utils import colormap
 
 from bot_utils.itertools_recipes import pairwise
+
+import logging
+logging.basicConfig(format='%(name)s :: %(message)s',level=logging.INFO)
 
 class FwdBwdKLT2(BaseKLT): 
     """
     Offline KLT Tracker using full information    
     """
-    fwdbwd_params = AttrDict(overlap_threshold=5, error_threshold=3.0)
+    fwdbwd_params = AttrDict(overlap_threshold=5, error_threshold=3.0, debug=False)
     default_params = AttrDict(
         BaseKLT.default_params, 
         fwdbwd_params=fwdbwd_params
     )
 
     def __init__(self, dataset, params=default_params):
+        print params
         BaseKLT.__init__(self, params=params)
+
         self.params = params.fwdbwd_params
         
         # Copy frame iterator
@@ -133,15 +138,6 @@ class FwdBwdKLT2(BaseKLT):
         vis = to_color(im)
         self.draw_tracks(pts, vis)
         return vis
-
-    def visualize(self, fvis, bvis): 
-        imshow_cv('FWD/BWD', np.vstack([fvis, bvis]))
-        imshow_cv('FWD/BWD CHECK', fvis/2 + bvis/2)
-
-    def visualize_error(self, im): 
-        errvis = to_color(im)
-        self.draw_good_tracks(errvis)
-        imshow_cv('FWD/BWD ERR', errvis)
         
     def run(self): 
 
@@ -151,8 +147,8 @@ class FwdBwdKLT2(BaseKLT):
 
         # I. FWD-Flow Extraction
         print 'Forward flow ====================================> '
-        for tidx, im in enumerate(self.frames()): 
-            ims.append(im)
+        for tidx, frame in enumerate(self.dataset.iteritems()): 
+            ims.append(gaussian_blur(to_gray(frame.img)))
 
             # 1. Detect/Track
             if len(ims) != 2: 
@@ -190,9 +186,9 @@ class FwdBwdKLT2(BaseKLT):
         detected = set([])
         ims = deque(maxlen=2)
         self.tm.reset()
-        for _tidx, im in enumerate(self.frames(reverse=True)): 
+        for _tidx, frame in enumerate(self.dataset.iteritems(reverse=True)): 
             tidx = T-1-_tidx
-            ims.append(im)
+            ims.append(gaussian_blur(to_gray(frame.img)))
 
             # Only look at pairs
             if len(ims) != 2: 
@@ -233,12 +229,14 @@ class FwdBwdKLT2(BaseKLT):
             # print 'detect: %i' % (len(detect_ids))
             # print 'tidx: %i, detect: %i track: %i' % (tidx, len(detect_ids), len(track_ids))
 
-        print 'Forward flow DONE -------------------------------> '
+        print 'Backward flow DONE -------------------------------> '
         bvis = self.visualize_tracks('BWD', ims[-1], self.bpts)
 
+        # Draw good tracks
+        errvis = to_color(ims[-1])
+        self.draw_good_tracks(errvis)
+        imshow_cv('FWD/BWD', im_mosaic(fvis, bvis, fvis/2 + bvis/2, errvis))
         print 'Final visualization'
-        self.visualize(fvis, bvis)
-        self.visualize_error(ims[-1])
         cv2.waitKey(0)
 
         # Tracks
