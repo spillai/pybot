@@ -44,13 +44,12 @@ class FwdBwdKLT2(BaseKLT):
         self.params = params.fwdbwd_params
         
         # Copy frame iterator
-        self.frames = dataset.iteritems
-        self.nframes = dataset.length
+        self.dataset = dataset
 
         # Process frames provided
         st = time.time()
         self.run()
-        self.log.info('Processed %i frames in %f s' % (self.nframes, time.time() - st))
+        self.log.info('Processed %i frames in %f s' % (self.dataset.length, time.time() - st))
 
 
     def draw_tracks(self, tpts, im): 
@@ -147,7 +146,7 @@ class FwdBwdKLT2(BaseKLT):
     def run(self): 
 
         # Store fwd/bwd features
-        T = self.nframes
+        T = self.dataset.length
         ims = deque(maxlen=2)
 
         # I. FWD-Flow Extraction
