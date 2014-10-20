@@ -11,7 +11,6 @@ from kinect.frame_msg_t import frame_msg_t
 from kinect.image_msg_t import image_msg_t
 from kinect.depth_msg_t import depth_msg_t
 
-
 class KinectDecoder(object): 
     kinect_params = AttrDict(fx=576.09757860, fy=576.09757860, cx=319.50, cy=239.50)
     def __init__(self, channel='KINECT_FRAME', scale=1., 
@@ -37,8 +36,6 @@ class KinectDecoder(object):
             depth = self.decode_depth(frame)
             if self.extract_X: 
                 X = self.camera.reconstruct(depth)
-
-        # return AttrDict(timestamp=frame.timestamp) 
         return AttrDict(timestamp=frame.timestamp, img=img, depth=depth, X=X)
 
     def decode_rgb(self, data): 
@@ -84,7 +81,6 @@ class LCMLogReader(object):
                     yield self.decoder.decode(ev.data)
 
 def KinectLCMLogReader(filename=None, **kwargs): 
-    print kwargs
     return LCMLogReader(filename=filename, decoder=KinectDecoder(**kwargs))        
 
 if __name__ == "__main__": 
@@ -95,10 +91,6 @@ if __name__ == "__main__":
     for frame in log.iter_frames(): 
         imshow_cv('frame', frame.img)
         imshow_cv('depth', frame.depth / 15)
-
-
-    
-        imshow_cv('normals', )
 
 
         # # Build Index
