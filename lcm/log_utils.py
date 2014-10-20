@@ -93,7 +93,7 @@ class LCMLogReader(object):
 
     @property
     def length(self): 
-        return len(self.files)
+        return len(self.index)
 
     def iteritems(self, every_k_frames=1, reverse=False): 
         if reverse: 
