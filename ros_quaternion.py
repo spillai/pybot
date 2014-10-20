@@ -2,7 +2,6 @@ import math
 import numpy as np
 import ros_transformations as tf
 from tf_tests import tf_isequal
-np.set_printoptions(precision=2, suppress=True, threshold='nan', linewidth=160)
 
 # q = [x, y, z, w]
 class Quaternion:

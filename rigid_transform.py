@@ -2,7 +2,6 @@ import numpy as np
 import transformations as tf
 from ros_quaternion import Quaternion
 from tf_tests import tf_isequal
-np.set_printoptions(precision=2, suppress=True, threshold='nan', linewidth=160)
 
 def normalize_vec(v): 
     return v * 1.0 / np.linalg.norm(v)
