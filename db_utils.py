@@ -4,10 +4,10 @@ import tables as tb
 import numpy as np
 import json
 
-def load_dict(fn): 
+def load_json_dict(fn): 
     return json.load(open(fn, 'r'))
 
-def save_dict(fn, d): 
+def save_json_dict(fn, d): 
     with open(fn, 'w') as fp:
         json.dump(d, fp, sort_keys=True, indent=4, separators=(',', ':'))
 
@@ -22,11 +22,23 @@ class AttrDict(dict):
         self[attr] = value
 
     @staticmethod
-    def load(fn): 
-        return AttrDict(load_dict(fn))
+    def load_json(fn): 
+        return AttrDict(load_json_dict(fn))
 
-    def save(self, fn): 
-        save_dict(fn, vars(self))
+    def save_json(self, fn): 
+        save_json_dict(fn, vars(self))
+
+# class AttrDictDB(AttrDict): 
+#     def __init__(self, filename=None, flags='w'): 
+#         super(AttrDictDB, self).__init__(*args, **kwargs)
+
+#     @staticmethod
+#     def load(fn, flags='r'): 
+#         pass
+        
+#     def save(self, fn): 
+#         pass
+
 
 # class AttrDict(dict):
 #     def __init__(self, *args, **kwargs):
