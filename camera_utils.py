@@ -6,7 +6,7 @@ from scipy import linalg
 
 from bot_geometry.rigid_transform import Quaternion, RigidTransform
 
-def construct_K(fx, fy, cx, cy): 
+def construct_K(fx=500.0, fy=500.0, cx=319.5, cy=239.5): 
     """
     Create camera intrinsics from focal lengths and focal centers
     """
