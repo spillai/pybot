@@ -2,7 +2,7 @@
 import time, logging, cPickle, shelve
 import tables as tb
 import numpy as np
-import json, argparse
+import json
 
 def load_dict(fn): 
     return json.load(open(fn, 'r'))
@@ -11,9 +11,15 @@ def save_dict(fn, d):
     with open(fn, 'w') as fp:
         json.dump(d, fp, sort_keys=True, indent=4, separators=(',', ':'))
 
-class AttrDict(argparse.Namespace): 
+class AttrDict(dict): 
     def __init__(self, *args, **kwargs): 
         super(AttrDict, self).__init__(*args, **kwargs)
+
+    def __getattr__(self, attr): 
+        return self[attr]
+
+    def __setattr__(self, attr, value): 
+        self[attr] = value
 
     @staticmethod
     def load(fn): 
@@ -21,7 +27,6 @@ class AttrDict(argparse.Namespace):
 
     def save(self, fn): 
         save_dict(fn, vars(self))
-
 
 # class AttrDict(dict):
 #     def __init__(self, *args, **kwargs):
