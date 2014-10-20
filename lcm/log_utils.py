@@ -72,13 +72,49 @@ class LCMLogReader(object):
         self._lc = lcm.LCM()
         self._log = lcm.EventLog(self.filename, "r")
 
+        # Build index
+        self.index()
+
+    def index(self): 
+        utimes = np.array([ev.timestamp for ev in self._log], dtype=np.int64)
+        inds = np.array([idx
+                         for idx, ev in enumerate(self._log) 
+                         if ev.channel == self.decoder.channel], dtype=np.int64)
+        self.index = utimes[np.maximum(0, inds-1)]
+
+        # for ts in self.index[::10]: 
+        #     # print 'Seeking ', ts
+        #     self._log.c_eventlog.seek_to_timestamp(ts)
+        #     while True: 
+        #         ev = self._log.next()
+        #         print ev.timestamp
+        #         if ev.channel == self.decoder.channel: break
+        #     # print 'Seeked to idx:', ts, ev.timestamp, ev.channel
+
+    @property
+    def length(self): 
+        return len(self.files)
+
+    def iteritems(self, every_k_frames=1, reverse=False): 
+        if reverse: 
+            ts = self.index[::-every_k_frames]
+            for t in ts: 
+                self._log.c_eventlog.seek_to_timestamp(t)
+                while True: 
+                    ev = self._log.next()
+                    if ev.channel == self.decoder.channel: 
+                        break
+                yield self.decoder.decode(ev.data)
+        else: 
+            idx = 0
+            for ev in self._log: 
+                if ev.channel == self.decoder.channel: 
+                    idx += 1
+                    if idx % every_k_frames == 0: 
+                        yield self.decoder.decode(ev.data)
+
     def iter_frames(self, every_k_frames=1):
-        idx = 0
-        for ev in self._log: 
-            if ev.channel == self.decoder.channel: 
-                idx += 1
-                if idx % every_k_frames == 0: 
-                    yield self.decoder.decode(ev.data)
+        return self.iteritems(every_k_frames=every_k_frames)
 
 def KinectLCMLogReader(filename=None, **kwargs): 
     return LCMLogReader(filename=filename, decoder=KinectDecoder(**kwargs))        
@@ -88,7 +124,11 @@ if __name__ == "__main__":
     from pybot_pcl import compute_normals
 
     log = KinectLCMLogReader(filename='~/data/2014_06_14_articulation_multibody/lcmlog-2014-06-14.05')
-    for frame in log.iter_frames(): 
+    # for frame in log.iter_frames(): 
+    #     imshow_cv('frame', frame.img)
+    #     imshow_cv('depth', frame.depth / 15)
+
+    for frame in log.iteritems(reverse=True): 
         imshow_cv('frame', frame.img)
         imshow_cv('depth', frame.depth / 15)
 

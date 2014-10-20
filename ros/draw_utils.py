@@ -14,6 +14,7 @@ import sensor_msgs.msg as sensor_msg
 from copy import deepcopy
 
 # Utility imports
+from bot_vision.draw_utils import reshape_arr, get_color_arr, height_map, color_by_height_axis
 from bot_utils.async_utils import run_async
 from bot_geometry.rigid_transform import RigidTransform
 from .pointclouds import xyz_array_to_pointcloud2, xyzrgb_array_to_pointcloud2
@@ -56,47 +57,6 @@ class VisualizationMsgsPub:
         if ns not in self.pc_map: 
             self.pc_map[ns] = rospy.Publisher(ns, sensor_msg.PointCloud2, latch=False, queue_size=10)
         return self.pc_map[ns]
-
-def reshape_arr(arr):
-    """ 
-    Reshapes organized point clouds to [Nx3] form
-    """
-    if arr.ndim == 3:
-        return arr.reshape((-1,3))
-    elif arr.ndim == 2: 
-        assert(arr.shape[1] == 3)
-        return arr
-    else: 
-        raise Exception('Invalid dimensions %s' % arr.shape)
-
-def get_color_arr(c, n, color_func=plt.cm.gist_rainbow, 
-                  color_by='value', palette_size=20, flip_rb=False):
-    """ 
-    Convert string c to carr array (N x 3) format
-    """
-    carr = None;
-
-    if color_by == 'value': 
-        if isinstance(c, str): # single color
-            carr = np.tile(np.array(colorConverter.to_rgb(c)), [n,1])
-        elif  isinstance(c, float):
-            carr = np.tile(np.array(color_func(c)), [n,1])
-        else:
-            carr = reshape_arr(c.astype(float) * 1.0)
-
-    elif color_by == 'label': 
-        if c < 0: 
-            carr = np.tile(np.array([0,0,0,0]), [n,1])
-        else: 
-            carr = np.tile(np.array(color_func( (c % palette_size) * 1. / palette_size)), [n,1])
-    else: 
-        raise Exception("unknown color_by argument")
-
-    if flip_rb: 
-        r, b = carr[:,0], carr[:,2]
-        carr[:,0], carr[:,2] = b.copy(), r.copy()
-
-    return carr        
 
 # Helper functions
 def _publish_tf(*args): 
@@ -351,14 +311,6 @@ def publish_octomap(pub_ns, arr, carr, size=0.1, stamp=None, frame_id='map', fli
     marker.lifetime = rospy.Duration()
     _publish_marker(marker)
          
-
-# ================================
-# Helper functions for plotting
-def height_map(hX, hmin=-0.20, hmax=5.0): 
-    return np.array(plt.cm.hsv((hX-hmin)/(hmax-hmin)))[:,:3]
-
-def color_by_height_axis(axis=2): 
-    return height_map(X[:,axis]) * 255
 
 def publish_height_map(ns, X, frame_id='map', height_axis=2): 
     carr = height_map(X[:,height_axis]) * 255
