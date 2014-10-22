@@ -1,9 +1,6 @@
 import cv2, os, logging
 import numpy as np
-
-import bot_externals.ros.draw_utils as draw_utils
-# import utils.draw_utils as draw_utils
-# import utils.plot_utils as plot_utils
+import bot_externals.draw_utils as draw_utils
 
 # Class to encapsulate all relevant data ===============================
 # Build data (idx id, idx utime -> idx feature) 
@@ -170,13 +167,11 @@ class Feature3DData:
         if utimes_inds is None: utimes_inds = np.arange(self.num_utimes)
 
         # Draw pruned features =================================================
-        viz_pts, viz_normals, viz_colors, viz_idloc, viz_text = [], [], [], [], []
+        viz_pts, viz_normals, viz_idloc, viz_text = [], [], [], []
         viz_traj1, viz_traj2 = [], []
         for idx in self.valid_feat_inds:
 
             # Valid utimes
-            # c = plt.cm.jet((self.feature_ids[idx]) % 10 * 1. / 10)
-            # c = [0., 0., 1.0, 1.]
             ut_inds, = np.where(self.idx[idx,utimes_inds] != -1)
             ut_inds = utimes_inds[ut_inds]
 
@@ -191,22 +186,21 @@ class Feature3DData:
             viz_traj2.append(self.xyz[idx,ut_inds[1:],:])
 
             viz_normals.append(self.xyz[idx,ut_inds,:] + self.normal[idx,ut_inds,:]*0.04)
-            # viz_colors.append(np.tile(c, (len(ut_inds), 1)));
 
         if not len(viz_pts): return
 
         viz_pts = np.vstack(viz_pts)
-        # viz_colors = np.vstack(viz_colors)
         viz_normals = np.vstack(viz_normals)
         viz_traj1, viz_traj2 = np.vstack(viz_traj1), np.vstack(viz_traj2)
         # viz_idloc = np.vstack(viz_idloc)
 
-        draw_utils.publish_cloud_markers('PRUNED_PTS', viz_pts, c='b', frame_id='kinect')
-        # draw_utils.publish_text_list('IDS', viz_idloc, viz_text);
-        # draw_utils.publish_point_cloud('PRUNED_PTS', viz_pts, viz_colors);
-        # draw_utils.publish_line_segments('PRUNED_NORMAL', viz_pts, viz_normals, c='b', frame_id='kinect')
-        draw_utils.publish_line_segments('PRUNED_TRAJ', viz_traj1, viz_traj2, c='b', frame_id='kinect')
+        print 'Publishing', len(viz_pts)
+        draw_utils.publish_cloud('PRUNED_PTS', viz_pts, c='b', frame_id='KINECT')
+        draw_utils.publish_line_segments('PRUNED_TRAJ', viz_traj1, viz_traj2, c='b', frame_id='KINECT')
+
+        # draw_utils.publish_line_segments('PRUNED_NORMAL', viz_pts, viz_normals, c='b', frame_id='KINECT')
         # draw_utils.publish_text_lcmgl('IDS', viz_ids)
+        # draw_utils.publish_text_list('IDS', viz_idloc, viz_text);
 
     # Determine Residual error given ground truth class that compute motion err 
     def compute_residual(self, gt_data, finds):

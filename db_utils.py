@@ -131,6 +131,7 @@ class AttrDict(dict):
         self[attr] = value
 
     def __repr__(self): 
+        import json
         return json.dumps(dict(self), sort_keys=True, indent=4)
 
     @staticmethod
