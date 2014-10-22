@@ -41,7 +41,7 @@ class VisualizationMsgsPub:
     Visualization publisher class
     """
     # Init publisher
-    marker_pub_ = rospy.Publisher('viz_msgs_marker_publisher', vis_msg.Marker, latch=False, queue_size=10)
+    marker_pub_ = rospy.Publisher('viz_msgs_marker_publisher', vis_msg.Marker, latch=True, queue_size=10)
     pose_pub_ = rospy.Publisher('viz_msgs_pose_publisher', geom_msg.PoseArray, latch=False, queue_size=10)
     geom_pose_pub_ = rospy.Publisher('viz_msgs_geom_pose_publisher', geom_msg.PoseStamped, latch=False, queue_size=10)
     pc_pub_ = rospy.Publisher('viz_msgs_pc_publisher', sensor_msg.PointCloud2, latch=False, queue_size=10)
@@ -97,8 +97,16 @@ def publish_tf(pose, stamp=None, frame_id='/camera', child_frame_id='map'):
     x,y,z,w = pose.quat.to_xyzw()
     _publish_tf(tuple(pose.tvec), (x,y,z,w), rospy.Time.now(), frame_id, child_frame_id)
 
+def copy_pointcloud_data(_arr, _carr, flip_rb=False): 
+    arr, carr = deepcopy(_arr), deepcopy(_carr)
+    arr = arr.reshape(-1,3)
+
+    N, D = arr.shape[:2]
+    carr = get_color_arr(carr, N, flip_rb=flip_rb);
+    return arr, carr
+
 @run_async
-def publish_cloud(pub_ns, _arr, _carr, stamp=None, flip_rb=False, frame_id='map', seq=None): 
+def publish_cloud(pub_ns, _arr, c='b', stamp=None, flip_rb=False, frame_id='map', seq=None): 
     """
     Publish point cloud on:
     pub_ns: Namespace on which the cloud will be published
@@ -109,14 +117,12 @@ def publish_cloud(pub_ns, _arr, _carr, stamp=None, flip_rb=False, frame_id='map'
     s: supported only by matplotlib plotting
     alpha: supported only by matplotlib plotting
     """
-    arr, carr = deepcopy(_arr), deepcopy(_carr)
-    N, D = arr.shape
-    carr = get_color_arr(carr, N, flip_rb=flip_rb);
-
+    arr, carr = copy_pointcloud_data(_arr, c, flip_rb=flip_rb)
     pc = xyzrgb_array_to_pointcloud2(arr, carr, stamp=stamp, frame_id=frame_id, seq=seq)
     _publish_pc(pub_ns, pc)
-    
-def publish_cloud_markers(pub_ns, arr, carr, stamp=None, flip_rb=False, seq=None): 
+
+@run_async    
+def publish_cloud_markers(pub_ns, _arr, c='b', stamp=None, flip_rb=False, frame_id='map'): 
     """
     Publish point cloud on:
     pub_ns: Namespace on which the cloud will be published
@@ -127,36 +133,34 @@ def publish_cloud_markers(pub_ns, arr, carr, stamp=None, flip_rb=False, seq=None
     s: supported only by matplotlib plotting
     alpha: supported only by matplotlib plotting
     """
-    marker = vis_msg.Marker(type=vis_msg.Marker.POINTS, ns=pub_ns, action=vis_msg.Marker.ADD)
+    arr, carr = copy_pointcloud_data(_arr, c, flip_rb=flip_rb)
 
-    marker.header.frame_id = 'sensor_link'
+    marker = vis_msg.Marker(type=vis_msg.Marker.SPHERE_LIST, ns=pub_ns, action=vis_msg.Marker.ADD)
+    marker.header.frame_id = frame_id
     marker.header.stamp = stamp if stamp is not None else rospy.Time.now()
-
-    # Point width, and height
-    marker.scale.x = 0.02
-    marker.scale.y = 0.02
+    marker.scale.x = 0.01
+    marker.scale.y = 0.01
    
-    N, D = arr.shape
-
     # XYZ
     inds, = np.where(~np.isnan(arr).any(axis=1))
     marker.points = [geom_msg.Point(arr[j,0], arr[j,1], arr[j,2]) for j in inds]
     
     # RGB (optionally alpha)
-    rax, bax = 0, 2
-    carr = carr.astype(np.float32) * 1.0 / 255
-    if flip_rb: rax, bax = 2, 0
+    N, D = arr.shape[:2]
     if D == 3: 
-        marker.colors = [std_msg.ColorRGBA(carr[j,rax], carr[j,1], carr[j,bax], 1.0) 
+        marker.colors = [std_msg.ColorRGBA(carr[j,0], carr[j,1], carr[j,2], 1.0) 
                          for j in inds]
     elif D == 4: 
-        marker.colors = [std_msg.ColorRGBA(carr[j,rax], carr[j,1], carr[j,bax], carr[j,3])
+        marker.colors = [std_msg.ColorRGBA(carr[j,0], carr[j,1], carr[j,2], carr[j,3])
                          for j in inds]
          
     marker.lifetime = rospy.Duration()
     _publish_marker(marker)
+    print 'Publishing marker', N
 
-def publish_line_segments(pub_ns, arr1, arr2, frame_id='camera', stamp=None, c='g', size=0.05): 
+
+@run_async    
+def publish_line_segments(pub_ns, _arr1, _arr2, c='b', stamp=None, frame_id='camera', flip_rb=False, size=0.002): 
     """
     Publish point cloud on:
     pub_ns: Namespace on which the cloud will be published
@@ -167,29 +171,22 @@ def publish_line_segments(pub_ns, arr1, arr2, frame_id='camera', stamp=None, c='
     s: supported only by matplotlib plotting
     alpha: supported only by matplotlib plotting
     """
-    marker = vis_msg.Marker(type=vis_msg.Marker.LINE_LIST, ns=pub_ns, action=vis_msg.Marker.ADD)
+    arr1, carr = copy_pointcloud_data(_arr1, c, flip_rb=flip_rb)
+    arr2 = (deepcopy(_arr2)).reshape(-1,3)
 
-    # check
+    marker = vis_msg.Marker(type=vis_msg.Marker.LINE_LIST, ns=pub_ns, action=vis_msg.Marker.ADD)
     if not arr1.shape == arr2.shape: raise AssertionError    
 
     marker.header.frame_id = frame_id
     marker.header.stamp = stamp if stamp is not None else rospy.Time.now()
-
-    # Point width, and height
     marker.scale.x = size
     marker.scale.y = size
-    
     marker.color.b = 1.0
     marker.color.a = 1.0
-
     marker.pose.position = geom_msg.Point(0,0,0)
     marker.pose.orientation = geom_msg.Quaternion(0,0,0,1)
-   
-    N, D = arr1.shape
-    carr = get_color_arr(c, N);
 
     # Handle 3D data: [ndarray or list of ndarrays]
-    arr1, arr2 = reshape_arr(arr1), reshape_arr(arr2)
     arr12 = np.hstack([arr1, arr2])
     inds, = np.where(~np.isnan(arr12).any(axis=1))
     
