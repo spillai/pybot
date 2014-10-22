@@ -2,7 +2,14 @@
 import time, logging, cPickle, shelve
 import tables as tb
 import numpy as np
+
+import cPickle
+import shelve
 import json
+
+# =============================================================================
+# Pytables helpers
+# =============================================================================
 
 def load_json_dict(fn): 
     return json.load(open(fn, 'r'))
@@ -10,6 +17,110 @@ def load_json_dict(fn):
 def save_json_dict(fn, d): 
     with open(fn, 'w') as fp:
         json.dump(d, fp, sort_keys=True, indent=4, separators=(',', ':'))
+
+def read_pytable(h5f, group=None): 
+    if group is None: group = h5f.root
+
+    data = AttrDict()
+    for child in h5f.listNodes(group): 
+        item = None
+        try: 
+            if isinstance(child, tb.group.Group): 
+                item = read_pytable(h5f, child)
+            else: 
+                item = child.read()
+                if isinstance(item, str) and item.startswith('OBJ_'): 
+                    item = cPickle.loads(item[4:])
+            data[child._v_name] = item
+        except tb.NoSuchNodeError:
+            warnings.warn('No such node: "%s", skipping...' % repr(child))
+            pass
+
+    return data
+
+def load_pytable(fn): 
+    try: 
+        h5f = tb.openFile(fn, mode='r', title='Title: %s' % fn)
+        data = read_pytable(h5f, group=h5f.root)
+        h5f.close()
+    except: 
+        data = AttrDict()
+    return data
+
+def get_node(g, k): 
+    if g._v_pathname.endswith('/'):
+        return ''.join([g._v_pathname,k])
+    else: 
+        return ''.join([g._v_pathname,'/',k])
+
+def flush_pytable(h5f, data=None, group=None, table=None, force=True): 
+    # if data is None: data = self.data
+    # if table is None: table = self.tables
+    # if group is None: group = self.groups
+
+    # print 'Keys: ', data.keys()
+    for k,v in data.iteritems(): 
+        # print 'key,val', k,v, type(v)
+
+        if not isinstance(k, str): 
+            # self.log.debug('Cannot save to DB, key is not string %s ' % k)
+            continue
+
+        # Clean up before writing 
+        if force: 
+            try:
+                h5f.removeNode(get_node(group._gp,k), recursive=True) 
+            except tb.NoSuchNodeError:
+                pass
+
+        # print 'In Group: ', group, k, v                
+        if isinstance(v, dict):
+            # self.log.debug('Attempting to save dict type')
+            # assert(k not in table);
+            table[k] = AttrDict()
+            group[k] = AttrDict();
+            group[k]._gp = h5f.createGroup(group._gp, k)
+            h5f.flush()
+            # self.log.debug('Out Group: %s' % group[k])
+            flush_pytable(h5f, data=v, group=group[k], table=table[k])
+        elif isinstance(v, np.ndarray): 
+            # self.log.debug('Attempting to save ndarray %s' % type(v))
+            table[k] = h5f.createArray(group._gp, k, v)
+            # self.log.debug('Out Table: %s' % table[k])
+        # elif isinstance(v,io_utils.TableWriter):
+        #     self.log.debug('Attempting to save with custom writer')
+        #     table[k] = self.h5f.createTable(group._gp, name=k, 
+        #                                     description=v.description, 
+        #                                     title='%s-data' % (k) )
+        #     v.write(table[k])
+        #     # print 'Creating table with group:%s name:%s desc:%s' % (group._gp, k, writer.description)
+        #     # print 'Out Table: ', table[k]
+        else: 
+            # self.log.debug('Attempting to save arbitrary type %s' % type(v))
+            try: 
+                assert v is not None
+                table[k] = h5f.createCArray(group._gp, k, obj=v)
+            except (TypeError, ValueError, AssertionError): 
+                v = 'OBJ_' + cPickle.dumps(v, -1)
+                table[k] = h5f.createArray(group._gp, k, v)
+                # print 'TypeError', v
+            finally: 
+                h5f.flush()
+    return 
+
+def save_pytable(fn, d): 
+    h5f = tb.openFile(fn, mode='w', title='%s' % fn)
+
+    tables = AttrDict()
+    groups = AttrDict()
+    groups._gp = h5f.root
+
+    flush_pytable(h5f, data=d, group=groups, table=tables)
+    h5f.close()
+
+# =============================================================================
+# AttrDict
+# =============================================================================
 
 class AttrDict(dict): 
     def __init__(self, *args, **kwargs): 
@@ -21,12 +132,24 @@ class AttrDict(dict):
     def __setattr__(self, attr, value): 
         self[attr] = value
 
+    def __repr__(self): 
+        return json.dumps(dict(self), sort_keys=True, indent=4)
+
     @staticmethod
     def load_json(fn): 
         return AttrDict(load_json_dict(fn))
 
     def save_json(self, fn): 
         save_json_dict(fn, vars(self))
+
+    @staticmethod
+    def load(fn): 
+        return load_pytable(fn)
+
+    def save(self, fn): 
+        print 'Saving ', dict(self)
+        return save_pytable(fn, dict(self))
+        
 
 # class AttrDictDB(AttrDict): 
 #     def __init__(self, filename=None, flags='w'): 
