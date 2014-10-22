@@ -15,19 +15,18 @@ import cv2, time, os.path
 import numpy as np
 
 from collections import namedtuple, deque
-# from sklearn.neighbors import BallTree
-from bot_utils.db_utils import AttrDict
+from itertools import izip
 
-# from utils.data_containers import Feature3DData
-# from utils.optflow_utils import draw_flow, draw_hsv
-# import utils.draw_utils as draw_utils
+from bot_utils.db_utils import AttrDict
+from bot_utils.data_containers import Feature3DData
 
 from .base_klt import BaseKLT
 from bot_vision.imshow_utils import imshow_cv
 from bot_vision.image_utils import to_color, to_gray, gaussian_blur, im_mosaic
 from bot_utils.plot_utils import colormap
 
-from bot_utils.itertools_recipes import pairwise
+import bot_externals.ros.draw_utils as draw_utils
+# import bot_externals.lcm.draw_utils as draw_utils
 
 import logging
 logging.basicConfig(format='%(name)s :: %(message)s',level=logging.INFO)
@@ -45,17 +44,10 @@ class FwdBwdKLT2(BaseKLT):
     def __init__(self, dataset, params=default_params):
         print params
         BaseKLT.__init__(self, params=params)
-
         self.params = params.fwdbwd_params
         
         # Copy frame iterator
         self.dataset = dataset
-
-        # Process frames provided
-        st = time.time()
-        self.run()
-        self.log.info('Processed %i frames in %f s' % (self.dataset.length, time.time() - st))
-
 
     def draw_tracks(self, tpts, im): 
         T, N = tpts.shape[:2]
@@ -82,15 +74,22 @@ class FwdBwdKLT2(BaseKLT):
             cv2.polylines(im,[np.vstack(pts).astype(np.int32)], False, 
                               tuple(map(int, colormap(err/10).ravel())), 
                               thickness=1, lineType=cv2.CV_AA)
+            
+    def get_features(self): 
+        return AttrDict(fpts=self.fpts, bpts=self.bpts)
 
-    def get_features(self, Xs, Ns): 
+    def set_features(self, data): 
+        self.fpts, self.bpts = data.fpts, data.bpts
+
+    def get_feature_data(self, Xs, Ns): 
         T, N = self.fpts.shape[:2]
         errs = np.nanmean(np.linalg.norm(self.fpts - self.bpts, axis=2), axis=0)
         counts = np.sum(np.bitwise_and(np.isfinite(self.fpts[:,:,0]), np.isfinite(self.bpts[:,:,0])), axis=0)
         valid_ninds, = np.where(np.bitwise_and(counts > self.params.overlap_threshold, 
                                                errs < self.params.error_threshold))        
 
-        from bot_utils.data_containers import Feature3DData
+        # Create feature data container
+        data = Feature3DData.empty(N, T)
 
         # Retrieve 3D
         for tidx, (Xidx, Nidx, pts) in enumerate(izip(Xs, Ns, self.fpts)): 
@@ -118,10 +117,11 @@ class FwdBwdKLT2(BaseKLT):
             # outliers = ninds[np.where((np.fabs(self.fpts[tidx, ninds] - 
             #                                    self.bpts[tidx, ninds]) > 1.0).any(axis=1))[0]]
             # data.idx[outliers,tidx] = -1
-        draw_utils.publish_point_cloud('tracks3d', data.xyz.reshape(-1,3), c='b')
+        # draw_utils.publish_point_cloud('tracks3d', data.xyz.reshape(-1,3), c='b')
+        xyz = data.xyz.reshape(-1,3)
+        draw_utils.publish_cloud_markers('KLT_TRACKS', xyz, c='g', frame_id='kinect')
+        # draw_utils.publish_line_segments('tracks3d_lines', xyz[:-1,:], xyz[1:,:], c='b', frame_id='kinect')
         return data 
-
-
 
     def get_tracks(self): 
         T, N = self.fpts.shape[:2]
@@ -140,6 +140,8 @@ class FwdBwdKLT2(BaseKLT):
         return vis
         
     def run(self): 
+        # Process frames provided
+        st = time.time()
 
         # Store fwd/bwd features
         T = self.dataset.length
@@ -239,8 +241,8 @@ class FwdBwdKLT2(BaseKLT):
         print 'Final visualization'
         cv2.waitKey(0)
 
-        # Tracks
-        self.get_tracks()
+        self.log.info('Processed %i frames in %f s' % (self.dataset.length, time.time() - st))
+
 
 class OfflineKLT(BaseKLT): 
 
