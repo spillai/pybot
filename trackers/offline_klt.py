@@ -24,9 +24,7 @@ from .base_klt import BaseKLT
 from bot_vision.imshow_utils import imshow_cv
 from bot_vision.image_utils import to_color, to_gray, gaussian_blur, im_mosaic
 from bot_utils.plot_utils import colormap
-
-import bot_externals.ros.draw_utils as draw_utils
-# import bot_externals.lcm.draw_utils as draw_utils
+import bot_externals.draw_utils as draw_utils
 
 import logging
 logging.basicConfig(format='%(name)s :: %(message)s',level=logging.INFO)
@@ -104,23 +102,20 @@ class FwdBwdKLT2(BaseKLT):
                 # Copy 3D data
                 data.xyz[ninds,tidx] = Xidx[xys[:,1],xys[:,0],:]
 
-                # # Copy Normals data
-                # data.normal[ninds,tidx] = Nidx[xys[:,1],xys[:,0],:]
+                # Copy Normals data
+                data.normal[ninds,tidx] = Nidx[xys[:,1],xys[:,0],:]
 
-                ninds_ = ninds[np.isfinite(data.xyz[ninds,tidx]).all(axis=1)] #  &
-                               # np.isfinite(data.normal[ninds,tidx]).all(axis=1)]
+                ninds_ = ninds[np.isfinite(data.xyz[ninds,tidx]).all(axis=1) &
+                               np.isfinite(data.normal[ninds,tidx]).all(axis=1)]
                 data.idx[ninds_,tidx] = 1
             except IndexError: 
                 pass
 
-            # # Mark outliers
-            # outliers = ninds[np.where((np.fabs(self.fpts[tidx, ninds] - 
-            #                                    self.bpts[tidx, ninds]) > 1.0).any(axis=1))[0]]
-            # data.idx[outliers,tidx] = -1
-        # draw_utils.publish_point_cloud('tracks3d', data.xyz.reshape(-1,3), c='b')
-        xyz = data.xyz.reshape(-1,3)
-        draw_utils.publish_cloud_markers('KLT_TRACKS', xyz, c='g', frame_id='kinect')
-        # draw_utils.publish_line_segments('tracks3d_lines', xyz[:-1,:], xyz[1:,:], c='b', frame_id='kinect')
+            # Mark outliers
+            outliers = ninds[np.where((np.fabs(self.fpts[tidx, ninds] - 
+                                               self.bpts[tidx, ninds]) > 1.0).any(axis=1))[0]]
+            data.idx[outliers,tidx] = -1
+
         return data 
 
     def get_tracks(self): 

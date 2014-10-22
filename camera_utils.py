@@ -13,7 +13,7 @@ kinect_v1_params = AttrDict(
                         [0, 0, 1]], dtype=np.float64), 
     K_rgb = np.array([[528.49404721, 0, 319.5],
                       [0, 528.49404721, 239.5],
-                      [0, 0, 1]], dtype=np.float64)
+                      [0, 0, 1]], dtype=np.float64), 
     H = 480, W = 640, 
     shift_offset = 1079.4753, 
     projector_depth_baseline = 0.07214
