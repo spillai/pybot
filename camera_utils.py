@@ -4,7 +4,20 @@ import numpy as np
 import numpy.matlib as npm
 from scipy import linalg
 
+from bot_utils.db_utils import AttrDict
 from bot_geometry.rigid_transform import Quaternion, RigidTransform
+
+kinect_v1_params = AttrDict(
+    K_depth = np.array([[576.09757860, 0, 319.5],
+                        [0, 576.09757860, 239.5],
+                        [0, 0, 1]], dtype=np.float64), 
+    K_rgb = np.array([[528.49404721, 0, 319.5],
+                      [0, 528.49404721, 239.5],
+                      [0, 0, 1]], dtype=np.float64)
+    H = 480, W = 640, 
+    shift_offset = 1079.4753, 
+    projector_depth_baseline = 0.07214
+)
 
 def construct_K(fx=500.0, fy=500.0, cx=319.5, cy=239.5): 
     """
@@ -37,22 +50,27 @@ class CameraIntrinsic(object):
         return cls(construct_K(fx, fy, cx, cy))
 
 class CameraExtrinsic(RigidTransform): 
-    def __init__(self, R, t):
+    def __init__(self, R=npm.eye(3), t=npm.zeros(3)):
         """
         Default init
         """
-        self.R = R
-        self.t = t
-
         p = RigidTransform.from_Rt(R, t)
         RigidTransform.__init__(self, xyzw=p.quat.to_xyzw(), tvec=p.tvec)
+
+    @property
+    def R(self): 
+        return self.quat.to_homogeneous_matrix()
+
+    @property
+    def t(self): 
+        return self.tvec
 
     @classmethod
     def identity(cls): 
         """
         Simulate a camera at identity
         """
-        return cls(npm.eye(3), npm.zeros(3))
+        return cls()
 
     @classmethod
     def simulate(cls): 
@@ -66,8 +84,10 @@ class Camera(CameraIntrinsic, CameraExtrinsic):
         CameraIntrinsic.__init__(self, K, D)
         CameraExtrinsic.__init__(self, R, t)
 
+    @property
+    def P(self): 
         Rt = self.to_homogeneous_matrix()[:3]
-        self.P = self.K * Rt     # Projection matrix
+        return self.K * Rt     # Projection matrix
 
     @classmethod
     def simulate(cls): 
@@ -103,6 +123,9 @@ class Camera(CameraIntrinsic, CameraExtrinsic):
         if self.cx is None: 
             raise AssertionError('cx, cy is not set')
         return npm.matrix([self.cx, self.cy])
+
+def KinectCamera(R=npm.eye(3), t=npm.zeros(3)): 
+    return Camera(kinect_v1_params.K_depth, R, t)
 
 class DepthCamera(CameraIntrinsic): 
     def __init__(self, K, shape=(480,640), skip=1, D=np.zeros(4, dtype=np.float64)):
