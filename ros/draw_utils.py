@@ -12,7 +12,7 @@ import sensor_msgs.msg as sensor_msg
 from copy import deepcopy
 
 # Utility imports
-from bot_vision.draw_utils import reshape_arr, get_color_arr, height_map, color_by_height_axis
+from bot_vision.draw_utils import reshape_arr, get_color_arr, height_map, color_by_height_axis, copy_pointcloud_data
 from bot_utils.async_utils import run_async
 from bot_geometry.rigid_transform import RigidTransform
 from .pointclouds import xyz_array_to_pointcloud2, xyzrgb_array_to_pointcloud2
@@ -96,14 +96,6 @@ def rt_from_geom_pose(msg):
 def publish_tf(pose, stamp=None, frame_id='/camera', child_frame_id='map'): 
     x,y,z,w = pose.quat.to_xyzw()
     _publish_tf(tuple(pose.tvec), (x,y,z,w), rospy.Time.now(), frame_id, child_frame_id)
-
-def copy_pointcloud_data(_arr, _carr, flip_rb=False): 
-    arr, carr = deepcopy(_arr), deepcopy(_carr)
-    arr = arr.reshape(-1,3)
-
-    N, D = arr.shape[:2]
-    carr = get_color_arr(carr, N, flip_rb=flip_rb);
-    return arr, carr
 
 @run_async
 def publish_cloud(pub_ns, _arr, c='b', stamp=None, flip_rb=False, frame_id='map', seq=None): 
