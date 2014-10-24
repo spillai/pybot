@@ -197,8 +197,8 @@ class Feature3DData:
         print 'Publishing', len(viz_pts)
         draw_utils.publish_cloud('PRUNED_PTS', viz_pts, c='b', frame_id='KINECT')
         draw_utils.publish_line_segments('PRUNED_TRAJ', viz_traj1, viz_traj2, c='b', frame_id='KINECT')
+        draw_utils.publish_line_segments('PRUNED_NORMAL', viz_pts, viz_normals, c='b', frame_id='KINECT')
 
-        # draw_utils.publish_line_segments('PRUNED_NORMAL', viz_pts, viz_normals, c='b', frame_id='KINECT')
         # draw_utils.publish_text_lcmgl('IDS', viz_ids)
         # draw_utils.publish_text_list('IDS', viz_idloc, viz_text);
 

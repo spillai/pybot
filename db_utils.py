@@ -3,6 +3,8 @@ import tables as tb
 import numpy as np
 import time, logging, cPickle, shelve
 
+from bot_utils.io_utils import create_path_if_not_exists
+
 # =============================================================================
 # Pytables helpers
 # =============================================================================
@@ -131,8 +133,11 @@ class AttrDict(dict):
         self[attr] = value
 
     def __repr__(self): 
-        import json
-        return json.dumps(dict(self), sort_keys=True, indent=4)
+        try: 
+            import json
+            return json.dumps(dict(self), sort_keys=True, indent=4)
+        except: 
+            return ''
 
     @staticmethod
     def load_json(fn): 
@@ -146,7 +151,9 @@ class AttrDict(dict):
         return load_pytable(fn)
 
     def save(self, fn): 
-        print 'Saving ', dict(self)
+        print 'Saving ', fn
+        if create_path_if_not_exists(fn): 
+            print 'Creating new folder with path: %s' % fn
         return save_pytable(fn, dict(self))
         
 
