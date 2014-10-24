@@ -11,10 +11,27 @@ from kinect.frame_msg_t import frame_msg_t
 from kinect.image_msg_t import image_msg_t
 from kinect.depth_msg_t import depth_msg_t
 
+from pybot_pcl import compute_normals, fast_bilateral_filter, median_filter
+
+class KinectFrame: 
+    def __init__(self, timestamp=None, img=None, depth=None, X=None): 
+        self.timestamp = timestamp
+        self.img = img
+        self.depth = depth
+        self.X = X
+
+    @property
+    def Xest(self): 
+        return fast_bilateral_filter(self.X, sigmaS=20.0, sigmaR=0.05)
+
+    @property
+    def N(self): 
+        return compute_normals(self.Xest, depth_change_factor=0.5, smoothing_size=10.0)
+
 class KinectDecoder(object): 
     kinect_params = AttrDict(fx=576.09757860, fy=576.09757860, cx=319.50, cy=239.50)
     def __init__(self, channel='KINECT_FRAME', scale=1., 
-                 extract_rgb=True, extract_depth=True, extract_X=True):
+                 extract_rgb=True, extract_depth=True, extract_X=True, properties=[]):
         self.channel = channel
         self.skip = int(1.0 / scale);
         
@@ -22,21 +39,23 @@ class KinectDecoder(object):
         self.extract_rgb = extract_rgb
         self.extract_depth = extract_depth    
         self.extract_X = extract_X
-
+        self.props = properties
+        
         if self.extract_X: 
             K = construct_K(**KinectDecoder.kinect_params)
             self.camera = DepthCamera(K=K, shape=(480,640), skip=self.skip)
 
     def decode(self, data):
         img, depth, X = [None] * 3
-        frame = frame_msg_t.decode(data)
+        frame_msg = frame_msg_t.decode(data)
         if self.extract_rgb: 
-            img = self.decode_rgb(frame)
+            img = self.decode_rgb(frame_msg)
         if self.extract_depth: 
-            depth = self.decode_depth(frame)
+            depth = self.decode_depth(frame_msg)
             if self.extract_X: 
                 X = self.camera.reconstruct(depth)
-        return AttrDict(timestamp=frame.timestamp, img=img, depth=depth, X=X)
+        # frame = AttrDict(timestamp=frame_msg.timestamp, img=img, depth=depth, X=X) 
+        return KinectFrame(timestamp=frame_msg.timestamp, img=img, depth=depth, X=X) 
 
     def decode_rgb(self, data): 
         w, h = data.image.width, data.image.height;
@@ -58,7 +77,7 @@ class KinectDecoder(object):
         return depth
 
 class LCMLogReader(object): 
-    def __init__(self, filename=None, decoder=None):
+    def __init__(self, filename=None, decoder=None, every_k_frames=1):
         filename = os.path.expanduser(filename)
         if filename is None or not os.path.exists(os.path.expanduser(filename)):
             raise Exception('Invalid Filename: %s' % filename)
@@ -67,6 +86,7 @@ class LCMLogReader(object):
         # Store attributes
         self.filename = filename
         self.decoder = decoder
+        self.every_k_frames = every_k_frames
 
         # Log specific
         self._lc = lcm.LCM()
@@ -80,44 +100,51 @@ class LCMLogReader(object):
         inds = np.array([idx
                          for idx, ev in enumerate(self._log) 
                          if ev.channel == self.decoder.channel], dtype=np.int64)
-        self.index = utimes[np.maximum(0, inds-1)]
-
-        # for ts in self.index[::10]: 
-        #     # print 'Seeking ', ts
-        #     self._log.c_eventlog.seek_to_timestamp(ts)
-        #     while True: 
-        #         ev = self._log.next()
-        #         print ev.timestamp
-        #         if ev.channel == self.decoder.channel: break
-        #     # print 'Seeked to idx:', ts, ev.timestamp, ev.channel
+        self.index = utimes[np.maximum(0, inds-1)][::self.every_k_frames]
 
     @property
     def length(self): 
         return len(self.index)
 
-    def iteritems(self, every_k_frames=1, reverse=False): 
+    def get_frame_with_timestamp(self, t): 
+        self._log.c_eventlog.seek_to_timestamp(t)
+        while True: 
+            ev = self._log.next()
+            if ev.channel == self.decoder.channel: 
+                break
+        return self.decoder.decode(ev.data)
+
+    def get_frame_with_index(self, idx): 
+        assert(idx >= 0 and idx < len(self.index))
+        return self.get_frame_with_timestamp(self.index[idx])
+
+    def iteritems(self, reverse=False): 
         if reverse: 
-            ts = self.index[::-every_k_frames]
-            for t in ts: 
-                self._log.c_eventlog.seek_to_timestamp(t)
-                while True: 
-                    ev = self._log.next()
-                    if ev.channel == self.decoder.channel: 
-                        break
-                yield self.decoder.decode(ev.data)
+            for t in self.index[::-1]: 
+                frame = self.get_frame_with_timestamp(t)
+                yield frame
         else: 
-            idx = 0
-            for ev in self._log: 
-                if ev.channel == self.decoder.channel: 
-                    idx += 1
-                    if idx % every_k_frames == 0: 
-                        yield self.decoder.decode(ev.data)
+            for t in self.index: 
+                frame = self.get_frame_with_timestamp(t)
+                yield frame
 
-    def iter_frames(self, every_k_frames=1):
-        return self.iteritems(every_k_frames=every_k_frames)
+        # No-seek: should be faster
+        # else: 
+        #     idx = 0
+        #     for ev in self._log: 
+        #         if ev.channel == self.decoder.channel: 
+        #             idx += 1
+        #             if idx % self.every_k_frames == 0: 
+        #                 yield self.decoder.decode(ev.data)
 
-def KinectLCMLogReader(filename=None, **kwargs): 
-    return LCMLogReader(filename=filename, decoder=KinectDecoder(**kwargs))        
+    def iter_frames(self):
+        return self.iteritems()
+
+    def get_first_frame(self): 
+        return self.get_frame_with_index(0)
+
+def KinectLCMLogReader(filename=None, every_k_frames=1, **kwargs): 
+    return LCMLogReader(filename=filename, every_k_frames=every_k_frames, decoder=KinectDecoder(**kwargs))        
 
 if __name__ == "__main__": 
     import os.path

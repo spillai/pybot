@@ -243,7 +243,7 @@ def publish_pose_list(pub_channel, _poses, texts=[], frame_id='KINECT'):
     pub_channel: Channel on which the cloud will be published
     """
     global g_viz_pub
-    poses = deepcopy.copy(_poses)
+    poses = deepcopy(_poses)
     frame_pose = g_viz_pub.get_sensor_pose(frame_id)
     print frame_pose
 
@@ -286,14 +286,14 @@ def publish_pose_list(pub_channel, _poses, texts=[], frame_id='KINECT'):
     # g_log.debug('Published %i poses' % (nposes))
 
     carr = plt.cm.Spectral(np.arange(len(poses)))
-    publish_point_cloud(pub_channel+'_POINTS', arr[:,:3], c='b', sensor_tf=sensor_tf)
+    publish_cloud(pub_channel+'_POINTS', arr[:,:3], c='b', frame_id=frame_id)
 
     # Publish corresponding text
     if len(texts): 
         assert(len(arr) == len(texts))
         # publish_text_list(pub_channel+'-text', pub_channel, 
         #                   texts, sensor_tf=sensor_tf)
-        publish_text_lcmgl(pub_channel+'-text', arr, texts, sensor_tf=sensor_tf)
+        publish_text_lcmgl(pub_channel+'-text', arr, texts, frame_id=frame_id)
 
 
 # ===== Tangents drawing ====
