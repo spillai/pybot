@@ -24,6 +24,7 @@ from .base_klt import BaseKLT
 from bot_vision.imshow_utils import imshow_cv
 from bot_vision.image_utils import to_color, to_gray, gaussian_blur, im_mosaic
 from bot_utils.plot_utils import colormap
+from bot_vision.color_utils import color_from_string, get_color_by_label
 import bot_externals.draw_utils as draw_utils
 
 import logging
@@ -47,7 +48,20 @@ class FwdBwdKLT2(BaseKLT):
         # Copy frame iterator
         self.dataset = dataset
 
-    def draw_tracks(self, tpts, im): 
+    def viz_data(self): 
+        frame = self.dataset.get_first_frame()
+        im = to_color(frame.img)
+        print self.fpts.shape, self.bpts.shape
+
+        fvis = self.visualize_tracks(im.copy(), self.fpts)
+        bvis = self.visualize_tracks(im.copy(), self.bpts)
+
+        # Draw good tracks
+        errvis = self.visualize_good_tracks(im.copy(), 'g')
+        imshow_cv('FWD/BWD', im_mosaic(fvis, bvis, fvis/2 + bvis/2, errvis))
+        cv2.waitKey(0)
+
+    def visualize_tracks(self, im, tpts, color=None): 
         T, N = tpts.shape[:2]
         for tid in np.arange(N): 
             pts = tpts[:,tid,:]
@@ -56,41 +70,44 @@ class FwdBwdKLT2(BaseKLT):
             cv2.polylines(im,[np.vstack(pts).astype(np.int32)], False, 
                               tuple(map(int, colormap(tid % 20 / 20.0).ravel())), 
                               thickness=1, lineType=cv2.CV_AA)
-
+        return im
             
-    def draw_good_tracks(self, im): 
+    def visualize_good_tracks(self, im, color=None): 
         T, N = self.fpts.shape[:2]
         assert(self.fpts.shape == self.bpts.shape)
         errs = np.nanmean(np.linalg.norm(self.fpts - self.bpts, axis=2), axis=0)
         counts = np.sum(np.bitwise_and(np.isfinite(self.fpts[:,:,0]), np.isfinite(self.bpts[:,:,0])), axis=0)
         inds, = np.where(counts > self.params.overlap_threshold)
 
+        colors = get_color_by_label(np.arange(5)) * 255 if color is None else color_from_string(color, 5) * 255
         for err, count, tid in zip(errs[inds], counts[inds], inds): 
             pts = self.fpts[:,tid,:]
             valid = np.isfinite(pts).all(axis=1)
             pts = pts[valid]
-            cv2.polylines(im,[np.vstack(pts).astype(np.int32)], False, 
-                              tuple(map(int, colormap(err/10).ravel())), 
-                              thickness=1, lineType=cv2.CV_AA)
-            
+            col = tuple(map(int, colors[tid % 5].ravel()))
+            cv2.polylines(im,[np.vstack(pts).astype(np.int32)], False, col, thickness=1, lineType=cv2.CV_AA)
+        return im
+
     def get_features(self): 
-        return AttrDict(fpts=self.fpts, bpts=self.bpts)
+        return AttrDict(fpts=self.fpts, bpts=self.bpts, pts3d=self.pts3d, normals3d=self.normals3d)
 
     def set_features(self, data): 
-        self.fpts, self.bpts = data.fpts, data.bpts
+        self.fpts, self.bpts, self.pts3d, self.normals3d = data.fpts, data.bpts, data.pts3d, data.normals3d
 
-    def get_feature_data(self, Xs, Ns): 
+    def get_feature_data(self): 
         T, N = self.fpts.shape[:2]
         errs = np.nanmean(np.linalg.norm(self.fpts - self.bpts, axis=2), axis=0)
         counts = np.sum(np.bitwise_and(np.isfinite(self.fpts[:,:,0]), np.isfinite(self.bpts[:,:,0])), axis=0)
-        valid_ninds, = np.where(np.bitwise_and(counts > self.params.overlap_threshold, 
-                                               errs < self.params.error_threshold))        
+        valid_ninds, = np.where(errs < self.params.error_threshold)
+        # valid_ninds, = np.where(np.bitwise_and(counts > self.params.overlap_threshold, 
+        #                                        errs < self.params.error_threshold))        
 
         # Create feature data container
         data = Feature3DData.empty(N, T)
 
         # Retrieve 3D
-        for tidx, (Xidx, Nidx, pts) in enumerate(izip(Xs, Ns, self.fpts)): 
+        # for tidx, (Xidx, Nidx, pts) in enumerate(izip(Xs, Ns, self.fpts)): 
+        for tidx, (pts, normals3d, pts3d) in enumerate(izip(self.fpts, self.normals3d, self.pts3d)): 
             # Find valid inds that are finite
             ninds = valid_ninds[np.where(np.isfinite(pts[valid_ninds]).all(axis=1))[0]]
             xys = pts[ninds].astype(int)
@@ -98,23 +115,27 @@ class FwdBwdKLT2(BaseKLT):
             # Copy 2D data
             data.xy[ninds,tidx] = pts[ninds]
 
-            try: 
-                # Copy 3D data
-                data.xyz[ninds,tidx] = Xidx[xys[:,1],xys[:,0],:]
+            # Copy 3D data
+            data.xyz[ninds, tidx] = pts3d[ninds]
 
-                # Copy Normals data
-                data.normal[ninds,tidx] = Nidx[xys[:,1],xys[:,0],:]
+            # Copy Normals data
+            data.normal[ninds,tidx] = normals3d[ninds]
+            
+            ninds_ = ninds[np.isfinite(data.xyz[ninds,tidx]).all(axis=1)]
+            data.idx[ninds_,tidx] = 1
+            # try: 
 
-                ninds_ = ninds[np.isfinite(data.xyz[ninds,tidx]).all(axis=1) &
-                               np.isfinite(data.normal[ninds,tidx]).all(axis=1)]
-                data.idx[ninds_,tidx] = 1
-            except IndexError: 
-                pass
+            #     ninds_ = ninds[np.isfinite(data.xyz[ninds,tidx]).all(axis=1) &
+            #                    np.isfinite(data.normal[ninds,tidx]).all(axis=1)]
+            #     data.idx[ninds_,tidx] = 1
+            # except IndexError as e: 
+            #     print e
+            #     pass
 
-            # Mark outliers
-            outliers = ninds[np.where((np.fabs(self.fpts[tidx, ninds] - 
-                                               self.bpts[tidx, ninds]) > 1.0).any(axis=1))[0]]
-            data.idx[outliers,tidx] = -1
+            # # Mark outliers
+            # outliers = ninds[np.where((np.fabs(self.fpts[tidx, ninds] - 
+            #                                    self.bpts[tidx, ninds]) > 1.0).any(axis=1))[0]]
+            # data.idx[outliers,tidx] = -1
 
         return data 
 
@@ -128,11 +149,6 @@ class FwdBwdKLT2(BaseKLT):
             pts = self.fpts[:,tid,:]
             valid = np.isfinite(pts).all(axis=1)
             pts = pts[valid]        
-        
-    def visualize_tracks(self, name, im, pts): 
-        vis = to_color(im)
-        self.draw_tracks(pts, vis)
-        return vis
         
     def run(self): 
         # Process frames provided
@@ -159,6 +175,9 @@ class FwdBwdKLT2(BaseKLT):
                 self.fpts = (np.empty(shape=(T, N, 2)) * np.nan).astype(np.float32)
                 self.bpts = (np.empty(shape=(T, N, 2)) * np.nan).astype(np.float32)
 
+                self.pts3d = (np.empty(shape=(T, N, 3)) * np.nan).astype(np.float32)
+                self.normals3d = (np.empty(shape=(T, N, 3)) * np.nan).astype(np.float32)
+
             else: 
                 # a. Track object
                 ids, ppts = self.tm.ids, self.tm.pts
@@ -169,14 +188,14 @@ class FwdBwdKLT2(BaseKLT):
             self.tm.add(pts, ids=ids, prune=prune)
 
             # 3. Save forward flow features
-            try: 
-                ids, pts = self.tm.ids, self.tm.pts
-                self.fpts[tidx,ids,:] = pts
-            except: 
-                pass
-
+            ids, pts = self.tm.ids, self.tm.pts
+            self.fpts[tidx,ids,:] = pts
+            
+            # 4. Compute 3D
+            ptsi = pts.astype(int)
+            self.pts3d[tidx,ids,:] = frame.Xest[ptsi[:,1], ptsi[:,0]]
+            self.normals3d[tidx,ids,:] = frame.N[ptsi[:,1], ptsi[:,0]]
         print 'Forward flow DONE -------------------------------> '
-        fvis = self.visualize_tracks('FWD', ims[-1], self.fpts)
 
         # I. BWD-Flow Extraction
         print 'Backward flow ====================================> '
@@ -225,17 +244,7 @@ class FwdBwdKLT2(BaseKLT):
 
             # print 'detect: %i' % (len(detect_ids))
             # print 'tidx: %i, detect: %i track: %i' % (tidx, len(detect_ids), len(track_ids))
-
         print 'Backward flow DONE -------------------------------> '
-        bvis = self.visualize_tracks('BWD', ims[-1], self.bpts)
-
-        # Draw good tracks
-        errvis = to_color(ims[-1])
-        self.draw_good_tracks(errvis)
-        imshow_cv('FWD/BWD', im_mosaic(fvis, bvis, fvis/2 + bvis/2, errvis))
-        print 'Final visualization'
-        cv2.waitKey(0)
-
         self.log.info('Processed %i frames in %f s' % (self.dataset.length, time.time() - st))
 
 
