@@ -7,16 +7,16 @@ from .image_utils import to_gray
 def draw_ellipses(im, ellipses): 
     for e in ellipses:
         cv2.ellipse(im, e, (255, 255, 0) if im.ndim == 3 else 255,1)
-    return 
+    return im
 
 def draw_hulls(im, hulls): 
     cv2.polylines(im, hulls, 1, (0, 255, 0) if im.ndim == 3 else 255, thickness=1)       
-    return 
+    return im
 
 def fill_hulls(im, hulls): 
     for hull in hulls: 
         cv2.fillPoly(im, [hull], (0, 255, 0) if im.ndim == 3 else 255)
-    return 
+    return im
 
 class MSER:
     def __init__(self):
