@@ -11,23 +11,30 @@ from sklearn.multiclass import OneVsRestClassifier
 from sklearn.cross_validation import train_test_split
 from sklearn.externals import joblib
 
+
+
 from bot_vision.image_utils import im_resize
 from bot_utils.io_utils import memory_usage_psutil
 from bot_utils.db_utils import AttrDict, AttrDictDB
 from bot_vision.bow_utils import BOWTrainer
 
+import bot_vision.mser_utils as mser_utils
 import bot_utils.io_utils as io_utils
 import sklearn.metrics as metrics
 
+# def selective_search_mask(frame, pts): 
+
+
 
 class ImageDescription(object): 
-    def __init__(self, descriptor='SIFT', dense=True, step=4, levels=4, scale=2.0): 
+    def __init__(self, detector='SIFT', descriptor='SIFT', selective_search=False, step=4, levels=4, scale=2.0): 
         self.dense = dense
         self.step = step
         self.levels = levels
         self.scale = scale
 
-        if dense: 
+        # Setup feature detector
+        if detector == 'dense'
             # self.detector = cv2.PyramidAdaptedFeatureDetector(, maxLevel=levels)
             self.detector = cv2.FeatureDetector_create('Dense')
             self.detector.setInt('initXyStep', step)
@@ -35,18 +42,17 @@ class ImageDescription(object):
             self.detector.setInt('featureScaleLevels', levels)
             self.detector.setBool('varyImgBoundWithScale', False)
             self.detector.setBool('varyXyStepWithScale', True)
-
         else: 
-            self.detector = cv2.FeatureDetector_create('FAST')
+            self.detector = cv2.FeatureDetector_create(detector)
 
+        # Setup feature extractor
         self.extractor = cv2.DescriptorExtractor_create(descriptor)
 
-        # self.matcher = cv2.DescriptorMatcher_create("FlannBased")
+        # Setup selective search
+        if selective_search: 
+            self.sel_search = mser_utils.MSER()
 
-    # def set_vocabulary(self, vocab): 
-    #     self.matcher.add(vocab)
-
-    def describe(self, im): 
+    def describe(self, im, mask=None): 
         """
         Computes dense/sparse features on an image and describes 
         these keypoints using a feature descriptor
@@ -54,7 +60,7 @@ class ImageDescription(object):
            kpts: [cv2.KeyPoint, ... ] 
            desc: [N x D]
         """
-        kpts = self.detector.detect(im)
+        kpts = self.detector.detect(im, mask=mask)
         kpts, desc = self.extractor.compute(im, kpts)
         return desc.astype(np.uint8)
 

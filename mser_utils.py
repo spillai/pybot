@@ -3,13 +3,29 @@ import numpy as np
 
 from .image_utils import to_gray
 
+        
+def draw_ellipses(im, ellipses): 
+    for e in ellipses:
+        cv2.ellipse(im, e, (255, 255, 0) if im.ndim == 3 else 255,1)
+    return im
+
+def draw_hulls(im, hulls): 
+    cv2.polylines(im, hulls, 1, (0, 255, 0) if im.ndim == 3 else 255, thickness=1)       
+    return im
+
+def fill_hulls(im, hulls): 
+    for hull in hulls: 
+        cv2.fillPoly(im, [hull], (0, 255, 0) if im.ndim == 3 else 255)
+    return im
+
+
 class MSER:
     def __init__(self):
         
         # Compute MSER features on the rgb image
         mser_delta = 5
         mser_min_area = 100
-        mser_max_area = 320*240
+        mser_max_area = 160*120
         mser_max_variation = 0.25
         mser_min_diversity = 0.2
         mser_max_evolution = 200 # 0.001 # 0.003
@@ -31,12 +47,3 @@ class MSER:
         hulls = self.hulls(im)
         return [cv2.fitEllipse(contours_from_endpoints(hull.reshape(-1,2),10))
                 for hull in hulls]
-        
-    def draw_ellipses(self, im, ellipses): 
-        for e in ellipses:
-            cv2.ellipse(im, e, (0,255,0),1)
-        return im
-
-    def draw_hulls(self, im, hulls): 
-        cv2.polylines(im, hulls, 1, (255, 255, 0), thickness=1)       
-        return im

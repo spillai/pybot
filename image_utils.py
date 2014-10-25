@@ -12,7 +12,7 @@ def im_mosaic(*args):
     H, W = items[0].shape[:2]
     sz = np.ceil(np.sqrt(len(items))).astype(int)
     for j in range(sz*sz - len(items)): 
-        items.append(im.zeros_like(items[0]))
+        items.append(np.zeros_like(items[0]))
 
     chunks = lambda l, n: [l[x: x+n] for x in xrange(0, len(l), n)]
     mosaic = np.vstack([np.hstack(chunk) for chunk in chunks(items, sz)])
