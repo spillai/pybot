@@ -22,10 +22,6 @@ import bot_vision.mser_utils as mser_utils
 import bot_utils.io_utils as io_utils
 import sklearn.metrics as metrics
 
-# def selective_search_mask(frame, pts): 
-
-
-
 class ImageDescription(object): 
     def __init__(self, detector='SIFT', descriptor='SIFT', selective_search=False, step=4, levels=4, scale=2.0): 
         self.dense = dense

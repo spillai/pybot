@@ -2,6 +2,9 @@ import cv2
 import numpy as np
 import shapely.geometry as sg
 
+from bot_vision.imshow_utils import imshow_cv
+from bot_vision.color_utils import color_from_string, get_color_by_label
+
 def reduce_funcs(*funcs): 
     from functools import wraps
     @wraps
@@ -97,10 +100,14 @@ class Annotator(object):
         win_name = "Annotator - %s" % name
         cv2.namedWindow(win_name)
         cv2.setMouseCallback(win_name, self._on_mouse)
-        self._print_hotkeys()
 
-        self.name = name
+        # self._print_hotkeys()
+
+        self.im = im.copy()
+        self.name = win_name
+
         self.reset()
+        self.show()
 
     def _print_hotkeys(self): 
         print '''
@@ -116,16 +123,31 @@ class Annotator(object):
         if event != cv2.EVENT_LBUTTONDOWN:
             return
         pt = np.array([[x, y]], dtype=np.int)
-        if self.pt_id in self.pts_map: 
-            self.pts_map[self.pt_id] = np.vstack([self.pts_map[self.pt_id], pt])
+
+        id_key = 'id_%i' % self.pt_id
+        if id_key in self.pts_map: 
+            self.pts_map[id_key] = np.vstack([self.pts_map[id_key], pt])
         else: 
-            self.pts_map[self.pt_id] = pt
+            self.pts_map[id_key] = pt
+        self.show()
+        
+    def show(self): 
+        im = self.im.copy()
+
+        colors = get_color_by_label(np.arange(10)) * 255
+        for pid, pts in enumerate(self.pts_map.itervalues()): 
+            col = tuple(map(int, colors[pid % len(colors)].ravel())) if im.ndim == 3 else 255
+            for pt in pts: 
+                cv2.circle(im, tuple(map(int, pt)), 2, col, -1, lineType=cv2.CV_AA)
+            cv2.polylines(im, [pts.reshape(-1,1,2)], 1, col, thickness=2)       
+        imshow_cv(self.name, im)
 
     def reset(self): 
-        self.pts_map = {}
+        self.pts_map = dict()
         self.pt_id = 0
 
     def run(self): 
+        annotate = True
         while True:
             ch = 0xFF & cv2.waitKey(1)
             if ch == ord('r'):
@@ -136,10 +158,15 @@ class Annotator(object):
                 self.pt_id -= 1
             elif ch == ord('s'): 
                 print 'Saving to %s' % self.name
+                self.pts_map.save()
                 pass
                 # savemat
-            elif ch == ord('q') or ch == 27: 
+            elif ch == ord('f'): 
                 break
+            elif ch == ord('q') or ch == 27: 
+                annotate = False
+                break
+        return annotate, self.pts_map
 
 if __name__ == "__main__": 
     pts = np.array([[0,0], [0,1], [1,1], [1.5, 0.5], [1,0]])
