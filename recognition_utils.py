@@ -24,13 +24,12 @@ import sklearn.metrics as metrics
 
 class ImageDescription(object): 
     def __init__(self, detector='SIFT', descriptor='SIFT', selective_search=False, step=4, levels=4, scale=2.0): 
-        self.dense = dense
         self.step = step
         self.levels = levels
         self.scale = scale
 
         # Setup feature detector
-        if detector == 'dense'
+        if detector == 'dense': 
             # self.detector = cv2.PyramidAdaptedFeatureDetector(, maxLevel=levels)
             self.detector = cv2.FeatureDetector_create('Dense')
             self.detector.setInt('initXyStep', step)
@@ -71,14 +70,15 @@ class ImageClassifier(object):
     """
 
     def __init__(self, dataset, 
-                 test_size=10, 
+                 max_test_size=10, process_cb=lambda fn: dict(im=cv2.imread(fn), mask=None), 
                  training_args = dict(train_size=10, random_state=1),
-                 descriptor_args = dict(dense=True, descriptor='SIFT'), 
+                 descriptor_args = dict(dense=True, descriptor='SIFT', detector='SIFT'), 
                  bow_args = dict(K=64, method='vlad', norm_method='square-rooting'), 
                  cache_args = AttrDict(vocab_path='vocab', clf_path='clf', overwrite=False)): 
         # Save dataset
         self.dataset = dataset
         self.cache_args = cache_args
+        self.process_cb = process_cb
         print 'Memory usage at __init__ start %5.2f MB' % (memory_usage_psutil())
 
         # Bag-of-words VLAD/VQ
@@ -103,8 +103,8 @@ class ImageClassifier(object):
             X_train, X_test, y_train, y_test = train_test_split(data, target, **training_args)
 
             # Only allow max testing size
-            self.X_train.extend(X_train), self.X_test.extend(X_test[:test_size])
-            self.y_train.extend(y_train), self.y_test.extend(y_test[:test_size])
+            self.X_train.extend(X_train), self.X_test.extend(X_test[:max_test_size])
+            self.y_train.extend(y_train), self.y_test.extend(y_test[:max_test_size])
 
         # Setup classifier
         self.clf_pretrained = False
@@ -131,7 +131,7 @@ class ImageClassifier(object):
         print 'Memory usage at pre-train %5.2f MB' % (memory_usage_psutil())
 
         # Extract features
-        train_desc = [self.image_descriptor.describe(cv2.imread(x_t)) for x_t in self.X_train]
+        train_desc = [self.image_descriptor.describe(**self.process_cb(x_t)) for x_t in self.X_train]
         print 'Descriptor extraction took %5.3f s' % (time.time() - st)    
 
         print 'Memory usage at post-describe %5.2f MB' % (memory_usage_psutil())
@@ -170,7 +170,7 @@ class ImageClassifier(object):
         st = time.time()
 
         # Extract features
-        test_desc = [ self.image_descriptor.describe(cv2.imread(x_t)) for x_t in self.X_test ]
+        test_desc = [ self.image_descriptor.describe(**self.process_cb(x_t)) for x_t in self.X_test ]
 
         print 'Descriptor extraction took %5.3f s' % (time.time() - st)    
     
