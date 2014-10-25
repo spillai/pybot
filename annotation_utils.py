@@ -96,17 +96,18 @@ class Box(Polygon):
         return cls(bounds=[xmin, ymin, xmax, ymax])
 
 class Annotator(object): 
-    def __init__(self, im, name): 
+    def __init__(self, im, name, annotation={}): 
         win_name = "Annotator - %s" % name
         cv2.namedWindow(win_name)
         cv2.setMouseCallback(win_name, self._on_mouse)
 
         # self._print_hotkeys()
-
         self.im = im.copy()
         self.name = win_name
-
         self.reset()
+
+        self.pts_map = dict(annotation)
+        print annotation
         self.show()
 
     def _print_hotkeys(self): 
@@ -145,6 +146,7 @@ class Annotator(object):
     def reset(self): 
         self.pts_map = dict()
         self.pt_id = 0
+        self.show()
 
     def run(self): 
         annotate = True
@@ -166,6 +168,8 @@ class Annotator(object):
             elif ch == ord('q') or ch == 27: 
                 annotate = False
                 break
+
+        cv2.destroyWindow(self.name)
         return annotate, self.pts_map
 
 if __name__ == "__main__": 
