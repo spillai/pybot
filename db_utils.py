@@ -63,9 +63,13 @@ def flush_pytable(h5f, data=None, group=None, table=None, force=True):
     for k,v in data.iteritems(): 
         # print 'key,val', k,v, type(v)
 
-        if not isinstance(k, str): 
-            # self.log.debug('Cannot save to DB, key is not string %s ' % k)
+        try: 
+            k = str(k)
+        except: 
+            self.log.debug('Cannot save to DB, key is not string %s ' % k)
             continue
+        # if not isinstance(k, str): 
+        #     continue
 
         # Clean up before writing 
         if force: 
@@ -126,19 +130,25 @@ def save_pytable(fn, d):
 class AttrDict(dict): 
     def __init__(self, *args, **kwargs): 
         super(AttrDict, self).__init__(*args, **kwargs)
+        
+    def __getitem__(self, attr): 
+        return super(AttrDict, self).__getitem__(attr)
+
+    def __setitem__(self, attr, value): 
+        super(AttrDict, self).__setitem__(attr, value)
 
     def __getattr__(self, attr): 
-        return self[attr]
+        return super(AttrDict, self).__getitem__(attr)
 
     def __setattr__(self, attr, value): 
-        self[attr] = value
+        super(AttrDict, self).__setitem__(attr, value)
 
-    def __repr__(self): 
-        try: 
-            import json
-            return json.dumps(dict(self), sort_keys=True, indent=4)
-        except: 
-            return ''
+    # def __repr__(self): 
+    #     # try: 
+    #     import json
+    #     return '__repr__' + json.dumps(self.copy(), sort_keys=True, indent=4)
+    #     # # except: 
+    #     #     return ''
 
     @staticmethod
     def load_json(fn): 
@@ -155,7 +165,7 @@ class AttrDict(dict):
         print 'Saving ', fn
         if create_path_if_not_exists(fn): 
             print 'Creating new folder with path: %s' % fn
-        return save_pytable(fn, dict(self))
+        return save_pytable(fn, self.copy())
         
 
 # class AttrDictDB(AttrDict): 
