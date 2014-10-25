@@ -106,7 +106,6 @@ class FwdBwdKLT2(BaseKLT):
         data = Feature3DData.empty(N, T)
 
         # Retrieve 3D
-        # for tidx, (Xidx, Nidx, pts) in enumerate(izip(Xs, Ns, self.fpts)): 
         for tidx, (pts, normals3d, pts3d) in enumerate(izip(self.fpts, self.normals3d, self.pts3d)): 
             # Find valid inds that are finite
             ninds = valid_ninds[np.where(np.isfinite(pts[valid_ninds]).all(axis=1))[0]]
@@ -122,20 +121,11 @@ class FwdBwdKLT2(BaseKLT):
             data.normal[ninds,tidx] = normals3d[ninds]
             
             ninds_ = ninds[np.isfinite(data.xyz[ninds,tidx]).all(axis=1)]
+            # ninds_ = ninds[np.isfinite(data.xyz[ninds,tidx]).all(axis=1) &
+            #                np.isfinite(data.normal[ninds,tidx]).all(axis=1)]
+
+            # Set inlier
             data.idx[ninds_,tidx] = 1
-            # try: 
-
-            #     ninds_ = ninds[np.isfinite(data.xyz[ninds,tidx]).all(axis=1) &
-            #                    np.isfinite(data.normal[ninds,tidx]).all(axis=1)]
-            #     data.idx[ninds_,tidx] = 1
-            # except IndexError as e: 
-            #     print e
-            #     pass
-
-            # # Mark outliers
-            # outliers = ninds[np.where((np.fabs(self.fpts[tidx, ninds] - 
-            #                                    self.bpts[tidx, ninds]) > 1.0).any(axis=1))[0]]
-            # data.idx[outliers,tidx] = -1
 
         return data 
 
