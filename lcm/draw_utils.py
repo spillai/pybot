@@ -213,7 +213,6 @@ def publish_point_type(pub_channel, _arr, c='r', point_type='POINT', flip_rb=Fal
     alpha: supported only by matplotlib plotting
     """
     global g_viz_pub
-    arr, carr = copy_pointcloud_data(_arr, c, flip_rb=flip_rb)
     frame_pose = g_viz_pub.get_sensor_pose(frame_id)
 
     # point3d list collection msg
@@ -225,7 +224,14 @@ def publish_point_type(pub_channel, _arr, c='r', point_type='POINT', flip_rb=Fal
     pc_list_msg.point_lists = []
 
     # Create the point cloud msg
-    pc_msg = arr_msg(arr, carr=carr, frame_uid=g_viz_pub.sensor_uid(frame_id))
+    if isinstance(_arr, list): 
+        for _arr_item in _arr: 
+            arr, carr = copy_pointcloud_data(_arr_item, c, flip_rb=flip_rb)
+            pc_msg = arr_msg(arr, carr=carr, frame_uid=g_viz_pub.sensor_uid(frame_id))
+            pc_list_msg.point_lists.append(pc_msg)
+    else: 
+        arr, carr = copy_pointcloud_data(_arr, c, flip_rb=flip_rb)
+        pc_msg = arr_msg(arr, carr=carr, frame_uid=g_viz_pub.sensor_uid(frame_id))
 
     # add to point cloud list                
     pc_list_msg.point_lists.append(pc_msg)
