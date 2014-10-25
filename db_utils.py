@@ -3,6 +3,7 @@ import tables as tb
 import numpy as np
 import time, logging, cPickle, shelve
 
+import os.path
 from bot_utils.io_utils import create_path_if_not_exists
 
 # =============================================================================
@@ -11,11 +12,11 @@ from bot_utils.io_utils import create_path_if_not_exists
 
 def load_json_dict(fn): 
     import json
-    return json.load(open(fn, 'r'))
+    return json.load(open(os.path.expanduser(fn), 'r'))
 
 def save_json_dict(fn, d): 
     import json
-    with open(fn, 'w') as fp:
+    with open(os.path.expanduser(fn), 'w') as fp:
         json.dump(d, fp, sort_keys=True, indent=4, separators=(',', ':'))
 
 def read_pytable(h5f, group=None): 
