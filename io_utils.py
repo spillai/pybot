@@ -2,6 +2,7 @@ import cv2
 import argparse, os
 import numpy as np
 import psutil
+import joblib
 
 def mkdir_p(path):
     try:
@@ -19,6 +20,11 @@ def create_path_if_not_exists(filename):
         return True
     return False
 
+def joblib_dump(item, path): 
+    if create_path_if_not_exists(path): 
+        print 'Making directory for path %s' % path
+    joblib.dump(item, path)
+    
 def memory_usage_psutil():
     # return the memory usage in MB
     process = psutil.Process(os.getpid())
