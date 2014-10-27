@@ -2,11 +2,13 @@ import cv2, time
 import numpy as np
 from scipy.cluster.vq import vq, kmeans2
 
+from bot_utils.db_utils import AttrDict
 from scipy.spatial import cKDTree
 from sklearn.cluster import KMeans, MiniBatchKMeans
 
 class BOWVectorizer(object): 
-    def __init__(self, K=100, method='vq', quantizer='kdtree', norm_method='square-rooting'): 
+    default_params = AttrDict(K=64, method='vlad', norm_method='square-rooting')
+    def __init__(self, K=64, method='vlad', quantizer='kdtree', norm_method='square-rooting'): 
         self.K = K
         self.method, self.quantizer = method, quantizer
         self.norm_method = norm_method
@@ -36,12 +38,26 @@ class BOWVectorizer(object):
                                                                                            self.codebook.shape, 
                                                                                            time.time() - st)
 
+        # Save codebook, and index
+        self.index_codebook()
+
+    def index_codebook(self): 
         # Index codebook for quick querying
         st = time.time()
         self.index = cKDTree(self.codebook)
         print 'Indexing codebook %s took %5.3f s' % (self.codebook.shape, time.time() - st)
 
-        return self.codebook
+    @classmethod
+    def load(cls, path):
+        db = AttrDict.load(path)
+        bowv = cls(**db.params)
+        bowv.codebook = db.codebook
+        bowv.index_codebook()
+        return bowv
+
+    def save(self, path): 
+        db = AttrDict(codebook=self.codebook, params=AttrDict(K=self.K, method=self.method, norm_method=self.norm_method))
+        db.save(path)
 
     def get_code(self, data): 
         """
@@ -114,35 +130,24 @@ class BOWVectorizer(object):
 class BOWTrainer(object): 
     def __init__(self, **kwargs): 
         self.vectorizer = BOWVectorizer(**kwargs)
-        # self.data = []
 
-    # def add(self, data): 
-    #     """
-    #     Accumuate the descriptions for codebook/vocabulary construction
-    #     """
-    #     self.data.append(data)
-
-
-    # def build(self): 
-    #     """
-    #     Build a codebook/vocabulary from data
-    #     """
-    #     assert(len(self.data) > 0)
-    #     return self.vectorizer.build(np.vstack(self.data))
-
-    def load(self, path): 
-        pass
+    @classmethod
+    def load(cls, path): 
+        bowt = cls()
+        bowt.vectorizer = BOWVectorizer.load(path)
+        return bowt
 
     def save(self, path): 
-        pass
-
+        self.vectorizer.save(path)
 
     def build(self, data): 
         """
         Build a codebook/vocabulary from data
         """
         assert(len(data) > 0)
-        return self.vectorizer.build(np.vstack(data))
+        self.vectorizer.build(np.vstack(data))
+
+        return 
         
     def project(self, data): 
         """

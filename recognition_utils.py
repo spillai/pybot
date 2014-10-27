@@ -11,8 +11,6 @@ from sklearn.multiclass import OneVsRestClassifier
 from sklearn.cross_validation import train_test_split
 from sklearn.externals import joblib
 
-
-
 from bot_vision.image_utils import im_resize
 from bot_utils.io_utils import memory_usage_psutil
 from bot_utils.db_utils import AttrDict, AttrDictDB
@@ -68,30 +66,37 @@ class ImageClassifier(object):
       target_ids:   [0, 1, 2, ..., 101]
       target_names: [car, bike, ... ]
     """
-
+    
+    training_params = AttrDict(train_size=10, random_state=1)
+    descriptor_params = AttrDict(dense=True, descriptor='SIFT', detector='SIFT')
+    bow_params = AttrDict(K=64, method='vlad', norm_method='square-rooting')
+    cache_params = AttrDict(vocab_path='vocab', clf_path='clf', overwrite=False)
+    default_params = AttrDict(
+        training=training_params, descriptor=descriptor_params, bow=bow_params, cache=cache_params
+    )
     def __init__(self, dataset, 
-                 max_test_size=10, process_cb=lambda fn: dict(im=cv2.imread(fn), mask=None), 
-                 training_args = dict(train_size=10, random_state=1),
-                 descriptor_args = dict(dense=True, descriptor='SIFT', detector='SIFT'), 
-                 bow_args = dict(K=64, method='vlad', norm_method='square-rooting'), 
-                 cache_args = AttrDict(vocab_path='vocab', clf_path='clf', overwrite=False)): 
+                 max_test_size=10, 
+                 process_cb=lambda fn: dict(im=cv2.imread(fn), mask=None), 
+                 params = default_params): 
+
         # Save dataset
         self.dataset = dataset
-        self.cache_args = cache_args
         self.process_cb = process_cb
+        self.params = AttrDict(params)
         print 'Memory usage at __init__ start %5.2f MB' % (memory_usage_psutil())
 
         # Bag-of-words VLAD/VQ
-        if cache_args.overwrite or not io_utils.path_exists(cache_args.clf_path): 
-            self.bow = BOWTrainer(**bow_args)
+        if self.params.cache.overwrite or not io_utils.path_exists(self.params.cache.clf_path): 
+            self.bow = BOWTrainer(**self.params.bow)
         else: 
-            self.bow = joblib.load(cache_args.vocab_path)            
+            self.bow = BOWTrainer.load(self.params.cache.vocab_path)
 
         # Image description using Dense SIFT/Descriptor
-        self.image_descriptor = ImageDescription(**descriptor_args)
+        self.image_descriptor = ImageDescription(**self.params.descriptor)
 
         # Split up training and test
         self.X_train, self.X_test, self.y_train, self.y_test = [], [], [], []
+
 
         print np.unique(self.dataset.target)
         for y_t in np.unique(self.dataset.target): 
@@ -100,7 +105,7 @@ class ImageClassifier(object):
             data, target = self.dataset.data[inds], self.dataset.target[inds]
 
             # Split train, and test (complement of test)
-            X_train, X_test, y_train, y_test = train_test_split(data, target, **training_args)
+            X_train, X_test, y_train, y_test = train_test_split(data, target, **self.params.training)
 
             # Only allow max testing size
             self.X_train.extend(X_train), self.X_test.extend(X_test[:max_test_size])
@@ -108,7 +113,7 @@ class ImageClassifier(object):
 
         # Setup classifier
         self.clf_pretrained = False
-        if not io_utils.path_exists(cache_args.clf_path) or cache_args.overwrite: 
+        if not io_utils.path_exists(self.params.cache.clf_path) or self.params.cache.overwrite: 
             print 'Building Classifier'
             # self._clf = KNeighborsClassifier(n_neighbors=10)
             self._clf = LinearSVC()
@@ -117,7 +122,7 @@ class ImageClassifier(object):
             #                                 max_depth=3, min_samples_split=1, random_state=0)
         else: 
             print 'Loading Classifier'
-            self.clf = joblib.load(cache_args.clf_path)
+            self.clf = AttrDict.load(self.params.cache.clf_path).clf
             self.clf_pretrained = True
 
         print 'Memory usage at __init__ completed %5.2f MB' % (memory_usage_psutil())
@@ -126,6 +131,7 @@ class ImageClassifier(object):
         if self.clf_pretrained: 
             return 
 
+        print '===> Training '
         st = time.time()
 
         print 'Memory usage at pre-train %5.2f MB' % (memory_usage_psutil())
@@ -154,9 +160,9 @@ class ImageClassifier(object):
 
         print 'Memory usage at post-fit %5.2f MB' % (memory_usage_psutil())
 
-        # # Save to DB
-        # joblib.dump(self.bow, self.cache_args.vocab_path)
-        # joblib.dump(self.clf, self.cache_args.clf_path)
+        # Save to DB
+        self.bow.save(self.params.cache.vocab_path)
+        AttrDict(clf=self.clf).save(self.params.cache.clf_path)
 
         print ' Accuracy score (Training): %4.3f' % (metrics.accuracy_score(train_target, pred_target))
         print ' Report (Training):\n %s' % (metrics.classification_report(train_target, pred_target, 
@@ -167,6 +173,7 @@ class ImageClassifier(object):
         return
 
     def classify(self): 
+        print '===> Classification '
         st = time.time()
 
         # Extract features
@@ -180,6 +187,7 @@ class ImageClassifier(object):
 
         pred_target = self.clf.predict(test_histogram)
 
+        print ' Confusion matrix (Test): %s' % (metrics.confusion_matrix(test_target, pred_target))
         print ' Accuracy score (Test): %4.3f' % (metrics.accuracy_score(test_target, pred_target))
         print ' Report (Test):\n %s' % (metrics.classification_report(test_target, pred_target, 
                                                                       target_names=self.dataset.target_names))

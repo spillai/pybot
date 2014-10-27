@@ -150,7 +150,7 @@ class OpticalFlowTracker(object):
 
     def __init__(self, params=klt_flow_params): 
         # FeatureDetector params
-        self.params = params
+        self.params = AttrDict(params)
         
         if self.params.type == 'lk': 
             self.track = self.sparse_track
