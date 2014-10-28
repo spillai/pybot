@@ -23,13 +23,13 @@ def to_color(im):
     if im.ndim == 2: 
         return cv2.cvtColor(im, cv2.COLOR_GRAY2BGR)
     else: 
-        return im
+        return im.copy()
 
 def to_gray(im): 
     if im.ndim == 3: 
         return cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
     else: 
-        return im
+        return im.copy()
 
 def gaussian_blur(im, size=3): 
     return cv2.GaussianBlur(im, (size,size), 0)
