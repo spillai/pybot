@@ -42,8 +42,8 @@ def get_color_arr(c, n, flip_rb=False):
         carr = reshape_arr(c)
 
     if flip_rb: 
-        r, b = carr[:,0], carr[:,2]
-        carr[:,0], carr[:,2] = b.copy(), r.copy()
+        b, r = carr[:,0], carr[:,2]
+        carr[:,0], carr[:,2] = r.copy(), b.copy()
 
     # return floating point with values in [0,1]
     return carr.astype(np.float32) / 255.0 if carr.dtype == np.uint8 else carr.astype(np.float32)

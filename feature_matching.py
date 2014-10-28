@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 from itertools import chain, izip
+from bot_vision.image_utils import to_gray
 
 def explore_match(win, img1, img2, kp_pairs, status = None, H = None):
     h1, w1 = img1.shape[:2]
@@ -72,8 +73,10 @@ class RichFeatureMatching:
         self.extractor = cv2.DescriptorExtractor_create(descriptor)
         self.matcher = cv2.DescriptorMatcher_create('FlannBased')
 
-    def match(self, im1, im2, mask1=None, mask2=None):
-        # Feature detection
+    def match(self, im1, im2, mask1=None, mask2=None): 
+
+       # Feature detection
+        im1, im2 = to_gray(im1), to_gray(im2)
         kpts1 = self.detector.detect(im1, mask=mask1)
         kpts2 = self.detector.detect(im2, mask=mask2)
         
@@ -84,9 +87,14 @@ class RichFeatureMatching:
         # Match
         m12 = self.matcher.knnMatch(desc1, desc2, 1)
         m21 = self.matcher.knnMatch(desc2, desc1, 1)
-        
-        # FWD-BWD check
         m12, m21 = list(chain(*m12)), list(chain(*m21))
+
+        # Re-assign kpts to valid ones
+        kpts1_all = [ kpts1[m12_item.queryIdx] for m12_item in m12 ]
+        kpts2_all = [ kpts2[m12_item.trainIdx] for m12_item in m12 ]
+        # explore_match('all', im1, im2, zip(kpts1_all, kpts2_all))
+
+        # FWD-BWD check
         fb_matches = [ m12_item 
                        for m12_item in m12 
                        if m12_item.queryIdx == m21[m12_item.trainIdx].trainIdx ]
@@ -99,19 +107,23 @@ class RichFeatureMatching:
         pts2 = np.vstack([ kp.pt for kp in kpts2 ]).astype(np.float32)
 
         # Fundamental matrix
-        # M, status = cv2.findHomography(pts1, pts2, cv2.RANSAC, 5.0)
-        F, status = cv2.findFundamentalMat(pts1, pts2, cv2.FM_RANSAC, 
-                                             1.0, 0.998)
+        M, status = cv2.findHomography(pts1, pts2, cv2.RANSAC, 5.0)
+        # F, status = cv2.findFundamentalMat(pts1, pts2, cv2.FM_RANSAC, 
+        #                                      1.0, 0.998)
 
         # Inliers matches
-        inliers = np.vstack([ np.array([m12_item.queryIdx, m12_item.trainIdx])
-                              for m12_item in fb_matches ]).astype(np.int32)
-        inliers = inliers[status.ravel() == 1]
-
-        explore_match('win', im1, im2, zip(kpts1, kpts2), status)
+        explore_match('inliers', im1, im2, zip(kpts1, kpts2), status)
         cv2.waitKey(0)
+
+        # Return corresponding points
+        pts1 = pts1[status.ravel() == 1] 
+        pts2 = pts2[status.ravel() == 1]
+
+        return pts1, pts2
 
 if __name__ == "__main__": 
     im1 = cv2.imread('box.png', 0)
     im2 = cv2.imread('box_in_scene.png', 0)
-    RichFeatureMatching().match(im1, im2)
+    pts1, pts2 = RichFeatureMatching().match(im1, im2)
+
+    
