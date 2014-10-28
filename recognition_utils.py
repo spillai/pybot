@@ -45,7 +45,7 @@ class ImageDescription(object):
         if selective_search: 
             self.sel_search = mser_utils.MSER()
 
-    def describe(self, im, mask=None): 
+    def describe(self, img, mask=None): 
         """
         Computes dense/sparse features on an image and describes 
         these keypoints using a feature descriptor
@@ -53,8 +53,8 @@ class ImageDescription(object):
            kpts: [cv2.KeyPoint, ... ] 
            desc: [N x D]
         """
-        kpts = self.detector.detect(im, mask=mask)
-        kpts, desc = self.extractor.compute(im, kpts)
+        kpts = self.detector.detect(img, mask=mask)
+        kpts, desc = self.extractor.compute(img, kpts)
         return desc.astype(np.uint8)
 
 class ImageClassifier(object): 
@@ -68,15 +68,15 @@ class ImageClassifier(object):
     """
     
     training_params = AttrDict(train_size=10, random_state=1)
-    descriptor_params = AttrDict(dense=True, descriptor='SIFT', detector='SIFT')
-    bow_params = AttrDict(K=64, method='vlad', norm_method='square-rooting')
-    cache_params = AttrDict(vocab_path='vocab', clf_path='clf', overwrite=False)
+    descriptor_params = AttrDict(detector='dense', descriptor='SIFT', step=2, levels=4, scale=2)
+    bow_params = AttrDict(K=64, method='vlad', quantizer='kdtree', norm_method='square-rooting')
+    cache_params = AttrDict(detector_path='detector.h5', overwrite=False)
     default_params = AttrDict(
         training=training_params, descriptor=descriptor_params, bow=bow_params, cache=cache_params
     )
-    def __init__(self, dataset, 
+    def __init__(self, dataset=None, 
                  max_test_size=10, 
-                 process_cb=lambda fn: dict(im=cv2.imread(fn), mask=None), 
+                 process_cb=lambda fn: dict(img=cv2.imread(fn), mask=None), 
                  params = default_params): 
 
         # Save dataset
@@ -85,18 +85,40 @@ class ImageClassifier(object):
         self.params = AttrDict(params)
         print 'Memory usage at __init__ start %5.2f MB' % (memory_usage_psutil())
 
-        # Bag-of-words VLAD/VQ
-        if self.params.cache.overwrite or not io_utils.path_exists(self.params.cache.clf_path): 
-            self.bow = BOWTrainer(**self.params.bow)
-        else: 
-            self.bow = BOWTrainer.load(self.params.cache.vocab_path)
+        # Optionally setup training testing
+        if dataset is not None: 
+            self.setup_training_testing(max_test_size)
 
+            # Persist, and retrieve db if available
+            if not io_utils.path_exists(self.params.cache.detector_path) or self.params.cache.overwrite: 
+                self.setup_recognition()
+                self.clf_pretrained = False
+            else: 
+                db = AttrDict.load(self.params.cache.detector_path)
+                self.setup_recognition_from_dict(db)
+                self.clf_pretrained = True
+
+    def setup_recognition(self): 
+        # Bag-of-words VLAD/VQ
+        self.bow = BOWTrainer(**self.params.bow)
+        
         # Image description using Dense SIFT/Descriptor
         self.image_descriptor = ImageDescription(**self.params.descriptor)
 
+        # Setup classifier
+        print 'Building Classifier'
+        # self._clf = KNeighborsClassifier(n_neighbors=10)
+        self._clf = LinearSVC()
+        self.clf = OneVsRestClassifier(self._clf, n_jobs=1)
+        # self.clf = ExtraTreesClassifier(n_estimators=10, 
+        #                                 max_depth=3, min_samples_split=1, random_state=0)
+
+        print 'Memory usage at __init__ completed %5.2f MB' % (memory_usage_psutil())
+
+
+    def setup_training_testing(self, max_test_size): 
         # Split up training and test
         self.X_train, self.X_test, self.y_train, self.y_test = [], [], [], []
-
 
         print np.unique(self.dataset.target)
         for y_t in np.unique(self.dataset.target): 
@@ -111,25 +133,12 @@ class ImageClassifier(object):
             self.X_train.extend(X_train), self.X_test.extend(X_test[:max_test_size])
             self.y_train.extend(y_train), self.y_test.extend(y_test[:max_test_size])
 
-        # Setup classifier
-        self.clf_pretrained = False
-        if not io_utils.path_exists(self.params.cache.clf_path) or self.params.cache.overwrite: 
-            print 'Building Classifier'
-            # self._clf = KNeighborsClassifier(n_neighbors=10)
-            self._clf = LinearSVC()
-            self.clf = OneVsRestClassifier(self._clf, n_jobs=1)
-            # self.clf = ExtraTreesClassifier(n_estimators=10, 
-            #                                 max_depth=3, min_samples_split=1, random_state=0)
-        else: 
-            print 'Loading Classifier'
-            self.clf = AttrDict.load(self.params.cache.clf_path).clf
-            self.clf_pretrained = True
-
-        print 'Memory usage at __init__ completed %5.2f MB' % (memory_usage_psutil())
-
     def train(self): 
         if self.clf_pretrained: 
             return 
+
+        if not hasattr(self, 'X_train') or not hasattr(self, 'y_train'): 
+            raise RuntimeError('Training cannot proceed. Setup training and testing samples first!')            
 
         print '===> Training '
         st = time.time()
@@ -160,16 +169,15 @@ class ImageClassifier(object):
 
         print 'Memory usage at post-fit %5.2f MB' % (memory_usage_psutil())
 
-        # Save to DB
-        self.bow.save(self.params.cache.vocab_path)
-        AttrDict(clf=self.clf).save(self.params.cache.clf_path)
-
         print ' Accuracy score (Training): %4.3f' % (metrics.accuracy_score(train_target, pred_target))
         print ' Report (Training):\n %s' % (metrics.classification_report(train_target, pred_target, 
                                                                           target_names=self.dataset.target_names))
 
         print 'Memory usage at post-predict %5.2f MB' % (memory_usage_psutil())
         print 'Training took %5.3f s' % (time.time() - st)
+
+        print 'Saving classifier'
+        self.save(self.params.cache.detector_path)
         return
 
     def classify(self): 
@@ -195,4 +203,46 @@ class ImageClassifier(object):
         print 'Testing took %5.3f s' % (time.time() - st)
 
         return test_histogram, test_target, pred_target
+
+
+    def classify_one(self, img, mask): 
+        print '===> Classification one '
+        st = time.time()
+
+        # Extract features
+        test_desc = self.image_descriptor.describe(img, mask=mask) 
+        test_histogram = self.bow.project(test_desc)
+        pred_target_proba = self.clf.decision_function(test_histogram)
+        pred_target, = self.clf.predict(test_histogram)
+        # print pred_target_proba, pred_target
+
+        return self.target_name[str(pred_target)]
+
+    def setup_recognition_from_dict(self, db): 
+        try: 
+            self.params = db.params
+            self.target_name = db.target_name
+            self.image_descriptor = ImageDescription(**db.params.descriptor)
+            self.bow = BOWTrainer.from_dict(db.bow)
+            self.clf = db.clf
+        except KeyError: 
+            raise RuntimeError('DB not setup correctly, try re-training!')
+            
+
+    @classmethod
+    def from_dict(cls, db): 
+        c = cls()
+        c.setup_recognition_from_dict(db)
+        return c
+
+    @classmethod
+    def load(cls, path): 
+        db = AttrDict.load(path)
+        return cls.from_dict(db)
+        
+    def save(self, path): 
+        db = AttrDict(params=self.params, bow=self.bow.to_dict(), clf=self.clf, 
+                      target_name=self.dataset.target_unhash)
+        db.save(path)
+
         

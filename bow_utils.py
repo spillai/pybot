@@ -47,16 +47,24 @@ class BOWVectorizer(object):
         self.index = cKDTree(self.codebook)
         print 'Indexing codebook %s took %5.3f s' % (self.codebook.shape, time.time() - st)
 
+
     @classmethod
-    def load(cls, path):
-        db = AttrDict.load(path)
+    def from_dict(cls, db): 
         bowv = cls(**db.params)
         bowv.codebook = db.codebook
         bowv.index_codebook()
         return bowv
 
+    @classmethod
+    def load(cls, path):
+        db = AttrDict.load(path)
+        return cls.from_dict(db)
+
+    def to_dict(self): 
+        return AttrDict(codebook=self.codebook, params=AttrDict(K=self.K, method=self.method, norm_method=self.norm_method))
+
     def save(self, path): 
-        db = AttrDict(codebook=self.codebook, params=AttrDict(K=self.K, method=self.method, norm_method=self.norm_method))
+        db = self.to_dict()
         db.save(path)
 
     def get_code(self, data): 
@@ -132,13 +140,22 @@ class BOWTrainer(object):
         self.vectorizer = BOWVectorizer(**kwargs)
 
     @classmethod
-    def load(cls, path): 
+    def from_dict(cls, db): 
         bowt = cls()
-        bowt.vectorizer = BOWVectorizer.load(path)
+        bowt.vectorizer = BOWVectorizer.from_dict(db.vectorizer)
         return bowt
 
+    @classmethod
+    def load(cls, path): 
+        db = AttrDict.load(path)
+        return cls.from_dict(db)
+
     def save(self, path): 
-        self.vectorizer.save(path)
+        db = self.to_dict()
+        db.save(path)
+
+    def to_dict(self): 
+        return AttrDict(vectorizer=self.vectorizer.to_dict())
 
     def build(self, data): 
         """
