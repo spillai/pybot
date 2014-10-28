@@ -41,7 +41,7 @@ def read_pytable(h5f, group=None):
 
 def load_pytable(fn): 
     try: 
-        h5f = tb.openFile(fn, mode='r', title='Title: %s' % fn)
+        h5f = tb.openFile(os.path.expanduser(fn), mode='r', title='Title: %s' % fn)
         data = read_pytable(h5f, group=h5f.root)
         h5f.close()
     except: 
@@ -114,7 +114,7 @@ def flush_pytable(h5f, data=None, group=None, table=None, force=True):
     return 
 
 def save_pytable(fn, d): 
-    h5f = tb.openFile(fn, mode='w', title='%s' % fn)
+    h5f = tb.openFile(os.path.expanduser(fn), mode='w', title='%s' % fn)
 
     tables = AttrDict()
     groups = AttrDict()
