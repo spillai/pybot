@@ -235,8 +235,7 @@ def arr_msg(arr, carr, frame_uid):
     return msg
 
 
-@run_async
-def publish_point_type(pub_channel, _arr, c='r', point_type='POINT', flip_rb=False, frame_id='KINECT'):
+def _publish_point_type(pub_channel, _arr, c='r', point_type='POINT', flip_rb=False, frame_id='KINECT'):
     """
     Publish point cloud on:
     pub_channel: Channel on which the cloud will be published
@@ -274,11 +273,15 @@ def publish_point_type(pub_channel, _arr, c='r', point_type='POINT', flip_rb=Fal
     g_viz_pub.lc.publish("POINTS_COLLECTION", pc_list_msg.encode())
     # g_log.debug('Published %i points' % (tpoints))
 
-def publish_cloud(pub_channel, arr, c='r', flip_rb=False, frame_id='KINECT'):
-    publish_point_type(pub_channel, arr, c=c, point_type='POINT', flip_rb=flip_rb, frame_id=frame_id)
+# @run_async
+def publish_point_type(pub_channel, arr, c='r', point_type='POINT', flip_rb=False, frame_id='KINECT'):
+    _publish_point_type(pub_channel, deepcopy(arr), c=deepcopy(c), point_type=point_type, flip_rb=flip_rb, frame_id=frame_id)
 
-@run_async
-def publish_pose_list(pub_channel, _poses, texts=[], frame_id='KINECT'):
+# @run_async
+def publish_cloud(pub_channel, arr, c='r', flip_rb=False, frame_id='KINECT'):
+    _publish_point_type(pub_channel, deepcopy(arr), c=deepcopy(c), point_type='POINT', flip_rb=flip_rb, frame_id=frame_id)
+
+def _publish_pose_list(pub_channel, _poses, texts=[], frame_id='KINECT'):
     """
     Publish Pose List on:
     pub_channel: Channel on which the cloud will be published
@@ -334,9 +337,12 @@ def publish_pose_list(pub_channel, _poses, texts=[], frame_id='KINECT'):
         #                   texts, sensor_tf=sensor_tf)
         publish_text_lcmgl(pub_channel+'-text', arr, texts, frame_id=frame_id)
 
+# @run_async
+def publish_pose_list(pub_channel, poses, texts=[], frame_id='KINECT'):
+    _publish_pose_list(pub_channel, deepcopy(poses), texts=texts, frame_id=frame_id)
 
 # ===== Tangents drawing ====
-def publish_line_segments(pub_channel, _arr1, _arr2, c='r', flip_rb=False, frame_id='KINECT'):
+def _publish_line_segments(pub_channel, _arr1, _arr2, c='r', flip_rb=False, frame_id='KINECT'):
     """ 
     Publish point cloud tangents:
     note: draw line from p1 to p2
@@ -351,7 +357,7 @@ def publish_line_segments(pub_channel, _arr1, _arr2, c='r', flip_rb=False, frame
     """
     global g_viz_pub
     arr1, carr = copy_pointcloud_data(_arr1, c, flip_rb=flip_rb)
-    arr2 = (deepcopy(_arr2)).reshape(-1,3)
+    arr2 = _arr2.reshape(-1,3)
     if not arr1.shape == arr2.shape: raise AssertionError    
 
     frame_pose = g_viz_pub.get_sensor_pose(frame_id)
@@ -415,6 +421,10 @@ def publish_line_segments(pub_channel, _arr1, _arr2, c='r', flip_rb=False, frame
     pc_list_msg.nlists = len(pc_list_msg.point_lists); 
     g_viz_pub.lc.publish("POINTS_COLLECTION", pc_list_msg.encode())
     # g_log.debug('Published %i normals' % (tpoints))
+
+@run_async
+def publish_line_segments(pub_channel, arr1, arr2, c='r', flip_rb=False, frame_id='KINECT'):
+    _publish_line_segments(pub_channel, deepcopy(arr1), deepcopy(arr2), c=deepcopy(c), flip_rb=flip_rb, frame_id=frame_id)
 
 
 # # # ===== Pose drawing (viz) ====
