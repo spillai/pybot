@@ -6,11 +6,13 @@ import time, logging
 
 # LCM libs
 import lcm, vs
+from bot_core import image_t
 
 # Asynchronous decorator
 from copy import deepcopy
 
 # Utility imports
+from bot_vision.image_utils import to_color
 from bot_vision.draw_utils import reshape_arr, get_color_arr, height_map, color_by_height_axis, copy_pointcloud_data
 from bot_utils.async_utils import run_async
 from bot_geometry.rigid_transform import RigidTransform
@@ -25,6 +27,7 @@ class VisualizationMsgsPub:
         self._sensor_pose = dict()
 
         self.lc = lcm.LCM()
+        self.log = logging.getLogger(__name__)
 
         kinect_pose = RigidTransform.from_roll_pitch_yaw_x_y_z(-np.pi/2, 0, -np.pi/2, 
                                                                0.15, 0.2, 1.48, axes='sxyz')
@@ -80,6 +83,38 @@ class VisualizationMsgsPub:
 global g_viz_pub
 g_viz_pub = VisualizationMsgsPub()
 
+def publish_image_t(pub_channel, im, jpeg=False, flip_rb=True): 
+    global g_viz_pub
+    out = image_t()
+    assert(im.ndim == 3)
+
+    # Populate appropriate fields
+    h,w = im.shape[:2]
+    c = 3
+    out.width, out.height = w, h
+    out.row_stride = w*c
+    out.utime = 1
+
+    # Propagate appropriate encoding 
+    if jpeg: 
+        out.pixelformat = image_t.PIXEL_FORMAT_MJPEG
+    else: 
+        out.pixelformat = image_t.PIXEL_FORMAT_RGB
+        
+    # Propagate encoded/raw data, 
+    image = to_color(im) if im.ndim == 2 else im
+    if flip_rb and im.ndim == 3: 
+        rarr, barr = image[:,:,2].copy(), image[:,:,0].copy()
+        image[:,:,0], image[:,:,2] = rarr, barr
+
+    out.data = image.tostring()
+    out.size = len(out.data)
+    out.nmetadata = 0
+
+    # Pub
+    g_viz_pub.lc.publish(pub_channel, out.encode())
+
+
 # @run_async
 # def publish_cloud(pub_ns, _arr, _carr, stamp=None, flip_rb=False, frame_id='map', seq=None): 
 #     """
@@ -101,7 +136,7 @@ g_viz_pub = VisualizationMsgsPub()
 
 
 # Globals ==============================================================
-g_log = logging.getLogger(__name__)
+
 
 # def get_frame_id(ch): 
 #     global g_frames_id
@@ -251,7 +286,6 @@ def publish_pose_list(pub_channel, _poses, texts=[], frame_id='KINECT'):
     global g_viz_pub
     poses = deepcopy(_poses)
     frame_pose = g_viz_pub.get_sensor_pose(frame_id)
-    print frame_pose
 
     # pose list collection msg
     pose_list_msg = vs.obj_collection_t();
@@ -291,8 +325,7 @@ def publish_pose_list(pub_channel, _poses, texts=[], frame_id='KINECT'):
     g_viz_pub.lc.publish("OBJ_COLLECTION", pose_list_msg.encode())
     # g_log.debug('Published %i poses' % (nposes))
 
-    carr = plt.cm.Spectral(np.arange(len(poses)))
-    publish_cloud(pub_channel+'_POINTS', arr[:,:3], c='b', frame_id=frame_id)
+    # publish_cloud(pub_channel+'_POINTS', arr[:,:3], c='b', frame_id=frame_id)
 
     # Publish corresponding text
     if len(texts): 
