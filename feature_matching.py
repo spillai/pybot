@@ -6,10 +6,11 @@ from bot_vision.image_utils import to_gray
 def explore_match(win, img1, img2, kp_pairs, status = None, H = None):
     h1, w1 = img1.shape[:2]
     h2, w2 = img2.shape[:2]
-    vis = np.zeros((max(h1, h2), w1+w2), np.uint8)
+    vis = np.zeros((max(h1, h2), w1+w2, 3), np.uint8) if img1.ndim == 3 else np.zeros((max(h1, h2), w1+w2), np.uint8)
     vis[:h1, :w1] = img1
     vis[:h2, w1:w1+w2] = img2
-    vis = cv2.cvtColor(vis, cv2.COLOR_GRAY2BGR)
+    if img1.ndim == 2 : vis = cv2.cvtColor(vis, cv2.COLOR_GRAY2BGR)
+    vis_img = vis.copy()
 
     if H is not None:
         corners = np.float32([[0, 0], [w1, 0], [w1, h1], [0, h1]])
@@ -43,7 +44,7 @@ def explore_match(win, img1, img2, kp_pairs, status = None, H = None):
         if inlier:
             cv2.line(vis, (x1, y1), (x2, y2), green)
 
-    cv2.imshow(win, vis)
+    cv2.imshow(win, np.vstack([vis_img, vis]))
     # def onmouse(event, x, y, flags, param):
     #     cur_vis = vis
     #     if flags & cv2.EVENT_FLAG_LBUTTON:
@@ -76,13 +77,13 @@ class RichFeatureMatching:
     def match(self, im1, im2, mask1=None, mask2=None): 
 
        # Feature detection
-        im1, im2 = to_gray(im1), to_gray(im2)
-        kpts1 = self.detector.detect(im1, mask=mask1)
-        kpts2 = self.detector.detect(im2, mask=mask2)
+        im1_gray, im2_gray = to_gray(im1), to_gray(im2)
+        kpts1 = self.detector.detect(im1_gray, mask=mask1)
+        kpts2 = self.detector.detect(im2_gray, mask=mask2)
         
         # Extract descriptors
-        kpts1, desc1 = self.extractor.compute(im1, kpts1)
-        kpts2, desc2 = self.extractor.compute(im2, kpts2)
+        kpts1, desc1 = self.extractor.compute(im1_gray, kpts1)
+        kpts2, desc2 = self.extractor.compute(im2_gray, kpts2)
 
         # Match
         m12 = self.matcher.knnMatch(desc1, desc2, 1)
@@ -112,8 +113,7 @@ class RichFeatureMatching:
         #                                      1.0, 0.998)
 
         # Inliers matches
-        explore_match('inliers', im1, im2, zip(kpts1, kpts2), status)
-        cv2.waitKey(0)
+        explore_match('inliers', im1_gray, im2_gray, zip(kpts1, kpts2), status)
 
         # Return corresponding points
         pts1 = pts1[status.ravel() == 1] 
