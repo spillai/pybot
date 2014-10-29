@@ -41,7 +41,6 @@ class FwdBwdKLT2(BaseKLT):
     )
 
     def __init__(self, dataset, params=default_params):
-        print params
         BaseKLT.__init__(self, params=params)
         self.params = params.fwdbwd_params
         
@@ -51,7 +50,6 @@ class FwdBwdKLT2(BaseKLT):
     def viz_data(self): 
         frame = self.dataset.get_first_frame()
         im = to_color(frame.img)
-        print self.fpts.shape, self.bpts.shape
 
         fvis = self.visualize_tracks(im.copy(), self.fpts)
         bvis = self.visualize_tracks(im.copy(), self.bpts)
