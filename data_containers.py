@@ -97,21 +97,47 @@ class Feature3DData:
                 (len(self.valid_feat_inds), self.num_feats))
         return 
 
-    def pick_top_lengths(self, k=100, verbose=True):
-        """
-        Pick top tracks based on length
-        """
-        self.log.debug('===> Picking top features by length ...')
-        valid_utimes_count = np.sum(self.idx[:,:] != -1, axis=1)
-        sorted_inds = sorted(zip(range(len(valid_utimes_count)), valid_utimes_count), 
-                                     key=lambda x: x[1], reverse=True)
-        top_inds, _ = zip(*sorted_inds)
-        self.valid_feat_inds = np.array(top_inds)[:k]
-        self.log.debug('%s' % self.valid_feat_inds)
-        # if verbose: 
-        self.log.debug('--- Done picking missing features: %i out of %i good' % \
-            (len(self.valid_feat_inds), self.num_feats))
+    # def pick_top_lengths(self, k=100, verbose=True):
+    #     """
+    #     Pick top tracks based on length
+    #     """
+    #     self.log.debug('===> Picking top features by length ...')
+    #     valid_utimes_count = np.sum(self.idx[:,:] != -1, axis=1)
+    #     sorted_inds = sorted(zip(range(len(valid_utimes_count)), valid_utimes_count), 
+    #                                  key=lambda x: x[1], reverse=True)
+    #     top_inds, _ = zip(*sorted_inds)
+    #     self.valid_feat_inds = np.array(top_inds)[:k]
+    #     self.log.debug('%s' % self.valid_feat_inds)
+    #     # if verbose: 
+    #     self.log.debug('--- Done picking missing features: %i out of %i good' % \
+    #         (len(self.valid_feat_inds), self.num_feats))
+    #     return 
+
+    def pick_top_lengths(self, k=20, verobse=True): 
+        top_inds = []
+        for ind in self.valid_feat_inds: 
+            ut_inds, = np.where(self.idx[ind,:] != -1)
+            if not len(ut_inds): continue
+            X = self.xyz[ind,ut_inds].reshape((-1,3))
+            uv = self.xy[ind,ut_inds].reshape((-1,2))
+            top_inds.append(
+                (ind, 
+                 np.sum(np.linalg.norm(X[1:] - X[:-1], axis=1)), 
+                 np.linalg.norm(np.fabs(np.max(uv, axis=0) - np.min(uv, axis=0))))
+            )
+
+        # Reverse true: for longest traj, false: for shortest traj
+        top_inds = filter(lambda x: x[1] > 0.1 and x[2] > 5, top_inds)
+        top_inds.sort(key=lambda x: x[1], reverse=True)
+        self.valid_feat_inds = np.array([ ind for ind,_,_ in top_inds[:k] ])
+        self.log.debug('Done picking top by displacement: %i good' % (len(self.valid_feat_inds)))
+        
+        # Setting the rest to invalid
+        for ind,score in top_inds[k:]: 
+            ut_inds, = np.where(self.idx[ind,:] != -1)
+            self.idx[ind, ut_inds] = -1;
         return 
+        
 
     def pick_top_by_displacement(self, k=20, verbose=True):
         """
@@ -122,7 +148,7 @@ class Feature3DData:
         for ind in self.valid_feat_inds: 
             ut_inds, = np.where(self.idx[ind,:] != -1)
             if not len(ut_inds): continue
-            X = self.xy[ind,ut_inds].reshape((-1,2))
+            X = self.xyz[ind,ut_inds].reshape((-1,2))
             Xmin, Xmax = np.min(X, axis=0), np.max(X, axis=0);
             top_inds.append((ind, np.linalg.norm(np.fabs(Xmin-Xmax)) ))
 
@@ -137,8 +163,7 @@ class Feature3DData:
             self.idx[ind, ut_inds] = -1;
         return 
 
-    def prune_discontinuous(self, min_feature_continuity_distance=0, 
-                            min_normal_continuity_angle=1.57, verbose=True):
+    def prune_discontinuous(self, min_feature_continuity_distance=0, verbose=True):
         """
         Prune features in valid tracks that are not continuous (in xyz)
         """
@@ -148,13 +173,15 @@ class Feature3DData:
             ut_inds, = np.where(self.idx[ind,:] != -1)
             ut_inds_p, ut_inds_n = ut_inds[:-1], ut_inds[1:]
             invalid_ut_inds, = np.where(
-                np.bitwise_or(np.linalg.norm(self.xyz[ind,ut_inds_p]-
-                                             self.xyz[ind,ut_inds_n], 
-                                             axis=1) > min_feature_continuity_distance, 
-                              np.sum(self.normal[ind,ut_inds_p] * 
-                                     self.normal[ind,ut_inds_n], 
-                                     axis=1) < min_normal_continuity_angle))
-            
+                    np.linalg.norm(self.xyz[ind,ut_inds_p]-
+                                   self.xyz[ind,ut_inds_n], 
+                                   axis=1) > min_feature_continuity_distance
+            )
+                # np.bitwise_or(
+                              # np.sum(self.normal[ind,ut_inds_p] * 
+                              #        self.normal[ind,ut_inds_n], 
+                              #        axis=1) < min_normal_continuity_angle)
+
             # Invalidate entire trakc if any discontinuity
             if len(invalid_ut_inds): 
                 self.idx[ind,:] = -1

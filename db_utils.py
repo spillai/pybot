@@ -19,6 +19,14 @@ def save_json_dict(fn, d):
     with open(os.path.expanduser(fn), 'w') as fp:
         json.dump(d, fp, sort_keys=True, indent=4, separators=(',', ':'))
 
+def load_mat(fn): 
+    import scipy.io as io
+    return io.loadmat(os.path.expanduser(fn))
+
+def save_mat(fn, d): 
+    import scipy.io as io
+    io.savemat(os.path.expanduser(fn), d)
+    
 def read_pytable(h5f, group=None): 
     if group is None: group = h5f.root
 
@@ -156,6 +164,13 @@ class AttrDict(dict):
 
     def save_json(self, fn): 
         save_json_dict(fn, vars(self))
+
+    @staticmethod
+    def load_mat(fn): 
+        return AttrDict(load_mat(fn))
+
+    def save_mat(self, fn): 
+        save_mat(fn, vars(self))
 
     @staticmethod
     def load(fn): 
