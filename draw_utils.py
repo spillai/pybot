@@ -7,7 +7,7 @@ from matplotlib.colors import colorConverter
 print 'Importing dummy draw_utils'
 
 # from bot_externals.ros.draw_utils import *
-from bot_externals.lcm.draw_utils import *
+# from bot_externals.lcm.draw_utils import *
 
 def height_map(hX, hmin=-0.20, hmax=5.0): 
     return np.array(plt.cm.hsv((hX-hmin)/(hmax-hmin)))[:,:3]

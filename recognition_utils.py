@@ -202,7 +202,7 @@ class ImageClassifier(object):
 
         print 'Testing took %5.3f s' % (time.time() - st)
 
-        return test_histogram, test_target, pred_target
+        return AttrDict(test_target=test_target, pred_target=pred_target, target_names=self.dataset.target_names)
 
 
     def classify_one(self, img, mask): 
