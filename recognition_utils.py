@@ -1,5 +1,6 @@
 import numpy as np
 import cv2, os, time, random
+import itertools
 
 from sklearn.linear_model import SGDClassifier
 from sklearn.neighbors import KNeighborsClassifier
@@ -133,6 +134,9 @@ class ImageClassifier(object):
             self.X_train.extend(X_train), self.X_test.extend(X_test[:max_test_size])
             self.y_train.extend(y_train), self.y_test.extend(y_test[:max_test_size])
 
+        self.X_all = list(itertools.chain(self.X_train, self.X_test))
+        self.y_all = list(itertools.chain(self.y_train, self.y_test))
+
     def train(self): 
         if self.clf_pretrained: 
             return 
@@ -180,20 +184,22 @@ class ImageClassifier(object):
         self.save(self.params.cache.detector_path)
         return
 
-    def classify(self): 
+    def classify(self, classify_trained=False): 
         print '===> Classification '
         st = time.time()
 
         # Extract features
-        test_desc = [ self.image_descriptor.describe(**self.process_cb(x_t)) for x_t in self.X_test ]
+        test_data = self.X_all if classify_trained else self.X_test
+        test_desc = [ self.image_descriptor.describe(**self.process_cb(x_t)) for x_t in test_data ]
 
         print 'Descriptor extraction took %5.3f s' % (time.time() - st)    
     
         # Histogram of trained features
-        test_target = self.y_test
+        test_target = self.y_all if classify_trained else self.y_test
         test_histogram = np.vstack([self.bow.project(desc) for desc in test_desc])
 
         pred_target = self.clf.predict(test_histogram)
+        pred_score = self.clf.decision_function(test_histogram)
 
         print ' Confusion matrix (Test): %s' % (metrics.confusion_matrix(test_target, pred_target))
         print ' Accuracy score (Test): %4.3f' % (metrics.accuracy_score(test_target, pred_target))
@@ -202,7 +208,8 @@ class ImageClassifier(object):
 
         print 'Testing took %5.3f s' % (time.time() - st)
 
-        return AttrDict(test_target=test_target, pred_target=pred_target, target_names=self.dataset.target_names)
+        return AttrDict(test_target=test_target, pred_target=pred_target, pred_score=pred_score, 
+                        target_names=self.dataset.target_names)
 
 
     def classify_one(self, img, mask): 
