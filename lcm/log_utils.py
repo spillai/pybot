@@ -61,9 +61,13 @@ class KinectDecoder(object):
         w, h = data.image.width, data.image.height;
         if data.image.image_data_format == image_msg_t.VIDEO_RGB_JPEG: 
             img = cv2.imdecode(np.asarray(bytearray(data.image.image_data), dtype=np.uint8), -1)
+            bgr = img.reshape((h,w,3))[::self.skip, ::self.skip, :]             
         else: 
             img = np.fromstring(data.image.image_data, dtype=np.uint8)
-        return img.reshape((h,w,3))[::self.skip, ::self.skip, :] 
+            rgb = img.reshape((h,w,3))[::self.skip, ::self.skip, :] 
+            bgr = cv2.cvtColor(rgb, cv2.COLOR_BGR2RGB)
+            
+        return bgr
 
     def decode_depth(self, data):
         # Extract depth image
