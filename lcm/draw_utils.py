@@ -266,9 +266,9 @@ def _publish_point_type(pub_channel, _arr, c='r', point_type='POINT', flip_rb=Fa
     else: 
         arr, carr = copy_pointcloud_data(_arr, c, flip_rb=flip_rb)
         pc_msg = arr_msg(arr, carr=carr, frame_uid=g_viz_pub.sensor_uid(frame_id))
+        pc_list_msg.point_lists.append(pc_msg)
 
     # add to point cloud list                
-    pc_list_msg.point_lists.append(pc_msg)
     pc_list_msg.nlists = len(pc_list_msg.point_lists); 
     g_viz_pub.lc.publish("POINTS_COLLECTION", pc_list_msg.encode())
     # g_log.debug('Published %i points' % (tpoints))
