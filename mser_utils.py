@@ -19,7 +19,7 @@ def fill_hulls(im, hulls):
     return im
 
 class MSER:
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
         
         # Compute MSER features on the rgb image
         mser_delta = 5
@@ -32,11 +32,14 @@ class MSER:
         mser_min_margin = 0.003
         mser_edge_blur_size = 11
 
-        self.mser = cv2.MSER(_min_area=mser_min_area, _max_area=mser_max_area, _max_evolution=mser_max_evolution,
-                             _edge_blur_size=mser_edge_blur_size)
+        self.mser = cv2.MSER(*args, **kwargs)
 
-    def detect(self, im): 
-        return self.mser.detect(im)
+    def detect(self, im, colorspace='hsv'): 
+        if colorspace == 'hsv': 
+            cim = cv2.cvtColor(im, cv2.COLOR_BGR2HLS)
+        else: 
+            cim = im
+        return self.mser.detect(cim)
 
     def hulls(self, im):
         regions = self.detect(im)
