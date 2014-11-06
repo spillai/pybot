@@ -4,8 +4,6 @@ import numpy as np
 import matplotlib.pylab as plt
 from matplotlib.colors import colorConverter
 
-print 'Importing dummy draw_utils'
-
 # from bot_externals.ros.draw_utils import *
 # from bot_externals.lcm.draw_utils import *
 
