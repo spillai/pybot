@@ -127,13 +127,13 @@ class Feature3DData:
             )
 
         # Reverse true: for longest traj, false: for shortest traj
-        top_inds = filter(lambda x: x[1] > 0.1 and x[2] > 5, top_inds)
+        top_inds = filter(lambda x: x[1] > 0.15 and x[2] > 5, top_inds)
         top_inds.sort(key=lambda x: x[1], reverse=True)
         self.valid_feat_inds = np.array([ ind for ind,_,_ in top_inds[:k] ])
         self.log.debug('Done picking top by displacement: %i good' % (len(self.valid_feat_inds)))
         
         # Setting the rest to invalid
-        for ind,score in top_inds[k:]: 
+        for ind,_,_ in top_inds[k:]: 
             ut_inds, = np.where(self.idx[ind,:] != -1)
             self.idx[ind, ut_inds] = -1;
         return 
