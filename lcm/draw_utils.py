@@ -64,7 +64,6 @@ class VisualizationMsgsPub:
         pose_msg = vs.obj_t()
         if pose is not None: 
             roll, pitch, yaw, x, y, z = pose.to_roll_pitch_yaw_x_y_z(axes='sxyz')
-            print roll, pitch, yaw, x, y, z
             pose_msg.id, pose_msg.x, pose_msg.y, pose_msg.z, \
                 pose_msg.roll, pose_msg.pitch, pose_msg.yaw  = 1, x, y, z, roll, pitch, yaw
         else: 
