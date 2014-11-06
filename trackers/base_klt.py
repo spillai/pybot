@@ -95,12 +95,11 @@ class OpenCVKLT(BaseKLT):
 
     def create_mask(self, shape, pts): 
         mask = np.ones(shape=shape, dtype=np.uint8) * 255
-        if pts is None: 
-            return mask
-            
-        for pt in pts: 
-            cv2.circle(mask, tuple(map(int, pt)), 9, 0, -1, lineType=cv2.CV_AA)
-
+        try: 
+            for pt in pts: 
+                cv2.circle(mask, tuple(map(int, pt)), 9, 0, -1, lineType=cv2.CV_AA)
+        except:
+            pass
         return mask
 
     def process(self, im):
@@ -111,18 +110,18 @@ class OpenCVKLT(BaseKLT):
         pids, ppts = self.tm.ids, self.tm.pts
         if ppts is not None and len(ppts) and len(self.ims) == 2: 
             pts = self.tracker.track(self.ims[-2], self.ims[-1], ppts)
-            self.tm.add(pts, ids=pids)
+            self.tm.add(pts, ids=pids, prune=True)
 
         # Check if more features required
         self.add_features = self.add_features or (ppts is not None and len(ppts) < 100)
-        
+
         # Initialize or add more features
         if self.add_features: 
             # Extract features
             mask = self.create_mask(im.shape, self.tm.pts)            
-            imshow_cv('mask', mask)
+            # imshow_cv('mask', mask)
 
             pts = self.detector.process(self.ims[-1], mask=mask)
-            self.tm.add(pts, ids=None)
+            self.tm.add(pts, ids=None, prune=False)
             self.add_features = True
 
