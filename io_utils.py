@@ -1,4 +1,4 @@
-import cv, cv2
+import cv2
 import argparse, os
 import numpy as np
 import psutil
@@ -44,7 +44,7 @@ class VideoWriter:
     def write(self, im):
         if self.writer is None: 
             h, w = im.shape[:2]
-            self.writer = cv2.VideoWriter(self.filename, cv.CV_FOURCC(*'mp42'), 
+            self.writer = cv2.VideoWriter(self.filename, cv2.cv.CV_FOURCC(*'mp42'), 
                                           25.0, (w, h), im.ndim == 3)
             print 'Creating writer: %s (%i,%i)' % (self.filename, w, h)
         self.writer.write(im)
@@ -53,11 +53,13 @@ class VideoWriter:
         if self.writer is not None: 
             self.writer.release()
 
-fn_map = {}
+global g_fn_map
+g_fn_map = {}
 def write_video(fn, im): 
-    if fn not in fn_map: 
-        fn_map[fn] = VideoWriter(fn)
-    fn_map[fn].write(im)
+    global g_fn_map
+    if fn not in g_fn_map: 
+        g_fn_map[fn] = VideoWriter(fn)
+    g_fn_map[fn].write(im)
 
 import subprocess
 class VideoSink(object) :
