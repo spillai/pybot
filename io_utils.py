@@ -1,4 +1,4 @@
-import cv2
+import cv, cv2
 import argparse, os
 import numpy as np
 import psutil
@@ -31,65 +31,15 @@ def memory_usage_psutil():
     mem = process.get_memory_info()[0] / float(2 ** 20)
     return mem
 
-# OSError as exc: # Python >2.5
-#         if exc.errno == errno.EEXIST and os.path.isdir(path):
-#             pass
-#         else: raise
-
-
-# class VideoWriter: 
-#     def __init__(self, filename, template, start_idx=0, max_files=10000): 
-
-#         # Basename, and filename
-#         fn_path, fn_file = os.path.split(filename)
-#         if not os.path.exists(fn_path): 
-#             mkdir_p(fn_path)
-
-#         self.filename = filename
-#         self.template = template
-#         self.start_idx = start_idx
-#         self.max_files = max_files
-
-#         # Init writer
-#         self.writer = None
-
-#     def run(self): 
-#         # Process based on template
-#         for idx in range(self.start_idx, self.max_files): 
-#             rgb_path = self.template % idx
-#             if not os.path.exists(rgb_path): 
-#                 break
-
-#             self.write(rgb_path)
-
-#             if idx % 100 == 0: 
-#                 print 'Processed %i frames' % idx
-
-#         # Release writer
-#         if self.writer is not None: 
-#             self.writer.release()
-
-#     def write(self, path):
-#         im = cv2.imread(path)
-#         if self.writer is None: 
-#             h, w = im.shape[:2]
-#             self.writer = cv2.VideoWriter(self.filename, cv.CV_FOURCC(*'mp42'), 
-#                                           15.0, (w, h), True)
-
-#             print 'Creating writer: %s (%i,%i)' % (self.filename, w, h)
-#         self.writer.write(im)
-
 class VideoWriter: 
     def __init__(self, filename): 
-
-        # Basename, and filename
-        fn_path, fn_file = os.path.split(filename)
-        if not os.path.exists(fn_path): 
-            mkdir_p(fn_path)
+        create_path_if_not_exists(filename)
         self.filename = filename
-
-        # Init writer
         self.writer = None
+
+    def __del__(self): 
+        self.close()
+        print 'Closing video writer and saving %s' % self.filename
 
     def write(self, im):
         if self.writer is None: 
@@ -103,9 +53,14 @@ class VideoWriter:
         if self.writer is not None: 
             self.writer.release()
 
+fn_map = {}
+def write_video(fn, im): 
+    if fn not in fn_map: 
+        fn_map[fn] = VideoWriter(fn)
+    fn_map[fn].write(im)
+
 import subprocess
 class VideoSink(object) :
-
     def __init__( self, size, filename="output", rate=10, byteorder="bgra" ) :
             self.size = size
             cmdstring  = ('mencoder',
