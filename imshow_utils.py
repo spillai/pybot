@@ -34,7 +34,7 @@ def bar_plt(label, ys, block=False):
     plt.show(block=block)
 
 
-def imshow_cv(label, im): 
+def imshow_cv(label, im, block=False): 
     cv2.imshow(label, im)
-    cv2.waitKey(1)
+    cv2.waitKey(0 if block else 1)
 

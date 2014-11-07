@@ -13,7 +13,7 @@ class StereoSGBM:
     # Parameters from KITTI dataset
     sad_window_size = 5
 
-    params_ = dict( minDisparity = 0, # 16,
+    default_params = dict( minDisparity = 0, # 16,
                     preFilterCap = 15, # 63, 
                     numDisparities = 256, # 128,
                     # SADWindowSize = sad_window_size, uniquenessRatio = 10, speckleWindowSize = 100,
@@ -26,7 +26,7 @@ class StereoSGBM:
                     fullDP = True )
 
 
-    def __init__(self, params=params_): 
+    def __init__(self, params=default_params): 
         self.params = params
 
         # Initilize stereo semi-global block matching
@@ -40,15 +40,10 @@ class StereoSGBM:
 
 class StereoBM: 
     sad_window_size = 9
-    params_ = dict( preset=cv2.STEREO_BM_BASIC_PRESET,
-                    uniquenessRatio = 10, 
-                    speckleWindowSize = 20, 
-                    preFilterCap = 31, 
-                    # preset=cv2.STEREO_BM_PREFILTER_NORMALIZED_RESPONSE, 
-                    ndisparities=128, 
-                    SADWindowSize=sad_window_size )
-
-    def __init__(self, params=params_): 
+    default_params = dict( preset=cv2.STEREO_BM_BASIC_PRESET, uniquenessRatio = 10, 
+                           speckleWindowSize = 20, preFilterCap = 31, 
+                           ndisparities=128, SADWindowSize=sad_window_size )
+    def __init__(self, params=default_params): 
         self.params = params
 
         # Initilize stereo block matching
