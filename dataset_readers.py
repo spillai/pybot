@@ -251,8 +251,6 @@ class UWRGBDDatasetReader(object):
         depth_files = natural_sort(filter(lambda  fn: '_depth.png' in fn, files))
         rgb_files = natural_sort(list(set(files) - set(mask_files) - set(depth_files)))
         loc_files = natural_sort(map(lambda fn: fn.replace('.png', '_loc.txt'), rgb_files))
-
-        print len(mask_files), len(depth_files), len(rgb_files), len(loc_files)
         assert(len(mask_files) == len(depth_files) == len(rgb_files) == len(loc_files))
 
         self.rgb = ImageDatasetReader.from_filenames(rgb_files)
