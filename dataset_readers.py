@@ -38,13 +38,14 @@ def read_dir(directory, pattern='*.png', recursive=True):
                    for fn in fnmatch.filter(files, pattern)]
         if not len(matches): continue
 
-        base = root[len(directory)+1:]
-        splits = base.split('/')
+        base = root[len(directory):]
+        splits = filter(lambda x: len(x) > 0, base.split('/'))
         if recursive and len(splits) > 1: 
             recursive_set_dict(fn_map, splits, matches)
-        else: 
+        elif len(splits) == 1: 
             fn_map[splits[0]] = matches
-            # fn_map[os.path.basename(root)] = matches
+        else: 
+            fn_map[os.path.basename(root)] = matches
 
     return fn_map
 
@@ -244,34 +245,38 @@ def natural_sort(l):
     alphanum_key = lambda key: [ convert(c) for c in re.split('([0-9]+)', key) ] 
     return sorted(l, key = alphanum_key)
 
-class UWRGBDDatasetReader(object): 
-    def __init__(self, target, files): 
-        self.target = target 
-        mask_files = natural_sort(filter(lambda fn: '_mask.png' in fn, files))
-        depth_files = natural_sort(filter(lambda  fn: '_depth.png' in fn, files))
-        rgb_files = natural_sort(list(set(files) - set(mask_files) - set(depth_files)))
-        loc_files = natural_sort(map(lambda fn: fn.replace('.png', '_loc.txt'), rgb_files))
-        assert(len(mask_files) == len(depth_files) == len(rgb_files) == len(loc_files))
-
-        self.rgb = ImageDatasetReader.from_filenames(rgb_files)
-        self.depth = ImageDatasetReader.from_filenames(depth_files)
-        self.mask = ImageDatasetReader.from_filenames(mask_files)
-
-    def iteritems(self): 
-        for rgb_im, depth_im, mask_im in izip(self.rgb.iteritems(), 
-                                              self.depth.iteritems(), 
-                                              self.mask.iteritems()): 
-            yield AttrDict(target=self.target, img=rgb_im, depth=depth_im, mask=mask_im)
-
-class UWRGBDObjectDatasetReader(object):
+class UWRGBDObjectDataset(object):
     """
     RGB-D Dataset reader 
     http://rgbd-dataset.cs.washington.edu/dataset.html
     """
 
+    class _reader(object): 
+        """
+        RGB-D reader 
+        Given mask, depth, and rgb files build an read iterator with appropriate process_cb
+        """
+
+        def __init__(self, target, files): 
+            self.target = target 
+            mask_files = natural_sort(filter(lambda fn: '_mask.png' in fn, files))
+            depth_files = natural_sort(filter(lambda  fn: '_depth.png' in fn, files))
+            rgb_files = natural_sort(list(set(files) - set(mask_files) - set(depth_files)))
+            loc_files = natural_sort(map(lambda fn: fn.replace('.png', '_loc.txt'), rgb_files))
+            assert(len(mask_files) == len(depth_files) == len(rgb_files) == len(loc_files))
+
+            self.rgb = ImageDatasetReader.from_filenames(rgb_files)
+            self.depth = ImageDatasetReader.from_filenames(depth_files)
+            self.mask = ImageDatasetReader.from_filenames(mask_files)
+
+        def iteritems(self): 
+            for rgb_im, depth_im, mask_im in izip(self.rgb.iteritems(), 
+                                                  self.depth.iteritems(), 
+                                                  self.mask.iteritems()): 
+                yield AttrDict(target=self.target, img=rgb_im, depth=depth_im, mask=mask_im)
+
+
     def __init__(self, directory='', targets=None, num_targets=None, blacklist=['']):         
-        # import scipy.io
-        # from utils.frame_utils import Frame, KinectFrame
         self._dataset = read_dir(os.path.expanduser(directory), pattern='*.png', recursive=False)
         self._class_names = np.sort(self._dataset.keys())
         self._class_ids = np.arange(len(self._class_names), dtype=np.int)
@@ -279,14 +284,14 @@ class UWRGBDObjectDatasetReader(object):
         self.target_hash = dict(zip(self._class_names, self._class_ids))
         self.target_unhash = dict(zip(self._class_ids, self._class_names))
 
-        # # Only randomly choose targets if not defined
-        # if num_targets is not None and targets is None and \
-        #    num_targets > 0 and num_targets < len(self._class_names): 
-        #     inds = np.random.randint(len(self._class_names), size=num_targets)
-        #     targets = self._class_names[inds]            
-        #     print 'Classes: %i' % len(targets)
-
-        print os.path.expanduser(directory)
+        # Only randomly choose targets if not defined
+        if num_targets is not None and targets is None and \
+           num_targets > 0 and num_targets < len(self._class_names): 
+            inds = np.random.randint(len(self._class_names), size=num_targets)
+            targets = self._class_names[inds]            
+        else: 
+            targets = self._class_names
+        print 'Classes: %i' % len(targets)
         print self._dataset.keys()# , self._dataset['coffee_mug']
 
         # Instantiate a reader for each of the objects
@@ -296,12 +301,57 @@ class UWRGBDObjectDatasetReader(object):
                 continue
 
             target_id = self.target_hash[key]
-            self.data[key] = UWRGBDDatasetReader(target_id, files)
+            self.data[key] = UWRGBDObjectDataset._reader(target_id, files)
 
     def iteritems(self): 
         for key, frames in self.data.iteritems(): 
             for frame in frames.iteritems(): 
                 yield frame
+
+class UWRGBDSceneDataset(object):
+    """
+    RGB-D Scene Dataset reader 
+    http://rgbd-dataset.cs.washington.edu/dataset.html
+    """
+
+    class _reader(object): 
+        """
+        RGB-D reader 
+        Given mask, depth, and rgb files build an read iterator with appropriate process_cb
+        """
+
+        def __init__(self, files): 
+            rgb_files = natural_sort(filter(lambda  fn: '-color.png' in fn, files))
+            depth_files = natural_sort(filter(lambda  fn: '-depth.png' in fn, files))
+            assert(len(depth_files) == len(rgb_files))
+
+            self.rgb = ImageDatasetReader.from_filenames(rgb_files)
+            self.depth = ImageDatasetReader.from_filenames(depth_files)
+
+        def iteritems(self): 
+            for rgb_im, depth_im in izip(self.rgb.iteritems(), 
+                                                  self.depth.iteritems()): 
+                yield AttrDict(img=rgb_im, depth=depth_im)
+
+
+    def __init__(self, directory='', targets=None, num_targets=None, blacklist=['']):         
+        self._dataset = read_dir(os.path.expanduser(directory), pattern='*.png', recursive=False)
+        print self._dataset.keys()# , self._dataset['coffee_mug']
+
+        # Instantiate a reader for each of the objects
+        self.data = {}
+        for key, files in self._dataset.iteritems(): 
+            if (targets is not None and key not in targets) or key in blacklist: 
+                continue
+
+            # target_id = self.target_hash[key]
+            self.data[key] = UWRGBDSceneDataset._reader(files)
+
+    def iteritems(self): 
+        for key, frames in self.data.iteritems(): 
+            for frame in frames.iteritems(): 
+                yield frame
+
 
         # self.data, self.target = [], []
         # for key, files in self._dataset.iteritems(): 
@@ -370,11 +420,6 @@ class UWRGBDObjectDatasetReader(object):
     def get_files(self, category): 
         return self.rgbd_fn_map[category]
 
-    # Retrieve frame (would be nice to use generator instead)
-    def get_frame(self, rgb_fn, depth_fn): 
-        rgb, depth = cv2.imread(rgb_fn, 1), cv2.imread(depth_fn, -1)
-        return rgb, depth
-
 
 class Caltech101DatasetReader(object): 
     """
@@ -398,7 +443,9 @@ class Caltech101DatasetReader(object):
            num_targets > 0 and num_targets < len(self._class_names): 
             inds = np.random.randint(len(self._class_names), size=num_targets)
             targets = self._class_names[inds]            
-            print 'Classes: %i' % len(targets)
+        else: 
+            targets = self._class_names
+        print 'Classes: %i' % len(targets)
 
         self.data, self.target = [], []
         for key, files in self._dataset.iteritems(): 
@@ -419,11 +466,9 @@ class Caltech101DatasetReader(object):
 
 def test_uw_rgbd_object(): 
     # Read dataset
-    rgbd_data_uw = UWRGBDObjectDatasetReader(directory='~/data/rgbd_datasets/udub/rgbd-object/rgbd-dataset')
+    rgbd_data_uw = UWRGBDObjectDataset(directory='~/data/rgbd_datasets/udub/rgbd-object/rgbd-dataset')
     for f in rgbd_data_uw.iteritems(): 
         imshow_cv('frame', f.img)
-
-
 
 
 # def test_rgbd_uw(): 
@@ -455,17 +500,17 @@ def test_uw_rgbd_object():
 #     print 'Average runtime: ', np.mean(runtime), 'ms'
 
 
-def test_imagedataset_reader(): 
-    # Read dataset
-    rgb_data = ImageDatasetReader(directory='~/data/rgb-dataset-test', 
-                                  pattern='*.png', template='img_%i.png')
+# def test_imagedataset_reader(): 
+#     # Read dataset
+#     rgb_data = ImageDatasetReader(directory='~/data/rgb-dataset-test', 
+#                                   pattern='*.png', template='img_%i.png')
     
-    while True: 
-        im = rgb_data.get_next()
-        if im is None: 
-            break
+#     while True: 
+#         im = rgb_data.get_next()
+#         if im is None: 
+#             break
 
-        print im.shape
+#         print im.shape
 
 if __name__ == "__main__": 
     # RGBD UW dataset
