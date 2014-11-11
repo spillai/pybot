@@ -1,13 +1,13 @@
 import os, cv2
 import numpy as np
-from collections import namedtuple
-from bot_geometry.rigid_transform import RigidTransform
 
+from bot_geometry.rigid_transform import RigidTransform
+from bot_utils.db_utils import AttrDict
 # Q = [ 1 0 0      -c_x
 #       0 1 0      -c_y
 #       0 0 0      f
 #       0 0 -1/T_x (c_x - c_x')/T_x ]')]
-CalibParams = namedtuple('CalibParams', ['R0', 'R1', 'P0', 'P1', 'Q', 'T0', 'T1', 'fx', 'fy', 'cx', 'cy', 'baseline'])
+
 def get_calib_params(fx, fy, cx, cy, baseline=None, baseline_px=None): 
     assert(baseline is not None or baseline_px is not None)
     if baseline is not None: 
@@ -33,8 +33,8 @@ def get_calib_params(fx, fy, cx, cy, baseline=None, baseline_px=None):
                     [0, 0, 0, -fx], 
                     [0, 0, q43,0]])
 
-    return CalibParams(R0, R1, P0, P1, Q, T0, T1, fx, fy, cx, cy, baseline)
-    
+    return AttrDict(R0=R0, R1=R1, P0=P0, P1=P1, Q=Q, T0=T0, T1=T1, 
+                    fx=fx, fy=fy, cx=cx, cy=cy, baseline=baseline)
 
 def kitti_stereo_calib_params(scale=1.0): 
     f = 718.856*scale
