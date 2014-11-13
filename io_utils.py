@@ -1,8 +1,10 @@
 import cv2
+import sys
 import argparse, os
 import numpy as np
 import psutil
 import joblib
+from cStringIO import StringIO
 
 def mkdir_p(path):
     try:
@@ -30,6 +32,15 @@ def memory_usage_psutil():
     process = psutil.Process(os.getpid())
     mem = process.get_memory_info()[0] / float(2 ** 20)
     return mem
+
+class Capturing(list):
+    def __enter__(self):
+        self._stdout = sys.stdout
+        sys.stdout = self._stringio = StringIO()
+        return self
+    def __exit__(self, *args):
+        self.extend(self._stringio.getvalue().splitlines())
+        sys.stdout = self._stdout
 
 class VideoWriter: 
     def __init__(self, filename): 
