@@ -14,7 +14,7 @@ def imshow_plt(label, im, block=True):
         plt.axis('off')
         
     figures[label].set_data(im)
-    figures[label].canvas.draw()
+    # figures[label].canvas.draw()
     # plt.draw()
     plt.show(block=block)
 
