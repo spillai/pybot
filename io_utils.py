@@ -5,6 +5,7 @@ import numpy as np
 import psutil
 import joblib
 from cStringIO import StringIO
+from bot_vision.image_utils import im_resize
 
 def mkdir_p(path):
     try:
@@ -66,11 +67,12 @@ class VideoWriter:
 
 global g_fn_map
 g_fn_map = {}
-def write_video(fn, im): 
+def write_video(fn, im, scale=1.0): 
     global g_fn_map
     if fn not in g_fn_map: 
         g_fn_map[fn] = VideoWriter(fn)
-    g_fn_map[fn].write(im)
+    im_scaled = im_resize(im, scale=scale) if scale != 1.0 else im
+    g_fn_map[fn].write(im_scaled)
 
 import subprocess
 class VideoSink(object) :
