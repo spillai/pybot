@@ -12,7 +12,7 @@ class Caltech101DatasetReader(object):
       target_ids:   [0, 1, 2, ..., 101]
       target_names: [car, bike, ... ]
     """
-    def __init__(self, directory='', targets=None, num_targets=None, blacklist=['BACKGROUND_Google']): 
+    def __init__(self, directory='', targets=None, blacklist=['BACKGROUND_Google']): 
         self._dataset = read_dir(os.path.expanduser(directory), pattern='*.jpg')
         self._class_names = np.sort(self._dataset.keys())
         self._class_ids = np.arange(len(self._class_names), dtype=np.int)
@@ -21,11 +21,18 @@ class Caltech101DatasetReader(object):
         self.target_unhash = dict(zip(self._class_ids, self._class_names))
 
         # Only randomly choose targets if not defined
-        if num_targets is not None and targets is None and \
-           num_targets > 0 and num_targets < len(self._class_names): 
-            inds = np.random.randint(len(self._class_names), size=num_targets)
-            targets = self._class_names[inds]            
+        if targets is not None: 
+            # If integer valued, retrieve targets
+            if isinstance(targets, int) and targets < len(self._class_names): 
+                inds = np.random.randint(len(self._class_names), size=targets)
+                targets = self._class_names[inds]
+            # If targets are list of strings
+            elif isinstance(targets, list) and len(targets) < len(self._class_names): 
+                pass                
+            else: 
+                raise ValueError('targets are not list of strings or integer')
         else: 
+            # Pick full dataset
             targets = self._class_names
         print 'Classes: %i' % len(targets)
 
@@ -42,5 +49,4 @@ class Caltech101DatasetReader(object):
         self.target = np.array(self.target)
 
         self.target_ids = sorted(np.unique(self.target))
-        self.target_names = map(lambda tid: self.target_unhash[tid], self.target_ids)
-
+        self.target_names = self._class_names # map(lambda tid: self.target_unhash[tid], self.target_ids)
