@@ -201,7 +201,7 @@ class ImageClassifier(object):
         pred_target = self.clf.predict(test_histogram)
         pred_score = self.clf.decision_function(test_histogram)
 
-        print ' Confusion matrix (Test): %s' % (metrics.confusion_matrix(test_target, pred_target))
+        # print ' Confusion matrix (Test): %s' % (metrics.confusion_matrix(test_target, pred_target))
         print ' Accuracy score (Test): %4.3f' % (metrics.accuracy_score(test_target, pred_target))
         print ' Report (Test):\n %s' % (metrics.classification_report(test_target, pred_target, 
                                                                       target_names=self.dataset.target_names))
@@ -223,12 +223,11 @@ class ImageClassifier(object):
         pred_target, = self.clf.predict(test_histogram)
         # print pred_target_proba, pred_target
 
-        return self.target_name[str(pred_target)]
+        return self.dataset.target_unhash[pred_target]
 
     def setup_recognition_from_dict(self, db): 
         try: 
             self.params = db.params
-            self.target_name = db.target_name
             self.image_descriptor = ImageDescription(**db.params.descriptor)
             self.bow = BOWTrainer.from_dict(db.bow)
             self.clf = db.clf
@@ -248,8 +247,7 @@ class ImageClassifier(object):
         return cls.from_dict(db)
         
     def save(self, path): 
-        db = AttrDict(params=self.params, bow=self.bow.to_dict(), clf=self.clf, 
-                      target_name=self.dataset.target_unhash)
+        db = AttrDict(params=self.params, bow=self.bow.to_dict(), clf=self.clf)
         db.save(path)
 
         
