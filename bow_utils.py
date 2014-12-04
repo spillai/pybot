@@ -135,9 +135,17 @@ class BOWVectorizer(object):
         # Vectorize [1 x (KD)]
         return residuals.ravel()
 
+    @property
+    def dictionary_size(self): 
+        return self.K
+
 class BOWTrainer(object): 
     def __init__(self, **kwargs): 
         self.vectorizer = BOWVectorizer(**kwargs)
+
+    @property
+    def dictionary_size(self): 
+        return self.vectorizer.dictionary_size
 
     @classmethod
     def from_dict(cls, db): 
@@ -173,3 +181,9 @@ class BOWTrainer(object):
         [N x 1] => [1 x K] histogram
         """
         return self.vectorizer.get_histogram(data)
+
+    def get_code(self, data): 
+        """
+        """
+        return self.vectorizer.get_code(data)
+

@@ -58,6 +58,20 @@ class ImageDescription(object):
         kpts, desc = self.extractor.compute(img, kpts)
         return desc.astype(np.uint8)
 
+
+    def detect_and_describe(self, img, mask=None): 
+        """
+        Computes dense/sparse features on an image and describes 
+        these keypoints using a feature descriptor
+        returns 
+           kpts: [cv2.KeyPoint, ... ] 
+           desc: [N x D]
+        """
+        kpts = self.detector.detect(img, mask=mask)
+        kpts, desc = self.extractor.compute(img, kpts)
+        return kpts, desc.astype(np.uint8)
+
+
 class ImageClassifier(object): 
     """
     Object recognition class from training data
