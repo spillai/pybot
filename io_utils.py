@@ -93,6 +93,20 @@ class VideoSink(object) :
     def close(self) :
             self.p.stdin.close()            
 
+class VideoCapture(object): 
+    def __init__(self, filename=-1, process_cb=None): 
+        self.cap = cv2.VideoCapture(filename)
+        self.process_cb = process_cb
+
+    def run(self): 
+        assert(self.process_cb is not None)
+        while True: 
+            try: 
+                ret, im = self.cap.read()
+                if not ret: break
+                self.process_cb(im)
+            except KeyboardInterrupt: 
+                break
 
 if __name__ == "__main__": 
     parser = argparse.ArgumentParser(
