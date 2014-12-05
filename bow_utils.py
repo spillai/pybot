@@ -95,7 +95,6 @@ class BOWVectorizer(object):
             code_hist = self.vlad(data, code)
         else: 
             raise NotImplementedError('Histogram method %s not implemented. Use vq or vlad!' % self.method)            
-
         return code_hist
 
     def vlad(self, data, code): 
