@@ -122,7 +122,8 @@ class BOWVectorizer(object):
         elif self.norm_method == 'global-l2': 
             residuals /= (np.linalg.norm(residuals) + 1e-12)
 
-        # Square rooting
+        # Square rooting / Power Normalization with alpha = 0.5
+        # Refer to http://www.robots.ox.ac.uk/~vgg/rg/papers/peronnin_etal_ECCV10.pdf
         elif self.norm_method == 'square-rooting': 
             residuals = np.sign(residuals) * np.sqrt(np.fabs(residuals))
 
