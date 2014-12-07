@@ -22,6 +22,21 @@ def recursive_set_dict(d, splits, value):
         recursive_set_dict(d_, splits[1:], value)
         return 
 
+def read_files(directory, pattern='*.png'): 
+    """
+    Recursively read a directory and return all files 
+    that match file pattern. 
+    """
+    matched_files = []
+    for root, dirs, files in os.walk(directory): 
+        # Filter only filename matches 
+        matches = [os.path.join(root, fn) 
+                   for fn in fnmatch.filter(files, pattern)]
+        if not len(matches): continue
+        matched_files.extend(matches)
+
+    return matched_files
+
 def read_dir(directory, pattern='*.png', recursive=True): 
     """
     Recursively read a directory and return a dictionary tree 

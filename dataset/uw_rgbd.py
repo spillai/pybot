@@ -1,11 +1,12 @@
 import os
 import numpy as np
 import cv2
-
-
 from itertools import izip, imap
+
+from scipy.io import loadmat
+
 from bot_utils.db_utils import AttrDict
-from bot_utils.dataset_readers import read_dir, natural_sort, \
+from bot_utils.dataset_readers import read_dir, read_files, natural_sort, \
     DatasetReader, ImageDatasetReader
 
 class UWRGBDObjectDataset(object):
@@ -81,13 +82,22 @@ class UWRGBDSceneDataset(object):
         RGB-D reader 
         Given mask, depth, and rgb files build an read iterator with appropriate process_cb
         """
-        def __init__(self, files, version): 
+        def __init__(self, files, meta_file, version): 
             rgb_files, depth_files = UWRGBDSceneDataset._reader.scene_files(files, version)
             assert(len(depth_files) == len(rgb_files))
 
             self.rgb = ImageDatasetReader.from_filenames(rgb_files)
+
             # TODO: Check depth seems scaled by 256 not 16
             self.depth = ImageDatasetReader.from_filenames(depth_files)
+
+            # Retrieve bounding boxes for each scene
+            bboxes = loadmat(meta_file, squeeze_me=True, struct_as_record=True)['bboxes'] \
+                     if meta_file is not None else [None] * len(rgb_files)
+            self.bboxes = [ [bbox] 
+                            if bbox is not None and bbox.size == 1 else bbox 
+                            for bbox in bboxes ]
+            assert(len(self.bboxes) == len(rgb_files))
 
         @staticmethod
         def scene_files(files, version): 
@@ -102,19 +112,28 @@ class UWRGBDSceneDataset(object):
                                  '''Check dataset and choose either v1 or v2 scene dataset''' % version)
             return rgb_files, depth_files
 
+        @staticmethod
+        def meta_files(directory, version): 
+            if version == 'v1': 
+                mat_files = read_files(os.path.expanduser(directory), pattern='*.mat')
+                return dict(((fn.split('/')[-1]).replace('.mat',''), fn) for fn in mat_files)
+            else: 
+                raise ValueError('''Version %s not supported. '''
+                                 '''Check dataset and choose v1 scene dataset''' % version)
+
         def iteritems(self): 
             print '\n\n===> Version v1 and v2 have discrepancies in depth values, FIX!! <===\n\n'
-            for rgb_im, depth_im in izip(self.rgb.iteritems(), 
-                                                  self.depth.iteritems()): 
-                yield AttrDict(img=rgb_im, depth=depth_im)
-
+            for rgb_im, depth_im, bbox in izip(self.rgb.iteritems(), 
+                                         self.depth.iteritems(), 
+                                         self.bboxes): 
+                yield AttrDict(img=rgb_im, depth=depth_im, bbox=bbox if bbox is not None else [])
 
     def __init__(self, version, directory='', targets=None, num_targets=None, blacklist=['']):         
         if version not in ['v1', 'v2']: 
             raise ValueError('Version not supported. Check dataset and choose either v1 or v2 scene dataset')
 
         self._dataset = read_dir(os.path.expanduser(directory), pattern='*.png', recursive=False)
-        print self._dataset.keys()# , self._dataset['coffee_mug']
+        self._meta = UWRGBDSceneDataset._reader.meta_files(directory, version)
 
         # Instantiate a reader for each of the objects
         self.data = {}
@@ -122,13 +141,26 @@ class UWRGBDSceneDataset(object):
             if (targets is not None and key not in targets) or key in blacklist: 
                 continue
 
+            # Get mat file for each scene
+            meta_file = self._meta.get(key, None)
+            print key, meta_file
             # target_id = self.target_hash[key]
-            self.data[key] = UWRGBDSceneDataset._reader(files, version)
+            self.data[key] = UWRGBDSceneDataset._reader(files, meta_file, version)
 
     def iteritems(self): 
         for key, frames in self.data.iteritems(): 
             for frame in frames.iteritems(): 
                 yield frame
+
+    @staticmethod
+    def annotate(f): 
+        vis = f.img.copy()
+        for bbox in f.bbox: 
+            cv2.rectangle(vis, (bbox['left'], bbox['top']), (bbox['right'], bbox['bottom']), 
+                          (50, 50, 50), 2)
+            cv2.putText(vis, '%s' % bbox['category'], (bbox['left'], bbox['top']-5), 
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.4, (240, 240, 240), thickness = 1)
+        return vis
 
 
         # self.data, self.target = [], []
