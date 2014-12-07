@@ -49,4 +49,4 @@ class Caltech101DatasetReader(object):
         self.target = np.array(self.target)
 
         self.target_ids = sorted(np.unique(self.target))
-        self.target_names = self._class_names # map(lambda tid: self.target_unhash[tid], self.target_ids)
+        self.target_names = map(lambda tid: self.target_unhash[tid], self.target_ids)
