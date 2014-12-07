@@ -2,6 +2,7 @@ import os
 import numpy as np
 import cv2
 
+
 from itertools import izip, imap
 from bot_utils.db_utils import AttrDict
 from bot_utils.dataset_readers import read_dir, natural_sort, \
@@ -75,30 +76,43 @@ class UWRGBDSceneDataset(object):
     RGB-D Scene Dataset reader 
     http://rgbd-dataset.cs.washington.edu/dataset.html
     """
-
     class _reader(object): 
         """
         RGB-D reader 
         Given mask, depth, and rgb files build an read iterator with appropriate process_cb
         """
-
-        def __init__(self, files): 
-            rgb_files = natural_sort(filter(lambda  fn: '-color.png' in fn, files))
-            depth_files = natural_sort(filter(lambda  fn: '-depth.png' in fn, files))
+        def __init__(self, files, version): 
+            rgb_files, depth_files = UWRGBDSceneDataset._reader.scene_files(files, version)
             assert(len(depth_files) == len(rgb_files))
 
             self.rgb = ImageDatasetReader.from_filenames(rgb_files)
             # TODO: Check depth seems scaled by 256 not 16
             self.depth = ImageDatasetReader.from_filenames(depth_files)
 
+        @staticmethod
+        def scene_files(files, version): 
+            if version == 'v1': 
+                depth_files = natural_sort(filter(lambda  fn: '_depth.png' in fn, files))
+                rgb_files = natural_sort(list(set(files) - set(depth_files)))
+            elif version == 'v2': 
+                depth_files = natural_sort(filter(lambda  fn: '-depth.png' in fn, files))
+                rgb_files = natural_sort(list(set(files) - set(depth_files)))    
+            else: 
+                raise ValueError('''Version %s not supported. '''
+                                 '''Check dataset and choose either v1 or v2 scene dataset''' % version)
+            return rgb_files, depth_files
 
         def iteritems(self): 
+            print '\n\n===> Version v1 and v2 have discrepancies in depth values, FIX!! <===\n\n'
             for rgb_im, depth_im in izip(self.rgb.iteritems(), 
                                                   self.depth.iteritems()): 
                 yield AttrDict(img=rgb_im, depth=depth_im)
 
 
-    def __init__(self, directory='', targets=None, num_targets=None, blacklist=['']):         
+    def __init__(self, version, directory='', targets=None, num_targets=None, blacklist=['']):         
+        if version not in ['v1', 'v2']: 
+            raise ValueError('Version not supported. Check dataset and choose either v1 or v2 scene dataset')
+
         self._dataset = read_dir(os.path.expanduser(directory), pattern='*.png', recursive=False)
         print self._dataset.keys()# , self._dataset['coffee_mug']
 
@@ -109,7 +123,7 @@ class UWRGBDSceneDataset(object):
                 continue
 
             # target_id = self.target_hash[key]
-            self.data[key] = UWRGBDSceneDataset._reader(files)
+            self.data[key] = UWRGBDSceneDataset._reader(files, version)
 
     def iteritems(self): 
         for key, frames in self.data.iteritems(): 
