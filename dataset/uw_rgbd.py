@@ -10,18 +10,21 @@ from bot_utils.db_utils import AttrDict
 from bot_utils.dataset_readers import read_dir, read_files, natural_sort, \
     DatasetReader, ImageDatasetReader
 
+# __categories__ = ['flashlight', 'cap', 'cereal_box', 'coffee_mug', 'soda_can']
+
 class UWRGBDObjectDataset(object):
     """
-    RGB-D Dataset reader 
+    RGB-D Dataset readers
     http://rgbd-dataset.cs.washington.edu/dataset.html
     """
+    default_rgb_shape = (480,640,3)
+    default_depth_shape = (480,640)
 
     class _reader(object): 
         """
         RGB-D reader 
         Given mask, depth, and rgb files build an read iterator with appropriate process_cb
         """
-
         def __init__(self, target, instance, files): 
             self.target = target 
             self.instance = instance
@@ -41,6 +44,48 @@ class UWRGBDObjectDataset(object):
                                                   self.mask.iteritems(every_k_frames=every_k_frames)): 
                 yield AttrDict(target=self.target, instance=self.instance, 
                                img=rgb_im, depth=depth_im, mask=mask_im)
+
+    class _cropped_reader(object): 
+        """
+        RGB-D reader 
+        Given mask, depth, and rgb files build an read iterator with appropriate process_cb
+        """
+        def __init__(self, target, instance, files): 
+            self.target = target 
+            self.instance = instance
+            mask_files = natural_sort(filter(lambda fn: '_maskcrop.png' in fn, files))
+            depth_files = natural_sort(filter(lambda  fn: '_depthcrop.png' in fn, files))
+            rgb_files = natural_sort(list(set(files) - set(mask_files) - set(depth_files)))
+            loc_files = natural_sort(map(lambda fn: fn.replace('_crop.png', '_loc.txt'), rgb_files))
+            assert(len(mask_files) == len(depth_files) == len(rgb_files) == len(loc_files))
+
+            # Read images
+            self.rgb = ImageDatasetReader.from_filenames(rgb_files)
+            self.depth = ImageDatasetReader.from_filenames(depth_files)
+            self.mask = ImageDatasetReader.from_filenames(mask_files)
+
+            # Read top-left locations of bounding box
+            self.locations = np.vstack([np.loadtxt(loc, delimiter=',', dtype=np.int32) 
+                                        for loc in loc_files])
+
+        def iteritems(self, every_k_frames=1): 
+            for rgb_im, depth_im, mask_im, loc in \
+                izip(self.rgb.iteritems(every_k_frames=every_k_frames), 
+                     self.depth.iteritems(every_k_frames=every_k_frames), 
+                     self.mask.iteritems(every_k_frames=every_k_frames), 
+                     self.locations[::every_k_frames]): 
+
+                rgb = np.zeros(shape=UWRGBDObjectDataset.default_rgb_shape, dtype=np.uint8)
+                depth = np.zeros(shape=UWRGBDObjectDataset.default_depth_shape, dtype=np.uint16)
+                mask = np.zeros(shape=UWRGBDObjectDataset.default_depth_shape, dtype=np.uint8)
+
+                rgb[loc[1]:loc[1]+rgb_im.shape[0], loc[0]:loc[0]+rgb_im.shape[1]] = rgb_im
+                depth[loc[1]:loc[1]+depth_im.shape[0], loc[0]:loc[0]+depth_im.shape[1]] = depth_im
+                mask[loc[1]:loc[1]+mask_im.shape[0], loc[0]:loc[0]+mask_im.shape[1]] = mask_im
+
+                yield AttrDict(target=self.target, instance=self.instance, 
+                               img=rgb, depth=depth, mask=mask)
+
 
 
 
@@ -80,7 +125,7 @@ class UWRGBDObjectDataset(object):
                 continue
             target_id = self.target_hash[get_category(key)]
             instance_id = get_instance(key)
-            self.data[key] = UWRGBDObjectDataset._reader(target_id, instance_id, files)
+            self.data[key] = UWRGBDObjectDataset._cropped_reader(target_id, instance_id, files)
 
     def iteritems(self, every_k_frames=1): 
         for key, frames in self.data.iteritems(): 
@@ -180,107 +225,37 @@ class UWRGBDSceneDataset(object):
         return vis
 
 
-        # self.data, self.target = [], []
-        # for key, files in self._dataset.iteritems(): 
-        #     if (targets is not None and key not in targets) or key in blacklist: 
-        #         continue
-
-        #     target_id = self.target_hash[key]
-
-        #     self.data.extend(files)
-        #     self.target.extend( [target_id] * len(files) )
-
-        
-        # # Build rgbd filename map [object_type -> [(rgb_fn,depth_fn), .... ]
-        # self.rgbd_fn_map = defaultdict(list)
-        # self.mat_fn_map = {}
-
-        # # Index starts at 1
-        # frame_info = namedtuple('frame_info', ['index', 'rgb_fn', 'depth_fn'])
-        # for root,v in fn_map.iteritems(): 
-        #     idx = 1;
-        #     while True: 
-        #         rgb_path = os.path.join(root, '%s_%i.png' % 
-        #                                 (os.path.basename(root), idx))
-        #         depth_path = os.path.join(root, '%s_%i_depth.png' % 
-        #                                   (os.path.basename(root), idx))
-        #         if not os.path.exists(rgb_path) or not os.path.exists(depth_path): 
-        #             break
-
-        #         self.rgbd_fn_map[os.path.basename(root)].append(
-        #             frame_info(index=idx, rgb_fn=rgb_path, depth_fn=depth_path)
-        #         )
-        #         idx += 1
-
-        # # Convert mat files
-        # mat_map = read_dir(directory, '*.mat')
-        # for files in mat_map.values(): 
-        #     for fn in files: 
-        #         self.mat_fn_map[os.path.splitext(os.path.basename(fn))[0]] = fn
-        # print self.mat_fn_map
-
-        # # Store relevant metadata about dataset
-        # self.total_frames = idx
-        # self.rgb = True
-
-    # # Retrieve items from a particular target
-    # def iteritems(self, target=None): 
-    #     if target is None: 
-    #         pass
-    #     else: 
-    #         for files in self._dataset.iteritems(): 
-
-    # Retrieve metadata
-    def load_metadata(self, mat_fn): 
-        return scipy.io.loadmat(mat_fn, squeeze_me=True, struct_as_record=False)
-
-    # Get metadata for a particular category
-    def get_metadata(self, category): 
-        matfile = self.mat_fn_map[category]
-        return self.load_metadata(matfile)
-
-    # Get bounding boxes for a particular category
-    def get_bboxes(self, category): 
-        return self.get_metadata(category)['bboxes']
-
-    # Get files for a particular category
-    def get_files(self, category): 
-        return self.rgbd_fn_map[category]
-
-
 
 def test_uw_rgbd_object(): 
-    # Read dataset
-    rgbd_data_uw = UWRGBDObjectDataset(directory='~/data/rgbd_datasets/udub/rgbd-object/rgbd-dataset')
-    for f in rgbd_data_uw.iteritems(): 
-        imshow_cv('frame', f.img)
+    from bot_vision.image_utils import to_color
+    from bot_vision.imshow_utils import imshow_cv
+
+    object_directory = '~/data/rgbd_datasets/udub/rgbd-object-crop/rgbd-dataset'
+    rgbd_data_uw = UWRGBDObjectDataset(directory=object_directory)
+
+    for f in rgbd_data_uw.iteritems(every_k_frames=5): 
+        imshow_cv('frame', 
+                  np.hstack([f.img, np.bitwise_and(f.img, to_color(f.mask))]), 
+                  text='Image + Mask [Category: %i, Instance: %i]' % (f.target, f.instance))
+        imshow_cv('depth', (f.depth / 16).astype(np.uint8), text='Depth')
+        cv2.waitKey(100)
+def test_uw_rgbd_scene(version='v1'): 
+    v1_directory = '/media/spillai/MRG-HD1/data/rgbd-scenes-v1/rgbd-scenes/'
+    v2_directory = '/media/spillai/MRG-HD1/data/rgbd-scenes-v2/rgbd-scenes-v2/imgs/'
+
+    if version == 'v1': 
+        rgbd_data_uw = UWRGBDSceneDataset(version='v1', directory=v1_directory)
+    elif version == 'v2': 
+        rgbd_data_uw = UWRGBDSceneDataset(version='v2', directory=v2_directory)
+    else: 
+        raise RuntimeError('''Version %s not supported. '''
+                           '''Check dataset and choose v1/v2 scene dataset''' % version)
+        
+    for f in rgbd_data_uw.iteritems(every_k_frames=5): 
+        vis = rgbd_data_uw.annotate(f)
+        imshow_cv('frame', np.hstack([f.img, vis]), text='Image')
+        imshow_cv('depth', (f.depth / 16).astype(np.uint8), text='Depth')
 
 
-# def test_rgbd_uw(): 
-#     # Read dataset
-#     rgbd_data_uw = RGBDDatasetReaderUW('~/data/rgbd-datasets/udub/rgbd-scenes')
 
-
-
-
-#     # Get metadata for object (bounding boxe)s
-#     # Note: length of metadata and frames should be the same
-#     matfile = rgbd_data_uw.get_metadata('table_1')
-#     bboxes = rgbd_data_uw.get_bboxes('table_1')
-
-#     # Get files for object
-#     files = rgbd_data_uw.get_files('table_1')
-
-#     # Construct frames with (rgb, d) filenames
-#     runtime = []
-#     for fidx, (bbox, f) in enumerate(zip(bboxes, files)): 
-#         rgb, depth = rgbd_data_uw.get_frame(f.rgb_fn, f.depth_fn)
-#         t1 = time.time()
-#         KinectFrame(f.index, rgb, depth, skip=1)
-#         print [(bb.category, bb.instance, bb.top, bb.bottom, bb.left, bb.right) 
-#                for bb in np.array([bbox]).flatten()]
-#         runtime.append((time.time() - t1) * 1e3)
-#         if fidx % 10 == 0: print 'Processed ', fidx
-#     print 'Done! Processed %i items. %i bboxes' % (len(files), len(bboxes))
-#     print 'Average runtime: ', np.mean(runtime), 'ms'
 
