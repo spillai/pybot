@@ -12,11 +12,7 @@ from bot_utils.dataset_readers import read_dir, read_files, natural_sort, \
 
 # __categories__ = ['flashlight', 'cap', 'cereal_box', 'coffee_mug', 'soda_can']
 
-class UWRGBDObjectDataset(object):
-    """
-    RGB-D Dataset readers
-    http://rgbd-dataset.cs.washington.edu/dataset.html
-    """
+class UWRGBDDataset(object): 
     default_rgb_shape = (480,640,3)
     default_depth_shape = (480,640)
 
@@ -41,6 +37,12 @@ class UWRGBDObjectDataset(object):
     @classmethod
     def get_category_id(cls, target_name): 
         return cls.target_hash[target_name]
+
+class UWRGBDObjectDataset(UWRGBDDataset):
+    """
+    RGB-D Dataset readers
+    http://rgbd-dataset.cs.washington.edu/dataset.html
+    """
 
     class _reader(object): 
         """
@@ -112,15 +114,15 @@ class UWRGBDObjectDataset(object):
                                      'top':loc[1], 'bottom':loc[1]+mask_im.shape[0], 
                                      'category':self.target, 'instance':self.instance})
 
-    def __init__(self, directory='', targets=train_names, blacklist=['']):         
+    def __init__(self, directory='', targets=UWRGBDDataset.train_names, blacklist=['']):         
         get_category = lambda name: '_'.join(name.split('_')[:-1])
         get_instance = lambda name: int(name.split('_')[-1])
 
-        self._class_names = UWRGBDObjectDataset.class_names
-        self._class_ids = UWRGBDObjectDataset.class_ids
+        self._class_names = UWRGBDDataset.class_names
+        self._class_ids = UWRGBDDataset.class_ids
 
-        self.target_hash = UWRGBDObjectDataset.target_hash
-        self.target_unhash = UWRGBDObjectDataset.target_unhash
+        self.target_hash = UWRGBDDataset.target_hash
+        self.target_unhash = UWRGBDDataset.target_unhash
 
 
         # Only randomly choose targets if not defined
@@ -162,7 +164,7 @@ class UWRGBDObjectDataset(object):
             for frame in frames.iteritems(every_k_frames=every_k_frames): 
                 yield frame
 
-class UWRGBDSceneDataset(object):
+class UWRGBDSceneDataset(UWRGBDDataset):
     """
     RGB-D Scene Dataset reader 
     http://rgbd-dataset.cs.washington.edu/dataset.html
@@ -188,7 +190,7 @@ class UWRGBDSceneDataset(object):
             bboxes = loadmat(meta_file, squeeze_me=True, struct_as_record=True)['bboxes'] \
                      if meta_file is not None else [None] * len(rgb_files)
             self.bboxes = [ [bbox] 
-                            if bbox is not None and bbox.size == 1 else bbox 
+                            if bbox is not None and bbox.size == 1 else bbox
                             for bbox in bboxes ]
             assert(len(self.bboxes) == len(rgb_files))
 
@@ -251,7 +253,10 @@ class UWRGBDSceneDataset(object):
         for bbox in f.bbox: 
             cv2.rectangle(vis, (bbox['left'], bbox['top']), (bbox['right'], bbox['bottom']), 
                           (50, 50, 50), 2)
-            cv2.putText(vis, '%s' % bbox['category'], (bbox['left'], bbox['top']-5), 
+            category_name = str(bbox['category'])
+            cv2.putText(vis, '[Category: [%i] %s]' % 
+                        (UWRGBDDataset.get_category_id(category_name), category_name), 
+                        (bbox['left'], bbox['top']-5), 
                         cv2.FONT_HERSHEY_SIMPLEX, 0.4, (240, 240, 240), thickness = 1)
         return vis
 
@@ -268,11 +273,14 @@ def test_uw_rgbd_object():
         bbox = f.bbox
         imshow_cv('frame', 
                   np.hstack([f.img, np.bitwise_and(f.img, to_color(f.mask))]), 
-                  text='Image + Mask [Category: %i, Instance: %i]' % (bbox['category'], bbox['instance']))
+                  text='Image + Mask [Category: [%i] %s, Instance: %i]' % 
+                  (bbox['category'], rgbd_data_uw.get_category_name(bbox['category']), bbox['instance']))
         imshow_cv('depth', (f.depth / 16).astype(np.uint8), text='Depth')
-        cv2.waitKey(100)
 
 def test_uw_rgbd_scene(version='v1'): 
+    from bot_vision.image_utils import to_color
+    from bot_vision.imshow_utils import imshow_cv
+
     v1_directory = '/media/spillai/MRG-HD1/data/rgbd-scenes-v1/rgbd-scenes/'
     v2_directory = '/media/spillai/MRG-HD1/data/rgbd-scenes-v2/rgbd-scenes-v2/imgs/'
 
@@ -288,7 +296,6 @@ def test_uw_rgbd_scene(version='v1'):
         vis = rgbd_data_uw.annotate(f)
         imshow_cv('frame', np.hstack([f.img, vis]), text='Image')
         imshow_cv('depth', (f.depth / 16).astype(np.uint8), text='Depth')
-
-
+        cv2.waitKey(100)
 
 
