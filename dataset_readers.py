@@ -37,7 +37,7 @@ def read_files(directory, pattern='*.png'):
 
     return matched_files
 
-def read_dir(directory, pattern='*.png', recursive=True): 
+def read_dir(directory, pattern='*.png', recursive=True, expected=None, verbose=False): 
     """
     Recursively read a directory and return a dictionary tree 
     that match file pattern. 
@@ -52,6 +52,15 @@ def read_dir(directory, pattern='*.png', recursive=True):
     # Build dictionary [full_root_path -> pattern_matched_files]
     fn_map = {}
     for root, dirs, files in os.walk(directory): 
+
+        # Filter only expected folders if given
+        # Go through /root/root_1 and see if root is in expected ["root", "other1", "other2"]
+        if expected is not None and not any((root.split('/')[-1]).startswith(exp) for exp in expected): 
+            continue
+
+        # Verbose print
+        if verbose: 
+            print root, dirs
 
         # Filter only filename matches 
         matches = [os.path.join(root, fn) 

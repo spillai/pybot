@@ -20,6 +20,19 @@ class UWRGBDObjectDataset(object):
     default_rgb_shape = (480,640,3)
     default_depth_shape = (480,640)
 
+    class_names = ["apple", "ball", "banana", "bell_pepper", "binder", "bowl", "calculator", "camera", 
+                   "cap", "cell_phone", "cereal_box", "coffee_mug", "comb", "dry_battery", "flashlight", 
+                   "food_bag", "food_box", "food_can", "food_cup", "food_jar", "garlic", "glue_stick", 
+                   "greens", "hand_towel", "instant_noodles", "keyboard", "kleenex", "lemon", "lightbulb", 
+                   "lime", "marker", "mushroom", "notebook", "onion", "orange", "peach", "pear", "pitcher", 
+                   "plate", "pliers", "potato", "rubber_eraser", "scissors", "shampoo", "soda_can", "sponge", 
+                   "stapler", "tomato", "toothbrush", "toothpaste", "water_bottle"]
+    class_ids = np.arange(len(class_names), dtype=np.int)
+    target_hash = dict(zip(class_names, class_ids))
+    target_unhash = dict(zip(class_ids, class_names))
+
+    train_names = ["bowl", "cap", "cereal_box", "coffee_mug", "soda_can"]
+
     class _reader(object): 
         """
         RGB-D reader 
@@ -57,6 +70,7 @@ class UWRGBDObjectDataset(object):
             depth_files = natural_sort(filter(lambda  fn: '_depthcrop.png' in fn, files))
             rgb_files = natural_sort(list(set(files) - set(mask_files) - set(depth_files)))
             loc_files = natural_sort(map(lambda fn: fn.replace('_crop.png', '_loc.txt'), rgb_files))
+            # print target, instance, len(loc_files), len(mask_files), len(depth_files), len(rgb_files)
             assert(len(mask_files) == len(depth_files) == len(rgb_files) == len(loc_files))
 
             # Read images
@@ -86,21 +100,18 @@ class UWRGBDObjectDataset(object):
                 yield AttrDict(target=self.target, instance=self.instance, 
                                img=rgb, depth=depth, mask=mask)
 
-
-
-
     def __init__(self, directory='', targets=None, blacklist=['']):         
-
         get_category = lambda name: '_'.join(name.split('_')[:-1])
         get_instance = lambda name: int(name.split('_')[-1])
 
         # Fusing all object instances of a category into a single key
-        self._dataset = read_dir(os.path.expanduser(directory), pattern='*.png', recursive=False)
-        self._class_names = np.unique(map(lambda name: get_category(name), np.sort(self._dataset.keys())))
-        self._class_ids = np.arange(len(self._class_names), dtype=np.int)
+        self._dataset = read_dir(os.path.expanduser(directory), pattern='*.png', 
+                                 recursive=False, expected=UWRGBDObjectDataset.train_names, verbose=False)
+        self._class_names = UWRGBDObjectDataset.class_names
+        self._class_ids = UWRGBDObjectDataset.class_ids
 
-        self.target_hash = dict(zip(self._class_names, self._class_ids))
-        self.target_unhash = dict(zip(self._class_ids, self._class_names))
+        self.target_hash = UWRGBDObjectDataset.target_hash
+        self.target_unhash = UWRGBDObjectDataset.target_unhash
 
         # Only randomly choose targets if not defined
         if targets is not None: 
@@ -116,7 +127,7 @@ class UWRGBDObjectDataset(object):
         else: 
             # Pick full/specified dataset
             targets = self._class_names
-        print 'Classes: %i' % len(targets), self._class_names, self._dataset.keys()
+        print 'Classes: %i' % len(targets), self._dataset.keys()
 
         # Instantiate a reader for each of the objects
         self.data = {}
