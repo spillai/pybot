@@ -34,6 +34,14 @@ class UWRGBDObjectDataset(object):
 
     train_names = ["bowl", "cap", "cereal_box", "coffee_mug", "soda_can"]
 
+    @classmethod
+    def get_category_name(cls, target_id): 
+        return cls.target_unhash[target_id]
+
+    @classmethod
+    def get_category_id(cls, target_name): 
+        return cls.target_hash[target_name]
+
     class _reader(object): 
         """
         RGB-D reader 
@@ -114,6 +122,7 @@ class UWRGBDObjectDataset(object):
         self.target_hash = UWRGBDObjectDataset.target_hash
         self.target_unhash = UWRGBDObjectDataset.target_unhash
 
+
         # Only randomly choose targets if not defined
         if targets is not None: 
             # If integer valued, retrieve targets
@@ -130,7 +139,7 @@ class UWRGBDObjectDataset(object):
             targets = self._class_names
 
         # Fusing all object instances of a category into a single key
-        print 'Targets, ', targets
+        print 'Train targets, ', targets
         self._dataset = read_dir(os.path.expanduser(directory), pattern='*.png', 
                                  recursive=False, expected=targets, verbose=False)
         print 'Classes: %i' % len(targets), self._dataset.keys()
@@ -144,8 +153,12 @@ class UWRGBDObjectDataset(object):
             instance_id = get_instance(key)
             self.data[key] = UWRGBDObjectDataset._cropped_reader(target_id, instance_id, files)
 
-    def iteritems(self, every_k_frames=1): 
+        # Save target names for metrics
+        self.target_names = targets
+
+    def iteritems(self, every_k_frames=1, verbose=False): 
         for key, frames in self.data.iteritems(): 
+            if verbose: print 'Processing: %s' % key
             for frame in frames.iteritems(every_k_frames=every_k_frames): 
                 yield frame
 
@@ -226,8 +239,9 @@ class UWRGBDSceneDataset(object):
             # target_id = self.target_hash[key]
             self.data[key] = UWRGBDSceneDataset._reader(files, meta_file, version)
 
-    def iteritems(self, every_k_frames=1): 
+    def iteritems(self, every_k_frames=1, verbose=False): 
         for key, frames in self.data.iteritems(): 
+            if verbose: print 'Processing: %s' % key
             for frame in frames.iteritems(every_k_frames): 
                 yield frame
 

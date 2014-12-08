@@ -122,6 +122,7 @@ def flush_pytable(h5f, data=None, group=None, table=None, force=True):
     return 
 
 def save_pytable(fn, d): 
+    create_path_if_not_exists(fn)
     h5f = tb.openFile(os.path.expanduser(fn), mode='w', title='%s' % fn)
 
     tables = AttrDict()
@@ -177,9 +178,9 @@ class AttrDict(dict):
         return load_pytable(fn)
 
     def save(self, fn): 
+        fn = os.path.expanduser(fn)
         print 'Saving ', fn
-        if create_path_if_not_exists(fn): 
-            print 'Creating new folder with path: %s' % fn
+        create_path_if_not_exists(fn)
         return save_pytable(fn, self.copy())
         
 

@@ -9,9 +9,9 @@ from bot_vision.image_utils import im_resize
 
 def mkdir_p(path):
     try:
-        os.makedirs(path)
+        os.makedirs(os.path.expanduser(path))
     except : 
-        pass 
+        print 'Failed to create path %s' % path 
 
 def path_exists(path): 
     return os.path.exists(os.path.expanduser(path))
@@ -19,13 +19,13 @@ def path_exists(path):
 def create_path_if_not_exists(filename): 
     fn_path, fn_file = os.path.split(filename)    
     if not path_exists(fn_path): 
+        print 'Making directory path %s' % fn_path
         mkdir_p(fn_path)
         return True
     return False
 
 def joblib_dump(item, path): 
-    if create_path_if_not_exists(path): 
-        print 'Making directory for path %s' % path
+    create_path_if_not_exists(path)
     joblib.dump(item, path)
     
 def memory_usage_psutil():
