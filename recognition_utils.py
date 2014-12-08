@@ -177,7 +177,7 @@ class ImageClassifier(object):
         print 'Memory usage at post-bow-build %5.2f MB' % (memory_usage_psutil())
 
         # Histogram of trained features
-        train_target = np.array(self.y_train)
+        train_target = np.array(self.y_train, dtype=np.int32)
         train_histogram = np.vstack([self.bow.project(desc) for desc in train_desc])
 
         print 'Memory usage at post-project %5.2f MB' % (memory_usage_psutil())
