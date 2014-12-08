@@ -2,6 +2,7 @@ import os
 import numpy as np
 import cv2
 from itertools import izip, imap
+from collections import defaultdict
 
 from scipy.io import loadmat
 
@@ -21,8 +22,9 @@ class UWRGBDObjectDataset(object):
         Given mask, depth, and rgb files build an read iterator with appropriate process_cb
         """
 
-        def __init__(self, target, files): 
+        def __init__(self, target, instance, files): 
             self.target = target 
+            self.instance = instance
             mask_files = natural_sort(filter(lambda fn: '_mask.png' in fn, files))
             depth_files = natural_sort(filter(lambda  fn: '_depth.png' in fn, files))
             rgb_files = natural_sort(list(set(files) - set(mask_files) - set(depth_files)))
@@ -33,43 +35,56 @@ class UWRGBDObjectDataset(object):
             self.depth = ImageDatasetReader.from_filenames(depth_files)
             self.mask = ImageDatasetReader.from_filenames(mask_files)
 
-        def iteritems(self): 
-            for rgb_im, depth_im, mask_im in izip(self.rgb.iteritems(), 
-                                                  self.depth.iteritems(), 
-                                                  self.mask.iteritems()): 
-                yield AttrDict(target=self.target, img=rgb_im, depth=depth_im, mask=mask_im)
+        def iteritems(self, every_k_frames=1): 
+            for rgb_im, depth_im, mask_im in izip(self.rgb.iteritems(every_k_frames=every_k_frames), 
+                                                  self.depth.iteritems(every_k_frames=every_k_frames), 
+                                                  self.mask.iteritems(every_k_frames=every_k_frames)): 
+                yield AttrDict(target=self.target, instance=self.instance, 
+                               img=rgb_im, depth=depth_im, mask=mask_im)
 
 
-    def __init__(self, directory='', targets=None, num_targets=None, blacklist=['']):         
+
+    def __init__(self, directory='', targets=None, blacklist=['']):         
+
+        get_category = lambda name: '_'.join(name.split('_')[:-1])
+        get_instance = lambda name: int(name.split('_')[-1])
+
+        # Fusing all object instances of a category into a single key
         self._dataset = read_dir(os.path.expanduser(directory), pattern='*.png', recursive=False)
-        self._class_names = np.sort(self._dataset.keys())
+        self._class_names = np.unique(map(lambda name: get_category(name), np.sort(self._dataset.keys())))
         self._class_ids = np.arange(len(self._class_names), dtype=np.int)
 
         self.target_hash = dict(zip(self._class_names, self._class_ids))
         self.target_unhash = dict(zip(self._class_ids, self._class_names))
 
         # Only randomly choose targets if not defined
-        if num_targets is not None and targets is None and \
-           num_targets > 0 and num_targets < len(self._class_names): 
-            inds = np.random.randint(len(self._class_names), size=num_targets)
-            targets = self._class_names[inds]            
+        if targets is not None: 
+            # If integer valued, retrieve targets
+            if isinstance(targets, int) and targets <= len(self._class_names): 
+                inds = np.random.randint(len(self._class_names), size=num_targets)
+                targets = self._class_names[inds]
+            # If targets are list of strings
+            elif isinstance(targets, list) and len(targets) < len(self._class_names): 
+                pass                
+            else: 
+                raise ValueError('targets are not list of strings or integer')
         else: 
+            # Pick full/specified dataset
             targets = self._class_names
-        print 'Classes: %i' % len(targets)
-        print self._dataset.keys()# , self._dataset['coffee_mug']
+        print 'Classes: %i' % len(targets), self._class_names, self._dataset.keys()
 
         # Instantiate a reader for each of the objects
         self.data = {}
         for key, files in self._dataset.iteritems(): 
-            if (targets is not None and key not in targets) or key in blacklist: 
+            if (targets is not None and get_category(key) not in targets) or key in blacklist: 
                 continue
+            target_id = self.target_hash[get_category(key)]
+            instance_id = get_instance(key)
+            self.data[key] = UWRGBDObjectDataset._reader(target_id, instance_id, files)
 
-            target_id = self.target_hash[key]
-            self.data[key] = UWRGBDObjectDataset._reader(target_id, files)
-
-    def iteritems(self): 
+    def iteritems(self, every_k_frames=1): 
         for key, frames in self.data.iteritems(): 
-            for frame in frames.iteritems(): 
+            for frame in frames.iteritems(every_k_frames=every_k_frames): 
                 yield frame
 
 class UWRGBDSceneDataset(object):
@@ -83,6 +98,9 @@ class UWRGBDSceneDataset(object):
         Given mask, depth, and rgb files build an read iterator with appropriate process_cb
         """
         def __init__(self, files, meta_file, version): 
+            if version == 'v2': 
+                print '\n\n===> Version v1 and v2 have discrepancies in depth values, FIX!! <===\n\n'
+
             rgb_files, depth_files = UWRGBDSceneDataset._reader.scene_files(files, version)
             assert(len(depth_files) == len(rgb_files))
 
@@ -121,11 +139,10 @@ class UWRGBDSceneDataset(object):
                 raise ValueError('''Version %s not supported. '''
                                  '''Check dataset and choose v1 scene dataset''' % version)
 
-        def iteritems(self): 
-            print '\n\n===> Version v1 and v2 have discrepancies in depth values, FIX!! <===\n\n'
-            for rgb_im, depth_im, bbox in izip(self.rgb.iteritems(), 
-                                         self.depth.iteritems(), 
-                                         self.bboxes): 
+        def iteritems(self, every_k_frames=1): 
+            for rgb_im, depth_im, bbox in izip(self.rgb.iteritems(every_k_frames=every_k_frames), 
+                                               self.depth.iteritems(every_k_frames=every_k_frames), 
+                                               self.bboxes[::every_k_frames]): 
                 yield AttrDict(img=rgb_im, depth=depth_im, bbox=bbox if bbox is not None else [])
 
     def __init__(self, version, directory='', targets=None, num_targets=None, blacklist=['']):         
@@ -147,9 +164,9 @@ class UWRGBDSceneDataset(object):
             # target_id = self.target_hash[key]
             self.data[key] = UWRGBDSceneDataset._reader(files, meta_file, version)
 
-    def iteritems(self): 
+    def iteritems(self, every_k_frames=1): 
         for key, frames in self.data.iteritems(): 
-            for frame in frames.iteritems(): 
+            for frame in frames.iteritems(every_k_frames): 
                 yield frame
 
     @staticmethod

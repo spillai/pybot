@@ -32,7 +32,7 @@ class Caltech101DatasetReader(object):
             else: 
                 raise ValueError('targets are not list of strings or integer')
         else: 
-            # Pick full dataset
+            # Pick full/specified dataset
             targets = self._class_names
         print 'Classes: %i' % len(targets)
 
