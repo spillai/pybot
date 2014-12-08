@@ -27,6 +27,7 @@ class UWRGBDObjectDataset(object):
                    "lime", "marker", "mushroom", "notebook", "onion", "orange", "peach", "pear", "pitcher", 
                    "plate", "pliers", "potato", "rubber_eraser", "scissors", "shampoo", "soda_can", "sponge", 
                    "stapler", "tomato", "toothbrush", "toothpaste", "water_bottle"]
+
     class_ids = np.arange(len(class_names), dtype=np.int)
     target_hash = dict(zip(class_names, class_ids))
     target_unhash = dict(zip(class_ids, class_names))
@@ -97,16 +98,16 @@ class UWRGBDObjectDataset(object):
                 depth[loc[1]:loc[1]+depth_im.shape[0], loc[0]:loc[0]+depth_im.shape[1]] = depth_im
                 mask[loc[1]:loc[1]+mask_im.shape[0], loc[0]:loc[0]+mask_im.shape[1]] = mask_im
 
-                yield AttrDict(target=self.target, instance=self.instance, 
-                               img=rgb, depth=depth, mask=mask)
+                # Only a single bbox per image
+                yield AttrDict(img=rgb, depth=depth, mask=mask, 
+                               bbox={'left':loc[0], 'right':loc[0]+mask_im.shape[1], 
+                                     'top':loc[1], 'bottom':loc[1]+mask_im.shape[0], 
+                                     'category':self.target, 'instance':self.instance})
 
-    def __init__(self, directory='', targets=None, blacklist=['']):         
+    def __init__(self, directory='', targets=train_names, blacklist=['']):         
         get_category = lambda name: '_'.join(name.split('_')[:-1])
         get_instance = lambda name: int(name.split('_')[-1])
 
-        # Fusing all object instances of a category into a single key
-        self._dataset = read_dir(os.path.expanduser(directory), pattern='*.png', 
-                                 recursive=False, expected=UWRGBDObjectDataset.train_names, verbose=False)
         self._class_names = UWRGBDObjectDataset.class_names
         self._class_ids = UWRGBDObjectDataset.class_ids
 
@@ -121,12 +122,17 @@ class UWRGBDObjectDataset(object):
                 targets = self._class_names[inds]
             # If targets are list of strings
             elif isinstance(targets, list) and len(targets) < len(self._class_names): 
-                pass                
+                pass
             else: 
                 raise ValueError('targets are not list of strings or integer')
         else: 
             # Pick full/specified dataset
             targets = self._class_names
+
+        # Fusing all object instances of a category into a single key
+        print 'Targets, ', targets
+        self._dataset = read_dir(os.path.expanduser(directory), pattern='*.png', 
+                                 recursive=False, expected=targets, verbose=False)
         print 'Classes: %i' % len(targets), self._dataset.keys()
 
         # Instantiate a reader for each of the objects
@@ -245,11 +251,13 @@ def test_uw_rgbd_object():
     rgbd_data_uw = UWRGBDObjectDataset(directory=object_directory)
 
     for f in rgbd_data_uw.iteritems(every_k_frames=5): 
+        bbox = f.bbox
         imshow_cv('frame', 
                   np.hstack([f.img, np.bitwise_and(f.img, to_color(f.mask))]), 
-                  text='Image + Mask [Category: %i, Instance: %i]' % (f.target, f.instance))
+                  text='Image + Mask [Category: %i, Instance: %i]' % (bbox['category'], bbox['instance']))
         imshow_cv('depth', (f.depth / 16).astype(np.uint8), text='Depth')
         cv2.waitKey(100)
+
 def test_uw_rgbd_scene(version='v1'): 
     v1_directory = '/media/spillai/MRG-HD1/data/rgbd-scenes-v1/rgbd-scenes/'
     v2_directory = '/media/spillai/MRG-HD1/data/rgbd-scenes-v2/rgbd-scenes-v2/imgs/'
