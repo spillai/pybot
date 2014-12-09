@@ -145,10 +145,10 @@ class BoWVectorizer(object):
         """
         BoW histogram with L2 normalization
         """
-        code_hist, bin_edges = np.histogram(code, bins=np.arange(self.K))
+        code_hist, bin_edges = np.histogram(code, bins=np.arange(self.K+1) - 0.5)
         
         # Normalize
-        code_hist = BOWVectorizer.normalize(code_hist, norm_method='global-l2')
+        code_hist = BoWVectorizer.normalize(code_hist, norm_method='global-l2')
 
         # Vectorize [1 x K]
         return code_hist.ravel()
@@ -167,7 +167,7 @@ class BoWVectorizer(object):
             residuals[c] += data[cidx] - self.codebook[c]
        
         # Normalize
-        residuals = BOWVectorizer.normalize(residuals, norm_method=self.norm_method)
+        residuals = BoWVectorizer.normalize(residuals, norm_method=self.norm_method)
             
         # Vectorize [1 x (KD)]
         return residuals.ravel()
@@ -176,51 +176,7 @@ class BoWVectorizer(object):
     def dictionary_size(self): 
         return self.K
 
-# class BOWTrainer(object): 
-#     def __init__(self, **kwargs): 
-#         self.vectorizer = BOWVectorizer(**kwargs)
-
-#     @property
-#     def dictionary_size(self): 
-#         return self.vectorizer.dictionary_size
-
-#     @classmethod
-#     def from_dict(cls, db): 
-#         bowt = cls()
-#         bowt.vectorizer = BOWVectorizer.from_dict(db.vectorizer)
-#         return bowt
-
-#     @classmethod
-#     def load(cls, path): 
-#         db = AttrDict.load(path)
-#         return cls.from_dict(db)
-
-#     def save(self, path): 
-#         db = self.to_dict()
-#         db.save(path)
-
-#     def to_dict(self): 
-#         return AttrDict(vectorizer=self.vectorizer.to_dict())
-
-#     def build(self, data): 
-#         """
-#         Build a codebook/vocabulary from data
-#         """
-#         assert(len(data) > 0)
-#         self.vectorizer.build(np.vstack(data))
-
-#         return 
-        
-#     def project(self, data): 
-#         """
-#         Project the descriptions on to the codebook/vocabulary, 
-#         returning the histogram of words
-#         [N x 1] => [1 x K] histogram
-#         """
-#         return self.vectorizer.get_histogram(data)
-
-#     def get_code(self, data): 
-#         """
-#         """
-#         return self.vectorizer.get_code(data)
+    @property
+    def dimension_size(self): 
+        return self.codebook.shape[1]
 
