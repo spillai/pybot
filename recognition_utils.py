@@ -51,7 +51,6 @@ class ImageDescription(object):
         kpts, desc = self.extractor.compute(img, kpts)
         return desc.astype(np.uint8)
 
-
     def detect_and_describe(self, img, mask=None): 
         """
         Computes dense/sparse features on an image and describes 

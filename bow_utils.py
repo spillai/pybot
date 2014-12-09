@@ -91,7 +91,7 @@ class BOWVectorizer(object):
         """
         if self.method == 'vq': 
             code = self.get_code(data)
-            code_hist, bin_edges = np.histogram(code, bins=np.arange(self.K))
+            code_hist, bin_edges = np.histogram(code, bins=np.arange(self.K), normed=True)
         elif self.method == 'vlad': 
             code = self.get_code(data)
             code_hist = self.vlad(data, code)
