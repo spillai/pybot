@@ -12,7 +12,7 @@ from bot_utils.io_utils import memory_usage_psutil
 from bot_utils.db_utils import AttrDict, AttrDictDB
 
 from bot_vision.image_utils import im_resize
-from bot_vision.bow_utils import BOWTrainer
+from bot_vision.bow_utils import BoWVectorizer
 import bot_vision.mser_utils as mser_utils
 
 import bot_utils.io_utils as io_utils
@@ -24,9 +24,11 @@ class ImageDescription(object):
         self.levels = levels
         self.scale = scale
 
+        # self.root_SIFT = (descriptor == 'rootSIFT')
+        # descriptor = 'SIFT' if self.root_SIFT else descriptor
+
         # Setup feature detector
         if detector == 'dense': 
-            # self.detector = cv2.PyramidAdaptedFeatureDetector(, maxLevel=levels)
             self.detector = cv2.FeatureDetector_create('Dense')
             self.detector.setInt('initXyStep', step)
             self.detector.setDouble('featureScaleMul', 2.0)
@@ -34,22 +36,11 @@ class ImageDescription(object):
             self.detector.setBool('varyImgBoundWithScale', False)
             self.detector.setBool('varyXyStepWithScale', True)
         else: 
+            # self.detector = cv2.PyramidAdaptedFeatureDetector(, maxLevel=levels)
             self.detector = cv2.FeatureDetector_create(detector)
 
         # Setup feature extractor
         self.extractor = cv2.DescriptorExtractor_create(descriptor)
-
-    def describe(self, img, mask=None): 
-        """
-        Computes dense/sparse features on an image and describes 
-        these keypoints using a feature descriptor
-        returns 
-           kpts: [cv2.KeyPoint, ... ] 
-           desc: [N x D]
-        """
-        kpts = self.detector.detect(img, mask=mask)
-        kpts, desc = self.extractor.compute(img, kpts)
-        return desc.astype(np.uint8)
 
     def detect_and_describe(self, img, mask=None): 
         """
@@ -61,8 +52,20 @@ class ImageDescription(object):
         """
         kpts = self.detector.detect(img, mask=mask)
         kpts, desc = self.extractor.compute(img, kpts)
+        # if self.root_SIFT: 
+        #     desc = np.sqrt( desc / np.sum(sqrt, axis=1) )
         return kpts, desc.astype(np.uint8)
 
+    def describe(self, img, mask=None): 
+        """
+        Computes dense/sparse features on an image and describes 
+        these keypoints using a feature descriptor
+        returns 
+           kpts: [cv2.KeyPoint, ... ] 
+           desc: [N x D]
+        """
+        kpts, desc = self.detect_and_describe(img, mask=mask)
+        return desc
 
 class ImageClassifier(object): 
     """
@@ -107,7 +110,7 @@ class ImageClassifier(object):
 
     def setup_recognition(self): 
         # Bag-of-words VLAD/VQ
-        self.bow = BOWTrainer(**self.params.bow)
+        self.bow = BoWVectorizer(**self.params.bow)
         
         # Image description using Dense SIFT/Descriptor
         self.image_descriptor = ImageDescription(**self.params.descriptor)
@@ -163,7 +166,7 @@ class ImageClassifier(object):
 
         # Build BOW
         self.bow.build(train_desc)
-        print 'Codebook: %s' % ('GOOD' if np.isfinite(self.bow.vectorizer.codebook).all() else 'BAD')
+        print 'Codebook: %s' % ('GOOD' if np.isfinite(self.bow.codebook).all() else 'BAD')
 
         print 'Memory usage at post-bow-build %5.2f MB' % (memory_usage_psutil())
 
@@ -235,7 +238,7 @@ class ImageClassifier(object):
         try: 
             self.params = db.params
             self.image_descriptor = ImageDescription(**db.params.descriptor)
-            self.bow = BOWTrainer.from_dict(db.bow)
+            self.bow = BoWVectorizer.from_dict(db.bow)
             self.clf = db.clf
         except KeyError: 
             raise RuntimeError('DB not setup correctly, try re-training!')

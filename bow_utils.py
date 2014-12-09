@@ -8,14 +8,14 @@ from sklearn.cluster import KMeans, MiniBatchKMeans
 
 from bot_utils.db_utils import AttrDict
 
-class BOWVectorizer(object): 
+class BoWVectorizer(object): 
     default_params = AttrDict(K=64, method='vlad', norm_method='square-rooting')
     def __init__(self, K=64, method='vlad', quantizer='kdtree', norm_method='square-rooting'): 
         self.K = K
         self.method, self.quantizer = method, quantizer
         self.norm_method = norm_method
 
-    def build(self, data): 
+    def _build(self, data): 
         """
         Build [K x D] codebook/vocabulary from data
         """
@@ -42,6 +42,13 @@ class BOWVectorizer(object):
 
         # Save codebook, and index
         self.index_codebook()
+
+    def build(self, data): 
+        """
+        Build a codebook/vocabulary from data
+        """
+        assert(len(data) > 0)
+        self._build(np.vstack(data))
 
     def index_codebook(self): 
         # Index codebook for quick querying
@@ -89,15 +96,63 @@ class BOWVectorizer(object):
         returning the histogram of words
         [N x 1] => [1 x K] histogram
         """
-        if self.method == 'vq': 
+        if self.method == 'vq' or self.method == 'bow': 
             code = self.get_code(data)
-            code_hist, bin_edges = np.histogram(code, bins=np.arange(self.K), normed=True)
+            code_hist = self.bow(data, code)
         elif self.method == 'vlad': 
             code = self.get_code(data)
             code_hist = self.vlad(data, code)
         else: 
-            raise NotImplementedError('Histogram method %s not implemented. Use vq or vlad!' % self.method)            
+            raise NotImplementedError('''Histogram method %s not implemented. '''
+                                      '''Use vq/bow or vlad!''' % self.method)            
         return code_hist
+
+    def project(self, data): 
+        """
+        Project the descriptions on to the codebook/vocabulary, 
+        returning the histogram of words
+        [N x 1] => [1 x K] histogram
+        """
+        return self.get_histogram(data)
+
+    @staticmethod
+    def normalize(hist, norm_method='global-l2'): 
+        """
+        Various normalization methods
+        """
+
+        # Component-wise mass normalization 
+        if norm_method == 'component-wise-mass': 
+            raise NotImplementedError('Component-wise-mass normalization_method not implemented')
+
+        # Component-wise L2 normalization
+        elif norm_method == 'component-wise-l2': 
+            return hist / np.max(np.linalg.norm(hist, axis=1), 1e-12)
+
+        # Global L2 normalization
+        elif norm_method == 'global-l2': 
+            return hist / (np.linalg.norm(hist) + 1e-12)
+
+        # Square rooting / Power Normalization with alpha = 0.5
+        # Refer to http://www.robots.ox.ac.uk/~vgg/rg/papers/peronnin_etal_ECCV10.pdf
+        elif norm_method == 'square-rooting': 
+            return np.sign(hist) * np.sqrt(np.fabs(hist))
+
+        else: 
+            raise NotImplementedError('Unknown normalization_method %s' % norm_method)            
+
+    def bow(self, data, code): 
+        """
+        BoW histogram with L2 normalization
+        """
+        code_hist, bin_edges = np.histogram(code, bins=np.arange(self.K))
+        
+        # Normalize
+        code_hist = BOWVectorizer.normalize(code_hist, norm_method='global-l2')
+
+        # Vectorize [1 x K]
+        return code_hist.ravel()
+        
 
     def vlad(self, data, code): 
         """
@@ -112,27 +167,7 @@ class BOWVectorizer(object):
             residuals[c] += data[cidx] - self.codebook[c]
        
         # Normalize
-        # Component-wise mass normalization 
-        if self.norm_method == 'component-wise-mass': 
-            raise NotImplementedError('VLAD normalization_method not implemented')
-
-        # Component-wise L2 normalization
-        elif self.norm_method == 'component-wise-l2': 
-            residuals /= np.max(np.linalg.norm(residuals, axis=1), 1e-12)
-
-        # Global L2 normalization
-        elif self.norm_method == 'global-l2': 
-            residuals /= (np.linalg.norm(residuals) + 1e-12)
-
-        # Square rooting / Power Normalization with alpha = 0.5
-        # Refer to http://www.robots.ox.ac.uk/~vgg/rg/papers/peronnin_etal_ECCV10.pdf
-        elif self.norm_method == 'square-rooting': 
-            residuals = np.sign(residuals) * np.sqrt(np.fabs(residuals))
-
-        # else: 
-        #     import warnings
-        #     raise warnings.warn('VLAD un-normalized')
-        #     # raise NotImplementedError('VLAD normalization_method not implemented')
+        residuals = BOWVectorizer.normalize(residuals, norm_method=self.norm_method)
             
         # Vectorize [1 x (KD)]
         return residuals.ravel()
@@ -141,51 +176,51 @@ class BOWVectorizer(object):
     def dictionary_size(self): 
         return self.K
 
-class BOWTrainer(object): 
-    def __init__(self, **kwargs): 
-        self.vectorizer = BOWVectorizer(**kwargs)
+# class BOWTrainer(object): 
+#     def __init__(self, **kwargs): 
+#         self.vectorizer = BOWVectorizer(**kwargs)
 
-    @property
-    def dictionary_size(self): 
-        return self.vectorizer.dictionary_size
+#     @property
+#     def dictionary_size(self): 
+#         return self.vectorizer.dictionary_size
 
-    @classmethod
-    def from_dict(cls, db): 
-        bowt = cls()
-        bowt.vectorizer = BOWVectorizer.from_dict(db.vectorizer)
-        return bowt
+#     @classmethod
+#     def from_dict(cls, db): 
+#         bowt = cls()
+#         bowt.vectorizer = BOWVectorizer.from_dict(db.vectorizer)
+#         return bowt
 
-    @classmethod
-    def load(cls, path): 
-        db = AttrDict.load(path)
-        return cls.from_dict(db)
+#     @classmethod
+#     def load(cls, path): 
+#         db = AttrDict.load(path)
+#         return cls.from_dict(db)
 
-    def save(self, path): 
-        db = self.to_dict()
-        db.save(path)
+#     def save(self, path): 
+#         db = self.to_dict()
+#         db.save(path)
 
-    def to_dict(self): 
-        return AttrDict(vectorizer=self.vectorizer.to_dict())
+#     def to_dict(self): 
+#         return AttrDict(vectorizer=self.vectorizer.to_dict())
 
-    def build(self, data): 
-        """
-        Build a codebook/vocabulary from data
-        """
-        assert(len(data) > 0)
-        self.vectorizer.build(np.vstack(data))
+#     def build(self, data): 
+#         """
+#         Build a codebook/vocabulary from data
+#         """
+#         assert(len(data) > 0)
+#         self.vectorizer.build(np.vstack(data))
 
-        return 
+#         return 
         
-    def project(self, data): 
-        """
-        Project the descriptions on to the codebook/vocabulary, 
-        returning the histogram of words
-        [N x 1] => [1 x K] histogram
-        """
-        return self.vectorizer.get_histogram(data)
+#     def project(self, data): 
+#         """
+#         Project the descriptions on to the codebook/vocabulary, 
+#         returning the histogram of words
+#         [N x 1] => [1 x K] histogram
+#         """
+#         return self.vectorizer.get_histogram(data)
 
-    def get_code(self, data): 
-        """
-        """
-        return self.vectorizer.get_code(data)
+#     def get_code(self, data): 
+#         """
+#         """
+#         return self.vectorizer.get_code(data)
 
