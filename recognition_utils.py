@@ -4,26 +4,22 @@ import itertools
 
 from sklearn.linear_model import SGDClassifier
 from sklearn.neighbors import KNeighborsClassifier
-
-# from sklearn.cross_validation import cross_val_score
-# from sklearn.ensemble import ExtraTreesClassifier, RandomForestClassifier
 from sklearn.svm import LinearSVC
 from sklearn.multiclass import OneVsRestClassifier
 from sklearn.cross_validation import train_test_split
-# from sklearn.externals import joblib
 
-from bot_vision.image_utils import im_resize
 from bot_utils.io_utils import memory_usage_psutil
 from bot_utils.db_utils import AttrDict, AttrDictDB
-from bot_vision.bow_utils import BOWTrainer
 
+from bot_vision.image_utils import im_resize
+from bot_vision.bow_utils import BOWTrainer
 import bot_vision.mser_utils as mser_utils
+
 import bot_utils.io_utils as io_utils
 import sklearn.metrics as metrics
 
 class ImageDescription(object): 
-    def __init__(self, detector='SIFT', descriptor='SIFT', selective_search=False, 
-                 step=4, levels=4, scale=2.0): 
+    def __init__(self, detector='SIFT', descriptor='SIFT', step=4, levels=4, scale=2.0): 
         self.step = step
         self.levels = levels
         self.scale = scale
@@ -42,10 +38,6 @@ class ImageDescription(object):
 
         # Setup feature extractor
         self.extractor = cv2.DescriptorExtractor_create(descriptor)
-
-        # Setup selective search
-        if selective_search: 
-            self.sel_search = mser_utils.MSER()
 
     def describe(self, img, mask=None): 
         """

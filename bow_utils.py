@@ -1,10 +1,12 @@
 import cv2, time
 import numpy as np
+
 from scipy.cluster.vq import vq, kmeans2
+from scipy.spatial import cKDTree
+
+from sklearn.cluster import KMeans, MiniBatchKMeans
 
 from bot_utils.db_utils import AttrDict
-from scipy.spatial import cKDTree
-from sklearn.cluster import KMeans, MiniBatchKMeans
 
 class BOWVectorizer(object): 
     default_params = AttrDict(K=64, method='vlad', norm_method='square-rooting')
@@ -26,17 +28,17 @@ class BOWVectorizer(object):
         km = MiniBatchKMeans(n_clusters=self.K, init='k-means++', 
                              compute_labels=False, batch_size=1000, max_iter=150, max_no_improvement=30, 
                              verbose=False).fit(data)
+        # Alternate
         # km = KMeans(n_clusters=self.K, n_jobs=4, tol=0.01, verbose=True).fit(data)
         self.codebook = km.cluster_centers_
 
         # # Opencv: 1x
-        # ret, labels, self.codebook = cv2.kmeans(data, self.K, 
-        #                                         criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_MAX_ITER, 1, 10), 
+        # term_crit = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_MAX_ITER, 1, 10)
+        # ret, labels, self.codebook = cv2.kmeans(data, self.K, criteria=term_crit, 
         #                                         attempts=10, flags=cv2.KMEANS_PP_CENTERS)
-        print 'Vocab construction from data %s (%s KB, %s) => codebook %s took %5.3f s' % (data.shape, 
-                                                                                           data.nbytes / 1024, data.dtype,
-                                                                                           self.codebook.shape, 
-                                                                                           time.time() - st)
+
+        print 'Vocab construction from data %s (%s KB, %s) => codebook %s took %5.3f s' % \
+            (data.shape, data.nbytes / 1024, data.dtype, self.codebook.shape, time.time() - st)
 
         # Save codebook, and index
         self.index_codebook()
