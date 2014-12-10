@@ -116,14 +116,13 @@ class BoWVectorizer(object):
         returning the histogram of words
         [N x 1] => [1 x K] histogram
 
-        Otherwise, if kpts specified, perform spatial pooling
+        Otherwise, if kpts and bbox shape specified, perform spatial pooling
         """
         
         if kpts is None or shape is None: 
             return self.get_histogram(data)
         else: 
             # Compute histogram for each spatial level
-
             pts = np.vstack([kp.pt for kp in kpts]).astype(int)
             xmin, ymin = shape[0], shape[1]
             xs, ys = pts[:,0]-xmin, pts[:,1]-ymin
