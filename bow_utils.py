@@ -119,6 +119,13 @@ class BoWVectorizer(object):
     def normalize(hist, norm_method='global-l2'): 
         """
         Various normalization methods
+
+        Refer to: 
+        [1] Improving the Fisher Kernel for Large-Scale Image Classifcation, Perronnin et al
+        http://www.robots.ox.ac.uk/~vgg/rg/papers/peronnin_etal_ECCV10.pdf
+        
+        [2] Segmentation Driven Object Detection with Fisher Vectors, Cinbis et al
+
         """
 
         # Component-wise mass normalization 
@@ -134,9 +141,10 @@ class BoWVectorizer(object):
             return hist / (np.linalg.norm(hist) + 1e-12)
 
         # Square rooting / Power Normalization with alpha = 0.5
-        # Refer to http://www.robots.ox.ac.uk/~vgg/rg/papers/peronnin_etal_ECCV10.pdf
         elif norm_method == 'square-rooting': 
-            return np.sign(hist) * np.sqrt(np.fabs(hist))
+            # Power-normalization followed by L2 normalization as in [2]
+            hist = np.sign(hist) * np.sqrt(np.fabs(hist))
+            return hist / (np.linalg.norm(hist) + 1e-12)
 
         else: 
             raise NotImplementedError('Unknown normalization_method %s' % norm_method)            
