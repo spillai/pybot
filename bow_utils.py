@@ -9,9 +9,12 @@ from sklearn.cluster import KMeans, MiniBatchKMeans
 from bot_utils.db_utils import AttrDict
 
 class BoWVectorizer(object): 
-    default_params = AttrDict(K=64, method='vlad', norm_method='square-rooting')
-    def __init__(self, K=64, method='vlad', quantizer='kdtree', norm_method='square-rooting'): 
+    default_params = AttrDict(K=64, levels=(1,2,4), 
+                              method='vlad', quantizer='kdtree', norm_method='square-rooting')
+    def __init__(self, K=64, levels=(1,2,4), 
+                 method='vlad', quantizer='kdtree', norm_method='square-rooting'): 
         self.K = K
+        self.levels = levels
         self.method, self.quantizer = method, quantizer
         self.norm_method = norm_method
 
@@ -107,14 +110,47 @@ class BoWVectorizer(object):
                                       '''Use vq/bow or vlad!''' % self.method)            
         return code_hist
 
-    def project(self, data): 
+    def project(self, data, kpts=None, shape=None): 
         """
         Project the descriptions on to the codebook/vocabulary, 
         returning the histogram of words
         [N x 1] => [1 x K] histogram
-        """
-        return self.get_histogram(data)
 
+        Otherwise, if kpts specified, perform spatial pooling
+        """
+        
+        if kpts is None or shape is None: 
+            return self.get_histogram(data)
+        else: 
+            # Compute histogram for each spatial level
+
+            pts = np.vstack([kp.pt for kp in kpts]).astype(int)
+            xmin, ymin = shape[0], shape[1]
+            xs, ys = pts[:,0]-xmin, pts[:,1]-ymin
+
+            # Ownership bin 
+            # For each pt, and each level find the x and y bin
+            # and assign to appropriate bin
+            # nbins = np.sum(np.array(self.levels) ** 2)
+
+            # levels = [1, 2, 4]
+            hist = []
+            for j,level in enumerate(self.levels): 
+                # Determine the bin each point belongs to given level, and assign
+                xdim, ydim = (shape[2]-shape[0]) / level, (shape[3]-shape[1]) / level
+                xbin, ybin = xs / xdim, ys / ydim
+                bin_idx = ybin * level + xbin
+
+                # Compute histogram for each bin                
+                for lbin in range(level * level): 
+                    inds, = np.where(bin_idx == lbin)
+                    hist.append(self.get_histogram(data[inds]))
+
+            # Stack all histograms together
+            return np.hstack(hist)
+                    
+                
+            
     @staticmethod
     def normalize(hist, norm_method='global-l2'): 
         """
