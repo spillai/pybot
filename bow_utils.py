@@ -52,6 +52,7 @@ class BoWVectorizer(object):
         """
         assert(len(data) > 0)
         self._build(np.vstack(data))
+        print 'Codebook: %s' % ('GOOD' if np.isfinite(self.codebook).all() else 'BAD')
 
     def index_codebook(self): 
         # Index codebook for quick querying
@@ -110,7 +111,7 @@ class BoWVectorizer(object):
                                       '''Use vq/bow or vlad!''' % self.method)            
         return code_hist
 
-    def project(self, data, kpts=None, shape=None): 
+    def project(self, data, pts=None, shape=None): 
         """
         Project the descriptions on to the codebook/vocabulary, 
         returning the histogram of words
@@ -119,11 +120,11 @@ class BoWVectorizer(object):
         Otherwise, if kpts and bbox shape specified, perform spatial pooling
         """
         
-        if kpts is None or shape is None: 
+        if pts is None or shape is None: 
             return self.get_histogram(data)
         else: 
             # Compute histogram for each spatial level
-            pts = np.vstack([kp.pt for kp in kpts]).astype(int)
+            assert(pts.dtype == np.int32)
             xmin, ymin = shape[0], shape[1]
             xs, ys = pts[:,0]-xmin, pts[:,1]-ymin
 
