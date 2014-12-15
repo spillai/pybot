@@ -21,23 +21,27 @@ class UWRGBDDataset(object):
                    "food_bag", "food_box", "food_can", "food_cup", "food_jar", "garlic", "glue_stick", 
                    "greens", "hand_towel", "instant_noodles", "keyboard", "kleenex", "lemon", "lightbulb", 
                    "lime", "marker", "mushroom", "notebook", "onion", "orange", "peach", "pear", "pitcher", 
-                   "plate", "pliers", "potato", "rubber_eraser", "scissors", "shampoo", "soda_can", "sponge", 
-                   "stapler", "tomato", "toothbrush", "toothpaste", "water_bottle"]
+                   "plate", "pliers", "potato", "rubber_eraser", "scissors", "shampoo", "soda_can", 
+                   "sponge", "stapler", "tomato", "toothbrush", "toothpaste", "water_bottle"]
 
-    class_ids = np.arange(len(class_names), dtype=np.int)
+    class_ids = np.arange(len(class_names), dtype=np.int)    
     target_hash = dict(zip(class_names, class_ids))
     target_unhash = dict(zip(class_ids, class_names))
 
     train_names = ["bowl", "cap", "cereal_box", "coffee_mug", "soda_can"]
+    train_ids = [target_hash[name] for name in train_names]
+    train_names_set, train_ids_set = set(train_names), set(train_ids)
 
     @classmethod
     def get_category_name(cls, target_id): 
-        return cls.target_unhash[target_id]
+        return cls.target_unhash[target_id]#  \
+            # if target_id in cls.train_ids_set else 'BACKGROUND'
 
     @classmethod
     def get_category_id(cls, target_name): 
-        return cls.target_hash[target_name]
-
+        return cls.target_hash[target_name] # \
+            # if target_name in cls.train_names_set else cls.target_hash['BACKGROUND']
+    
 class UWRGBDObjectDataset(UWRGBDDataset):
     """
     RGB-D Dataset readers
@@ -81,6 +85,12 @@ class UWRGBDObjectDataset(UWRGBDDataset):
             depth_files = natural_sort(filter(lambda  fn: '_depthcrop.png' in fn, files))
             rgb_files = natural_sort(list(set(files) - set(mask_files) - set(depth_files)))
             loc_files = natural_sort(map(lambda fn: fn.replace('_crop.png', '_loc.txt'), rgb_files))
+
+            # Ensure all have equal number of files (Hack! doesn't ensure filename consistency)
+            nfiles = np.min([len(loc_files), len(mask_files), len(depth_files), len(rgb_files)])
+            mask_files, depth_files, rgb_files, loc_files = mask_files[:nfiles], depth_files[:nfiles], \
+                                                            rgb_files[:nfiles], loc_files[:nfiles]
+
             # print target, instance, len(loc_files), len(mask_files), len(depth_files), len(rgb_files)
             assert(len(mask_files) == len(depth_files) == len(rgb_files) == len(loc_files))
 
@@ -132,7 +142,7 @@ class UWRGBDObjectDataset(UWRGBDDataset):
                 inds = np.random.randint(len(self._class_names), size=num_targets)
                 targets = self._class_names[inds]
             # If targets are list of strings
-            elif isinstance(targets, list) and len(targets) < len(self._class_names): 
+            elif isinstance(targets, list) and len(targets) <= len(self._class_names): 
                 pass
             else: 
                 raise ValueError('targets are not list of strings or integer')
@@ -152,6 +162,7 @@ class UWRGBDObjectDataset(UWRGBDDataset):
             if (targets is not None and get_category(key) not in targets) or key in blacklist: 
                 continue
             target_id = self.target_hash[get_category(key)]
+            # target_id = UWRGBDDataset.get_category_id(get_category(key))
             instance_id = get_instance(key)
             self.data[key] = UWRGBDObjectDataset._cropped_reader(target_id, instance_id, files)
 
@@ -224,7 +235,8 @@ class UWRGBDSceneDataset(UWRGBDDataset):
 
     def __init__(self, version, directory='', targets=None, num_targets=None, blacklist=['']):         
         if version not in ['v1', 'v2']: 
-            raise ValueError('Version not supported. Check dataset and choose either v1 or v2 scene dataset')
+            raise ValueError('Version %s not supported. '''
+                             '''Check dataset and choose either v1 or v2 scene dataset''' % version)
 
         self._dataset = read_dir(os.path.expanduser(directory), pattern='*.png', recursive=False)
         self._meta = UWRGBDSceneDataset._reader.meta_files(directory, version)
