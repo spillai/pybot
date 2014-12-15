@@ -22,25 +22,25 @@ class UWRGBDDataset(object):
                    "greens", "hand_towel", "instant_noodles", "keyboard", "kleenex", "lemon", "lightbulb", 
                    "lime", "marker", "mushroom", "notebook", "onion", "orange", "peach", "pear", "pitcher", 
                    "plate", "pliers", "potato", "rubber_eraser", "scissors", "shampoo", "soda_can", 
-                   "sponge", "stapler", "tomato", "toothbrush", "toothpaste", "water_bottle"]
+                   "sponge", "stapler", "tomato", "toothbrush", "toothpaste", "water_bottle", "BACKGROUND"]
 
     class_ids = np.arange(len(class_names), dtype=np.int)    
     target_hash = dict(zip(class_names, class_ids))
     target_unhash = dict(zip(class_ids, class_names))
 
-    train_names = ["bowl", "cap", "cereal_box", "coffee_mug", "soda_can"]
+    train_names = ["bowl", "cap", "cereal_box", "coffee_mug", "soda_can", "BACKGROUND"]
     train_ids = [target_hash[name] for name in train_names]
     train_names_set, train_ids_set = set(train_names), set(train_ids)
 
     @classmethod
     def get_category_name(cls, target_id): 
-        return cls.target_unhash[target_id]#  \
-            # if target_id in cls.train_ids_set else 'BACKGROUND'
+        return cls.target_unhash[target_id] \
+            if target_id in cls.train_ids_set else 'BACKGROUND'
 
     @classmethod
     def get_category_id(cls, target_name): 
-        return cls.target_hash[target_name] # \
-            # if target_name in cls.train_names_set else cls.target_hash['BACKGROUND']
+        return cls.target_hash[target_name] \
+            if target_name in cls.train_names_set else cls.target_hash['BACKGROUND']
     
 class UWRGBDObjectDataset(UWRGBDDataset):
     """
