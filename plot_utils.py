@@ -79,7 +79,7 @@ def draw_histogram_1d(hist, output=None, shape=(20,100)):
     for idx, hval in enumerate((hist * H).astype(int)): 
         output[H - hval:H, int(idx * w) : int((idx + 1) * w)] = cols[idx]
     # output[0,:,:] = 255
-    output[-1,:w*len(hist),:] = 255
+    output[-1,:w*len(hist),:] = 200
     # output[:,0,:] = 255
     # output[:,-1,:] = 255
     return output
