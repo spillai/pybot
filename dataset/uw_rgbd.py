@@ -10,7 +10,15 @@ from bot_utils.db_utils import AttrDict
 from bot_utils.dataset_readers import read_dir, read_files, natural_sort, \
     DatasetReader, ImageDatasetReader
 
+import progressbar as pb
+
 # __categories__ = ['flashlight', 'cap', 'cereal_box', 'coffee_mug', 'soda_can']
+
+def setup_pbar(maxval): 
+    widgets = ['Progress: ', pb.Percentage(), ' ', pb.Bar(), ' ', pb.ETA()]
+    pbar = pb.ProgressBar(widgets=widgets, maxval=maxval)
+    pbar.start()
+    return pbar
 
 class UWRGBDDataset(object): 
     default_rgb_shape = (480,640,3)
@@ -170,10 +178,15 @@ class UWRGBDObjectDataset(UWRGBDDataset):
         self.target_names = targets
 
     def iteritems(self, every_k_frames=1, verbose=False): 
+        pbar = setup_pbar(len(self.data)) if verbose else None
         for key, frames in self.data.iteritems(): 
-            if verbose: print 'Processing: %s' % key
+            if verbose: 
+                pbar.update(pbar.currval + 1)
+                # print 'Processing: %s' % key
+
             for frame in frames.iteritems(every_k_frames=every_k_frames): 
                 yield frame
+        pbar.finish()
 
 class UWRGBDSceneDataset(UWRGBDDataset):
     """
@@ -249,15 +262,21 @@ class UWRGBDSceneDataset(UWRGBDDataset):
 
             # Get mat file for each scene
             meta_file = self._meta.get(key, None)
-            print key, meta_file
+            # print key, meta_file
             # target_id = self.target_hash[key]
             self.data[key] = UWRGBDSceneDataset._reader(files, meta_file, version)
 
+
     def iteritems(self, every_k_frames=1, verbose=False): 
+        pbar = setup_pbar(len(self.data)) if verbose else None
         for key, frames in self.data.iteritems(): 
-            if verbose: print 'Processing: %s' % key
+            if verbose: 
+                pbar.update(pbar.currval + 1)
+                # print 'Processing: %s' % key
+
             for frame in frames.iteritems(every_k_frames): 
                 yield frame
+        pbar.finish()
 
     @staticmethod
     def annotate(f): 
