@@ -186,7 +186,7 @@ class UWRGBDObjectDataset(UWRGBDDataset):
 
             for frame in frames.iteritems(every_k_frames=every_k_frames): 
                 yield frame
-        pbar.finish()
+        if verbose: pbar.finish()
 
 class UWRGBDSceneDataset(UWRGBDDataset):
     """
@@ -276,7 +276,7 @@ class UWRGBDSceneDataset(UWRGBDDataset):
 
             for frame in frames.iteritems(every_k_frames): 
                 yield frame
-        pbar.finish()
+        if verbose: pbar.finish()
 
     @staticmethod
     def annotate(f): 
