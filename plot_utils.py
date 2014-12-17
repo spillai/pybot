@@ -7,7 +7,6 @@ import matplotlib.pyplot as plt
 def colormap(v, scale=255): 
     return plt.cm.hsv(v.ravel())[:,:3] * scale
 
-
 def moving_average(X, win_size=3): 
     return np.convolve(X, np.repeat(1.0, win_size) / win_size, 'valid')
 
@@ -70,4 +69,21 @@ def plot_poses(poses, pose_type='absolute'):
 
     plt.tight_layout()
     plt.show(block=True)
+
+def draw_histogram_1d(hist, output=None, shape=(20,100)): 
+    if output is None: 
+        output = np.zeros(shape=shape, dtype=np.uint8)
+    H, W = output.shape[:2]
+    w = 8
+    cols = colormap(np.arange(len(hist)) * 1.0 / len(hist))
+    for idx, hval in enumerate((hist * H).astype(int)): 
+        output[H - hval:H, int(idx * w) : int((idx + 1) * w)] = cols[idx]
+    # output[0,:,:] = 255
+    output[-1,:w*len(hist),:] = 255
+    # output[:,0,:] = 255
+    # output[:,-1,:] = 255
+    return output
+        
+        
+    
 
