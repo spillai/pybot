@@ -31,7 +31,7 @@ class ImageDescription(object):
         if detector == 'dense': 
             self.detector = cv2.FeatureDetector_create('Dense')
             self.detector.setInt('initXyStep', step)
-            self.detector.setDouble('featureScaleMul', 2.0)
+            self.detector.setDouble('featureScaleMul', scale)
             self.detector.setInt('featureScaleLevels', levels)
             self.detector.setBool('varyImgBoundWithScale', False)
             self.detector.setBool('varyXyStepWithScale', True)
