@@ -24,17 +24,14 @@ class ImageDescription(object):
         self.levels = levels
         self.scale = scale
 
-        # self.root_SIFT = (descriptor == 'rootSIFT')
-        # descriptor = 'SIFT' if self.root_SIFT else descriptor
-
         # Setup feature detector
         if detector == 'dense': 
             self.detector = cv2.FeatureDetector_create('Dense')
             self.detector.setInt('initXyStep', step)
             self.detector.setDouble('featureScaleMul', scale)
             self.detector.setInt('featureScaleLevels', levels)
-            self.detector.setBool('varyImgBoundWithScale', False)
-            self.detector.setBool('varyXyStepWithScale', True)
+            self.detector.setBool('varyImgBoundWithScale', True)
+            self.detector.setBool('varyXyStepWithScale', False)
         else: 
             # self.detector = cv2.PyramidAdaptedFeatureDetector(, maxLevel=levels)
             self.detector = cv2.FeatureDetector_create(detector)
@@ -52,9 +49,7 @@ class ImageDescription(object):
         """
         kpts = self.detector.detect(img, mask=mask)
         kpts, desc = self.extractor.compute(img, kpts)
-        # if self.root_SIFT: 
-        #     desc = np.sqrt( desc / np.sum(sqrt, axis=1) )
-        return kpts, desc.astype(np.uint8)
+        return kpts, desc
 
     def describe(self, img, mask=None): 
         """

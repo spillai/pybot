@@ -164,7 +164,7 @@ class BoWVectorizer(object):
             hist = []
             for j,level in enumerate(self.levels): 
                 # Determine the bin each point belongs to given level, and assign
-                xdim, ydim = (shape[2]-shape[0]) / level, (shape[3]-shape[1]) / level
+                xdim, ydim = (shape[2]-shape[0]+1) / level, (shape[3]-shape[1]+1) / level
                 xbin, ybin = xs / xdim, ys / ydim
                 bin_idx = ybin * level + xbin
 
