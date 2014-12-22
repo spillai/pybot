@@ -5,6 +5,7 @@ from scipy.cluster.vq import vq, kmeans2
 from scipy.spatial import cKDTree
 
 from sklearn.cluster import KMeans, MiniBatchKMeans
+from sklearn.mixture import GMM
 
 from bot_utils.db_utils import AttrDict
 
@@ -18,7 +19,7 @@ class BoWVectorizer(object):
         self.method, self.quantizer = method, quantizer
         self.norm_method = norm_method
 
-    def _build(self, data): 
+    def _build_codebook(self, data): 
         """
         Build [K x D] codebook/vocabulary from data
         """
@@ -42,6 +43,26 @@ class BoWVectorizer(object):
 
         print 'Vocab construction from data %s (%s KB, %s) => codebook %s took %5.3f s' % \
             (data.shape, data.nbytes / 1024, data.dtype, self.codebook.shape, time.time() - st)
+        print 'Codebook: %s' % ('GOOD' if np.isfinite(self.codebook).all() else 'BAD')
+
+        # Save codebook, and index
+        self.index_codebook()
+
+    def _build_gmm(self, data): 
+        """
+        Build gmm from data
+        """
+        st = time.time()
+
+        self.gmm = GMM(n_components=self.K, covariance_type='diag')
+        self.gmm.fit(data)
+
+        # Setup codebook for closest center lookup
+        self.codebook = self.gmm.means_
+
+        print 'Vocab construction from data %s (%s KB, %s) => GMM %s took %5.3f s' % \
+            (data.shape, data.nbytes / 1024, data.dtype, self.gmm.means_.shape, time.time() - st)
+        print 'GMM: %s' % ('GOOD' if np.isfinite(self.gmm.means_).all() else 'BAD')
 
         # Save codebook, and index
         self.index_codebook()
@@ -51,8 +72,10 @@ class BoWVectorizer(object):
         Build a codebook/vocabulary from data
         """
         assert(len(data) > 0)
-        self._build(np.vstack(data))
-        print 'Codebook: %s' % ('GOOD' if np.isfinite(self.codebook).all() else 'BAD')
+        if self.method == 'fisher': 
+            self._build_gmm(np.vstack(data))
+        else: 
+            self._build_codebook(np.vstack(data))
 
     def index_codebook(self): 
         # Index codebook for quick querying
@@ -106,9 +129,12 @@ class BoWVectorizer(object):
         elif self.method == 'vlad': 
             code = self.get_code(data)
             code_hist = self.vlad(data, code)
+        elif self.method == 'fisher': 
+            code = self.get_code(data)
+            code_hist = self.fisher(data, code)
         else: 
             raise NotImplementedError('''Histogram method %s not implemented. '''
-                                      '''Use vq/bow or vlad!''' % self.method)            
+                                      '''Use vq/bow or vlad or fisher!''' % self.method)            
         return code_hist
 
     def project(self, data, pts=None, shape=None): 
@@ -124,7 +150,8 @@ class BoWVectorizer(object):
             return self.get_histogram(data)
         else: 
             # Compute histogram for each spatial level
-            assert(pts.dtype == np.int32)
+            # assert(pts.dtype == np.int32)
+            pts = pts.astype(np.int32)
             xmin, ymin = shape[0], shape[1]
             xs, ys = pts[:,0]-xmin, pts[:,1]-ymin
 
@@ -204,7 +231,7 @@ class BoWVectorizer(object):
         Herve Jegou, Matthijs Douze, Cordelia Schmid and Patrick Perez
         Proc. IEEE CVPR 10, June, 2010.
         """
-        residuals = np.zeros(self.codebook.shape)
+        residuals = np.zeros(self.codebook.shape, dtype=np.float32)
 
         # Accumulate residuals [K x D]
         for cidx, c in enumerate(code):
@@ -214,6 +241,40 @@ class BoWVectorizer(object):
         residuals = BoWVectorizer.normalize(residuals, norm_method=self.norm_method)
             
         # Vectorize [1 x (KD)]
+        return residuals.ravel()
+
+    def fisher(self, data, code): 
+        """
+        [1] Fisher kenrels on visual vocabularies for image categorizaton. 
+        F. Perronnin and C. Dance. In Proc. CVPR, 2006.
+        [2] Improving the fisher kernel for large-scale image classification. 
+        Florent Perronnin, Jorge Sanchez, and Thomas Mensink. In Proc. ECCV, 2010.
+        """
+
+        # Fisher vector encoding
+        K, D = self.gmm.means_.shape[:2]
+        residuals_v = np.zeros(shape=(K,D), dtype=np.float32)
+        residuals_u = np.zeros(shape=(K,D), dtype=np.float32)
+
+        # Posterior prob. of data under each mixture [N x K]
+        posteriors = self.gmm.predict_proba(data)
+        
+        # Inverse sqrt of covariance [K x K] 
+        sigma_inv = 1.0 / (np.sqrt(self.gmm.covars_) + 1e-12)
+
+        # Accumulate residuals [K x D]
+        for cidx, c in enumerate(code):
+            residuals_v[c] += posteriors[cidx,c] * (data[cidx] - self.codebook[c]) * sigma_inv[c]
+            residuals_u[c] += posteriors[cidx,c] * np.square((data[cidx] - self.codebook[c]) * sigma_inv[c] - 1)
+
+        for c in range(len(residuals_v)):
+            residuals_v[c] *= 1.0 / (len(data) * np.sqrt(self.gmm.weights_[c]) + 1e-12)
+            residuals_u[c] *= 1.0 / (len(data) * np.sqrt(2 * self.gmm.weights_[c]) + 1e-12)
+
+        # Normalize
+        residuals = BoWVectorizer.normalize(np.vstack([residuals_v, residuals_u]), norm_method=self.norm_method)
+
+        # Vectorize [1 x (2KD)]
         return residuals.ravel()
 
     @property
