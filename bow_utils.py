@@ -219,7 +219,7 @@ class BoWVectorizer(object):
         code_hist, bin_edges = np.histogram(code, bins=np.arange(self.K+1) - 0.5)
         
         # Normalize
-        code_hist = BoWVectorizer.normalize(code_hist, norm_method='global-l2')
+        code_hist = BoWVectorizer.normalize(code_hist.astype(np.float32), norm_method='global-l2')
 
         # Vectorize [1 x K]
         return code_hist.ravel()
