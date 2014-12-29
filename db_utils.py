@@ -110,7 +110,7 @@ def flush_pytable(h5f, data=None, group=None, table=None, force=True):
         #     # print 'Creating table with group:%s name:%s desc:%s' % (group._gp, k, writer.description)
         #     # print 'Out Table: ', table[k]
         else: 
-            # self.log.debug('Attempting to save arbitrary type %s' % type(v))
+            # print 'Attempting to save arbitrary type %s' % type(v), k, group._gp
             try: 
                 assert v is not None
                 table[k] = h5f.createCArray(group._gp, k, obj=v)
