@@ -50,6 +50,21 @@ class UWRGBDDataset(object):
     def get_category_id(cls, target_name): 
         return cls.target_hash[target_name] \
             if target_name in cls.train_names_set else cls.target_hash['BACKGROUND']
+
+    @classmethod
+    def setup_all_datasets(cls, object_dir, scene_dir, targets=train_names, version='v1'): 
+        return AttrDict(
+
+            # Main object dataset (single object instance per image)
+            objects = UWRGBDObjectDataset(directory=object_dir, targets=targets), 
+
+            # Scene dataset for evaluation
+            scene = UWRGBDSceneDataset(version=version, directory=scene_dir), 
+
+            # Background dataset for hard-negative training
+            background = UWRGBDSceneDataset(version=version, 
+                                            directory=os.path.join(scene_dir, 'background'))
+        )
     
 class UWRGBDObjectDataset(UWRGBDDataset):
     """
@@ -291,7 +306,6 @@ class UWRGBDSceneDataset(UWRGBDDataset):
                         (bbox['left'], bbox['top']-5), 
                         cv2.FONT_HERSHEY_SIMPLEX, 0.4, (240, 240, 240), thickness = 1)
         return vis
-
 
 
 def test_uw_rgbd_object(): 

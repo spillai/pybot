@@ -52,7 +52,8 @@ def load_pytable(fn):
         h5f = tb.openFile(os.path.expanduser(fn), mode='r', title='Title: %s' % fn)
         data = read_pytable(h5f, group=h5f.root)
         h5f.close()
-    except: 
+    except Exception as e: 
+        raise RuntimeError('%s' % e)
         data = AttrDict()
     return data
 
