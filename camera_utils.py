@@ -154,7 +154,8 @@ class DepthCamera(CameraIntrinsic):
         assert(depth.shape == self.xs.shape)
         return np.dstack([self.xs * depth, self.ys * depth, depth])
 
-# def KinectDepthCamera()
+def KinectDepthCamera(K=kinect_v1_params.K_depth, shape=(480,640)): 
+    return DepthCamera(K=K, shape=shape)
 
 def compute_fundamental(x1, x2, method=cv2.FM_RANSAC): 
     """
