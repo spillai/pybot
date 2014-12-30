@@ -2,9 +2,13 @@ import time
 from collections import defaultdict
 
 class Profiler(object): 
-    def __init__(self): 
+    """
+    Simple profiler for run-time reporting
+    """
+    def __init__(self, in_ms=False): 
         self.elapsed_time = 0.0
         self._last, self._counts = 0, 0
+        self._in_ms = in_ms
 
     def start(self): 
         if self._last != 0: 
@@ -21,15 +25,19 @@ class Profiler(object):
     @property
     def elapsed(self): 
         assert(self._counts > 0)
-        return self.elapsed_time * 1.0 / self._counts
+        return self.elapsed_time * (1e3 if self._in_ms else 1.0 ) / self._counts
         
     def __repr__(self): 
-        return '%4.3f s' % self.elapsed
+        return '%4.3f %s' % (self.elapsed, 'ms' if self._in_ms else 's')
 
 class ProfilerReport(defaultdict): 
-    def __init__(self): 
-        defaultdict.__init__(self, Profiler)
-        
+    """
+    Aggregated profiler reports
+    """
+    def __init__(self, in_ms=False): 
+        defaultdict.__init__(self, lambda: Profiler(in_ms=in_ms))
+        self.in_ms = in_ms
+
     def report(self): 
         report_str = 'Report: \n'
         for k,v in self.iteritems(): 
