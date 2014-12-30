@@ -13,6 +13,8 @@ class Profiler(object):
         self._counts += 1
 
     def stop(self): 
+        if self._last == 0: 
+            raise RuntimeError('start() not called')
         self.elapsed_time += (time.time() - self._last)
         self._last = 0
 
@@ -28,11 +30,14 @@ class ProfilerReport(defaultdict):
     def __init__(self): 
         defaultdict.__init__(self, Profiler)
         
-    def __repr__(self): 
+    def report(self): 
         report_str = 'Report: \n'
         for k,v in self.iteritems(): 
             report_str += '\t%s: \t%s\n' % (k,v)
         return report_str
+
+    def __repr__(self): 
+        return self.report_str()
 
 if __name__ == "__main__": 
     r = ProfilerReport()
