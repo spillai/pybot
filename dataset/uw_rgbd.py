@@ -204,6 +204,7 @@ class UWRGBDObjectDataset(UWRGBDDataset):
                 yield frame
         if verbose: pbar.finish()
 
+
 class UWRGBDSceneDataset(UWRGBDDataset):
     """
     RGB-D Scene Dataset reader 
@@ -294,8 +295,12 @@ class UWRGBDSceneDataset(UWRGBDDataset):
                 yield frame
         if verbose: pbar.finish()
 
+    def scene(self, key): 
+        return self.data[key]
+
     @staticmethod
     def annotate(f): 
+        # TODO: Standardize
         vis = f.img.copy()
         for bbox in f.bbox: 
             cv2.rectangle(vis, (bbox['left'], bbox['top']), (bbox['right'], bbox['bottom']), 
