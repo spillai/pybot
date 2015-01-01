@@ -74,6 +74,8 @@ def write_video(fn, im, scale=1.0):
     im_scaled = im_resize(im, scale=scale) if scale != 1.0 else im
     g_fn_map[fn].write(im_scaled)
 
+# def write_images(template, im): 
+
 import subprocess
 class VideoSink(object) :
     def __init__( self, size, filename="output", rate=10, byteorder="bgra" ) :

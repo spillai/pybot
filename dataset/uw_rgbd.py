@@ -298,6 +298,12 @@ class UWRGBDSceneDataset(UWRGBDDataset):
     def scene(self, key): 
         return self.data[key]
 
+    def scenes(self): 
+        return self.data.keys()
+
+    def iterscenes(self): 
+        return self.data.iterkeys()
+
     @staticmethod
     def annotate(f): 
         # TODO: Standardize
