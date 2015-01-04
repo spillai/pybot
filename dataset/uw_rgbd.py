@@ -9,6 +9,8 @@ from scipy.io import loadmat
 from bot_utils.db_utils import AttrDict
 from bot_utils.dataset_readers import read_dir, read_files, natural_sort, \
     DatasetReader, ImageDatasetReader
+from bot_geometry.rigid_transform import Quaternion, RigidTransform
+from bot_externals.plyfile import PlyData
 
 import progressbar as pb
 
@@ -215,25 +217,111 @@ class UWRGBDSceneDataset(UWRGBDDataset):
         RGB-D reader 
         Given mask, depth, and rgb files build an read iterator with appropriate process_cb
         """
-        def __init__(self, files, meta_file, version): 
+        def __init__(self, files, meta_file, aligned_file, version): 
             if version == 'v2': 
                 print '\n\n===> Version v1 and v2 have discrepancies in depth values, FIX!! <===\n\n'
 
             rgb_files, depth_files = UWRGBDSceneDataset._reader.scene_files(files, version)
             assert(len(depth_files) == len(rgb_files))
 
-            self.rgb = ImageDatasetReader.from_filenames(rgb_files)
-
+            # RGB, Depth
             # TODO: Check depth seems scaled by 256 not 16
+            self.rgb = ImageDatasetReader.from_filenames(rgb_files)
             self.depth = ImageDatasetReader.from_filenames(depth_files)
 
-            # Retrieve bounding boxes for each scene
-            bboxes = loadmat(meta_file, squeeze_me=True, struct_as_record=True)['bboxes'] \
-                     if meta_file is not None else [None] * len(rgb_files)
-            self.bboxes = [ [bbox] 
-                            if bbox is not None and bbox.size == 1 else bbox
-                            for bbox in bboxes ]
+            # BBOX
+            self.bboxes = UWRGBDSceneDataset._reader.load_bboxes(meta_file, version) \
+                         if meta_file is not None else [None] * len(rgb_files)
             assert(len(self.bboxes) == len(rgb_files))
+            
+            # POSE
+            # Version 2 only supported! Version 1 support for rgbd scene (unclear)
+            self.poses = UWRGBDSceneDataset._reader.load_poses(aligned_file.pose, version) \
+                         if aligned_file is not None and version == 'v2' else [None] * len(rgb_files)
+            assert(len(self.poses) == len(rgb_files))
+
+            # ALIGNED POINT CLOUD
+            # Version 2 only supported! 
+            ply_xyz, ply_rgb = UWRGBDSceneDataset._reader.load_ply(aligned_file.ply, version)
+            ply_label = UWRGBDSceneDataset._reader.load_plylabel(aligned_file.label, version)
+
+            self.pc = AttrDict(
+                cloud = ply_xyz, color = ply_rgb, target = ply_label
+            ) if aligned_file is not None and version == 'v2' else None
+
+        @staticmethod
+        def load_bboxes(fn, version): 
+            """ Retrieve bounding boxes for each scene """
+            if version == 'v1': 
+                bboxes = loadmat(fn, squeeze_me=True, struct_as_record=True)['bboxes']
+                return [ [bbox] 
+                         if bbox is not None and bbox.size == 1 else bbox
+                         for bbox in bboxes ]
+
+                # bboxes = loadmat(fn, squeeze_me=True, struct_as_record=True)['bboxes'] \
+                #          if fn is not None else [None] * default_count
+                # return [ [bbox] 
+                #          if bbox is not None and bbox.size == 1 else bbox
+                #          for bbox in bboxes ]
+
+            elif version == 'v2': 
+                return None
+            else: 
+                raise ValueError('''Version %s not supported. '''
+                                 '''Check dataset and choose either v1 or v2 scene dataset''' % version)
+
+        @staticmethod
+        def load_poses(fn, version): 
+            """ Retrieve poses for each scene """ 
+
+            if version == 'v1': 
+                P = np.loadtxt(os.path.expanduser(fn), usecols=(2,3,4,5,6,7,8), dtype=np.float64)
+                return map(lambda p: RigidTransform(Quaternion.from_wxyz(p[:4]), p[4:]), P)
+            elif version == 'v2': 
+                P = np.loadtxt(os.path.expanduser(fn), dtype=np.float64)
+                return map(lambda p: RigidTransform(Quaternion.from_wxyz(p[:4]), p[4:]), P)
+            else: 
+                raise ValueError('''Version %s not supported. '''
+                                 '''Check dataset and choose either v1 or v2 scene dataset''' % version)
+
+
+        @staticmethod
+        def load_ply(fn, version): 
+            """ Retrieve aligned point cloud for each scene """ 
+
+            if version == 'v1': 
+                raise ValueError('''Version %s not supported. '''
+                                 '''Check dataset and choose either v1 or v2 scene dataset''' % version)
+                # P = np.loadtxt(os.path.expanduser(fn), usecols=(2,3,4,5,6,7,8), dtype=np.float64)
+                # return map(lambda p: RigidTransform(Quaternion.from_wxyz(p[:4]), p[4:]), P)
+            elif version == 'v2': 
+                ply = PlyData.read(os.path.expanduser(fn))
+                xyz = np.vstack([ply['vertex'].data['x'], 
+                                 ply['vertex'].data['y'], 
+                                 ply['vertex'].data['z']]).T
+                rgb = np.vstack([ply['vertex'].data['diffuse_red'], 
+                                 ply['vertex'].data['diffuse_green'], 
+                                 ply['vertex'].data['diffuse_blue']]).T
+                return xyz, rgb
+
+            else: 
+                raise ValueError('''Version %s not supported. '''
+                                 '''Check dataset and choose either v1 or v2 scene dataset''' % version)
+
+
+        @staticmethod
+        def load_plylabel(fn, version): 
+            """ Retrieve aligned point cloud labels for each scene """ 
+
+            if version == 'v1': 
+                raise ValueError('''Version %s not supported. '''
+                                 '''Check dataset and choose either v1 or v2 scene dataset''' % version)
+            elif version == 'v2': 
+                return np.loadtxt(fn, dtype=np.int32)[1:]
+            else: 
+                raise ValueError('''Version %s not supported. '''
+                                 '''Check dataset and choose either v1 or v2 scene dataset''' % version)
+
 
         @staticmethod
         def scene_files(files, version): 
@@ -253,40 +341,78 @@ class UWRGBDSceneDataset(UWRGBDDataset):
             if version == 'v1': 
                 mat_files = read_files(os.path.expanduser(directory), pattern='*.mat')
                 return dict(((fn.split('/')[-1]).replace('.mat',''), fn) for fn in mat_files)
+            elif version == 'v2': 
+                label_files = read_files(os.path.expanduser(directory), pattern='*.label')
+                return dict(((fn.split('/')[-1]).replace('.label',''), fn) for fn in label_files)
+            else: 
+                raise ValueError('''Version %s not supported. '''
+                                 '''Check dataset and choose v1 scene dataset''' % version)
+
+        @staticmethod
+        def aligned_files(directory, version): 
+
+            if version == 'v1': 
+                pose_files = read_files(os.path.expanduser(directory), pattern='*.txt')
+                return dict(((fn.split('/')[-1]).replace('.txt',''), fn) for fn in pose_files)
+            elif version == 'v2': 
+
+                aligned = defaultdict(AttrDict)
+                pose_files = read_files(os.path.expanduser(directory), pattern='*.pose')
+                label_files = read_files(os.path.expanduser(directory), pattern='*.label')
+                ply_files = read_files(os.path.expanduser(directory), pattern='*.ply')
+
+                pretty_name = lambda fn, ext: 'scene_' + (fn.split('/')[-1]).replace(ext,'')
+                for fn in pose_files: 
+                    aligned[pretty_name(fn, '.pose')].pose = fn
+                for fn in label_files: 
+                    aligned[pretty_name(fn, '.label')].label = fn
+                for fn in ply_files: 
+                    aligned[pretty_name(fn, '.ply')].ply = fn
+
+                return aligned
+                # return dict(('scene_' + (fn.split('/')[-1]).replace('.pose',''), fn) 
+                #             for fn in pose_files)
             else: 
                 raise ValueError('''Version %s not supported. '''
                                  '''Check dataset and choose v1 scene dataset''' % version)
 
         def iteritems(self, every_k_frames=1): 
-            for rgb_im, depth_im, bbox in izip(self.rgb.iteritems(every_k_frames=every_k_frames), 
-                                               self.depth.iteritems(every_k_frames=every_k_frames), 
-                                               self.bboxes[::every_k_frames]): 
-                yield AttrDict(img=rgb_im, depth=depth_im, bbox=bbox if bbox is not None else [])
+            for rgb_im, depth_im, bbox, pose in izip(self.rgb.iteritems(every_k_frames=every_k_frames), 
+                                                     self.depth.iteritems(every_k_frames=every_k_frames), 
+                                                     self.bboxes[::every_k_frames], 
+                                                     self.poses[::every_k_frames]): 
+                yield AttrDict(img=rgb_im, depth=depth_im, bbox=bbox if bbox is not None else [], pose=pose)
 
-    def __init__(self, version, directory='', targets=None, num_targets=None, blacklist=['']):         
+    def __init__(self, version, directory='', targets=None, num_targets=None, 
+                 blacklist=[''], aligned_directory=None):
         if version not in ['v1', 'v2']: 
             raise ValueError('Version %s not supported. '''
                              '''Check dataset and choose either v1 or v2 scene dataset''' % version)
+        self.version = version
+        self.blacklist = blacklist
 
         self._dataset = read_dir(os.path.expanduser(directory), pattern='*.png', recursive=False)
         self._meta = UWRGBDSceneDataset._reader.meta_files(directory, version)
+        self._aligned = UWRGBDSceneDataset._reader.aligned_files(aligned_directory, version) \
+                        if aligned_directory else None
 
-        # Instantiate a reader for each of the objects
-        self.data = {}
-        for key, files in self._dataset.iteritems(): 
-            if (targets is not None and key not in targets) or key in blacklist: 
-                continue
+        # # Instantiate a reader for each of the objects
+        # self.data = {}
+        # for key, files in self._dataset.iteritems(): 
+        #     if (targets is not None and key not in targets) or key in blacklist: 
+        #         continue
 
-            # Get mat file for each scene
-            meta_file = self._meta.get(key, None)
-            # print key, meta_file
-            # target_id = self.target_hash[key]
-            self.data[key] = UWRGBDSceneDataset._reader(files, meta_file, version)
+        #     # Get mat file for each scene
+        #     meta_file = self._meta.get(key, None)
+        #     aligned_file = self._aligned.get(key, None)
+        #     print key, meta_file, aligned_file
+        #     # target_id = self.target_hash[key]
+        #     self.data[key] = UWRGBDSceneDataset._reader(files, meta_file, aligned_file, version)
 
 
     def iteritems(self, every_k_frames=1, verbose=False): 
         pbar = setup_pbar(len(self.data)) if verbose else None
-        for key, frames in self.data.iteritems(): 
+        for key, frames in self.iterscenes(): 
             if verbose: 
                 pbar.update(pbar.currval + 1)
                 # print 'Processing: %s' % key
@@ -296,13 +422,26 @@ class UWRGBDSceneDataset(UWRGBDDataset):
         if verbose: pbar.finish()
 
     def scene(self, key): 
-        return self.data[key]
+        # if (targets is not None and key not in targets) or key in blacklist: 
+        #     continue
+        if key in self.blacklist: 
+            raise RuntimeError('Key %s is in blacklist, are you sure you want this!' % key)
+
+        # Get mat file for each scene
+        files = self._dataset[key]
+        meta_file = self._meta.get(key, None)
+        aligned_file = self._aligned.get(key, None)
+        print key, meta_file, aligned_file
+
+        return UWRGBDSceneDataset._reader(files, meta_file, aligned_file, self.version)
 
     def scenes(self): 
-        return self.data.keys()
+        return self._dataset.keys()
 
     def iterscenes(self): 
-        return self.data.iterkeys()
+        for key in self._dataset.iterkeys(): 
+            yield key, self.scene(key)
+        # return self._dataset.iterkeys()
 
     @staticmethod
     def annotate(f): 
@@ -338,13 +477,17 @@ def test_uw_rgbd_scene(version='v1'):
     from bot_vision.image_utils import to_color
     from bot_vision.imshow_utils import imshow_cv
 
-    v1_directory = '/media/spillai/MRG-HD1/data/rgbd-scenes-v1/rgbd-scenes/'
-    v2_directory = '/media/spillai/MRG-HD1/data/rgbd-scenes-v2/rgbd-scenes-v2/imgs/'
+    v1_directory = '/media/spillai/MRG-HD1/data/rgbd-scenes-v1/'
+    v2_directory = '/media/spillai/MRG-HD1/data/rgbd-scenes-v2/rgbd-scenes-v2/'
 
     if version == 'v1': 
-        rgbd_data_uw = UWRGBDSceneDataset(version='v1', directory=v1_directory)
+        rgbd_data_uw = UWRGBDSceneDataset(version='v1', 
+                                          directory=os.path.join(v1_directory, 'rgbd-scenes'), 
+                                          aligned_directory=os.path.join(v1_directory, 'rgbd-scenes-aligned'))
     elif version == 'v2': 
-        rgbd_data_uw = UWRGBDSceneDataset(version='v2', directory=v2_directory)
+        rgbd_data_uw = UWRGBDSceneDataset(version='v2', 
+                                          directory=os.path.join(v2_directory, 'imgs'), 
+                                          aligned_directory=os.path.join(v2_directory, 'pc'))
     else: 
         raise RuntimeError('''Version %s not supported. '''
                            '''Check dataset and choose v1/v2 scene dataset''' % version)
