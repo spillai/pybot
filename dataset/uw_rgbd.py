@@ -160,7 +160,6 @@ class UWRGBDObjectDataset(UWRGBDDataset):
         self.target_hash = UWRGBDDataset.target_hash
         self.target_unhash = UWRGBDDataset.target_unhash
 
-
         # Only randomly choose targets if not defined
         if targets is not None: 
             # If integer valued, retrieve targets
@@ -212,6 +211,10 @@ class UWRGBDSceneDataset(UWRGBDDataset):
     RGB-D Scene Dataset reader 
     http://rgbd-dataset.cs.washington.edu/dataset.html
     """
+    target_hash = dict(bowl=1, cap=2, cereal_box=3, coffee_mug=4, coffee_table=5, 
+                       office_chair=6, soda_can=7, sofa=9, table=9, background=10)
+    target_unhash = dict((v,k) for k,v in target_hash.iteritems())
+
     class _reader(object): 
         """
         RGB-D reader 
@@ -248,6 +251,17 @@ class UWRGBDSceneDataset(UWRGBDDataset):
             self.pc = AttrDict(
                 cloud = ply_xyz, color = ply_rgb, target = ply_label
             ) if aligned_file is not None and version == 'v2' else None
+
+
+        @classmethod
+        def get_category_name(cls, target_id): 
+            return cls.target_unhash[target_id] # \
+                # if target_id in cls.train_ids_set else 'BACKGROUND'
+
+        @classmethod
+        def get_category_id(cls, target_name): 
+            return cls.target_hash[target_name] # \
+                # if target_name in cls.train_names_set else cls.target_hash['BACKGROUND']
 
         @staticmethod
         def load_bboxes(fn, version): 
