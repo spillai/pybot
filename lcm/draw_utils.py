@@ -23,7 +23,7 @@ class VisualizationMsgsPub:
     """
     def __init__(self): 
         self._channel_uid = dict()
-        self._sensor_uid = dict()
+        # self._sensor_uid = dict()
         self._sensor_pose = dict()
 
         self.lc = lcm.LCM()
@@ -37,9 +37,9 @@ class VisualizationMsgsPub:
         uid = self._channel_uid.setdefault(channel, len(self._channel_uid))
         return uid + 1000
 
-    def sensor_uid(self, channel): 
-        uid = self._sensor_uid.setdefault(channel, len(self._sensor_uid))
-        return uid
+    # def sensor_uid(self, channel): 
+    #     uid = self._sensor_uid.setdefault(channel, len(self._sensor_uid))
+    #     return uid
 
     def get_sensor_pose(self, channel): 
         return self._sensor_pose[channel]
@@ -55,7 +55,7 @@ class VisualizationMsgsPub:
         """
         # Sensor frames msg
         msg = vs.obj_collection_t();
-        msg.id = self.sensor_uid(channel)
+        msg.id = self.channel_uid(channel)
         msg.name = channel + '_BOTFRAME'
         msg.type = vs.obj_collection_t.AXIS3D;
         msg.reset = True;
@@ -260,11 +260,11 @@ def _publish_point_type(pub_channel, _arr, c='r', point_type='POINT', flip_rb=Fa
     if isinstance(_arr, list): 
         for _arr_item in _arr: 
             arr, carr = copy_pointcloud_data(_arr_item, c, flip_rb=flip_rb)
-            pc_msg = arr_msg(arr, carr=carr, frame_uid=g_viz_pub.sensor_uid(frame_id))
+            pc_msg = arr_msg(arr, carr=carr, frame_uid=g_viz_pub.channel_uid(frame_id))
             pc_list_msg.point_lists.append(pc_msg)
     else: 
         arr, carr = copy_pointcloud_data(_arr, c, flip_rb=flip_rb)
-        pc_msg = arr_msg(arr, carr=carr, frame_uid=g_viz_pub.sensor_uid(frame_id))
+        pc_msg = arr_msg(arr, carr=carr, frame_uid=g_viz_pub.channel_uid(frame_id))
         pc_list_msg.point_lists.append(pc_msg)
 
     # add to point cloud list                
@@ -314,7 +314,9 @@ def _publish_pose_list(pub_channel, _poses, texts=[], frame_id='KINECT'):
         p = frame_pose.oplus(RigidTransform(pose.quat, pose.tvec))
         roll, pitch, yaw, x, y, z = p.to_roll_pitch_yaw_x_y_z(axes='sxyz')
 
-        pose_list_msg.objs[j].id = j
+        # Optionally get the id of the pose, 
+        # for plotting clouds with corresponding pose
+        pose_list_msg.objs[j].id = j # getattr(pose, 'id', default=j)
 
         pose_list_msg.objs[j].x = x
         pose_list_msg.objs[j].y = y
@@ -407,7 +409,7 @@ def _publish_line_segments(pub_channel, _arr1, _arr2, c='r', flip_rb=False, fram
         arr = np.hstack([arr1, arr2]).reshape((-1,3))
         
         # Create the point cloud msg
-        pc_msg = arr_msg(arr, carr=carr, frame_uid=g_viz_pub.sensor_uid(frame_id))
+        pc_msg = arr_msg(arr, carr=carr, frame_uid=g_viz_pub.channel_uid(frame_id))
 
         pc_list_msg.point_lists.append(pc_msg)
 
