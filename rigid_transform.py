@@ -177,14 +177,14 @@ class RigidTransform(object):
     def identity(cls):
         return cls()
 
-# class Pose(RigidTransform): 
-#     def __init__(self, pid, rotation_quat, translation_vec):
-#         RigidTransform.__init__(self, rotation_quat, translation_vec)
-#         self.id = pid
+class Pose(RigidTransform): 
+    def __init__(self, pid, rotation_quat, translation_vec):
+        RigidTransform.__init__(self, rotation_quat, translation_vec)
+        self.id = pid
 
-#     def __repr__(self): 
-#         return 'Pose ID: %i, quat: %s, rpy: %s tvec: %s' % (self.id, 
-#                                                             self.quat, self.quat.to_roll_pitch_yaw(), self.tvec)
+    def __repr__(self): 
+        return 'Pose ID: %i, quat: %s, rpy: %s tvec: %s' % \
+            (self.id, self.quat, self.quat.to_roll_pitch_yaw(), self.tvec)
 
 #     @classmethod
 #     def from_triad(cls, pid, pos, v1, v2):

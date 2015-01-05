@@ -4,7 +4,7 @@ import ros_transformations as tf
 from tf_tests import tf_isequal
 
 # q = [x, y, z, w]
-class Quaternion:
+class Quaternion(object):
     def __init__ (self, q=[0,0,0,1]):
         if isinstance(q, Quaternion): 
             self.q = q.q.copy()
