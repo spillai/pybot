@@ -1,19 +1,22 @@
 #!/usr/bin/env python
-import numpy as np
-import matplotlib.pylab as plt
-from matplotlib.colors import colorConverter
 import time, logging
+import numpy as np
+
+from itertools import izip
+from copy import deepcopy
 
 # LCM libs
 import lcm, vs
 from bot_core import image_t
 
-# Asynchronous decorator
-from copy import deepcopy
+# Plotting
+import matplotlib.pylab as plt
+from matplotlib.colors import colorConverter
 
 # Utility imports
 from bot_vision.image_utils import to_color
-from bot_vision.draw_utils import reshape_arr, get_color_arr, height_map, color_by_height_axis, copy_pointcloud_data
+from bot_vision.draw_utils import reshape_arr, get_color_arr, height_map, \
+    color_by_height_axis, copy_pointcloud_data
 from bot_utils.async_utils import run_async
 from bot_geometry.rigid_transform import RigidTransform
 
@@ -29,8 +32,10 @@ class VisualizationMsgsPub:
         self.lc = lcm.LCM()
         self.log = logging.getLogger(__name__)
 
-        kinect_pose = RigidTransform.from_roll_pitch_yaw_x_y_z(-np.pi/2, 0, -np.pi/2, 
-                                                               0.15, 0.2, 1.48, axes='sxyz')
+        # kinect_pose = RigidTransform.from_roll_pitch_yaw_x_y_z(-np.pi/2, 0, -np.pi/2, 
+        #                                                        0.15, 0.2, 1.48, axes='sxyz')
+        kinect_pose = RigidTransform.identity()
+
         self.publish_sensor_frame('KINECT', pose=kinect_pose)
 
     def channel_uid(self, channel): 
@@ -57,23 +62,18 @@ class VisualizationMsgsPub:
         msg = vs.obj_collection_t();
         msg.id = self.channel_uid(channel)
         msg.name = channel + '_BOTFRAME'
-        msg.type = vs.obj_collection_t.AXIS3D;
+        msg.type = vs.obj_collection_t.AXIS3D
         msg.reset = True;
         
         # Send sensor pose
         pose_msg = vs.obj_t()
-        if pose is not None: 
-            roll, pitch, yaw, x, y, z = pose.to_roll_pitch_yaw_x_y_z(axes='sxyz')
-            pose_msg.id, pose_msg.x, pose_msg.y, pose_msg.z, \
-                pose_msg.roll, pose_msg.pitch, pose_msg.yaw  = 1, x, y, z, roll, pitch, yaw
-        else: 
-            # Get botframes sensor ref. frame
-            # x, y, z, roll, pitch, yaw = 0, 0, 0, 0, 0, 0 # botframes_get_trans(frame_ch, 'local')
-            pose = RigidTransform.from_roll_pitch_yaw_x_y_z(roll, pitch, yaw, x, y, z, axes='sxyz')
+        roll, pitch, yaw, x, y, z = pose.to_roll_pitch_yaw_x_y_z(axes='sxyz')
+        pose_msg.id = 0
+        pose_msg.x, pose_msg.y, pose_msg.z, \
+            pose_msg.roll, pose_msg.pitch, pose_msg.yaw  = x, y, z, roll, pitch, yaw
         
-        # Save pose (Either botframe or provided)
+        # Save pose
         self.set_sensor_pose(channel, pose)
-        # publish_pose_list2(frame_ch+'_BOTFRAME', [pose_msg], texts=[frame_ch])
 
         msg.objs = [pose_msg];
         msg.nobjs = len(msg.objs);
@@ -201,7 +201,7 @@ def publish_image_t(pub_channel, im, jpeg=False, flip_rb=True):
 #     arr = reshape_arr(arr)
 #     ax.plot(arr[:,0], arr[:,1], arr[:,2],'.',markersize=size, c=c)
 
-def arr_msg(arr, carr, frame_uid): 
+def arr_msg(arr, carr, frame_uid, element_id): 
     # point3d collection msg
     msg = vs.point3d_list_t()
     msg.nnormals = 0;
@@ -212,7 +212,7 @@ def arr_msg(arr, carr, frame_uid):
     
     # comes from the sensor_frames_msg published earlier
     msg.collection = frame_uid; 
-    msg.element_id = 1;
+    msg.element_id = element_id;
 
     npoints = len(arr);
     msg.points = [vs.point3d_t() for j in range(0,npoints)];
@@ -234,7 +234,8 @@ def arr_msg(arr, carr, frame_uid):
     return msg
 
 
-def _publish_point_type(pub_channel, _arr, c='r', point_type='POINT', flip_rb=False, frame_id='KINECT'):
+def _publish_point_type(pub_channel, _arr, c='r', point_type='POINT', flip_rb=False, 
+                        frame_id='KINECT', element_id=0):
     """
     Publish point cloud on:
     pub_channel: Channel on which the cloud will be published
@@ -246,7 +247,6 @@ def _publish_point_type(pub_channel, _arr, c='r', point_type='POINT', flip_rb=Fa
     alpha: supported only by matplotlib plotting
     """
     global g_viz_pub
-    frame_pose = g_viz_pub.get_sensor_pose(frame_id)
 
     # point3d list collection msg
     pc_list_msg = vs.point3d_list_collection_t();
@@ -258,32 +258,41 @@ def _publish_point_type(pub_channel, _arr, c='r', point_type='POINT', flip_rb=Fa
 
     # Create the point cloud msg
     if isinstance(_arr, list): 
-        for _arr_item in _arr: 
-            arr, carr = copy_pointcloud_data(_arr_item, c, flip_rb=flip_rb)
-            pc_msg = arr_msg(arr, carr=carr, frame_uid=g_viz_pub.channel_uid(frame_id))
+        element_ids = element_id if isinstance(element_id, list) else [0] * len(_arr) 
+        assert(len(c) == len(_arr))
+        for element_id, _arr_item, _carr_item in izip(element_ids, _arr, c): 
+            arr, carr = copy_pointcloud_data(_arr_item, _carr_item, flip_rb=flip_rb)
+            pc_msg = arr_msg(arr, carr=carr, 
+                             frame_uid=g_viz_pub.channel_uid(frame_id), element_id=element_id)
+            print element_id, len(arr), arr.shape, carr.shape
             pc_list_msg.point_lists.append(pc_msg)
     else: 
         arr, carr = copy_pointcloud_data(_arr, c, flip_rb=flip_rb)
-        pc_msg = arr_msg(arr, carr=carr, frame_uid=g_viz_pub.channel_uid(frame_id))
+        pc_msg = arr_msg(arr, carr=carr, frame_uid=g_viz_pub.channel_uid(frame_id), element_id=element_id)
         pc_list_msg.point_lists.append(pc_msg)
 
     # add to point cloud list                
+    print 'published %i lists' % len(_arr)
     pc_list_msg.nlists = len(pc_list_msg.point_lists); 
     g_viz_pub.lc.publish("POINTS_COLLECTION", pc_list_msg.encode())
     # g_log.debug('Published %i points' % (tpoints))
 
 # @run_async
-def publish_point_type(pub_channel, arr, c='r', point_type='POINT', flip_rb=False, frame_id='KINECT'):
-    _publish_point_type(pub_channel, deepcopy(arr), c=deepcopy(c), point_type=point_type, flip_rb=flip_rb, frame_id=frame_id)
+def publish_point_type(pub_channel, arr, c='r', point_type='POINT', 
+                       flip_rb=False, frame_id='KINECT', element_id=0):
+    _publish_point_type(pub_channel, deepcopy(arr), c=deepcopy(c), point_type=point_type, 
+                        flip_rb=flip_rb, frame_id=frame_id, element_id=element_id)
 
 # @run_async
-def publish_cloud(pub_channel, arr, c='r', flip_rb=False, frame_id='KINECT'):
-    _publish_point_type(pub_channel, deepcopy(arr), c=deepcopy(c), point_type='POINT', flip_rb=flip_rb, frame_id=frame_id)
+def publish_cloud(pub_channel, arr, c='r', flip_rb=False, frame_id='KINECT', element_id=0):
+    _publish_point_type(pub_channel, deepcopy(arr), c=deepcopy(c), point_type='POINT', 
+                        flip_rb=flip_rb, frame_id=frame_id, element_id=element_id)
 
 def _publish_pose_list(pub_channel, _poses, texts=[], frame_id='KINECT'):
     """
     Publish Pose List on:
     pub_channel: Channel on which the cloud will be published
+    element_id: None (defaults to np.arange(len(poses)), otherwise provide list of ids
     """
     global g_viz_pub
     poses = deepcopy(_poses)
@@ -316,7 +325,8 @@ def _publish_pose_list(pub_channel, _poses, texts=[], frame_id='KINECT'):
 
         # Optionally get the id of the pose, 
         # for plotting clouds with corresponding pose
-        pose_list_msg.objs[j].id = j # getattr(pose, 'id', default=j)
+        # Note: defaults to index of pose
+        pose_list_msg.objs[j].id = getattr(pose, 'id', j) 
 
         pose_list_msg.objs[j].x = x
         pose_list_msg.objs[j].y = y
@@ -637,7 +647,6 @@ def draw_camera(pose):
     return (faces, np.hstack([pts[:-1], pts[1:]]).reshape((-1,3)))
 
 def publish_cameras(pub_channel, poses, c='y', texts=[], frame_id='KINECT'):
-
     cam_feats = [draw_camera(pose) for pose in poses]
     cam_faces = map(lambda x: x[0], cam_feats)
     cam_edges = map(lambda x: x[1], cam_feats)
