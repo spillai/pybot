@@ -249,9 +249,9 @@ class UWRGBDSceneDataset(UWRGBDDataset):
             ply_label = UWRGBDSceneDataset._reader.load_plylabel(aligned_file.label, version)
 
             self.pc = AttrDict(
-                cloud = ply_xyz, color = ply_rgb, target = ply_label
+                cloud=ply_xyz, color=ply_rgb, target=ply_label
             ) if aligned_file is not None and version == 'v2' else None
-
+            assert(len(ply_xyz) == len(ply_rgb))
 
         @classmethod
         def get_category_name(cls, target_id): 
