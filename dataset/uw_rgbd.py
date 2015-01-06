@@ -243,15 +243,16 @@ class UWRGBDSceneDataset(UWRGBDDataset):
                          if aligned_file is not None and version == 'v2' else [None] * len(rgb_files)
             assert(len(self.poses) == len(rgb_files))
 
-            # ALIGNED POINT CLOUD
-            # Version 2 only supported! 
-            ply_xyz, ply_rgb = UWRGBDSceneDataset._reader.load_ply(aligned_file.ply, version)
-            ply_label = UWRGBDSceneDataset._reader.load_plylabel(aligned_file.label, version)
+            if aligned_file: 
+                # ALIGNED POINT CLOUD
+                # Version 2 only supported! 
+                ply_xyz, ply_rgb = UWRGBDSceneDataset._reader.load_ply(aligned_file.ply, version)
+                ply_label = UWRGBDSceneDataset._reader.load_plylabel(aligned_file.label, version)
 
-            self.pc = AttrDict(
-                cloud=ply_xyz, color=ply_rgb, target=ply_label
-            ) if aligned_file is not None and version == 'v2' else None
-            assert(len(ply_xyz) == len(ply_rgb))
+                self.pc = AttrDict(
+                    cloud=ply_xyz, color=ply_rgb, target=ply_label
+                ) if aligned_file is not None and version == 'v2' else None
+                assert(len(ply_xyz) == len(ply_rgb))
 
         @classmethod
         def get_category_name(cls, target_id): 
@@ -444,7 +445,7 @@ class UWRGBDSceneDataset(UWRGBDDataset):
         # Get mat file for each scene
         files = self._dataset[key]
         meta_file = self._meta.get(key, None)
-        aligned_file = self._aligned.get(key, None)
+        aligned_file = self._aligned.get(key, None) if self._aligned else None
         print key, meta_file, aligned_file
 
         return UWRGBDSceneDataset._reader(files, meta_file, aligned_file, self.version)
