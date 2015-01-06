@@ -32,10 +32,8 @@ class VisualizationMsgsPub:
         self.lc = lcm.LCM()
         self.log = logging.getLogger(__name__)
 
-        # kinect_pose = RigidTransform.from_roll_pitch_yaw_x_y_z(-np.pi/2, 0, -np.pi/2, 
-        #                                                        0.15, 0.2, 1.48, axes='sxyz')
-        kinect_pose = RigidTransform.identity()
-
+        kinect_pose = RigidTransform.from_roll_pitch_yaw_x_y_z(-np.pi/2, 0, -np.pi/2, 
+                                                               0.15, 0.2, 1.48, axes='sxyz')
         self.publish_sensor_frame('KINECT', pose=kinect_pose)
 
     def channel_uid(self, channel): 
