@@ -426,7 +426,7 @@ class UWRGBDSceneDataset(UWRGBDDataset):
 
 
     def iteritems(self, every_k_frames=1, verbose=False): 
-        pbar = setup_pbar(len(self.data)) if verbose else None
+        pbar = setup_pbar(len(self._dataset)) if verbose else None
         for key, frames in self.iterscenes(): 
             if verbose: 
                 pbar.update(pbar.currval + 1)
@@ -453,11 +453,12 @@ class UWRGBDSceneDataset(UWRGBDDataset):
     def scenes(self): 
         return self._dataset.keys()
 
-    def iterscenes(self): 
+    def iterscenes(self, verbose=False): 
+        pbar = setup_pbar(len(self._dataset)) if verbose else None
         for key in self._dataset.iterkeys(): 
+            if verbose: pbar.update(pbar.currval + 1)
             yield key, self.scene(key)
-        # return self._dataset.iterkeys()
-
+        if verbose: pbar.finish()
     @staticmethod
     def annotate(f): 
         # TODO: Standardize
