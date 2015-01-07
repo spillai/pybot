@@ -437,8 +437,6 @@ class UWRGBDSceneDataset(UWRGBDDataset):
         if verbose: pbar.finish()
 
     def scene(self, key): 
-        # if (targets is not None and key not in targets) or key in blacklist: 
-        #     continue
         if key in self.blacklist: 
             raise RuntimeError('Key %s is in blacklist, are you sure you want this!' % key)
 
@@ -453,9 +451,13 @@ class UWRGBDSceneDataset(UWRGBDDataset):
     def scenes(self): 
         return self._dataset.keys()
 
-    def iterscenes(self, verbose=False): 
+    def iterscenes(self, targets=None, blacklist=None, verbose=False): 
         pbar = setup_pbar(len(self._dataset)) if verbose else None
         for key in self._dataset.iterkeys(): 
+            # Optionally only iterate over targets, and avoid blacklist
+            if (targets is not None and key not in targets) or \
+               (blacklist is not None and key in blacklist): 
+                continue
             if verbose: pbar.update(pbar.currval + 1)
             yield key, self.scene(key)
         if verbose: pbar.finish()
