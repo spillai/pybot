@@ -9,7 +9,10 @@ from scipy.io import loadmat
 from bot_utils.db_utils import AttrDict
 from bot_utils.dataset_readers import read_dir, read_files, natural_sort, \
     DatasetReader, ImageDatasetReader
+from bot_vision.camera_utils import kinect_v1_params
+
 from bot_geometry.rigid_transform import Quaternion, RigidTransform
+
 from bot_externals.plyfile import PlyData
 
 import progressbar as pb
@@ -25,7 +28,7 @@ def setup_pbar(maxval):
 class UWRGBDDataset(object): 
     default_rgb_shape = (480,640,3)
     default_depth_shape = (480,640)
-
+    camera_params = kinect_v1_params
     class_names = ["apple", "ball", "banana", "bell_pepper", "binder", "bowl", "calculator", "camera", 
                    "cap", "cell_phone", "cereal_box", "coffee_mug", "comb", "dry_battery", "flashlight", 
                    "food_bag", "food_box", "food_can", "food_cup", "food_jar", "garlic", "glue_stick", 
@@ -392,11 +395,14 @@ class UWRGBDSceneDataset(UWRGBDDataset):
                                  '''Check dataset and choose v1 scene dataset''' % version)
 
         def iteritems(self, every_k_frames=1): 
+            index = 0 
             for rgb_im, depth_im, bbox, pose in izip(self.rgb.iteritems(every_k_frames=every_k_frames), 
                                                      self.depth.iteritems(every_k_frames=every_k_frames), 
                                                      self.bboxes[::every_k_frames], 
                                                      self.poses[::every_k_frames]): 
-                yield AttrDict(img=rgb_im, depth=depth_im, bbox=bbox if bbox is not None else [], pose=pose)
+                index += every_k_frames
+                yield AttrDict(index=index, img=rgb_im, depth=depth_im, 
+                               bbox=bbox if bbox is not None else [], pose=pose)
 
     def __init__(self, version, directory='', targets=None, num_targets=None, 
                  blacklist=[''], aligned_directory=None):
