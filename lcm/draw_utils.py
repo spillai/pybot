@@ -336,14 +336,31 @@ def _publish_pose_list(pub_channel, _poses, texts=[], frame_id='KINECT'):
     g_viz_pub.lc.publish("OBJ_COLLECTION", pose_list_msg.encode())
     # g_log.debug('Published %i poses' % (nposes))
 
-    # publish_cloud(pub_channel+'_POINTS', arr[:,:3], c='b', frame_id=frame_id)
-
     # Publish corresponding text
     if len(texts): 
-        assert(len(arr) == len(texts))
-        # publish_text_list(pub_channel+'-text', pub_channel, 
-        #                   texts, sensor_tf=sensor_tf)
-        publish_text_lcmgl(pub_channel+'-text', arr, texts, frame_id=frame_id)
+        publish_text_list(pub_channel, arr, texts, frame_id=frame_id)
+
+def publish_text_list(pub_channel, poses, texts=[], frame_id='KINECT'):
+    text_list_msg = vs.text_collection_t()
+    text_list_msg.name = pub_channel+'-text';
+    text_list_msg.id = g_viz_pub.channel_uid(text_list_msg.name)
+    text_list_msg.type = 1; # doesn't matter
+    text_list_msg.reset = True;
+
+    assert(len(poses) == len(texts))
+    nposes = len(texts)
+    text_list_msg.texts = [vs.text_t() for j in range(0,nposes)]
+    text_list_msg.n = nposes
+
+    for j,pose in enumerate(poses):
+        text_list_msg.texts[j].id = getattr(pose, 'id', j) 
+        text_list_msg.texts[j].collection_id = g_viz_pub.channel_uid(pub_channel)
+        text_list_msg.texts[j].object_id = getattr(pose, 'id', j) 
+        text_list_msg.texts[j].text = texts[j]
+       
+    g_viz_pub.lc.publish("TEXT_COLLECTION", text_list_msg.encode())
+    # g_log.debug('Published %i poses' % (nposes))
+
 
 # @run_async
 def publish_pose_list(pub_channel, poses, texts=[], frame_id='KINECT'):
