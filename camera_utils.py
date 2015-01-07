@@ -49,6 +49,14 @@ class CameraIntrinsic(object):
     def from_calib_params(cls, fx, fy, cx, cy): 
         return cls(construct_K(fx, fy, cx, cy))
 
+    @property
+    def fov(self): 
+        """
+        Returns the field of view for each axis
+        """
+        return np.array([np.arctan(self.cx / self.fx), np.arctan(self.cy / self.fy)]) * 2
+
+
 class CameraExtrinsic(RigidTransform): 
     def __init__(self, R=npm.eye(3), t=npm.zeros(3)):
         """
@@ -124,6 +132,13 @@ class Camera(CameraIntrinsic, CameraExtrinsic):
             raise AssertionError('cx, cy is not set')
         return npm.matrix([self.cx, self.cy])
 
+    def set_pose(self, pose): 
+        """
+        Provide extrinsics to the camera
+        """
+        self.quat = pose.quat
+        self.tvec = pose.tvec
+
 def KinectCamera(R=npm.eye(3), t=npm.zeros(3)): 
     return Camera(kinect_v1_params.K_depth, R, t)
 
@@ -185,6 +200,24 @@ def compute_epipole(F):
 def compute_essential(F, K): 
     """ Compute the Essential matrix, and R1, R2 """
     return K.T * npm.mat(F) * K
+
+def check_visibility(camera, pts): 
+    """
+    Check if points are visible given fov of camera
+    camera: type Camera
+    """
+    # Hack: only check min of the fovs
+    fov = np.min(camera.fov)
+    lookat = camera.R[:,2]
+
+    v = pts - camera.tvec
+    thetas = np.arccos(np.sum( np.multiply(
+        np.tile(lookat, (len(pts), 1)), 
+        v / np.linalg.norm(v, axis=1).reshape(-1, 1)), axis=1))
+
+    # Provides inds mask for all points that are within fov
+    return thetas < fov
+
 
 
 
