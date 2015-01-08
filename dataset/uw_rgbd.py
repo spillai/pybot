@@ -57,18 +57,21 @@ class UWRGBDDataset(object):
             if target_name in cls.train_names_set else cls.target_hash['BACKGROUND']
 
     @classmethod
-    def setup_all_datasets(cls, object_dir, scene_dir, targets=train_names, version='v1'): 
+    def setup_all_datasets(cls, object_dir=None, scene_dir=None, targets=train_names, version='v1'): 
         return AttrDict(
 
             # Main object dataset (single object instance per image)
-            objects = UWRGBDObjectDataset(directory=object_dir, targets=targets), 
+            objects = UWRGBDObjectDataset(directory=object_dir, targets=targets) \
+            if object_dir is not None else None, 
 
             # Scene dataset for evaluation
-            scene = UWRGBDSceneDataset(version=version, directory=scene_dir), 
+            scene = UWRGBDSceneDataset(version=version, directory=scene_dir) \
+            if scene_dir is not None else None, 
 
             # Background dataset for hard-negative training
             background = UWRGBDSceneDataset(version=version, 
-                                            directory=os.path.join(scene_dir, 'background'))
+                                            directory=os.path.join(scene_dir, 'background')) \
+            if scene_dir is not None else None
         )
     
 class UWRGBDObjectDataset(UWRGBDDataset):
