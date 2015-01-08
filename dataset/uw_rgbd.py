@@ -467,6 +467,7 @@ class UWRGBDSceneDataset(UWRGBDDataset):
             if verbose: pbar.update(pbar.currval + 1)
             yield key, self.scene(key)
         if verbose: pbar.finish()
+
     @staticmethod
     def annotate(f): 
         # TODO: Standardize
