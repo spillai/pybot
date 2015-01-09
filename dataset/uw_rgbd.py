@@ -41,13 +41,15 @@ class UWRGBDDataset(object):
 
     @classmethod
     def get_category_name(cls, target_id): 
-        return cls.target_unhash[target_id] \
-            if target_id in cls.train_ids_set else 'BACKGROUND'
+        tid = int(target_id)
+        return cls.target_unhash[tid] \
+            if tid in cls.train_ids_set else 'BACKGROUND'
 
     @classmethod
     def get_category_id(cls, target_name): 
-        return cls.target_hash[target_name] \
-            if target_name in cls.train_names_set else cls.target_hash['BACKGROUND']
+        tname = str(target_name)
+        return cls.target_hash[tname] \
+            if tname in cls.train_names_set else cls.target_hash['BACKGROUND']
 
     @classmethod
     def setup_all_datasets(cls, object_dir=None, scene_dir=None, targets=train_names, version='v1'): 
@@ -145,9 +147,10 @@ class UWRGBDObjectDataset(UWRGBDDataset):
 
                 # Only a single bbox per image
                 yield AttrDict(img=rgb, depth=depth, mask=mask, 
-                               bbox={'left':loc[0], 'right':loc[0]+mask_im.shape[1], 
-                                     'top':loc[1], 'bottom':loc[1]+mask_im.shape[0], 
-                                     'category':self.target, 'instance':self.instance})
+                               bbox=[{'left':loc[0], 'right':loc[0]+mask_im.shape[1], 
+                                      'top':loc[1], 'bottom':loc[1]+mask_im.shape[0], 
+                                      'category':UWRGBDDataset.get_category_name(self.target), 
+                                      'instance':self.instance}])
 
     def __init__(self, directory='', targets=UWRGBDDataset.train_names, blacklist=['']):         
         get_category = lambda name: '_'.join(name.split('_')[:-1])
