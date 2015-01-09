@@ -6,24 +6,16 @@ from collections import defaultdict
 
 from scipy.io import loadmat
 
+from bot_utils.misc import setup_pbar
 from bot_utils.db_utils import AttrDict
 from bot_utils.dataset_readers import read_dir, read_files, natural_sort, \
     DatasetReader, ImageDatasetReader
+
 from bot_vision.camera_utils import kinect_v1_params
-
 from bot_geometry.rigid_transform import Quaternion, RigidTransform
-
 from bot_externals.plyfile import PlyData
 
-import progressbar as pb
-
 # __categories__ = ['flashlight', 'cap', 'cereal_box', 'coffee_mug', 'soda_can']
-
-def setup_pbar(maxval): 
-    widgets = ['Progress: ', pb.Percentage(), ' ', pb.Bar(), ' ', pb.ETA()]
-    pbar = pb.ProgressBar(widgets=widgets, maxval=maxval)
-    pbar.start()
-    return pbar
 
 class UWRGBDDataset(object): 
     default_rgb_shape = (480,640,3)
@@ -42,7 +34,8 @@ class UWRGBDDataset(object):
     target_unhash = dict(zip(class_ids, class_names))
 
     # train_names = ["cereal_box", "BACKGROUND"]
-    train_names = ["bowl", "cap", "cereal_box", "coffee_mug", "soda_can", "BACKGROUND"]
+    # train_names = ["bowl", "cap", "cereal_box", "coffee_mug", "soda_can", "BACKGROUND"]
+    train_names = ["bowl", "cap", "cereal_box", "BACKGROUND"]
     train_ids = [target_hash[name] for name in train_names]
     train_names_set, train_ids_set = set(train_names), set(train_ids)
 
@@ -204,7 +197,7 @@ class UWRGBDObjectDataset(UWRGBDDataset):
         pbar = setup_pbar(len(self.data)) if verbose else None
         for key, frames in self.data.iteritems(): 
             if verbose: 
-                pbar.update(pbar.currval + 1)
+                pbar.increment()
                 # print 'Processing: %s' % key
 
             for frame in frames.iteritems(every_k_frames=every_k_frames): 
@@ -436,9 +429,9 @@ class UWRGBDSceneDataset(UWRGBDDataset):
 
     def iteritems(self, every_k_frames=1, verbose=False): 
         pbar = setup_pbar(len(self._dataset)) if verbose else None
-        for key, frames in self.iterscenes(): 
+        for key, frames in self.iterscenes(verbose=verbose): 
             if verbose: 
-                pbar.update(pbar.currval + 1)
+                pbar.increment()
                 # print 'Processing: %s' % key
 
             for frame in frames.iteritems(every_k_frames): 
@@ -453,8 +446,7 @@ class UWRGBDSceneDataset(UWRGBDDataset):
         files = self._dataset[key]
         meta_file = self._meta.get(key, None)
         aligned_file = self._aligned.get(key, None) if self._aligned else None
-        print key, meta_file, aligned_file
-
+        # print key, meta_file, aligned_file
         return UWRGBDSceneDataset._reader(files, meta_file, aligned_file, self.version)
 
     def scenes(self): 
@@ -467,7 +459,7 @@ class UWRGBDSceneDataset(UWRGBDDataset):
             if (targets is not None and key not in targets) or \
                (blacklist is not None and key in blacklist): 
                 continue
-            if verbose: pbar.update(pbar.currval + 1)
+            if verbose: pbar.increment()
             yield key, self.scene(key)
         if verbose: pbar.finish()
 
