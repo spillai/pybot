@@ -34,5 +34,8 @@ def to_gray(im):
 def gaussian_blur(im, size=3): 
     return cv2.GaussianBlur(im, (size,size), 0)
 
+def box_blur(im, size=3): 
+    return cv2.boxFilter(im, -1, (size,size))
+
 def median_blur(im, size=3): 
     return cv2.medianBlur(im, size)

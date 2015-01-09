@@ -11,7 +11,7 @@ from sklearn.cross_validation import train_test_split
 from bot_utils.io_utils import memory_usage_psutil
 from bot_utils.db_utils import AttrDict, AttrDictDB
 
-from bot_vision.image_utils import im_resize
+from bot_vision.image_utils import im_resize, gaussian_blur, median_blur, box_blur
 from bot_vision.bow_utils import BoWVectorizer
 import bot_vision.mser_utils as mser_utils
 
@@ -19,7 +19,7 @@ import bot_utils.io_utils as io_utils
 import sklearn.metrics as metrics
 
 class ImageDescription(object): 
-    def __init__(self, detector='SIFT', descriptor='SIFT', step=4, levels=4, scale=2.0): 
+    def __init__(self, detector='dense', descriptor='SIFT', step=4, levels=4, scale=2.0): 
         self.step = step
         self.levels = levels
         self.scale = scale
@@ -47,9 +47,26 @@ class ImageDescription(object):
            kpts: [cv2.KeyPoint, ... ] 
            desc: [N x D]
         """
-        kpts = self.detector.detect(img, mask=mask)
-        kpts, desc = self.extractor.compute(img, kpts)
-        return kpts, desc
+
+        try: 
+            # Descriptor extraction
+            kpts = self.detector.detect(img, mask=mask)
+            kpts, desc = self.extractor.compute(img, kpts)
+
+            # Extract color information (Lab)
+            pts = np.vstack([kp.pt for kp in kpts]).astype(np.int32)
+            imgc = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
+            lab = median_blur(imgc, size=5) 
+            cdesc = lab[pts[:,1], pts[:,0]]
+
+            # vis = lab.copy()
+            # vis[pts[:,1], pts[:,0]] = 255
+            # from bot_vision.imshow_utils import imshow_cv
+            # imshow_cv('vis', vis, block=True)
+
+            return kpts, np.hstack([desc, cdesc])
+        except: 
+            return None, None
 
     def describe(self, img, mask=None): 
         """
