@@ -1,6 +1,7 @@
 #!/usr/bin/python
 import tables as tb
 import numpy as np
+import pickle
 import time, logging, cPickle, shelve
 
 import os.path
@@ -9,6 +10,12 @@ from bot_utils.io_utils import create_path_if_not_exists
 # =============================================================================
 # Pytables helpers
 # =============================================================================
+
+def load_pickled_dict(fn): 
+    return pickle.load(open(os.path.expanduser(fn), 'rb'))
+
+def save_pickled_dict(fn, d): 
+    pickle.dump(d, open(os.path.expanduser(fn), 'w'))
 
 def load_json_dict(fn): 
     import json
@@ -75,8 +82,9 @@ def flush_pytable(h5f, data=None, group=None, table=None, force=True):
         try: 
             k = str(k)
         except: 
-            self.log.debug('Cannot save to DB, key is not string %s ' % k)
+            print 'Cannot save to DB, key is not string %s ' % k
             continue
+
         # if not isinstance(k, str): 
         #     continue
 
@@ -153,6 +161,12 @@ class AttrDict(dict):
     def __setattr__(self, attr, value): 
         super(AttrDict, self).__setitem__(attr, value)
 
+    def __getstate__(self): 
+        pass
+
+    def __setstate__(self): 
+        pass
+
     # def __repr__(self): 
     #     # try: 
     #     import json
@@ -161,18 +175,26 @@ class AttrDict(dict):
     #     #     return ''
 
     @staticmethod
+    def load_dict(fn): 
+        return AttrDict(load_pickled_dict(fn))
+
+    def save_dict(self, fn): 
+        save_pickled_dict(fn, self)
+        print 'saving ', self
+
+    @staticmethod
     def load_json(fn): 
         return AttrDict(load_json_dict(fn))
 
     def save_json(self, fn): 
-        save_json_dict(fn, vars(self))
+        save_json_dict(fn, self)
 
     @staticmethod
     def load_mat(fn): 
         return AttrDict(load_mat(fn))
 
     def save_mat(self, fn): 
-        save_mat(fn, vars(self))
+        save_mat(fn, self)
 
     @staticmethod
     def load(fn): 
