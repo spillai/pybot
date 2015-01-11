@@ -56,8 +56,8 @@ class ImageDescription(object):
             # Extract color information (Lab)
             pts = np.vstack([kp.pt for kp in kpts]).astype(np.int32)
             imgc = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
-            lab = median_blur(imgc, size=5) 
-            cdesc = lab[pts[:,1], pts[:,0]]
+            # lab = median_blur(imgc, size=5) 
+            cdesc = imgc[pts[:,1], pts[:,0]]
 
             # vis = lab.copy()
             # vis[pts[:,1], pts[:,0]] = 255
@@ -65,6 +65,7 @@ class ImageDescription(object):
             # imshow_cv('vis', vis, block=True)
 
             return kpts, np.hstack([desc, cdesc])
+
         except: 
             return None, None
 
