@@ -28,7 +28,7 @@ class Profiler(object):
         return self.elapsed_time * (1e3 if self._in_ms else 1.0 ) / self._counts
         
     def __repr__(self): 
-        return '%4.3f %s' % (self.elapsed, 'ms' if self._in_ms else 's')
+        return '%4.3f %s -> (Total: %i)' % (self.elapsed, 'ms' if self._in_ms else 's', self._counts)
 
 class ProfilerReport(defaultdict): 
     """
