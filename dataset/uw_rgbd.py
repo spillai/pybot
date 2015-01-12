@@ -35,8 +35,9 @@ class UWRGBDDataset(object):
     target_unhash = dict(zip(class_ids, class_names))
 
     # train_names = ["cereal_box", "BACKGROUND"]
-    train_names = ["bowl", "cap", "cereal_box", "coffee_mug", "soda_can", "BACKGROUND"]
+    # train_names = ["bowl", "cap", "cereal_box", "coffee_mug", "soda_can", "BACKGROUND"]
     # train_names = ["bowl", "cap", "cereal_box", "BACKGROUND"]
+    train_names = ["cap", "cereal_box", "coffee_mug", "soda_can", "BACKGROUND"]
     train_ids = [target_hash[name] for name in train_names]
     train_names_set, train_ids_set = set(train_names), set(train_ids)
 
@@ -251,6 +252,9 @@ class UWRGBDSceneDataset(UWRGBDDataset):
                 # Version 2 only supported! 
                 ply_xyz, ply_rgb = UWRGBDSceneDataset._reader.load_ply(aligned_file.ply, version)
                 ply_label = UWRGBDSceneDataset._reader.load_plylabel(aligned_file.label, version)
+                inds, = np.where(ply_label != 1)
+                ply_xyz, ply_rgb = ply_xyz[inds], ply_rgb[inds]
+                ply_label = ply_label[inds]
 
                 # 1b. Plot centers with poses and text
                 unique_labels = np.unique(ply_label)
