@@ -218,6 +218,26 @@ def check_visibility(camera, pts):
     # Provides inds mask for all points that are within fov
     return thetas < fov
 
+def get_object_bbox(camera, pts, subsample=10, visualize=False): 
+    pts2d = camera.project(pts[::subsample].astype(np.float32))
+    x0, x1 = int(np.min(pts2d[:,0])), int(np.max(pts2d[:,0]))
+    y0, y1 = int(np.min(pts2d[:,1])), int(np.max(pts2d[:,1]))
+    if (x0 >= 0 and y0 >= 0 and x0 <= camera.cx * 2 and y0 < camera.cy * 2) and \
+       (x1 >= 0 and y1 >= 0 and x1 <= camera.cx * 2 and y1 < camera.cy * 2): 
+
+        # Median depth of the candidate object 
+        depth = np.linalg.norm(camera.tvec - np.median(pts[::subsample], axis=0))
+        if visualize: 
+            draw_utils.publish_cloud('obj_cloud', pts[::subsample], c='r', frame_id='KINECT')
+            draw_utils.publish_point_type('obj_distance', 
+                                          np.vstack([camera.inverse().tvec.reshape(-1,3), 
+                                                     pts[0].reshape(-1,3)]), 
+                                          c='r', point_type='LINES', frame_id='KINECT')
+        return pts2d.astype(np.int32), {'left':x0, 'right':x1, 'top':y0, 'bottom':y1}, depth
+    else: 
+        return [None] * 3
+
+
 
 
 
