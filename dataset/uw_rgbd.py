@@ -11,7 +11,8 @@ from bot_utils.db_utils import AttrDict
 from bot_utils.dataset_readers import read_dir, read_files, natural_sort, \
     DatasetReader, ImageDatasetReader
 
-from bot_vision.camera_utils import kinect_v1_params
+from bot_vision.camera_utils import kinect_v1_params, Camera, CameraIntrinsic, CameraExtrinsic, \
+    check_visibility, get_object_bbox
 from bot_geometry.rigid_transform import Quaternion, RigidTransform
 from bot_externals.plyfile import PlyData
 
@@ -251,10 +252,43 @@ class UWRGBDSceneDataset(UWRGBDDataset):
                 ply_xyz, ply_rgb = UWRGBDSceneDataset._reader.load_ply(aligned_file.ply, version)
                 ply_label = UWRGBDSceneDataset._reader.load_plylabel(aligned_file.label, version)
 
-                self.pc = AttrDict(
-                    cloud=ply_xyz, color=ply_rgb, target=ply_label
+                # 1b. Plot centers with poses and text
+                unique_labels = np.unique(ply_label)
+
+                # 1c. Determine centroid of each cluster
+                unique_centers = np.vstack([np.mean(ply_xyz[ply_label == l], axis=0) for l in unique_labels])
+
+                # FIX: Needs to be re-worked to use arbitrary camera matrix
+                intrinsic = CameraIntrinsic(K=UWRGBDSceneDataset.camera_params.K_rgb)
+                camera = Camera.from_intrinsics_extrinsics(intrinsic, CameraExtrinsic.identity())
+                self.map_info = AttrDict(
+                    points=ply_xyz, color=ply_rgb, labels=ply_label, 
+                    unique_labels=unique_labels, unique_centers=unique_centers, camera=camera
                 ) if aligned_file is not None and version == 'v2' else None
                 assert(len(ply_xyz) == len(ply_rgb))
+
+        def get_bboxes(self, pose): 
+            # 1. Get pose for a particular frame, 
+            # and set camera extrinsic
+            try: 
+                self.map_info.camera.set_pose(pose.inverse())
+            except: 
+                # Otherwise break from detection loop
+                print 'Failed to find pose'
+                return None
+
+            # 2. Get all cluster centers that are visible from camera's view
+            visible_inds = check_visibility(self.map_info.camera, self.map_info.unique_centers)
+            visible_labels = self.map_info.unique_labels[visible_inds]
+
+            # 3. Determine bounding boxes for each of the visible clusters
+            object_candidates = []
+            for label in visible_labels:
+                label_pts = self.map_info.points[label == self.map_info.labels]
+                pts2d, bbox, depth = get_object_bbox(self.map_info.camera, label_pts, subsample=3)
+                if bbox is not None: 
+                    object_candidates.append(AttrDict(label=label, bbox=bbox, depth=depth))
+            return object_candidates
 
         @classmethod
         def get_category_name(cls, target_id): 
@@ -400,6 +434,11 @@ class UWRGBDSceneDataset(UWRGBDDataset):
                                                      self.bboxes[::every_k_frames], 
                                                      self.poses[::every_k_frames]): 
                 index += every_k_frames
+
+                # Compute bbox from pose and map (v2 support)
+                if bbox is None and hasattr(self, 'map_info'): 
+                    bbox = self.get_bboxes(pose)
+
                 yield AttrDict(index=index, img=rgb_im, depth=depth_im, 
                                bbox=bbox if bbox is not None else [], pose=pose)
 
