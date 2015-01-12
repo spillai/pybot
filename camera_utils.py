@@ -218,7 +218,7 @@ def check_visibility(camera, pts):
     # Provides inds mask for all points that are within fov
     return thetas < fov
 
-def get_object_bbox(camera, pts, subsample=10, visualize=False): 
+def get_object_bbox(camera, pts, subsample=10, scale=1.0, visualize=False): 
     pts2d = camera.project(pts[::subsample].astype(np.float32))
     x0, x1 = int(np.min(pts2d[:,0])), int(np.max(pts2d[:,0]))
     y0, y1 = int(np.min(pts2d[:,1])), int(np.max(pts2d[:,1]))
@@ -233,6 +233,11 @@ def get_object_bbox(camera, pts, subsample=10, visualize=False):
                                           np.vstack([camera.inverse().tvec.reshape(-1,3), 
                                                      pts[0].reshape(-1,3)]), 
                                           c='r', point_type='LINES', frame_id='KINECT')
+
+        if scale != 1.0: 
+            w2, h2 = (scale-1.0) * (x1-x0) / 2, (scale-1.0) * (y1-y0) / 2
+            x0, x1 = int(max(0, x0 - w2)), int(min(x1 + w2, camera.cx * 2))
+            y0, y1 = int(max(0, y0 - h2)), int(min(y1 + h2, camera.cy * 2))
         return pts2d.astype(np.int32), {'left':x0, 'right':x1, 'top':y0, 'bottom':y1}, depth
     else: 
         return [None] * 3
