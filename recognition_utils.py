@@ -55,15 +55,9 @@ class ImageDescription(object):
 
             # Extract color information (Lab)
             pts = np.vstack([kp.pt for kp in kpts]).astype(np.int32)
-            imgc = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
+            # imgc = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
             # lab = median_blur(imgc, size=5) 
-            cdesc = imgc[pts[:,1], pts[:,0]]
-
-            # vis = lab.copy()
-            # vis[pts[:,1], pts[:,0]] = 255
-            # from bot_vision.imshow_utils import imshow_cv
-            # imshow_cv('vis', vis, block=True)
-
+            cdesc = img[pts[:,1], pts[:,0]]
             return kpts, np.hstack([desc, cdesc])
 
         except: 
