@@ -218,12 +218,13 @@ def check_visibility(camera, pts):
     # Provides inds mask for all points that are within fov
     return thetas < fov
 
-def get_object_bbox(camera, pts, subsample=10, scale=1.0, visualize=False): 
+def get_object_bbox(camera, pts, subsample=10, scale=1.0, min_height=10, min_width=10, visualize=False): 
     pts2d = camera.project(pts[::subsample].astype(np.float32))
     x0, x1 = int(np.min(pts2d[:,0])), int(np.max(pts2d[:,0]))
     y0, y1 = int(np.min(pts2d[:,1])), int(np.max(pts2d[:,1]))
     if (x0 >= 0 and y0 >= 0 and x0 <= camera.cx * 2 and y0 < camera.cy * 2) and \
-       (x1 >= 0 and y1 >= 0 and x1 <= camera.cx * 2 and y1 < camera.cy * 2): 
+       (x1 >= 0 and y1 >= 0 and x1 <= camera.cx * 2 and y1 < camera.cy * 2) and \
+       (y1-y0) >= min_height and (x1-x0) >= min_width: 
 
         # Median depth of the candidate object 
         depth = np.linalg.norm(camera.tvec - np.median(pts[::subsample], axis=0))
@@ -241,10 +242,6 @@ def get_object_bbox(camera, pts, subsample=10, scale=1.0, visualize=False):
         return pts2d.astype(np.int32), {'left':x0, 'right':x1, 'top':y0, 'bottom':y1}, depth
     else: 
         return [None] * 3
-
-
-
-
 
 # def plot_epipolar_line(im, F, x, epipole=None, show_epipole=True):
 #   """
