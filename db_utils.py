@@ -3,6 +3,7 @@ import tables as tb
 import numpy as np
 import pickle
 import time, logging, cPickle, shelve
+from itertools import izip
 
 import os.path
 from bot_utils.io_utils import create_path_if_not_exists
@@ -205,6 +206,108 @@ class AttrDict(dict):
         print 'Saving ', fn
         create_path_if_not_exists(fn)
         return save_pytable(fn, self.copy())
+
+class IterDBChunk(object): 
+    def __init__(self, filename, mode, fields=[]): 
+        pass
+
+class IterDB(object): 
+    def __init__(self, filename, mode, fields=[], batch_size=500): 
+        """
+        An iterable database that should theoretically allow 
+        scalable reading/writing of datasets. 
+           batch_size: rough filechunk size in MB
+
+        Notes: 
+           meta_file should contain all the related meta data 
+        including keys, their corresponding value lengths, 
+        overall file size etc
+        """
+
+        # Setup filenames, meta filenames, and chunk idx
+        self.setup(filename)
+
+        if mode == 'w': 
+            # Keep data_.keys(), and keys_ consistent
+            self.data_ = AttrDict()
+            self.keys_ = set()
+            for field in fields: 
+                self.data_[field] = []
+                self.keys_.add(field)
+            self.meta_file_ = AttrDict(chunks=[], keys=[])
+        elif mode == 'r': 
+            # Load first chunk, and keep keys_ consistent
+            self.meta_file_ = AttrDict.load(self.meta_filename_)
+            self.keys_ = self.meta_file_.keynames
+            print self.meta_file_
+        
+            # For the time-being, dynamically disattach append, extend functionality
+
+            self.append, self.extend, self.add_fields = None, None, None
+            self.flush, self.save = None, None
+
+        else: 
+            raise RuntimeError('Unknown mode %s' % mode)
+
+    def setup(self, filename): 
+        self.chunk_idx_ = 0
+        self.folder_, self.filename_ = os.path.split(filename)
+        self.meta_filename_ = os.path.join(self.folder_, self.filename_, 'meta_%s' % self.filename_)
+        self.get_chunk_filename = lambda idx: os.path.join(self.folder_, self.filename_, 'chunks', 'chunk_%04i_%s' % (idx, self.filename_))
+
+    def __del__(self): 
+        if len(self.data_): 
+            print 'Seems like you have data stored away, but has not been flushed!'
+            self.flush()
+
+    def add_fields(self, fields): 
+        for field in fields: 
+            if field in self.data_: 
+                raise RuntimeError('Field %s is already in data, cannot update/replace fields!' % field)
+            self.data_[field] = []
+            self.keys_.add(field)
+
+    def append(self, key, item): 
+        self.data_[key].append(item)
+        print [(k, len(v)) for k,v in self.data_.iteritems()]
+
+    def extend(self, key, items): 
+        self.data_[key].extend(item)
+
+    def itervalues(self, key=None): 
+        if key not in self.keys_: 
+            raise RuntimeError('Key %s not found in dataset. keys: %s' % (key, self.keys_))
+
+        total_chunks = len(self.meta_file_.chunks)
+        for chunk_idx, chunk in enumerate(self.meta_file_.chunks): 
+            data = AttrDict.load(self.get_chunk_filename(chunk_idx))
+            if key not in data: continue
+            for item in data[key]: 
+                yield item
+ 
+    def flush(self): 
+        """
+        Save dictionary with metadata, move to new chunk, 
+        and prepare it for writing.       
+        """
+        self.meta_file_.keynames = list(self.data_.keys())
+        self.meta_file_.chunks.append(AttrDict((k, len(v)) for k,v in self.data_.iteritems()))
+        self.meta_file_.save(self.meta_filename_)
+
+        self.data_.save(self.get_chunk_filename(self.chunk_idx_))
+        self._next_chunk_to_write()
+
+    def save(self): 
+        self.flush()
+
+    def _next_chunk_to_write(self): 
+        for k, v in self.data_.iteritems(): 
+            self.data_[k] = []
+        self.chunk_idx_ += 1
+
+        
+            
+
         
 
 # class AttrDictDB(AttrDict): 
