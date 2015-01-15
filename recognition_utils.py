@@ -1,6 +1,6 @@
 import numpy as np
 import cv2, os, time, random
-import itertools
+from itertools import izip, chain
 
 from sklearn.linear_model import SGDClassifier
 from sklearn.neighbors import KNeighborsClassifier
@@ -9,7 +9,7 @@ from sklearn.multiclass import OneVsRestClassifier
 from sklearn.cross_validation import train_test_split
 
 from bot_utils.io_utils import memory_usage_psutil
-from bot_utils.db_utils import AttrDict, AttrDictDB
+from bot_utils.db_utils import AttrDict, AttrDictDB, IterDB
 
 from bot_vision.image_utils import im_resize, gaussian_blur, median_blur, box_blur
 from bot_vision.bow_utils import BoWVectorizer
@@ -150,8 +150,8 @@ class ImageClassifier(object):
             self.X_train.extend(X_train), self.X_test.extend(X_test[:max_test_size])
             self.y_train.extend(y_train), self.y_test.extend(y_test[:max_test_size])
 
-        self.X_all = list(itertools.chain(self.X_train, self.X_test))
-        self.y_all = list(itertools.chain(self.y_train, self.y_test))
+        self.X_all = list(chain(self.X_train, self.X_test))
+        self.y_all = list(chain(self.y_train, self.y_test))
 
     def train(self): 
         if self.clf_pretrained: 
@@ -166,27 +166,43 @@ class ImageClassifier(object):
         print 'Memory usage at pre-train %5.2f MB' % (memory_usage_psutil())
 
         # Extract features
-        train_desc = [self.image_descriptor.describe(**self.process_cb(x_t)) for x_t in self.X_train]
+        if not self.params.cache.features_path: 
+            raise RuntimeError('Setup features_path before running training')
+        
+        # train_desc = [self.image_descriptor.describe(**self.process_cb(x_t)) for x_t in self.X_train]
+        features_db = IterDB(filename=self.params.cache.features_path, mode='w', 
+                             fields=['train_desc', 'train_target'], )
+        for idx, (x_t,y_t) in enumerate(izip(self.X_train, self.y_train)): 
+            features_db.append('train_desc', self.image_descriptor.describe(**self.process_cb(x_t)))
+            features_db.append('train_target', y_t)
+            if idx % 20 == 0 and idx > 0: 
+                features_db.flush()
+        features_db.save()
+
         print 'Descriptor extraction took %5.3f s' % (time.time() - st)    
 
         print 'Memory usage at post-describe %5.2f MB' % (memory_usage_psutil())
 
         # Build BOW
-        self.bow.build(train_desc)
+        inds = np.random.permutation(len(self.X_train))[:1e2]
+        train_desc = [item for item in features_db.itervalues(key='train_desc', inds=inds)]
+        self.bow.build(train_desc); 
+        train_desc = None
         print 'Codebook: %s' % ('GOOD' if np.isfinite(self.bow.codebook).all() else 'BAD')
 
         print 'Memory usage at post-bow-build %5.2f MB' % (memory_usage_psutil())
 
         # Histogram of trained features
         train_target = np.array(self.y_train, dtype=np.int32)
-        train_histogram = np.vstack([self.bow.project(desc) for desc in train_desc])
+        train_histogram = np.vstack([self.bow.project(desc) for desc in features_db.itervalues(key='train_desc')])
+        # train_histogram = np.vstack([self.bow.project(desc) for desc in train_desc])
 
         print 'Memory usage at post-project %5.2f MB' % (memory_usage_psutil())
-
+        
         # Train/Predict one-vs-all classifier
         self.clf.fit(train_histogram, train_target)
         pred_target = self.clf.predict(train_histogram)
-
+        
         print 'Memory usage at post-fit %5.2f MB' % (memory_usage_psutil())
 
         print ' Accuracy score (Training): %4.3f' % (metrics.accuracy_score(train_target, pred_target))
