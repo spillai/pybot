@@ -2,21 +2,37 @@ import numpy as np
 import cv2, os, time, random
 from itertools import izip, chain
 
-from sklearn.linear_model import SGDClassifier
-from sklearn.neighbors import KNeighborsClassifier
-from sklearn.svm import LinearSVC
-from sklearn.multiclass import OneVsRestClassifier
-from sklearn.cross_validation import train_test_split
-
-from bot_utils.io_utils import memory_usage_psutil
-from bot_utils.db_utils import AttrDict, AttrDictDB, IterDB
-
 from bot_vision.image_utils import im_resize, gaussian_blur, median_blur, box_blur
 from bot_vision.bow_utils import BoWVectorizer
 import bot_vision.mser_utils as mser_utils
 
 import bot_utils.io_utils as io_utils
+from bot_utils.io_utils import memory_usage_psutil
+from bot_utils.db_utils import AttrDict, AttrDictDB, IterDB
+
 import sklearn.metrics as metrics
+from sklearn.linear_model import SGDClassifier
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.svm import LinearSVC
+from sklearn.multiclass import OneVsRestClassifier
+from sklearn.cross_validation import train_test_split
+from sklearn.kernel_approximation import AdditiveChi2Sampler
+
+class HomogenousKernelMap(AdditiveChi2Sampler): 
+    def __init__(self, sample_steps=2, sample_interval=None): 
+        AdditiveChi2Sampler.__init__(self, sample_steps=sample_steps, sample_interval=None)
+        self.hlength = (self.sample_steps-1) * 2 + 1
+
+    def fit(self, X, y=None): 
+        sgn, Xp = np.sign(X), np.fabs(X)
+        super(HomogenousKernelMap, self).fit(Xp, y=y)
+        return self
+
+    def transform(self, X, y=None): 
+        sgn, Xp = np.sign(X), np.fabs(X)
+        sgn = np.tile(sgn, (1,self.hlength))
+        psix = super(HomogenousKernelMap, self).transform(Xp, y=y)
+        return sgn * psix
 
 class ImageDescription(object): 
     def __init__(self, detector='dense', descriptor='SIFT', step=4, levels=4, scale=2.0): 
@@ -122,6 +138,9 @@ class ImageClassifier(object):
         # Image description using Dense SIFT/Descriptor
         self.image_descriptor = ImageDescription(**self.params.descriptor)
 
+        # Setup kernel feature map
+        self.kernel_tf = HomogenousKernelMap(2) if self.params.use_kernel_approximation else None
+
         # Setup classifier
         print 'Building Classifier'
         # self._clf = KNeighborsClassifier(n_neighbors=10)
@@ -185,7 +204,7 @@ class ImageClassifier(object):
 
         # Build BOW
         inds = np.random.permutation(len(self.X_train))[:1e2]
-        train_desc = [item for item in features_db.itervalues(key='train_desc', inds=inds)]
+        train_desc = np.vstack([item for item in features_db.itervalues(key='train_desc', inds=inds)])
         self.bow.build(train_desc); 
         train_desc = None
         print 'Codebook: %s' % ('GOOD' if np.isfinite(self.bow.codebook).all() else 'BAD')
@@ -196,12 +215,17 @@ class ImageClassifier(object):
         train_target = np.array(self.y_train, dtype=np.int32)
         train_histogram = np.vstack([self.bow.project(desc) for desc in features_db.itervalues(key='train_desc')])
         # train_histogram = np.vstack([self.bow.project(desc) for desc in train_desc])
-
         print 'Memory usage at post-project %5.2f MB' % (memory_usage_psutil())
+
+        # Homogeneous Kernel map
+        if self.params.use_kernel_approximation: 
+            train_histogram = self.kernel_tf.fit_transform(train_histogram)
         
         # Train/Predict one-vs-all classifier
+        st_sgd = time.time()
         self.clf.fit(train_histogram, train_target)
         pred_target = self.clf.predict(train_histogram)
+        print 'Training SGD Classifier took %5.3f s' % (time.time() - st_sgd)
         
         print 'Memory usage at post-fit %5.2f MB' % (memory_usage_psutil())
 
@@ -230,10 +254,17 @@ class ImageClassifier(object):
         test_target = self.y_all if classify_trained else self.y_test
         test_histogram = np.vstack([self.bow.project(desc) for desc in test_desc])
 
+        if self.params.use_kernel_approximation: 
+            # Apply homogeneous transform
+            test_histogram = self.kernel_tf.fit_transform(test_histogram)
+
         pred_target = self.clf.predict(test_histogram)
         pred_score = self.clf.decision_function(test_histogram)
 
         # print ' Confusion matrix (Test): %s' % (metrics.confusion_matrix(test_target, pred_target))
+        print '=========================================================> '
+        print 'Params: ', self.params
+        print '-----------------------------------------------------------'
         print ' Accuracy score (Test): %4.3f' % (metrics.accuracy_score(test_target, pred_target))
         print ' Report (Test):\n %s' % (metrics.classification_report(test_target, pred_target, 
                                                                       target_names=self.dataset.target_names))

@@ -7,6 +7,7 @@ from scipy.spatial import cKDTree
 from sklearn.cluster import KMeans, MiniBatchKMeans
 from sklearn.mixture import GMM
 
+
 from bot_utils.db_utils import AttrDict
 
 class BoWVectorizer(object): 
@@ -75,7 +76,8 @@ class BoWVectorizer(object):
         if self.method == 'fisher': 
             self._build_gmm(np.vstack(data))
         else: 
-            self._build_codebook(np.vstack(data))
+            # self._build_codebook(np.vstack(data))
+            self._build_codebook(data)
 
     def index_codebook(self): 
         # Index codebook for quick querying
