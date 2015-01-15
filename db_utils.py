@@ -274,16 +274,26 @@ class IterDB(object):
     def extend(self, key, items): 
         self.data_[key].extend(item)
 
-    def itervalues(self, key=None): 
+    def itervalues(self, key=None, inds=None): 
         if key not in self.keys_: 
             raise RuntimeError('Key %s not found in dataset. keys: %s' % (key, self.keys_))
 
+        idx, ii = 0, 0
         total_chunks = len(self.meta_file_.chunks)
+        inds = np.sort(inds) if inds is not None else None
         for chunk_idx, chunk in enumerate(self.meta_file_.chunks): 
             data = AttrDict.load(self.get_chunk_filename(chunk_idx))
-            if key not in data: continue
-            for item in data[key]: 
-                yield item
+            if inds is None: 
+                for item in data[key]: 
+                    yield item
+            else:
+                
+                for i, item in enumerate(data[key]): 
+                    if inds[ii] == idx + i: 
+                        yield item
+                        ii += 1
+                        if ii >= len(inds): break
+                idx += len(data[key])
  
     def flush(self): 
         """
