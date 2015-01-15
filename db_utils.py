@@ -269,7 +269,7 @@ class IterDB(object):
 
     def append(self, key, item): 
         self.data_[key].append(item)
-        print [(k, len(v)) for k,v in self.data_.iteritems()]
+        # print [(k, len(v)) for k,v in self.data_.iteritems()]
 
     def extend(self, key, items): 
         self.data_[key].extend(item)
@@ -287,7 +287,6 @@ class IterDB(object):
                 for item in data[key]: 
                     yield item
             else:
-                
                 for i, item in enumerate(data[key]): 
                     if inds[ii] == idx + i: 
                         yield item
@@ -306,6 +305,7 @@ class IterDB(object):
 
         self.data_.save(self.get_chunk_filename(self.chunk_idx_))
         self._next_chunk_to_write()
+        print 'Flushing', self.meta_file_.chunks[-1]
 
     def save(self): 
         self.flush()
