@@ -1,6 +1,8 @@
 import cv2
 import sys
-import argparse, os
+import argparse
+import ConfigParser
+import os
 import numpy as np
 import psutil
 import joblib
@@ -23,6 +25,33 @@ def create_path_if_not_exists(filename):
         mkdir_p(fn_path)
         return True
     return False
+
+def config_and_args_parser(conf_path, section, description=''): 
+    """
+    Recipe mostly stolen from
+    http://blog.vwelch.com/2011/04/combining-configparser-and-argparse.html 
+    """
+    
+    # Parse directory
+    parser = argparse.ArgumentParser(
+        description=description)
+    parser.add_argument('-c', '--conf_file', required=False, 
+                        default=conf_path, help='Specify config file', metavar='FILE')
+    args, remaining_argv = parser.parse_known_args()
+
+    # Try reading the conf file
+    try: 
+        config = ConfigParser.SafeConfigParser()
+        config.read([args.conf_file])
+        defaults = dict(config.items(section))
+    except Exception as e: 
+        raise RuntimeError('Failed reading %s: %s' % (args.conf_file, e))
+
+    parser.set_defaults(**defaults)
+    # parser.add_argument("--option1", help="some option")
+    args = parser.parse_args(remaining_argv)        
+    return args
+
 
 def joblib_dump(item, path): 
     create_path_if_not_exists(path)

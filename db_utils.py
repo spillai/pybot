@@ -8,6 +8,7 @@ from itertools import izip
 import os.path
 from bot_utils.misc import setup_pbar
 from bot_utils.io_utils import create_path_if_not_exists
+from bot_utils.itertools_recipes import grouper
 
 # =============================================================================
 # Pytables helpers
@@ -240,6 +241,11 @@ class IterDB(object):
             # Load first chunk, and keep keys_ consistent
             self.meta_file_ = AttrDict.load(self.meta_filename_)
             self.keys_ = self.meta_file_.keynames
+            self.lengths_ = {}
+            for key in self.keys_: 
+                l = 0
+                for chunk in self.meta_file_.chunks: l += chunk[key]
+                self.lengths_[key] = l
             print 'IterDB::[LOADED] # keys: ', len(self.meta_file_)
         
             # For the time-being, dynamically disattach append, extend functionality
@@ -275,10 +281,9 @@ class IterDB(object):
     def extend(self, key, items): 
         self.data_[key].extend(item)
 
-    def itervalues(self, key=None, inds=None, verbose=False): 
+    def itervalues(self, key, inds=None, verbose=False): 
         if key not in self.keys_: 
             raise RuntimeError('Key %s not found in dataset. keys: %s' % (key, self.keys_))
-
 
         idx, ii = 0, 0
         total_chunks = len(self.meta_file_.chunks)
@@ -299,6 +304,55 @@ class IterDB(object):
                         ii += 1
                         if ii >= len(inds): break
                 idx += len(data[key])
+        if verbose: pbar.finish()
+
+    def iter_keys_values(self, keys, inds=None, verbose=False): 
+        for key in keys: 
+            if key not in self.keys_: 
+                raise RuntimeError('Key %s not found in dataset. keys: %s' % (key, self.keys_))
+
+        idx, ii = 0, 0
+        total_chunks = len(self.meta_file_.chunks)
+        pbar = setup_pbar(total_chunks) if verbose else None
+
+        inds = np.sort(inds) if inds is not None else None
+        for chunk_idx, chunk in enumerate(self.meta_file_.chunks): 
+            data = AttrDict.load(self.get_chunk_filename(chunk_idx))
+            if verbose: pbar.increment()
+        
+            # if inds is None: 
+            items = [data[key] for key in keys]
+            for item in izip(*items): 
+                yield item
+            # else:
+            #     for i, item in enumerate(data[key]): 
+            #         if inds[ii] == idx + i: 
+            #             yield item
+            #             ii += 1
+            #             if ii >= len(inds): break
+            #     idx += len(data[key])
+        if verbose: pbar.finish()
+
+
+    def iterchunks(self, key, batch_size=10, verbose=False): 
+        if key not in self.keys_: 
+            raise RuntimeError('Key %s not found in dataset. keys: %s' % (key, self.keys_))
+
+        idx, ii = 0, 0
+        total_chunks = len(self.meta_file_.chunks)
+        pbar = setup_pbar(total_chunks) if verbose else None
+
+        batch_chunks = grouper(range(len(self.meta_file_.chunks)), batch_size)
+        for chunk_group in batch_chunks: 
+            items = []
+            print chunk_group
+            for chunk_idx in chunk_group: 
+                if chunk_idx is None: continue
+                data = AttrDict.load(self.get_chunk_filename(chunk_idx))
+                for item in data[key]: 
+                    items.append(item)
+            yield items
+            if verbose: pbar.increment(pbar.currval + len(chunk_group))
         if verbose: pbar.finish()
  
     def flush(self): 
