@@ -6,6 +6,7 @@ import time, logging, cPickle, shelve
 from itertools import izip
 
 import os.path
+from bot_utils.misc import setup_pbar
 from bot_utils.io_utils import create_path_if_not_exists
 
 # =============================================================================
@@ -205,7 +206,7 @@ class AttrDict(dict):
         fn = os.path.expanduser(fn)
         print 'Saving ', fn
         create_path_if_not_exists(fn)
-        return save_pytable(fn, self.copy())
+        return save_pytable(fn, self)
 
 class IterDBChunk(object): 
     def __init__(self, filename, mode, fields=[]): 
@@ -239,7 +240,7 @@ class IterDB(object):
             # Load first chunk, and keep keys_ consistent
             self.meta_file_ = AttrDict.load(self.meta_filename_)
             self.keys_ = self.meta_file_.keynames
-            print self.meta_file_
+            print 'IterDB::[LOADED] # keys: ', len(self.meta_file_)
         
             # For the time-being, dynamically disattach append, extend functionality
 
@@ -274,15 +275,20 @@ class IterDB(object):
     def extend(self, key, items): 
         self.data_[key].extend(item)
 
-    def itervalues(self, key=None, inds=None): 
+    def itervalues(self, key=None, inds=None, verbose=False): 
         if key not in self.keys_: 
             raise RuntimeError('Key %s not found in dataset. keys: %s' % (key, self.keys_))
 
+
         idx, ii = 0, 0
         total_chunks = len(self.meta_file_.chunks)
+        pbar = setup_pbar(total_chunks) if verbose else None
+
         inds = np.sort(inds) if inds is not None else None
         for chunk_idx, chunk in enumerate(self.meta_file_.chunks): 
             data = AttrDict.load(self.get_chunk_filename(chunk_idx))
+            if verbose: pbar.increment()
+        
             if inds is None: 
                 for item in data[key]: 
                     yield item
@@ -293,6 +299,7 @@ class IterDB(object):
                         ii += 1
                         if ii >= len(inds): break
                 idx += len(data[key])
+        if verbose: pbar.finish()
  
     def flush(self): 
         """
