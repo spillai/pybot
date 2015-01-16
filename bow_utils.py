@@ -79,18 +79,24 @@ class BoWVectorizer(object):
             # self._build_codebook(np.vstack(data))
             self._build_codebook(data)
 
+    @staticmethod
+    def compute_index(codebook): 
+        return cKDTree(codebook)
+
     def index_codebook(self): 
         # Index codebook for quick querying
         st = time.time()
-        self.index = cKDTree(self.codebook)
+        self.index = BoWVectorizer.compute_index(self.codebook)
         print 'Indexing codebook %s took %5.3f s' % (self.codebook.shape, time.time() - st)
 
-
     @classmethod
-    def from_dict(cls, db): 
+    def from_dict(cls, db, index=None): 
         bowv = cls(**db.params)
         bowv.codebook = db.codebook
-        bowv.index_codebook()
+        if index is None: 
+            bowv.index_codebook()
+        else: 
+            bowv.index = index
         return bowv
 
     @classmethod
