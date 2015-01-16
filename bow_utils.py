@@ -97,6 +97,7 @@ class BoWVectorizer(object):
             bowv.index_codebook()
         else: 
             bowv.index = index
+            print 'BoVW using supplied index', index
         return bowv
 
     @classmethod

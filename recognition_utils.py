@@ -8,9 +8,10 @@ import bot_vision.mser_utils as mser_utils
 
 import bot_utils.io_utils as io_utils
 from bot_utils.io_utils import memory_usage_psutil
-from bot_utils.db_utils import AttrDict, AttrDictDB, IterDB
+from bot_utils.db_utils import AttrDict, IterDB
 
 import sklearn.metrics as metrics
+from sklearn.decomposition import PCA, RandomizedPCA
 from sklearn.svm import LinearSVC
 from sklearn.linear_model import SGDClassifier
 from sklearn.grid_search import GridSearchCV
@@ -65,23 +66,18 @@ class ImageDescription(object):
            kpts: [cv2.KeyPoint, ... ] 
            desc: [N x D]
         """
+        try: 
+            # Descriptor extraction
+            kpts = self.detector.detect(img, mask=mask)
+            kpts, desc = self.extractor.compute(img, kpts)
 
-        # try: 
-
-        # Descriptor extraction
-        kpts = self.detector.detect(img, mask=mask)
-        kpts, desc = self.extractor.compute(img, kpts)
-        # print 'KPTS, DESC: ', len(kpts), desc.shape
-            
-        # Extract color information (Lab)
-        pts = np.vstack([kp.pt for kp in kpts]).astype(np.int32)
-        # imgc = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
-        # lab = median_blur(imgc, size=5) 
-        cdesc = img[pts[:,1], pts[:,0]]
-        return kpts, np.hstack([desc, cdesc])
-
-        # except: 
-        #     return None, None
+            # Extract color information (Lab)
+            pts = np.vstack([kp.pt for kp in kpts]).astype(np.int32)
+            imgc = median_blur(img, size=5) 
+            cdesc = img[pts[:,1], pts[:,0]]
+            return kpts, np.hstack([desc, cdesc])
+        except: 
+            return None, None
 
     def describe(self, img, mask=None): 
         """
@@ -94,9 +90,24 @@ class ImageDescription(object):
         kpts, desc = self.detect_and_describe(img, mask=mask)
         return desc
 
-def bow_project(desc, vocab, index): 
-    self.bow = BoWVectorizer.from_dict(vocab, index=index)
-    return self.bow.project(desc)
+# def bow_project(desc, vocab, index): 
+#     print desc.shape
+#     bow = BoWVectorizer.from_dict(vocab, index=index)
+#     return bow.project(desc)
+
+# def bow_project(desc, bow): 
+#     print desc.shape
+#     return bow.project(desc)
+
+# vocab_index = BoWVectorizer.compute_index(vocab_db.bow.codebook)
+# bow = BoWVectorizer.from_dict(vocab_db.bow) 
+# train_histogram = []
+# for chunks in features_db.iterchunks('train_desc', batch_size=10, verbose=True): 
+#     # print 'Chunks: ', len(chunks)
+#     # res = Parallel(n_jobs=2, verbose=5)(delayed(bow_project)(desc, bow) for desc in chunks)
+#     res = np.vstack([self.bow.project(desc) for desc in chunks])
+#     train_histogram.extend(res)
+
 
 class ImageClassifier(object): 
     """
@@ -145,6 +156,9 @@ class ImageClassifier(object):
         # Image description using Dense SIFT/Descriptor
         self.image_descriptor = ImageDescription(**self.params.descriptor)
 
+        # Setup dim. red
+        self.pca = RandomizedPCA(n_components=1000, whiten=False)
+
         # Setup kernel feature map
         # kernel_tf = [('chi2_kernel', HomogenousKernelMap(2)), ('rbf_sampler', RBFSampler(gamma=0.2, n_components=40))]
         # self.kernel_tf = Pipeline(kernel_tf) if self.params.use_kernel_approximation else None
@@ -182,6 +196,49 @@ class ImageClassifier(object):
         self.X_all = list(chain(self.X_train, self.X_test))
         self.y_all = list(chain(self.y_train, self.y_test))
 
+    def extract_features(self): 
+        if self.clf_pretrained: 
+            return 
+
+        if not hasattr(self, 'X_train') or not hasattr(self, 'y_train'): 
+            raise RuntimeError('Training cannot proceed. Setup training and testing samples first!')            
+
+        # Extract features, only if not already available
+        if not os.path.isdir(self.params.cache.train_path): 
+            print '====> [COMPUTE] TRAINING: Feature Extraction '        
+            vocab_construction = AttrDict(num_per_image=1e3)
+            features_db = IterDB(filename=self.params.cache.train_path, mode='w', 
+                                 fields=['train_desc', 'train_target', 'vocab_desc'])
+            for idx, (x_t,y_t) in enumerate(izip(self.X_train, self.y_train)): 
+                # Extract and add descriptors to db
+                im_desc = self.image_descriptor.describe(**self.process_cb(x_t))
+                features_db.append('train_desc', im_desc)
+                features_db.append('train_target', y_t)
+
+                # Randomly sample from descriptors for vocab construction
+                inds = np.random.permutation(int(min(len(im_desc), vocab_construction.num_per_image)))
+                features_db.append('vocab_desc', im_desc[inds])
+
+                if idx % 5 == 0 and idx > 0: 
+                    features_db.flush()
+            features_db.save()
+            print 'Descriptor extraction took %5.3f s' % (time.time() - st)    
+        print '-------------------------------'
+
+        # Extract features
+        if not os.path.isdir(self.params.cache.test_path): 
+            print '====> [COMPUTE] TESTING: Feature Extraction '        
+            features_db = IterDB(filename=self.params.cache.test_path, mode='w', 
+                                 fields=['test_desc', 'test_target'])
+            for idx, (x_t,y_t) in enumerate(izip(self.X_test, self.y_test)): 
+                features_db.append('test_desc', self.image_descriptor.describe(**self.process_cb(x_t)))
+                features_db.append('test_target', y_t)
+                if idx % 5 == 0 and idx > 0: 
+                    features_db.flush()
+            features_db.save()
+        print '-------------------------------'
+
+
     def train(self): 
         if self.clf_pretrained: 
             return 
@@ -197,10 +254,10 @@ class ImageClassifier(object):
             raise RuntimeError('Setup features_dir before running training')
 
         # Extract features, only if not already available
-        vocab_construction = AttrDict(num_per_image=1e3, num_images=1e3)
-        if not os.path.isdir(os.path.join(self.params.cache.features_dir, 'training.h5')): 
+        if not os.path.isdir(self.params.cache.train_path): 
             print '====> [COMPUTE] Feature Extraction '        
-            features_db = IterDB(filename=os.path.join(self.params.cache.features_dir, 'training.h5'), mode='w', 
+            vocab_construction = AttrDict(num_per_image=1e3)
+            features_db = IterDB(filename=self.params.cache.train_path, mode='w', 
                                  fields=['train_desc', 'train_target', 'vocab_desc'])
             for idx, (x_t,y_t) in enumerate(izip(self.X_train, self.y_train)): 
                 # Extract and add descriptors to db
@@ -218,14 +275,15 @@ class ImageClassifier(object):
             print 'Descriptor extraction took %5.3f s' % (time.time() - st)    
         else: 
             print '====> [LOAD] Feature Extraction'        
-            features_db = IterDB(filename=os.path.join(self.params.cache.features_dir, 'training.h5'), mode='r')
+            features_db = IterDB(filename=self.params.cache.train_path, mode='r')
         print '-------------------------------'
 
         # Build BOW
         if not os.path.exists(self.params.cache.vocab_path):# or self.params.cache.overwrite: 
             print '====> [COMPUTE] Vocabulary Construction'
+            vocab_construction = AttrDict(num_images=1e3)
             inds = np.random.permutation(len(self.X_train))[:vocab_construction.num_images]
-            vocab_desc = np.vstack([item for item in features_db.itervalues(key='vocab_desc', inds=inds, verbose=True)])
+            vocab_desc = np.vstack([item for item in features_db.itervalues('vocab_desc', inds=inds, verbose=True)])
             print 'Codebook data: %i, %i' % (len(inds), len(vocab_desc))
             print '====> MEMORY: Codebook construction: %4.3f MB' % (vocab_desc.nbytes / 1024 / 1024.0) 
             self.bow.build(vocab_desc)
@@ -240,23 +298,26 @@ class ImageClassifier(object):
         print '-------------------------------'
 
         # Histogram of trained features
-        if not os.path.exists(self.params.cache.hists_path): 
+        if not os.path.exists(self.params.cache.train_hists_path): 
             print '====> [COMPUTE] BoVW / VLAD projection '
             train_target = np.array(self.y_train, dtype=np.int32)
-        
-            vocab_index = BoWVectorizer.compute_index(vocab_db.bow.codebook)
-            res = Parallel(n_jobs=8, verbose=5)(delayed(bow_project)(desc, vocab_db.bow, vocab_index) for desc in features_db.itervalues(key='train_desc', verbose=True))
-            # train_histogram = np.vstack([self.bow.project(desc) 
-            #                              for desc in features_db.itervalues(key='train_desc', verbose=True)])
+            train_histogram = np.vstack([self.bow.project(desc) 
+                                         for desc in features_db.itervalues('train_desc', verbose=True)])
             hists_db = AttrDict(train_target=train_target, train_histogram=train_histogram)
-            hists_db.save(self.params.cache.hists_path)
+            hists_db.save(self.params.cache.train_hists_path)
             print '====> MEMORY: Histogram: %s %4.3f MB' % (train_histogram.shape, 
                                                             train_histogram.nbytes / 1024 / 1024.0) 
         else: 
             print '====> [LOAD] BoVW / VLAD projection '
-            hists_db = AttrDict.load(self.params.cache.hists_path)
+            hists_db = AttrDict.load(self.params.cache.train_hists_path)
             train_target, train_histogram = hists_db.train_target, hists_db.train_histogram
         print '-------------------------------'
+
+        # PCA dim. red
+        if self.params.use_dimensionality_reduction: 
+            print '====> PCA '            
+            train_histogram = self.pca.fit_transform(train_histogram)
+            print '-------------------------------'        
 
         # Homogeneous Kernel map
         if self.params.use_kernel_approximation: 
@@ -289,26 +350,51 @@ class ImageClassifier(object):
         st = time.time()
 
         # Extract features
-        print '====> Feature Extraction '        
-        features_db = IterDB(filename=os.path.join(self.params.cache.features_dir, 'testing.h5'), mode='w', 
-                             fields=['test_desc', 'test_target'])
-        for idx, (x_t,y_t) in enumerate(izip(self.X_test, self.y_test)): 
-            features_db.append('test_desc', self.image_descriptor.describe(**self.process_cb(x_t)))
-            features_db.append('test_target', y_t)
-            if idx % 5 == 0 and idx > 0: 
-                features_db.flush()
-        features_db.save()
-        print '-------------------------------'
+        if not os.path.isdir(self.params.cache.test_path): 
+            print '====> [COMPUTE] Feature Extraction '        
 
+            features_db = IterDB(filename=self.params.cache.test_path, mode='w', 
+                                 fields=['test_desc', 'test_target'])
+            for idx, (x_t,y_t) in enumerate(izip(self.X_test, self.y_test)): 
+                features_db.append('test_desc', self.image_descriptor.describe(**self.process_cb(x_t)))
+                features_db.append('test_target', y_t)
+                if idx % 5 == 0 and idx > 0: 
+                    features_db.flush()
+            features_db.save()
+        else: 
+            print '====> [LOAD] Feature Extraction'        
+            features_db = IterDB(filename=self.params.cache.test_path, mode='r')
+        print '-------------------------------'
         print 'Descriptor extraction took %5.3f s' % (time.time() - st)    
 
-        print '====> BoVW / VLAD projection '
+        # Load Vocabulary
+        if os.path.exists(self.params.cache.vocab_path):# or self.params.cache.overwrite: 
+            print '====> [LOAD] Vocabulary Construction'
+            vocab_db = AttrDict.load(self.params.cache.vocab_path)
+            self.bow = BoWVectorizer.from_dict(vocab_db.bow)
+        else: 
+            raise RuntimeError('Vocabulary not built %s' % self.params.cache.vocab_path)
+
         # Histogram of trained features
-        test_target = self.y_test
-        test_histogram = np.vstack([self.bow.project(desc) for desc in features_db.itervalues(key='test_desc')])
-        # test_histogram = np.vstack([self.bow.project(desc) for desc in test_desc])
-        print '====> MEMORY: Histogram: %s %4.3f MB' % (test_histogram.shape, test_histogram.nbytes / 1024 / 1024.0) 
+        if not os.path.exists(self.params.cache.test_hists_path): 
+            print '====> [COMPUTE] BoVW / VLAD projection '
+            test_target = self.y_test
+            test_histogram = np.vstack([self.bow.project(desc) for desc in features_db.itervalues('test_desc', verbose=True)])
+            hists_db = AttrDict(test_target=test_target, test_histogram=test_histogram)
+            hists_db.save(self.params.cache.test_hists_path)
+            print '====> MEMORY: Histogram: %s %4.3f MB' % (test_histogram.shape, 
+                                                            test_histogram.nbytes / 1024 / 1024.0) 
+        else: 
+            print '====> [LOAD] BoVW / VLAD projection '
+            hists_db = AttrDict.load(self.params.cache.test_hists_path)
+            test_target, test_histogram = hists_db.train_target, hists_db.train_histogram
         print '-------------------------------'
+
+        # PCA dim. red
+        if self.params.use_dimensionality_reduction: 
+            print '====> PCA '            
+            test_histogram = self.pca.transform(test_histogram)
+            print '-------------------------------'        
 
         if self.params.use_kernel_approximation: 
             # Apply homogeneous transform
