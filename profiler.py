@@ -16,8 +16,8 @@ class Profiler(object):
         self._last = time.time()
         self._counts += 1
 
-    def stop(self): 
-        if self._last == 0: 
+    def stop(self, force=False): 
+        if not force and self._last == 0: 
             raise RuntimeError('start() not called')
         self.elapsed_time += (time.time() - self._last)
         self._last = 0

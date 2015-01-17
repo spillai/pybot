@@ -3,6 +3,7 @@ import tables as tb
 import numpy as np
 import pickle
 import time, logging, cPickle, shelve
+from collections import defaultdict
 from itertools import izip
 
 import os.path
@@ -214,11 +215,11 @@ class IterDBChunk(object):
         pass
 
 class IterDB(object): 
-    def __init__(self, filename, mode, fields=[], batch_size=500): 
+    def __init__(self, filename, mode, fields=[], batch_size=5): 
         """
         An iterable database that should theoretically allow 
         scalable reading/writing of datasets. 
-           batch_size: rough filechunk size in MB
+           batch_size: length of list
 
         Notes: 
            meta_file should contain all the related meta data 
@@ -237,6 +238,8 @@ class IterDB(object):
                 self.data_[field] = []
                 self.keys_.add(field)
             self.meta_file_ = AttrDict(chunks=[], keys=[])
+            self.batch_size_ = batch_size
+            self.lengths_ = defaultdict(lambda: 0)
         elif mode == 'r': 
             # Load first chunk, and keep keys_ consistent
             self.meta_file_ = AttrDict.load(self.meta_filename_)
@@ -262,10 +265,10 @@ class IterDB(object):
         self.meta_filename_ = os.path.join(self.folder_, self.filename_, 'meta_%s' % self.filename_)
         self.get_chunk_filename = lambda idx: os.path.join(self.folder_, self.filename_, 'chunks', 'chunk_%04i_%s' % (idx, self.filename_))
 
-    def __del__(self): 
-        if len(self.data_): 
-            print 'Seems like you have data stored away, but has not been flushed!'
-            self.flush()
+    # def __del__(self): 
+    #     if len(self.data_): 
+    #         print 'Seems like you have data stored away, but has not been flushed!'
+    #         self.flush()
 
     def add_fields(self, fields): 
         for field in fields: 
@@ -275,11 +278,16 @@ class IterDB(object):
             self.keys_.add(field)
 
     def append(self, key, item): 
+        if len(self.data_[key]) == self.batch_size_: 
+            self.flush()
         self.data_[key].append(item)
         # print [(k, len(v)) for k,v in self.data_.iteritems()]
 
     def extend(self, key, items): 
         self.data_[key].extend(item)
+
+    def length(self, key): 
+        return self.lengths_[key]
 
     def itervalues(self, key, inds=None, verbose=False): 
         if key not in self.keys_: 
@@ -321,7 +329,7 @@ class IterDB(object):
             if verbose: pbar.increment()
         
             # if inds is None: 
-            items = [data[key] for key in keys]
+            items = (data[key] for key in keys)
             for item in izip(*items): 
                 yield item
             # else:
@@ -363,12 +371,14 @@ class IterDB(object):
         self.meta_file_.keynames = list(self.data_.keys())
         self.meta_file_.chunks.append(AttrDict((k, len(v)) for k,v in self.data_.iteritems()))
         self.meta_file_.save(self.meta_filename_)
+        for k,v in self.data_.iteritems(): 
+            self.lengths_[k] += len(v)
 
         self.data_.save(self.get_chunk_filename(self.chunk_idx_))
         self._next_chunk_to_write()
         print 'Flushing', self.meta_file_.chunks[-1]
 
-    def save(self): 
+    def finalize(self): 
         self.flush()
 
     def _next_chunk_to_write(self): 
