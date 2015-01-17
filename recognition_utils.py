@@ -208,8 +208,8 @@ class ImageClassifier(object):
             print '====> [COMPUTE] TRAINING: Feature Extraction '        
             vocab_construction = AttrDict(num_per_image=1e3)
             features_db = IterDB(filename=self.params.cache.train_path, mode='w', 
-                                 fields=['train_desc', 'train_target', 'vocab_desc'])
-            for idx, (x_t,y_t) in enumerate(izip(self.X_train, self.y_train)): 
+                                 fields=['train_desc', 'train_target', 'vocab_desc'], batch_size=5)
+            for (x_t,y_t) in izip(self.X_train, self.y_train): 
                 # Extract and add descriptors to db
                 im_desc = self.image_descriptor.describe(**self.process_cb(x_t))
                 features_db.append('train_desc', im_desc)
@@ -218,10 +218,7 @@ class ImageClassifier(object):
                 # Randomly sample from descriptors for vocab construction
                 inds = np.random.permutation(int(min(len(im_desc), vocab_construction.num_per_image)))
                 features_db.append('vocab_desc', im_desc[inds])
-
-                if idx % 5 == 0 and idx > 0: 
-                    features_db.flush()
-            features_db.save()
+            features_db.finalize()
             print 'Descriptor extraction took %5.3f s' % (time.time() - st)    
         print '-------------------------------'
 
@@ -229,13 +226,11 @@ class ImageClassifier(object):
         if not os.path.isdir(self.params.cache.test_path): 
             print '====> [COMPUTE] TESTING: Feature Extraction '        
             features_db = IterDB(filename=self.params.cache.test_path, mode='w', 
-                                 fields=['test_desc', 'test_target'])
-            for idx, (x_t,y_t) in enumerate(izip(self.X_test, self.y_test)): 
+                                 fields=['test_desc', 'test_target'], batch_size=5)
+            for (x_t,y_t) in izip(self.X_test, self.y_test): 
                 features_db.append('test_desc', self.image_descriptor.describe(**self.process_cb(x_t)))
                 features_db.append('test_target', y_t)
-                if idx % 5 == 0 and idx > 0: 
-                    features_db.flush()
-            features_db.save()
+            features_db.finalize()
         print '-------------------------------'
 
 
@@ -259,7 +254,7 @@ class ImageClassifier(object):
             vocab_construction = AttrDict(num_per_image=1e3)
             features_db = IterDB(filename=self.params.cache.train_path, mode='w', 
                                  fields=['train_desc', 'train_target', 'vocab_desc'])
-            for idx, (x_t,y_t) in enumerate(izip(self.X_train, self.y_train)): 
+            for (x_t,y_t) in izip(self.X_train, self.y_train): 
                 # Extract and add descriptors to db
                 im_desc = self.image_descriptor.describe(**self.process_cb(x_t))
                 features_db.append('train_desc', im_desc)
@@ -268,10 +263,7 @@ class ImageClassifier(object):
                 # Randomly sample from descriptors for vocab construction
                 inds = np.random.permutation(int(min(len(im_desc), vocab_construction.num_per_image)))
                 features_db.append('vocab_desc', im_desc[inds])
-
-                if idx % 5 == 0 and idx > 0: 
-                    features_db.flush()
-            features_db.save()
+            features_db.finalize()
             print 'Descriptor extraction took %5.3f s' % (time.time() - st)    
         else: 
             print '====> [LOAD] Feature Extraction'        
@@ -354,13 +346,11 @@ class ImageClassifier(object):
             print '====> [COMPUTE] Feature Extraction '        
 
             features_db = IterDB(filename=self.params.cache.test_path, mode='w', 
-                                 fields=['test_desc', 'test_target'])
-            for idx, (x_t,y_t) in enumerate(izip(self.X_test, self.y_test)): 
+                                 fields=['test_desc', 'test_target'], batch_size=5)
+            for (x_t,y_t) in izip(self.X_test, self.y_test): 
                 features_db.append('test_desc', self.image_descriptor.describe(**self.process_cb(x_t)))
                 features_db.append('test_target', y_t)
-                if idx % 5 == 0 and idx > 0: 
-                    features_db.flush()
-            features_db.save()
+            features_db.finalize()
         else: 
             print '====> [LOAD] Feature Extraction'        
             features_db = IterDB(filename=self.params.cache.test_path, mode='r')
