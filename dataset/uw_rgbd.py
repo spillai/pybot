@@ -38,6 +38,10 @@ class UWRGBDDataset(object):
     # train_names = ["bowl", "cap", "cereal_box", "BACKGROUND"]
     # train_names = ["cap", "cereal_box", "coffee_mug", "soda_can", "BACKGROUND"]
     train_names = ["bowl", "cap", "cereal_box", "coffee_mug", "soda_can", "BACKGROUND"]
+    # train_names = ["bowl", "cap", "cereal_box", "coffee_mug", "flashlight", 
+    #                 "keyboard", "kleenex", "scissors",  "soda_can", 
+    #                 "stapler", "BACKGROUND"]
+    # train_names = class_names
 
     train_ids = [target_hash[name] for name in train_names]
     train_names_set, train_ids_set = set(train_names), set(train_ids)
@@ -481,7 +485,7 @@ class UWRGBDSceneDataset(UWRGBDDataset):
                 pbar.increment()
                 # print 'Processing: %s' % key
 
-            for frame in frames.iteritems(every_k_frames): 
+            for frame in frames.iteritems(every_k_frames=every_k_frames): 
                 yield frame
         if verbose: pbar.finish()
 
