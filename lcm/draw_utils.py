@@ -630,10 +630,7 @@ def publish_line_segments(pub_channel, arr1, arr2, c='r', flip_rb=False, frame_i
 
 
 # Object Renderers ==============================================================
-def draw_camera(pose): 
-    
-    depth = 0.1
-    fov = np.pi * 60.0 / 180
+def draw_camera(pose, depth=0.1, fov=np.deg2rad(60)): 
     off = np.tan(fov / 2 * depth)
 
     p0, b0 = np.array([0,0,0]), np.array([0,0,depth])
@@ -664,7 +661,7 @@ def draw_camera(pose):
     return (faces, np.hstack([pts[:-1], pts[1:]]).reshape((-1,3)))
 
 def publish_cameras(pub_channel, poses, c='y', texts=[], frame_id='KINECT'):
-    cam_feats = [draw_camera(pose) for pose in poses]
+    cam_feats = [draw_camera(pose, depth=0.12) for pose in poses]
     cam_faces = map(lambda x: x[0], cam_feats)
     cam_edges = map(lambda x: x[1], cam_feats)
 
@@ -672,11 +669,12 @@ def publish_cameras(pub_channel, poses, c='y', texts=[], frame_id='KINECT'):
     publish_pose_list(pub_channel, poses, texts=texts, frame_id=frame_id)
 
     # Light faces
-    publish_point_type(pub_channel+'-faces', cam_faces, point_type='TRIANGLES', c=c, 
-                        frame_id=frame_id)
+    carr = [c] * len(cam_faces)
+    publish_point_type(pub_channel+'-faces', cam_faces, point_type='TRIANGLES', c=carr, frame_id=frame_id)
 
     # Darker yellow edge
-    publish_point_type(pub_channel+'-edges', cam_edges, point_type='LINES', c='r', 
+    carr = ['r'] * len(cam_edges)
+    publish_point_type(pub_channel+'-edges', cam_edges, point_type='LINES', c=carr, 
                        frame_id=frame_id)
 
 
