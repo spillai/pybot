@@ -71,12 +71,21 @@ class ImageDescription(object):
             kpts = self.detector.detect(img, mask=mask)
             kpts, desc = self.extractor.compute(img, kpts)
 
+            # # RootSIFT
+            # pre_shape = desc.shape
+            # desc = np.sqrt(desc.astype(np.float32) / (np.sum(desc, axis=1)).reshape(-1,1))
+            # inds, = np.where(np.isfinite(desc).all(axis=1))
+            # kpts, desc = [kpts[ind] for ind in inds], desc[inds]
+            # post_shape = desc.shape
+            # print pre_shape, post_shape
+
             # Extract color information (Lab)
             pts = np.vstack([kp.pt for kp in kpts]).astype(np.int32)
             imgc = median_blur(img, size=5) 
             cdesc = img[pts[:,1], pts[:,0]]
             return kpts, np.hstack([desc, cdesc])
-        except: 
+        except Exception as e: 
+            print e
             return None, None
 
     def describe(self, img, mask=None): 

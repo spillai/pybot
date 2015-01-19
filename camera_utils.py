@@ -228,12 +228,12 @@ def get_object_bbox(camera, pts, subsample=10, scale=1.0, min_height=10, min_wid
 
         # Median depth of the candidate object 
         depth = np.linalg.norm(camera.tvec - np.median(pts[::subsample], axis=0))
-        if visualize: 
-            draw_utils.publish_cloud('obj_cloud', pts[::subsample], c='r', frame_id='KINECT')
-            draw_utils.publish_point_type('obj_distance', 
-                                          np.vstack([camera.inverse().tvec.reshape(-1,3), 
-                                                     pts[0].reshape(-1,3)]), 
-                                          c='r', point_type='LINES', frame_id='KINECT')
+        # if visualize: 
+        #     draw_utils.publish_cloud('obj_cloud', pts[::subsample], c='r', frame_id='KINECT')
+        #     draw_utils.publish_point_type('obj_distance', 
+        #                                   np.vstack([camera.inverse().tvec.reshape(-1,3), 
+        #                                              pts[0].reshape(-1,3)]), 
+        #                                   c='r', point_type='LINES', frame_id='KINECT')
 
         if scale != 1.0: 
             w2, h2 = (scale-1.0) * (x1-x0) / 2, (scale-1.0) * (y1-y0) / 2
