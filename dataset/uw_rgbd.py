@@ -344,7 +344,6 @@ class UWRGBDSceneDataset(UWRGBDDataset):
                 raise ValueError('''Version %s not supported. '''
                                  '''Check dataset and choose either v1 or v2 scene dataset''' % version)
 
-
         @staticmethod
         def load_ply(fn, version): 
             """ Retrieve aligned point cloud for each scene """ 
@@ -436,6 +435,13 @@ class UWRGBDSceneDataset(UWRGBDDataset):
                 raise ValueError('''Version %s not supported. '''
                                  '''Check dataset and choose v1 scene dataset''' % version)
 
+        def _process_items(self, index, rgb_im, depth_im, bbox, pose): 
+            # Compute bbox from pose and map (v2 support)
+            if bbox is None and hasattr(self, 'map_info'): 
+                bbox = self.get_bboxes(pose)
+            return AttrDict(index=index, img=rgb_im, depth=depth_im, 
+                            bbox=bbox if bbox is not None else [], pose=pose)
+            
         def iteritems(self, every_k_frames=1): 
             index = 0 
             for rgb_im, depth_im, bbox, pose in izip(self.rgb.iteritems(every_k_frames=every_k_frames), 
@@ -443,13 +449,16 @@ class UWRGBDSceneDataset(UWRGBDDataset):
                                                      self.bboxes[::every_k_frames], 
                                                      self.poses[::every_k_frames]): 
                 index += every_k_frames
+                yield self._process_items(index, rgb_im, depth_im, bbox, pose)
 
-                # Compute bbox from pose and map (v2 support)
-                if bbox is None and hasattr(self, 'map_info'): 
-                    bbox = self.get_bboxes(pose)
+        def iterinds(self, inds): 
+            for index, rgb_im, depth_im, bbox, pose in izip(inds, 
+                                                     self.rgb.iterinds(inds), 
+                                                     self.depth.iterinds(inds), 
+                                                     (self.bboxes[ind] for ind in inds), 
+                                                     (self.poses[ind] for ind in inds)): 
+                yield self._process_items(index, rgb_im, depth_im, bbox, pose)
 
-                yield AttrDict(index=index, img=rgb_im, depth=depth_im, 
-                               bbox=bbox if bbox is not None else [], pose=pose)
 
     def __init__(self, version, directory='', targets=None, num_targets=None, 
                  blacklist=[''], aligned_directory=None):

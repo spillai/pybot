@@ -110,6 +110,13 @@ class DatasetReader(object):
         for fno in fnos: 
             yield self.process_cb(self.files[fno])
 
+    def iterinds(self, inds, reverse=False): 
+        fnos = inds.astype(int)
+        if reverse: 
+            fnos = fnos[::-1]
+        for fno in fnos: 
+            yield self.process_cb(self.files[fno])
+
     @property
     def length(self): 
         return len(self.files)
