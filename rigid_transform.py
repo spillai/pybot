@@ -177,9 +177,27 @@ class RigidTransform(object):
     def identity(cls):
         return cls()
 
+class Sim3(RigidTransform): 
+    def __init__(self, xyzw=[0.,0.,0.,1.], tvec=[0.,0.,0.], scale=1.0):    
+        RigidTransform.__init__(self, xyzw=xyzw, tvec=tvec)
+        self.scale = scale
+
+    @classmethod
+    def from_homogenous_matrix(cls, T):
+        sR_t = np.eye(4)
+        sR_t[:3,:3] = T[:3,:3] / T[3,3]
+        return cls(Quaternion.from_matrix(sR_t), T[:3,3], scale=1.0 / T[3,3])
+
+    def to_homogeneous_matrix(self):
+        result = self.quat.to_homogeneous_matrix()
+        result[:3, 3] = self.tvec
+        result[3, 3] = 1.0 / self.scale
+        result[:3, :3] /= self.scale
+        return result
+
 class Pose(RigidTransform): 
-    def __init__(self, pid, rotation_quat, translation_vec):
-        RigidTransform.__init__(self, rotation_quat, translation_vec)
+    def __init__(self, pid, xyzw=[0.,0.,0.,1.], tvec=[0.,0.,0.]):
+        RigidTransform.__init__(self, xyzw=xyzw, tvec=tvec)
         self.id = pid
 
     def __repr__(self): 

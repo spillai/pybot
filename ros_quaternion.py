@@ -16,7 +16,8 @@ class Quaternion(object):
                 # raise TypeError ("invalid initializer")            
 
         norm = np.linalg.norm(self.q)
-        assert abs(norm-1) < 1e-2
+        if abs(norm-1) > 1e-2: 
+            raise RuntimeError('Norm computed is %5.3f' % norm)
         if abs(norm - 1) > 1e-2:
             self.q /= norm
 
