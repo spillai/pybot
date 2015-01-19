@@ -320,7 +320,7 @@ def _publish_pose_list(pub_channel, _poses, texts=[], frame_id='KINECT'):
         arr[j,2] = pose.tvec[2]
 
         # Pose compounding
-        p = frame_pose.oplus(RigidTransform(pose.quat, pose.tvec))
+        p = frame_pose.oplus(pose) # RigidTransform(pose.quat, pose.tvec))
         roll, pitch, yaw, x, y, z = p.to_roll_pitch_yaw_x_y_z(axes='sxyz')
 
         # Optionally get the id of the pose, 
