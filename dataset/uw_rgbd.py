@@ -28,19 +28,20 @@ class UWRGBDDataset(object):
                    "greens", "hand_towel", "instant_noodles", "keyboard", "kleenex", "lemon", "lightbulb", 
                    "lime", "marker", "mushroom", "notebook", "onion", "orange", "peach", "pear", "pitcher", 
                    "plate", "pliers", "potato", "rubber_eraser", "scissors", "shampoo", "soda_can", 
-                   "sponge", "stapler", "tomato", "toothbrush", "toothpaste", "water_bottle", "BACKGROUND"]
+                   "sponge", "stapler", "tomato", "toothbrush", "toothpaste", "water_bottle", "background", "sofa", "table", "office_chair", "coffee_table"]
+    # Added more v2 objects into v1
 
     class_ids = np.arange(len(class_names), dtype=np.int)    
     target_hash = dict(zip(class_names, class_ids))
     target_unhash = dict(zip(class_ids, class_names))
 
-    # train_names = ["cereal_box", "cap", "BACKGROUND"]
-    # train_names = ["bowl", "cap", "cereal_box", "BACKGROUND"]
-    # train_names = ["cap", "cereal_box", "coffee_mug", "soda_can", "BACKGROUND"]
-    train_names = ["bowl", "cap", "cereal_box", "coffee_mug", "soda_can", "BACKGROUND"]
+    # train_names = ["cereal_box", "cap", "background"]
+    # train_names = ["bowl", "cap", "cereal_box", "background"]
+    # train_names = ["cap", "cereal_box", "coffee_mug", "soda_can", "background"]
+    train_names = ["bowl", "cap", "cereal_box", "coffee_mug", "soda_can", "background"]
     # train_names = ["bowl", "cap", "cereal_box", "coffee_mug", "flashlight", 
     #                 "keyboard", "kleenex", "scissors",  "soda_can", 
-    #                 "stapler", "BACKGROUND"]
+    #                 "stapler", "background"]
     # train_names = class_names
 
     train_ids = [target_hash[name] for name in train_names]
@@ -50,13 +51,13 @@ class UWRGBDDataset(object):
     def get_category_name(cls, target_id): 
         tid = int(target_id)
         return cls.target_unhash[tid] \
-            if tid in cls.train_ids_set else 'BACKGROUND'
+            if tid in cls.train_ids_set else 'background'
 
     @classmethod
     def get_category_id(cls, target_name): 
         tname = str(target_name)
         return cls.target_hash[tname] \
-            if tname in cls.train_names_set else cls.target_hash['BACKGROUND']
+            if tname in cls.train_names_set else cls.target_hash['background']
 
     @classmethod
     def setup_all_datasets(cls, object_dir=None, scene_dir=None, targets=train_names, version='v1'): 
@@ -220,9 +221,10 @@ class UWRGBDSceneDataset(UWRGBDDataset):
     RGB-D Scene Dataset reader 
     http://rgbd-dataset.cs.washington.edu/dataset.html
     """
-    target_hash = dict(bowl=1, cap=2, cereal_box=3, coffee_mug=4, coffee_table=5, 
-                       office_chair=6, soda_can=7, sofa=9, table=9, background=10)
-    target_unhash = dict((v,k) for k,v in target_hash.iteritems())
+    v2_target_hash = dict(bowl=1, cap=2, cereal_box=3, coffee_mug=4, coffee_table=5, 
+                       office_chair=6, soda_can=7, sofa=8, table=9, background=10)
+    # v2_target_unhash = dict((v,k) for k,v in v2_target_hash.iteritems())
+    v2_to_v1 = dict((v2,UWRGBDDataset.target_hash[k2]) for k2,v2 in v2_target_hash.iteritems())
 
     class _reader(object): 
         """
@@ -259,9 +261,8 @@ class UWRGBDSceneDataset(UWRGBDDataset):
                 ply_xyz, ply_rgb = UWRGBDSceneDataset._reader.load_ply(aligned_file.ply, version)
                 ply_label = UWRGBDSceneDataset._reader.load_plylabel(aligned_file.label, version)
 
-                inds, = np.where(ply_label != 1)
-                ply_xyz, ply_rgb = ply_xyz[inds], ply_rgb[inds]
-                ply_label = ply_label[inds]
+                # Remapping to v1 index
+                ply_label = np.array([UWRGBDSceneDataset.v2_to_v1[l] for l in ply_label], dtype=np.int32)
 
                 # 1b. Plot centers with poses and text
                 unique_labels = np.unique(ply_label)
@@ -277,6 +278,18 @@ class UWRGBDSceneDataset(UWRGBDDataset):
                     unique_labels=unique_labels, unique_centers=unique_centers, camera=camera
                 ) if aligned_file is not None and version == 'v2' else None
                 assert(len(ply_xyz) == len(ply_rgb))
+
+        # @staticmethod
+        # def cluster_pts(all_pts): 
+        #     from pybot_pcl import euclidean_clustering
+
+        #     splits = []
+        #     labels = euclidean_clustering(all_pts.astype(np.float32), tolerance=0.2, scale=1.0, min_cluster_size=10, max_cluster_size=10000000)
+        #     for label in np.unique(labels): 
+        #         if label < 0: continue
+        #         inds, = np.where(labels == label)
+        #         splits.append(all_pts[inds])
+        #     return splits
 
         def get_bboxes(self, pose): 
             # 1. Get pose for a particular frame, 
@@ -298,18 +311,16 @@ class UWRGBDSceneDataset(UWRGBDDataset):
                 label_pts = self.map_info.points[label == self.map_info.labels]
                 pts2d, bbox, depth = get_object_bbox(self.map_info.camera, label_pts, subsample=3)
                 if bbox is not None: 
-                    object_candidates.append(AttrDict(label=label, bbox=bbox, depth=depth))
+                    bbox['label'], bbox['depth'] = label, depth
+                    object_candidates.append(bbox)
+
+                    # Might need FIXING 
+                    # object_candidates.append(AttrDict(label=label, bbox=bbox, depth=depth))
+
+                # label_pts_list = UWRGBDSceneDataset._reader.cluster_pts(label_pts_all)
+                # print 'Unique Splits: ', len(label_pts_list)
+                # for label_pts in label_pts_list: 
             return object_candidates
-
-        @classmethod
-        def get_category_name(cls, target_id): 
-            return cls.target_unhash[target_id] # \
-                # if target_id in cls.train_ids_set else 'BACKGROUND'
-
-        @classmethod
-        def get_category_id(cls, target_name): 
-            return cls.target_hash[target_name] # \
-                # if target_name in cls.train_names_set else cls.target_hash['BACKGROUND']
 
         @staticmethod
         def load_bboxes(fn, version): 
@@ -438,9 +449,13 @@ class UWRGBDSceneDataset(UWRGBDDataset):
                                  '''Check dataset and choose v1 scene dataset''' % version)
 
         def _process_items(self, index, rgb_im, depth_im, bbox, pose): 
+            # print 'Processing pose', pose, bbox
+
             # Compute bbox from pose and map (v2 support)
             if bbox is None and hasattr(self, 'map_info'): 
                 bbox = self.get_bboxes(pose)
+
+            # print 'Processing pose', pose, bbox
             return AttrDict(index=index, img=rgb_im, depth=depth_im, 
                             bbox=bbox if bbox is not None else [], pose=pose)
             
@@ -455,10 +470,10 @@ class UWRGBDSceneDataset(UWRGBDDataset):
 
         def iterinds(self, inds): 
             for index, rgb_im, depth_im, bbox, pose in izip(inds, 
-                                                     self.rgb.iterinds(inds), 
-                                                     self.depth.iterinds(inds), 
-                                                     (self.bboxes[ind] for ind in inds), 
-                                                     (self.poses[ind] for ind in inds)): 
+                                                            self.rgb.iterinds(inds), 
+                                                            self.depth.iterinds(inds), 
+                                                            [self.bboxes[ind] for ind in inds], 
+                                                            [self.poses[ind] for ind in inds]): 
                 yield self._process_items(index, rgb_im, depth_im, bbox, pose)
 
 
@@ -487,6 +502,16 @@ class UWRGBDSceneDataset(UWRGBDDataset):
         #     print key, meta_file, aligned_file
         #     # target_id = self.target_hash[key]
         #     self.data[key] = UWRGBDSceneDataset._reader(files, meta_file, aligned_file, version)
+
+    # @classmethod
+    # def get_v2_category_name(cls, target_id): 
+    #     return cls.v2_target_unhash[target_id] # \
+    #         # if target_id in cls.train_ids_set else 'background'
+
+    # @classmethod
+    # def get_v2_category_id(cls, target_name): 
+    #     return cls.v2_target_hash[target_name] # \
+    #         # if target_name in cls.train_names_set else cls.target_hash['background']
 
 
     def iteritems(self, every_k_frames=1, verbose=False): 
@@ -525,6 +550,17 @@ class UWRGBDSceneDataset(UWRGBDDataset):
             if verbose: pbar.increment()
             yield key, self.scene(key)
         if verbose: pbar.finish()
+
+    @staticmethod
+    def annotate_bboxes(vis, bboxes, target_names): # , box_color=lambda target: (0, 200, 0) if UWRGBDDataset.get_category_name(target) != 'background' else (100, 100, 100)): 
+        for bbox,target_name in izip(bboxes, target_names): 
+            box_color = (0, 200, 0) # if UWRGBDDataset.get_category_name(target) != 'background' else (100, 100, 100)
+            cv2.rectangle(vis, (bbox['left'], bbox['top']), (bbox['right'], bbox['bottom']), box_color, 2) 
+            cv2.rectangle(vis, (bbox['left']-1, bbox['top']-15), (bbox['right']+1, bbox['top']), box_color, -1)
+            cv2.putText(vis, '%s' % (target_name.title().replace('_', ' ')), 
+                        (bbox['left'], bbox['top']-5), 
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 0, 0), thickness=1, lineType=cv2.CV_AA)
+        return vis
 
     @staticmethod
     def annotate(f): 
