@@ -255,8 +255,10 @@ class UWRGBDSceneDataset(UWRGBDDataset):
             if aligned_file: 
                 # ALIGNED POINT CLOUD
                 # Version 2 only supported! 
+                print '\n===> Un-optimized load_plylabel. Takes too long. FIX!! <===\n\n' 
                 ply_xyz, ply_rgb = UWRGBDSceneDataset._reader.load_ply(aligned_file.ply, version)
                 ply_label = UWRGBDSceneDataset._reader.load_plylabel(aligned_file.label, version)
+
                 inds, = np.where(ply_label != 1)
                 ply_xyz, ply_rgb = ply_xyz[inds], ply_rgb[inds]
                 ply_label = ply_label[inds]
@@ -489,6 +491,7 @@ class UWRGBDSceneDataset(UWRGBDDataset):
 
     def iteritems(self, every_k_frames=1, verbose=False): 
         pbar = setup_pbar(len(self._dataset)) if verbose else None
+        print 'Scenes: %i %s' % (len(self.scenes()), self.scenes())
         for key, frames in self.iterscenes(verbose=verbose): 
             if verbose: 
                 pbar.increment()
