@@ -252,6 +252,7 @@ class UWRGBDSceneDataset(UWRGBDDataset):
             # Version 2 only supported! Version 1 support for rgbd scene (unclear)
             self.poses = UWRGBDSceneDataset._reader.load_poses(aligned_file.pose, version) \
                          if aligned_file is not None and version == 'v2' else [None] * len(rgb_files)
+            print 'Aligned: ', aligned_file
             assert(len(self.poses) == len(rgb_files))
 
             if aligned_file: 
