@@ -1,5 +1,7 @@
 import cv2
 import numpy as np
+import sys
+
 import matplotlib.pyplot as plt
 from collections import OrderedDict
 
@@ -41,5 +43,11 @@ def imshow_cv(label, im, block=False, text=None):
         cv2.putText(vis, '%s' % text, (2, vis.shape[0] - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.4, 
                     (240, 240, 240), thickness = 1)
     cv2.imshow(label, vis)
-    cv2.waitKey(0 if block else 1)
+    ch = cv2.waitKey(0 if block else 1) & 0xFF
+    if ch == ord(' '):
+        cv2.waitKey(0)
+    elif ch == 27 or ch == ord('q'):
+        sys.exit(1)
+
+
 
