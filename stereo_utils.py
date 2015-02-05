@@ -101,7 +101,7 @@ class EdgeStereoBM:
     def __init__(self): 
         # Initilize stereo block matching
         self.stereo = _EdgeStereoBM(preset=cv2.STEREO_BM_BASIC_PRESET, 
-                                    ndisparities=64, SAD_window_size=7)
+                                    ndisparities=64, SAD_window_size=5)
 
     def compute(self, left, right): 
         return self.stereo.process(left, right).astype(np.float32) / 16.0
