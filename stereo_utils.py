@@ -2,12 +2,26 @@ import cv2, time
 import numpy as np
 from collections import deque
 
-from pybot_vision import StereoBMCustom
+import bot_vision.color_utils as color_utils 
+import bot_vision.image_utils as image_utils 
+
+from pybot_vision import VoxelStereoBM as _VoxelStereoBM
+from pybot_vision import EdgeStereoBM as _EdgeStereoBM
+from pybot_vision import EdgeStereo as _EdgeStereo
+
 from pybot_externals import StereoELAS # , OrderedCostVolumeStereo
 # from pybot_externals import fast_cost_volume_filtering, ordered_row_disparity
 
 from bot_vision.image_utils import im_resize, gaussian_blur
 from bot_vision.imshow_utils import imshow_cv
+
+def colorize_stereo_disparity(disp, im=None): 
+    # Display colored disparity
+    disp_color = color_utils.colormap(disp.astype(np.float32) / 16) 
+    if im is None: 
+        return disp_color 
+    else: 
+        return np.vstack([image_utils.to_color(im), disp_color])
 
 class StereoSGBM: 
     # Parameters from KITTI dataset
@@ -54,12 +68,12 @@ class StereoBM:
     def compute(self, left, right): 
         return self.bm.compute(left, right).astype(np.float32) / 16.0
 
-class StereoSGBMDiscretized: 
+class VoxelStereoBM: 
     def __init__(self, discretize=1, do_sgm=True): 
         self.discretize = discretize
         if discretize > 1: 
             # Initilize stereo block matching
-            self.stereo = StereoBMCustom(discretize=discretize, 
+            self.stereo = _VoxelStereoBM(discretize=discretize, 
                                          do_sgm=do_sgm,
                                          preset=cv2.STEREO_BM_BASIC_PRESET, 
                                          ndisparities=64, SAD_window_size=5)
@@ -81,6 +95,25 @@ class StereoSGBMDiscretized:
                               interpolation=cv2.INTER_NEAREST)
 
         return disp_out
+
+
+class EdgeStereoBM: 
+    def __init__(self): 
+        # Initilize stereo block matching
+        self.stereo = _EdgeStereoBM(preset=cv2.STEREO_BM_BASIC_PRESET, 
+                                    ndisparities=64, SAD_window_size=7)
+
+    def compute(self, left, right): 
+        return self.stereo.process(left, right).astype(np.float32) / 16.0
+
+
+class EdgeStereo: 
+    def __init__(self): 
+        # Initilize stereo block matching
+        self.stereo = _EdgeStereo()
+
+    def compute(self, left, right): 
+        return self.stereo.process(left, right).astype(np.float32) / 16.0
 
 
 # ================================
