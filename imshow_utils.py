@@ -1,6 +1,7 @@
 import cv2
-import numpy as np
 import sys
+import time
+import numpy as np
 
 import matplotlib.pyplot as plt
 from collections import OrderedDict
@@ -46,6 +47,10 @@ def imshow_cv(label, im, block=False, text=None):
     ch = cv2.waitKey(0 if block else 1) & 0xFF
     if ch == ord(' '):
         cv2.waitKey(0)
+    if ch == ord('s'):
+        fn = 'img-%s.png' % time.strftime("%Y-%m-%d-%H-%M-%S")
+        print 'Saving %s' % fn
+        cv2.imwrite(fn, vis)
     elif ch == 27 or ch == ord('q'):
         sys.exit(1)
 
