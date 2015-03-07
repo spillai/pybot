@@ -92,7 +92,7 @@ class DatasetReader(object):
         self.process_cb = process_cb
 
         # Index starts at 1
-        if files is None: 
+        if files is None:
             self.files = [template % idx
                           for idx in range(start_idx, max_files) 
                           if os.path.exists(template % idx)]
@@ -107,7 +107,7 @@ class DatasetReader(object):
         fnos = np.arange(0, len(self.files), every_k_frames).astype(int)
         if reverse: 
             fnos = fnos[::-1]
-        for fno in fnos: 
+        for fno in fnos:
             yield self.process_cb(self.files[fno])
 
     def iterinds(self, inds, reverse=False): 
@@ -157,7 +157,7 @@ class ImageDatasetReader(DatasetReader):
     """
 
     @staticmethod
-    def imread_process_cb(scale=1.0): 
+    def imread_process_cb(scale=1.0):
         if scale != 1.0: 
             return lambda fn: im_resize(cv2.imread(fn, -1), scale)
         else: 
