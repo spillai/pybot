@@ -6,7 +6,7 @@ General-purpose class for quaternion / rotation transformations.
 
 import math
 import numpy as np
-import ros_transformations as tf
+import transformations as tf
 from tf_tests import tf_isequal
 
 ###############################################################################
@@ -147,32 +147,32 @@ class Quaternion(object):
     def to_homogeneous_matrix(self):
         return tf.quaternion_matrix(self.q)
 
-    # def interpolate(self, other, this_weight):
-    #     q0, q1 = np.roll(self.q, shift=1), np.roll(other.q, shift=1)
-    #     u = 1 - this_weight
-    #     assert(u >= 0 and u <= 1)
-    #     cos_omega = np.dot(q0, q1)
+    def interpolate(self, other, this_weight):
+        q0, q1 = np.roll(self.q, shift=1), np.roll(other.q, shift=1)
+        u = 1 - this_weight
+        assert(u >= 0 and u <= 1)
+        cos_omega = np.dot(q0, q1)
 
-    #     if cos_omega < 0:
-    #         result = -q0[:]
-    #         cos_omega = -cos_omega
-    #     else:
-    #         result = q0[:]
+        if cos_omega < 0:
+            result = -q0[:]
+            cos_omega = -cos_omega
+        else:
+            result = q0[:]
 
-    #     cos_omega = min(cos_omega, 1)
+        cos_omega = min(cos_omega, 1)
 
-    #     omega = math.acos(cos_omega)
-    #     sin_omega = math.sin(omega)
-    #     a = math.sin((1-u) * omega)/ sin_omega
-    #     b = math.sin(u * omega) / sin_omega
+        omega = math.acos(cos_omega)
+        sin_omega = math.sin(omega)
+        a = math.sin((1-u) * omega)/ sin_omega
+        b = math.sin(u * omega) / sin_omega
 
-    #     if abs(sin_omega) < 1e-6:
-    #         # direct linear interpolation for numerically unstable regions
-    #         result = result * this_weight + q1 * u
-    #         result /= math.sqrt(np.dot(result, result))
-    #     else:
-    #         result = result*a + q1*b
-    #     return Quaternion(np.roll(result, shift=-1))
+        if abs(sin_omega) < 1e-6:
+            # direct linear interpolation for numerically unstable regions
+            result = result * this_weight + q1 * u
+            result /= math.sqrt(np.dot(result, result))
+        else:
+            result = result*a + q1*b
+        return Quaternion(np.roll(result, shift=-1))
 
 
 ###############################################################################
