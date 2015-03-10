@@ -63,7 +63,8 @@ def tf_compose(R, t):
 ###############################################################################
 class RigidTransform(object):
     """
-    Quaternion quat within this class is interpreted as xyzw
+    Quaternion quat within this class is interpreted as xyzw, 
+    similar to ros_quaternion.py file
     """
     def __init__(self, xyzw=[0.,0.,0.,1.], tvec=[0.,0.,0.]):
         """ Initialize a RigidTransform with Quaternion and 3D Position """
