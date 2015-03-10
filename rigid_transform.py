@@ -1,19 +1,29 @@
+"""
+General-purpose class for rigid-body transformations.
+"""
+# Author: Sudeep Pillai <spillai@csail.mit.edu>
+# License: TODO
+
 import numpy as np
 import transformations as tf
 from ros_quaternion import Quaternion
 from tf_tests import tf_isequal
 
+###############################################################################
 def normalize_vec(v): 
+    """ Normalizes a vector with its L2 norm """
     return v * 1.0 / np.linalg.norm(v)
 
-# Construct a reference frame with two vectors
-# TODO: checks for degenerate cases
 def tf_construct(vec1,vec2): 
     """
-    Align vx along v1, and construct [vx,vy,vz] as follows: 
-    vx = v1
-    vz = v1 x v2
-    vy = vz x vx
+    Construct a reference frame with two vectors
+
+    Align vx along v1, and construct [vx,vy,vz] as follows:
+      vx = v1
+      vz = v1 x v2
+      vy = vz x vx
+
+    TODO: checks for degenerate cases
     """
     assert(np.linalg.norm(vec1)-1.0 < 1e-6)
     assert(np.linalg.norm(vec2)-1.0 < 1e-6)
@@ -32,7 +42,8 @@ def tf_construct(vec1,vec2):
     
     return R
 
-def tf_construct_3pt(p1, p2, p3, origin=None): 
+def tf_construct_3pt(p1, p2, p3, origin=None):
+    """ Construct triad with 3-points """
     v1, v2 = p1-p2, p2-p3
     v1 = v1 / np.linalg.norm(v1)
     v2 = v2 / np.linalg.norm(v2)
@@ -43,21 +54,20 @@ def tf_construct_3pt(p1, p2, p3, origin=None):
         return RigidTransform.from_Rt(R, origin)
 
 def tf_compose(R, t): 
-    """ 
-    Construct [R t; 0 1] transformation matrix from R and t 
-    """
+    """ Construct [R t; 0 1] transformation matrix from R and t """
     T = np.eye(4);
     T[:3,:3] = R.copy()
     T[:3,3] = t.copy()
     return T
     
-
+###############################################################################
 class RigidTransform(object):
     """
     Quaternion quat within this class is interpreted as xyzw, 
     similar to ros_quaternion.py file
     """
     def __init__(self, xyzw=[0.,0.,0.,1.], tvec=[0.,0.,0.]):
+        """ Initialize a RigidTransform with Quaternion and 3D Position """
         self.quat = Quaternion(xyzw)
         self.tvec = np.array(tvec)
 
@@ -66,33 +76,23 @@ class RigidTransform(object):
         # return 'quat: %s, tvec: %s' % (self.quat, self.tvec)
 
     def inverse(self):
-        """ returns a new RigidTransform that corresponds to the inverse of this one """
+        """ Returns a new RigidTransform that corresponds to the inverse of this one """
         qinv = self.quat.inverse()
         return RigidTransform(qinv, qinv.rotate(- self.tvec))
 
     def to_homogeneous_matrix(self):
+        """ Returns a 4x4 homogenous matrix of the form [R t; 0 1] """
         result = self.quat.to_homogeneous_matrix()
         result[:3, 3] = self.tvec
         return result
 
-    def to_Rt(self): 
+    def to_Rt(self):
+        """ Returns rotation R, and translational vector t """
         T = self.to_homogeneous_matrix()
         return T[:3,:3].copy(), T[:3,3].copy()
 
-    # def interpolate(self, other_transform, this_weight):
-    #     assert this_weight >= 0 and this_weight <= 1
-    #     t = self.tvec * this_weight + other_transform.tvec * (1 - this_weight)
-    #     r = self.quat.interpolate(other_transform.quat, this_weight)
-    #     return RigidTransform(r, t)
-
-    # def ominus(self, other): 
-    #     if not isinstance(other, RigidTransform): 
-    #         raise TypeError("Type inconsistent")
-    #     oinv = other.inverse()
-    #     return oinv.oplus(self)
-
-    # left multiply
     def __mul__(self, other):
+        """ Left-multiply RigidTransform with another """
         if isinstance(other, RigidTransform):
             t = self.quat.rotate(other.tvec) + self.tvec
             r = self.quat * other.quat
@@ -176,6 +176,19 @@ class RigidTransform(object):
     @classmethod
     def identity(cls):
         return cls()
+
+    # def interpolate(self, other_transform, this_weight):
+    #     assert this_weight >= 0 and this_weight <= 1
+    #     t = self.tvec * this_weight + other_transform.tvec * (1 - this_weight)
+    #     r = self.quat.interpolate(other_transform.quat, this_weight)
+    #     return RigidTransform(r, t)
+
+    # def ominus(self, other): 
+    #     if not isinstance(other, RigidTransform): 
+    #         raise TypeError("Type inconsistent")
+    #     oinv = other.inverse()
+    #     return oinv.oplus(self)
+
 
 class Sim3(RigidTransform): 
     def __init__(self, xyzw=[0.,0.,0.,1.], tvec=[0.,0.,0.], scale=1.0):    
