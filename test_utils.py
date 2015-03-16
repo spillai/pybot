@@ -4,11 +4,11 @@ from bot_utils.dataset.kitti import KITTIDatasetReader
 
 def test_dataset(color=False, **kwargs): 
     if color: 
-        return KITTIDatasetReader(directory='~/data/dataset/', sequence='16', 
+        return KITTIDatasetReader(directory='~/data/dataset/', sequence='01', 
                                         left_template='image_2/%06i.png', right_template='image_3/%06i.png', 
                                         start_idx=0, **kwargs)
     else: 
-        return KITTIDatasetReader(directory='~/data/dataset/', sequence='16', start_idx=0, **kwargs)
+        return KITTIDatasetReader(directory='~/data/dataset/', sequence='01', start_idx=0, **kwargs)
 
 def test_image(color=True, scale=1.0, stereo=False): 
     for l,r in test_dataset(color=True).iter_stereo_frames(): 
