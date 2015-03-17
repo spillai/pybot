@@ -9,6 +9,7 @@ import bot_vision.mser_utils as mser_utils
 import bot_utils.io_utils as io_utils
 from bot_utils.io_utils import memory_usage_psutil
 from bot_utils.db_utils import AttrDict, IterDB
+from bot_utils.itertools_recipes import chunks
 
 import sklearn.metrics as metrics
 from sklearn.decomposition import PCA, RandomizedPCA
@@ -18,6 +19,8 @@ from sklearn.grid_search import GridSearchCV
 from sklearn.cross_validation import train_test_split
 from sklearn.kernel_approximation import AdditiveChi2Sampler, RBFSampler
 from sklearn.pipeline import Pipeline
+
+
 
 from sklearn.externals.joblib import Parallel, delayed
 
@@ -37,25 +40,49 @@ class HomogenousKernelMap(AdditiveChi2Sampler):
         psix = super(HomogenousKernelMap, self).transform(Xp, y=y)
         return sgn * psix
 
-class ImageDescription(object): 
-    def __init__(self, detector='dense', descriptor='SIFT', step=4, levels=4, scale=2.0): 
+def get_dense_detector(step=4, levels=7, scale=np.sqrt(2)): 
+    detector = cv2.FeatureDetector_create('Dense')
+    detector.setInt('initXyStep', step)
+    # detector.setDouble('initFeatureScale', 36)
+    detector.setDouble('featureScaleMul', scale)
+    detector.setInt('featureScaleLevels', levels)
+    detector.setBool('varyImgBoundWithScale', True)
+    detector.setBool('varyXyStepWithScale', False)
+    return detector
+
+def dense_sift(img, mask=None, descriptor='SIFT', step=4, levels=7, scale=np.sqrt(2)): 
+    detector = get_dense_detector(step=step, levels=levels, scale=scale)
+    extractor = cv2.DescriptorExtractor_create(descriptor)
+
+    kpts = detector.detect(img, mask=mask)
+    kpts, desc = extractor.compute(img, kpts)
+    return kpts, desc
+
+def dense_sift_describe(*args, **kwargs): 
+    kpts, desc = dense_sift(*args, **kwargs)
+    return desc
+
+class ImageDescription(object):  
+    def __init__(self, detector='dense', descriptor='SIFT', step=4, levels=7, scale=np.sqrt(2)): 
         self.step = step
         self.levels = levels
         self.scale = scale
-
+        
         # Setup feature detector
         if detector == 'dense': 
             self.detector = cv2.FeatureDetector_create('Dense')
             self.detector.setInt('initXyStep', step)
+            self.detector.setDouble('initFeatureScale', 36)
             self.detector.setDouble('featureScaleMul', scale)
             self.detector.setInt('featureScaleLevels', levels)
             self.detector.setBool('varyImgBoundWithScale', True)
             self.detector.setBool('varyXyStepWithScale', False)
+            # self.detector = cv2.PyramidAdaptedFeatureDetector(self.detector, maxLevel=4)
         else: 
-            # self.detector = cv2.PyramidAdaptedFeatureDetector(, maxLevel=levels)
             self.detector = cv2.FeatureDetector_create(detector)
+            # self.detector = cv2.PyramidAdaptedFeatureDetector(detector, maxLevel=levels)
 
-        # Setup feature extractor
+            # Setup feature extractor
         self.extractor = cv2.DescriptorExtractor_create(descriptor)
 
     def detect_and_describe(self, img, mask=None): 
@@ -68,22 +95,35 @@ class ImageDescription(object):
         """
         try: 
             # Descriptor extraction
+            # all_kpts, all_desc = [], []
+            # for l in xrange(self.levels): 
+            #     img_ = im_resize(img, scale=self.scale**l)
+            #     mask_ = im_resize(mask, scale=self.scale**l) if mask is not None else None
+            #     kpts_ = self.detector.detect(img_, mask=mask_)
+            #     kpts_, desc_ = self.extractor.compute(img_, kpts_)
+            #     all_kpts.extend(kpts_), all_desc.append(desc_)
+
+            # return all_kpts, np.vstack(all_desc)
+                
             kpts = self.detector.detect(img, mask=mask)
             kpts, desc = self.extractor.compute(img, kpts)
 
             # # RootSIFT
-            # pre_shape = desc.shape
+            # # pre_shape = desc.shape
             # desc = np.sqrt(desc.astype(np.float32) / (np.sum(desc, axis=1)).reshape(-1,1))
             # inds, = np.where(np.isfinite(desc).all(axis=1))
             # kpts, desc = [kpts[ind] for ind in inds], desc[inds]
-            # post_shape = desc.shape
-            # print pre_shape, post_shape
+            # # post_shape = desc.shape
+            # # print pre_shape, post_shape
 
-            # Extract color information (Lab)
-            pts = np.vstack([kp.pt for kp in kpts]).astype(np.int32)
-            imgc = median_blur(img, size=5) 
-            cdesc = img[pts[:,1], pts[:,0]]
-            return kpts, np.hstack([desc, cdesc])
+            # # Extract color information (Lab)
+            # pts = np.vstack([kp.pt for kp in kpts]).astype(np.int32)
+            # imgc = median_blur(img, size=5) 
+            # cdesc = img[pts[:,1], pts[:,0]]
+            # return kpts, np.hstack([desc, cdesc])
+
+            return kpts, desc
+
         except Exception as e: 
             print e
             return None, None
@@ -212,33 +252,60 @@ class ImageClassifier(object):
         if not hasattr(self, 'X_train') or not hasattr(self, 'y_train'): 
             raise RuntimeError('Training cannot proceed. Setup training and testing samples first!')            
 
-        # Extract features, only if not already available
+        # Extract training features, only if not already available
         if not os.path.isdir(self.params.cache.train_path): 
             print '====> [COMPUTE] TRAINING: Feature Extraction '        
+            st = time.time()
             vocab_construction = AttrDict(num_per_image=1e3)
             features_db = IterDB(filename=self.params.cache.train_path, mode='w', 
                                  fields=['train_desc', 'train_target', 'vocab_desc'], batch_size=5)
-            for (x_t,y_t) in izip(self.X_train, self.y_train): 
-                # Extract and add descriptors to db
-                im_desc = self.image_descriptor.describe(**self.process_cb(x_t))
-                features_db.append('train_desc', im_desc)
-                features_db.append('train_target', y_t)
 
-                # Randomly sample from descriptors for vocab construction
-                inds = np.random.permutation(int(min(len(im_desc), vocab_construction.num_per_image)))
-                features_db.append('vocab_desc', im_desc[inds])
+            # Parallel Processing
+            for chunk in chunks(izip(self.X_train, self.y_train), 8): 
+                res = Parallel(n_jobs=8, verbose=5)(delayed(dense_sift_describe)(**self.process_cb(x_t)) for (x_t,_) in chunk)
+                for im_desc, (_, y_t) in izip(res, chunk): 
+                    features_db.append('train_desc', im_desc)
+                    features_db.append('train_target', y_t)
+
+                    # Randomly sample from descriptors for vocab construction
+                    inds = np.random.permutation(int(min(len(im_desc), vocab_construction.num_per_image)))
+                    features_db.append('vocab_desc', im_desc[inds])
+
+            # Serial Processing                    
+            # for (x_t,y_t) in izip(self.X_train, self.y_train): 
+            #     # Extract and add descriptors to db
+            #     im_desc = self.image_descriptor.describe(**self.process_cb(x_t))
+            #     features_db.append('train_desc', im_desc)
+            #     features_db.append('train_target', y_t)
+
+            #     # Randomly sample from descriptors for vocab construction
+            #     inds = np.random.permutation(int(min(len(im_desc), vocab_construction.num_per_image)))
+            #     features_db.append('vocab_desc', im_desc[inds])
+
             features_db.finalize()
+
             print 'Descriptor extraction took %5.3f s' % (time.time() - st)    
         print '-------------------------------'
 
-        # Extract features
+        # Extract test features
         if not os.path.isdir(self.params.cache.test_path): 
             print '====> [COMPUTE] TESTING: Feature Extraction '        
             features_db = IterDB(filename=self.params.cache.test_path, mode='w', 
                                  fields=['test_desc', 'test_target'], batch_size=5)
-            for (x_t,y_t) in izip(self.X_test, self.y_test): 
-                features_db.append('test_desc', self.image_descriptor.describe(**self.process_cb(x_t)))
-                features_db.append('test_target', y_t)
+
+
+            # Parallel Processing
+            for chunk in chunks(izip(self.X_test, self.y_test), 8): 
+                res = Parallel(n_jobs=8, verbose=5)(delayed(dense_sift_describe)(**self.process_cb(x_t)) for (x_t,_) in chunk)
+                for im_desc, (_, y_t) in izip(res, chunk): 
+                    features_db.append('test_desc', im_desc)
+                    features_db.append('test_target', y_t)
+
+            # Serial Processing
+            # for (x_t,y_t) in izip(self.X_test, self.y_test): 
+            #     features_db.append('test_desc', self.image_descriptor.describe(**self.process_cb(x_t)))
+            #     features_db.append('test_target', y_t)
+
             features_db.finalize()
         print '-------------------------------'
 
@@ -353,7 +420,6 @@ class ImageClassifier(object):
         # Extract features
         if not os.path.isdir(self.params.cache.test_path): 
             print '====> [COMPUTE] Feature Extraction '        
-
             features_db = IterDB(filename=self.params.cache.test_path, mode='w', 
                                  fields=['test_desc', 'test_target'], batch_size=5)
             for (x_t,y_t) in izip(self.X_test, self.y_test): 
