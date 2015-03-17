@@ -63,6 +63,17 @@ def memory_usage_psutil():
     mem = process.get_memory_info()[0] / float(2 ** 20)
     return mem
 
+class Tee(object):
+    def __init__(self, *files):
+        self.files = files
+
+    def write(self, obj):
+        for f in self.files:
+            f.write(obj)
+
+    def flush(self): 
+        pass
+
 class Capturing(list):
     def __enter__(self):
         self._stdout = sys.stdout
