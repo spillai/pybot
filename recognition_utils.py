@@ -50,16 +50,22 @@ def get_dense_detector(step=4, levels=7, scale=np.sqrt(2)):
     detector.setBool('varyXyStepWithScale', False)
     return detector
 
-def dense_sift(img, mask=None, descriptor='SIFT', step=4, levels=7, scale=np.sqrt(2)): 
-    detector = get_dense_detector(step=step, levels=levels, scale=scale)
-    extractor = cv2.DescriptorExtractor_create(descriptor)
+def get_detector(detector='dense', step=4, levels=7, scale=np.sqrt(2)): 
+    if detector == 'dense': 
+        return get_dense_detector(step=step, levels=levels, scale=scale)
+    else: 
+        return cv2.FeatureDetector_create(detector)
 
+def im_detect_and_describe(img, mask=None, detector='dense', descriptor='SIFT', step=4, levels=7, scale=np.sqrt(2)): 
+    detector = get_detector(detector=detector, step=step, levels=levels, scale=scale)
+    extractor = cv2.DescriptorExtractor_create(descriptor)
+    
     kpts = detector.detect(img, mask=mask)
     kpts, desc = extractor.compute(img, kpts)
     return kpts, desc
 
-def dense_sift_describe(*args, **kwargs): 
-    kpts, desc = dense_sift(*args, **kwargs)
+def im_describe(*args, **kwargs): 
+    kpts, desc = im_detect_and_describe(*args, **kwargs)
     return desc
 
 class ImageDescription(object):  
@@ -258,11 +264,15 @@ class ImageClassifier(object):
             st = time.time()
             vocab_construction = AttrDict(num_per_image=1e3)
             features_db = IterDB(filename=self.params.cache.train_path, mode='w', 
-                                 fields=['train_desc', 'train_target', 'vocab_desc'], batch_size=5)
+                                 fields=['train_desc', 'train_target', 'vocab_desc'], batch_size=50)
 
             # Parallel Processing
-            for chunk in chunks(izip(self.X_train, self.y_train), 8): 
-                res = Parallel(n_jobs=8, verbose=5)(delayed(dense_sift_describe)(**self.process_cb(x_t)) for (x_t,_) in chunk)
+            for chunk in chunks(izip(self.X_train, self.y_train), 50): 
+                res = Parallel(n_jobs=8, verbose=5) (
+                    delayed(im_describe)
+                    (**dict(self.process_cb(x_t), **self.params.descriptor)) for (x_t,_) in chunk
+                )
+
                 for im_desc, (_, y_t) in izip(res, chunk): 
                     features_db.append('train_desc', im_desc)
                     features_db.append('train_target', y_t)
@@ -283,20 +293,24 @@ class ImageClassifier(object):
             #     features_db.append('vocab_desc', im_desc[inds])
 
             features_db.finalize()
+            print '[TRAIN] Descriptor extraction took %5.3f s' % (time.time() - st)    
 
-            print 'Descriptor extraction took %5.3f s' % (time.time() - st)    
         print '-------------------------------'
 
         # Extract test features
         if not os.path.isdir(self.params.cache.test_path): 
             print '====> [COMPUTE] TESTING: Feature Extraction '        
+            st = time.time()
             features_db = IterDB(filename=self.params.cache.test_path, mode='w', 
-                                 fields=['test_desc', 'test_target'], batch_size=5)
+                                 fields=['test_desc', 'test_target'], batch_size=50)
 
 
             # Parallel Processing
-            for chunk in chunks(izip(self.X_test, self.y_test), 8): 
-                res = Parallel(n_jobs=8, verbose=5)(delayed(dense_sift_describe)(**self.process_cb(x_t)) for (x_t,_) in chunk)
+            for chunk in chunks(izip(self.X_test, self.y_test), 50): 
+                res = Parallel(n_jobs=8, verbose=5) (
+                    delayed(im_describe)
+                    (**dict(self.process_cb(x_t), **self.params.descriptor)) for (x_t,_) in chunk
+                )
                 for im_desc, (_, y_t) in izip(res, chunk): 
                     features_db.append('test_desc', im_desc)
                     features_db.append('test_target', y_t)
@@ -307,6 +321,7 @@ class ImageClassifier(object):
             #     features_db.append('test_target', y_t)
 
             features_db.finalize()
+            print '[TEST] Descriptor extraction took %5.3f s' % (time.time() - st)    
         print '-------------------------------'
 
 
@@ -330,6 +345,7 @@ class ImageClassifier(object):
             vocab_construction = AttrDict(num_per_image=1e3)
             features_db = IterDB(filename=self.params.cache.train_path, mode='w', 
                                  fields=['train_desc', 'train_target', 'vocab_desc'])
+            # Serial Processing
             for (x_t,y_t) in izip(self.X_train, self.y_train): 
                 # Extract and add descriptors to db
                 im_desc = self.image_descriptor.describe(**self.process_cb(x_t))
@@ -339,6 +355,7 @@ class ImageClassifier(object):
                 # Randomly sample from descriptors for vocab construction
                 inds = np.random.permutation(int(min(len(im_desc), vocab_construction.num_per_image)))
                 features_db.append('vocab_desc', im_desc[inds])
+
             features_db.finalize()
             print 'Descriptor extraction took %5.3f s' % (time.time() - st)    
         else: 
@@ -371,6 +388,7 @@ class ImageClassifier(object):
             train_target = np.array(self.y_train, dtype=np.int32)
             train_histogram = np.vstack([self.bow.project(desc) 
                                          for desc in features_db.itervalues('train_desc', verbose=True)])
+
             hists_db = AttrDict(train_target=train_target, train_histogram=train_histogram)
             hists_db.save(self.params.cache.train_hists_path)
             print '====> MEMORY: Histogram: %s %4.3f MB' % (train_histogram.shape, 
