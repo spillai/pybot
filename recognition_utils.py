@@ -190,20 +190,21 @@ class ImageClassifier(object):
 
     def setup_training_testing(self, max_test_size): 
         # Split up training and test
-        self.X_train, self.X_test, self.y_train, self.y_test = [], [], [], []
+        self.X_train, self.y_train, self.X_test, self.y_test = self.dataset.get_train_test_split()
 
-        print np.unique(self.dataset.target)
-        for y_t in np.unique(self.dataset.target): 
+        # self.X_train, self.X_test, self.y_train, self.y_test = [], [], [], []
+        # print np.unique(self.dataset.target)
+        # for y_t in np.unique(self.dataset.target): 
 
-            inds, = np.where(self.dataset.target == y_t)
-            data, target = self.dataset.data[inds], self.dataset.target[inds]
+        #     inds, = np.where(self.dataset.target == y_t)
+        #     data, target = self.dataset.data[inds], self.dataset.target[inds]
 
-            # Split train, and test (complement of test)
-            X_train, X_test, y_train, y_test = train_test_split(data, target, **self.params.training)
+        #     # Split train, and test (complement of test)
+        #     X_train, X_test, y_train, y_test = train_test_split(data, target, **self.params.training)
 
-            # Only allow max testing size
-            self.X_train.extend(X_train), self.X_test.extend(X_test[:max_test_size])
-            self.y_train.extend(y_train), self.y_test.extend(y_test[:max_test_size])
+        #     # Only allow max testing size
+        #     self.X_train.extend(X_train), self.X_test.extend(X_test[:max_test_size])
+        #     self.y_train.extend(y_train), self.y_test.extend(y_test[:max_test_size])
 
         self.X_all = list(chain(self.X_train, self.X_test))
         self.y_all = list(chain(self.y_train, self.y_test))
@@ -219,7 +220,6 @@ class ImageClassifier(object):
         if not os.path.isdir(self.params.cache.train_path): 
             print '====> [COMPUTE] TRAINING: Feature Extraction '        
             st = time.time()
-            vocab_construction = AttrDict(num_per_image=1e3)
             features_db = IterDB(filename=self.params.cache.train_path, mode='w', 
                                  fields=['train_desc', 'train_target', 'vocab_desc'], batch_size=50)
 
@@ -235,7 +235,7 @@ class ImageClassifier(object):
                     features_db.append('train_target', y_t)
 
                     # Randomly sample from descriptors for vocab construction
-                    inds = np.random.permutation(int(min(len(im_desc), vocab_construction.num_per_image)))
+                    inds = np.random.permutation(int(min(len(im_desc), self.params.vocab.num_per_image)))
                     features_db.append('vocab_desc', im_desc[inds])
 
             # Serial Processing                    
@@ -246,7 +246,7 @@ class ImageClassifier(object):
             #     features_db.append('train_target', y_t)
 
             #     # Randomly sample from descriptors for vocab construction
-            #     inds = np.random.permutation(int(min(len(im_desc), vocab_construction.num_per_image)))
+            #     inds = np.random.permutation(int(min(len(im_desc), self.params.vocab.num_per_image)))
             #     features_db.append('vocab_desc', im_desc[inds])
 
             features_db.finalize()
@@ -299,7 +299,6 @@ class ImageClassifier(object):
         # Extract features, only if not already available
         if not os.path.isdir(self.params.cache.train_path): 
             print '====> [COMPUTE] Feature Extraction '        
-            vocab_construction = AttrDict(num_per_image=1e3)
             features_db = IterDB(filename=self.params.cache.train_path, mode='w', 
                                  fields=['train_desc', 'train_target', 'vocab_desc'])
             # Serial Processing
@@ -310,7 +309,7 @@ class ImageClassifier(object):
                 features_db.append('train_target', y_t)
 
                 # Randomly sample from descriptors for vocab construction
-                inds = np.random.permutation(int(min(len(im_desc), vocab_construction.num_per_image)))
+                inds = np.random.permutation(int(min(len(im_desc), self.params.vocab.num_per_image)))
                 features_db.append('vocab_desc', im_desc[inds])
 
             features_db.finalize()
@@ -323,8 +322,7 @@ class ImageClassifier(object):
         # Build BOW
         if not os.path.exists(self.params.cache.vocab_path): # or self.params.cache.overwrite: 
             print '====> [COMPUTE] Vocabulary Construction'
-            vocab_construction = AttrDict(num_images=1e3)
-            inds = np.random.permutation(len(self.X_train))[:vocab_construction.num_images]
+            inds = np.random.permutation(len(self.X_train))[:self.params.vocab.num_images]
             vocab_desc = np.vstack([item for item in features_db.itervalues('vocab_desc', inds=inds, verbose=True)])
             print 'Codebook data: %i, %i' % (len(inds), len(vocab_desc))
 
