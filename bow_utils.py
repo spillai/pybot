@@ -246,8 +246,9 @@ class BoWVectorizer(object):
         for cidx, c in enumerate(code):
             residuals[c] += data[cidx] - self.codebook[c]
        
-        # Normalize
+        # Normalize [ Component-wise L2 / SSR followed by L2 normalization]
         residuals = BoWVectorizer.normalize(residuals, norm_method=self.norm_method)
+        residuals = BoWVectorizer.normalize(residuals, norm_method='global-l2')
             
         # Vectorize [1 x (KD)]
         return residuals.ravel()

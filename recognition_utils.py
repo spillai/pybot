@@ -13,14 +13,12 @@ from bot_utils.itertools_recipes import chunks
 
 import sklearn.metrics as metrics
 from sklearn.decomposition import PCA, RandomizedPCA
-from sklearn.svm import LinearSVC
+from sklearn.svm import LinearSVC, SVC
 from sklearn.linear_model import SGDClassifier
 from sklearn.grid_search import GridSearchCV
-from sklearn.cross_validation import train_test_split
+from sklearn.cross_validation import train_test_split, ShuffleSplit
 from sklearn.kernel_approximation import AdditiveChi2Sampler, RBFSampler
 from sklearn.pipeline import Pipeline
-
-
 
 from sklearn.externals.joblib import Parallel, delayed
 
@@ -43,11 +41,13 @@ class HomogenousKernelMap(AdditiveChi2Sampler):
 def get_dense_detector(step=4, levels=7, scale=np.sqrt(2)): 
     detector = cv2.FeatureDetector_create('Dense')
     detector.setInt('initXyStep', step)
-    # detector.setDouble('initFeatureScale', 36)
+    # detector.setDouble('initFeatureScale', 0.5)
     detector.setDouble('featureScaleMul', scale)
     detector.setInt('featureScaleLevels', levels)
     detector.setBool('varyImgBoundWithScale', True)
     detector.setBool('varyXyStepWithScale', False)
+
+    # detector = cv2.PyramidAdaptedFeatureDetector(detector, maxLevel=4)
     return detector
 
 def get_detector(detector='dense', step=4, levels=7, scale=np.sqrt(2)): 
@@ -75,20 +75,9 @@ class ImageDescription(object):
         self.scale = scale
         
         # Setup feature detector
-        if detector == 'dense': 
-            self.detector = cv2.FeatureDetector_create('Dense')
-            self.detector.setInt('initXyStep', step)
-            self.detector.setDouble('initFeatureScale', 36)
-            self.detector.setDouble('featureScaleMul', scale)
-            self.detector.setInt('featureScaleLevels', levels)
-            self.detector.setBool('varyImgBoundWithScale', True)
-            self.detector.setBool('varyXyStepWithScale', False)
-            # self.detector = cv2.PyramidAdaptedFeatureDetector(self.detector, maxLevel=4)
-        else: 
-            self.detector = cv2.FeatureDetector_create(detector)
-            # self.detector = cv2.PyramidAdaptedFeatureDetector(detector, maxLevel=levels)
+        self.detector = get_dense_detector(step=step, levels=levels, scale=scale)
 
-            # Setup feature extractor
+        # Setup feature extractor
         self.extractor = cv2.DescriptorExtractor_create(descriptor)
 
     def detect_and_describe(self, img, mask=None): 
@@ -101,16 +90,6 @@ class ImageDescription(object):
         """
         try: 
             # Descriptor extraction
-            # all_kpts, all_desc = [], []
-            # for l in xrange(self.levels): 
-            #     img_ = im_resize(img, scale=self.scale**l)
-            #     mask_ = im_resize(mask, scale=self.scale**l) if mask is not None else None
-            #     kpts_ = self.detector.detect(img_, mask=mask_)
-            #     kpts_, desc_ = self.extractor.compute(img_, kpts_)
-            #     all_kpts.extend(kpts_), all_desc.append(desc_)
-
-            # return all_kpts, np.vstack(all_desc)
-                
             kpts = self.detector.detect(img, mask=mask)
             kpts, desc = self.extractor.compute(img, kpts)
 
@@ -144,25 +123,6 @@ class ImageDescription(object):
         """
         kpts, desc = self.detect_and_describe(img, mask=mask)
         return desc
-
-# def bow_project(desc, vocab, index): 
-#     print desc.shape
-#     bow = BoWVectorizer.from_dict(vocab, index=index)
-#     return bow.project(desc)
-
-# def bow_project(desc, bow): 
-#     print desc.shape
-#     return bow.project(desc)
-
-# vocab_index = BoWVectorizer.compute_index(vocab_db.bow.codebook)
-# bow = BoWVectorizer.from_dict(vocab_db.bow) 
-# train_histogram = []
-# for chunks in features_db.iterchunks('train_desc', batch_size=10, verbose=True): 
-#     # print 'Chunks: ', len(chunks)
-#     # res = Parallel(n_jobs=2, verbose=5)(delayed(bow_project)(desc, bow) for desc in chunks)
-#     res = np.vstack([self.bow.project(desc) for desc in chunks])
-#     train_histogram.extend(res)
-
 
 class ImageClassifier(object): 
     """
@@ -212,12 +172,12 @@ class ImageClassifier(object):
         self.image_descriptor = ImageDescription(**self.params.descriptor)
 
         # Setup dim. red
-        self.pca = RandomizedPCA(n_components=1000, whiten=False)
+        self.pca = RandomizedPCA(**self.params.pca)
 
         # Setup kernel feature map
         # kernel_tf = [('chi2_kernel', HomogenousKernelMap(2)), ('rbf_sampler', RBFSampler(gamma=0.2, n_components=40))]
-        # self.kernel_tf = Pipeline(kernel_tf) if self.params.use_kernel_approximation else None
-        self.kernel_tf = HomogenousKernelMap(2) if self.params.use_kernel_approximation else None
+        # self.kernel_tf = Pipeline(kernel_tf) if self.params.do_kernel_approximation else None
+        self.kernel_tf = HomogenousKernelMap(2) if self.params.do_kernel_approximation else None
 
         # Setup classifier
         print 'Building Classifier'
@@ -225,11 +185,8 @@ class ImageClassifier(object):
         # self._clf = SGDClassifier(loss='hinge', n_jobs=4)
 
         # Linear SVM
-        cv_params = {'C':[0.01, 0.1, 0.5, 1.0, 10.0]}
-        self._clf = LinearSVC()
-
-        # Grid search cross-val
-        self.clf = GridSearchCV(self._clf, cv_params, cv=10, n_jobs=4, verbose=1)
+        self.clf_hyparams = {'C':[0.01, 0.1, 0.5, 1.0, 10.0]}
+        self.clf = LinearSVC(random_state=1, tol=1e-4)
 
     def setup_training_testing(self, max_test_size): 
         # Split up training and test
@@ -364,12 +321,20 @@ class ImageClassifier(object):
         print '-------------------------------'
 
         # Build BOW
-        if not os.path.exists(self.params.cache.vocab_path):# or self.params.cache.overwrite: 
+        if not os.path.exists(self.params.cache.vocab_path): # or self.params.cache.overwrite: 
             print '====> [COMPUTE] Vocabulary Construction'
             vocab_construction = AttrDict(num_images=1e3)
             inds = np.random.permutation(len(self.X_train))[:vocab_construction.num_images]
             vocab_desc = np.vstack([item for item in features_db.itervalues('vocab_desc', inds=inds, verbose=True)])
             print 'Codebook data: %i, %i' % (len(inds), len(vocab_desc))
+
+            # Apply dimensionality reduction
+            # Fit PCA to subset of data computed
+            print '====> [REDUCE] PCA dim. reduction before: %4.3f MB' % (vocab_desc.nbytes / 1024 / 1024.0) 
+            if self.params.do_pca: 
+                vocab_desc = self.pca.fit_transform(vocab_desc)
+            print '====> [REDUCE] PCA dim. reduction after: %4.3f MB' % (vocab_desc.nbytes / 1024 / 1024.0) 
+
             print '====> MEMORY: Codebook construction: %4.3f MB' % (vocab_desc.nbytes / 1024 / 1024.0) 
             self.bow.build(vocab_desc)
             vocab_desc = None
@@ -383,11 +348,12 @@ class ImageClassifier(object):
         print '-------------------------------'
 
         # Histogram of trained features
-        if not os.path.exists(self.params.cache.train_hists_path): 
+        if not os.path.exists(self.params.cache.train_hists_path): #  or self.params.cache.overwrite: 
             print '====> [COMPUTE] BoVW / VLAD projection '
             train_target = np.array(self.y_train, dtype=np.int32)
-            train_histogram = np.vstack([self.bow.project(desc) 
-                                         for desc in features_db.itervalues('train_desc', verbose=True)])
+            train_histogram = np.vstack([self.bow.project(
+                self.pca.transform(desc) if self.params.do_pca else desc
+            ) for desc in features_db.itervalues('train_desc', verbose=True)])
 
             hists_db = AttrDict(train_target=train_target, train_histogram=train_histogram)
             hists_db.save(self.params.cache.train_hists_path)
@@ -399,24 +365,30 @@ class ImageClassifier(object):
             train_target, train_histogram = hists_db.train_target, hists_db.train_histogram
         print '-------------------------------'
 
-        # PCA dim. red
-        if self.params.use_dimensionality_reduction: 
-            print '====> PCA '            
-            train_histogram = self.pca.fit_transform(train_histogram)
-            print '-------------------------------'        
+        # # PCA dim. red
+        # if self.params.do_pca: 
+        #     print '====> PCA '            
+        #     train_histogram = self.pca.fit_transform(train_histogram)
+        #     print '-------------------------------'        
 
         # Homogeneous Kernel map
-        if self.params.use_kernel_approximation: 
+        if self.params.do_kernel_approximation: 
             print '====> Kernel Approximation '
             train_histogram = self.kernel_tf.fit_transform(train_histogram)
             print '-------------------------------'        
 
         # Train/Predict one-vs-all classifier
-        print '====> Train SGD classifier '
-        st_sgd = time.time()
+        print '====> Train classifier '
+        st_clf = time.time()
+
+        # Grid search cross-val
+        cv = ShuffleSplit(len(train_histogram), n_iter=10, test_size=0.3, random_state=4)
+        self.clf = GridSearchCV(self.clf, self.clf_hyparams, cv=cv, n_jobs=8, verbose=1)
         self.clf.fit(train_histogram, train_target)
+        self.clf = self.clf.best_estimator_
         pred_target = self.clf.predict(train_histogram)
-        print 'Training SGD Classifier took %5.3f s' % (time.time() - st_sgd)
+
+        print 'Training Classifier took %5.3f s' % (time.time() - st_clf)
         print '-------------------------------'        
 
 
@@ -451,7 +423,7 @@ class ImageClassifier(object):
         print 'Descriptor extraction took %5.3f s' % (time.time() - st)    
 
         # Load Vocabulary
-        if os.path.exists(self.params.cache.vocab_path):# or self.params.cache.overwrite: 
+        if os.path.exists(self.params.cache.vocab_path):
             print '====> [LOAD] Vocabulary Construction'
             vocab_db = AttrDict.load(self.params.cache.vocab_path)
             self.bow = BoWVectorizer.from_dict(vocab_db.bow)
@@ -459,10 +431,12 @@ class ImageClassifier(object):
             raise RuntimeError('Vocabulary not built %s' % self.params.cache.vocab_path)
 
         # Histogram of trained features
-        if not os.path.exists(self.params.cache.test_hists_path): 
+        if not os.path.exists(self.params.cache.test_hists_path): #  or self.params.cache.overwrite: 
             print '====> [COMPUTE] BoVW / VLAD projection '
             test_target = self.y_test
-            test_histogram = np.vstack([self.bow.project(desc) for desc in features_db.itervalues('test_desc', verbose=True)])
+            test_histogram = np.vstack([self.bow.project(
+                self.pca.transform(desc) if self.params.do_pca else desc
+            ) for desc in features_db.itervalues('test_desc', verbose=True)])
             hists_db = AttrDict(test_target=test_target, test_histogram=test_histogram)
             hists_db.save(self.params.cache.test_hists_path)
             print '====> MEMORY: Histogram: %s %4.3f MB' % (test_histogram.shape, 
@@ -470,20 +444,20 @@ class ImageClassifier(object):
         else: 
             print '====> [LOAD] BoVW / VLAD projection '
             hists_db = AttrDict.load(self.params.cache.test_hists_path)
-            test_target, test_histogram = hists_db.train_target, hists_db.train_histogram
+            test_target, test_histogram = hists_db.test_target, hists_db.test_histogram
         print '-------------------------------'
 
-        # PCA dim. red
-        if self.params.use_dimensionality_reduction: 
-            print '====> PCA '            
-            test_histogram = self.pca.transform(test_histogram)
-            print '-------------------------------'        
+        # # PCA dim. red
+        # if self.params.do_pca: 
+        #     print '====> PCA '            
+        #     test_histogram = self.pca.transform(test_histogram)
+        #     print '-------------------------------'        
 
-        if self.params.use_kernel_approximation: 
+        if self.params.do_kernel_approximation: 
             # Apply homogeneous transform
             test_histogram = self.kernel_tf.transform(test_histogram)
 
-        print '====> Predict using SGD classifer '
+        print '====> Predict using classifer '
         pred_target = self.clf.predict(test_histogram)
         pred_score = self.clf.decision_function(test_histogram)
         print '-------------------------------'
