@@ -21,7 +21,7 @@ def path_exists(path):
 def create_path_if_not_exists(filename): 
     fn_path, fn_file = os.path.split(filename)    
     if not path_exists(fn_path): 
-        print 'Making directory path %s' % fn_path
+        # print 'Making directory path %s' % fn_path
         mkdir_p(fn_path)
         return True
     return False
