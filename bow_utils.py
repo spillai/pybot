@@ -10,6 +10,98 @@ from sklearn.mixture import GMM
 
 from bot_utils.db_utils import AttrDict
 
+def normalize_hist(hist, norm_method='global-l2'): 
+    """
+    Various normalization methods
+
+    Refer to: 
+    [1] Improving the Fisher Kernel for Large-Scale Image Classifcation, Perronnin et al
+    http://www.robots.ox.ac.uk/~vgg/rg/papers/peronnin_etal_ECCV10.pdf
+
+    [2] Segmentation Driven Object Detection with Fisher Vectors, Cinbis et al
+
+    """
+
+    # Component-wise mass normalization 
+    if norm_method == 'component-wise-mass': 
+        raise NotImplementedError('Component-wise-mass normalization_method not implemented')
+
+    # Component-wise L2 normalization
+    elif norm_method == 'component-wise-l2': 
+        return hist / np.max(np.linalg.norm(hist, axis=1), 1e-12)
+
+    # Global L2 normalization
+    elif norm_method == 'global-l2': 
+        return hist / (np.linalg.norm(hist) + 1e-12)
+
+    # Square rooting / Power Normalization with alpha = 0.5
+    elif norm_method == 'square-rooting': 
+        # Power-normalization followed by L2 normalization as in [2]
+        hist = np.sign(hist) * np.sqrt(np.fabs(hist))
+        return hist / (np.linalg.norm(hist) + 1e-12)
+
+    else: 
+        raise NotImplementedError('Unknown normalization_method %s' % norm_method)            
+
+
+def bow(data, code, K): 
+    """
+    BoW histogram with L2 normalization
+    """
+    code_hist, bin_edges = np.histogram(code, bins=np.arange(K+1) - 0.5)
+
+    # Normalize
+    code_hist = normalize_hist(code_hist.astype(np.float32), norm_method='global-l2')
+
+    # Vectorize [1 x K]
+    return code_hist.ravel()
+
+def bow_histogram(data, codebook, pts=None, shape=None): 
+    code, dist = vq(data, codebook)
+    code_hist = bow(data, code, codebook.shape[0])
+    return code_hist
+
+def bow_project(data, codebook, pts=None, shape=None, levels=(1,2,4)): 
+    """
+    Project the descriptions on to the codebook/vocabulary, 
+    returning the histogram of words
+    [N x 1] => [1 x K] histogram
+
+    Otherwise, if kpts and bbox shape specified, perform spatial pooling
+    """
+
+    if pts is None or shape is None: 
+        return bow_histogram(data, codebook)
+    else: 
+        # Compute histogram for each spatial level
+        # assert(pts.dtype == np.int32)
+        pts = pts.astype(np.int32)
+        xmin, ymin = shape[0], shape[1]
+        xs, ys = pts[:,0]-xmin, pts[:,1]-ymin
+
+        # Ownership bin 
+        # For each pt, and each level find the x and y bin
+        # and assign to appropriate bin
+        # nbins = np.sum(np.array(self.levels) ** 2)
+
+        # levels = [1, 2, 4]
+        assert(len(pts) == len(data))
+        hist = []
+        for j,level in enumerate(levels): 
+            # Determine the bin each point belongs to given level, and assign
+            xdim, ydim = int(np.floor((shape[2]-shape[0]) * 1. / level + 1)), int(np.floor((shape[3]-shape[1]) * 1. / level + 1))
+            xbin, ybin = xs / xdim, ys / ydim
+            bin_idx = ybin * level + xbin
+
+            # Compute histogram for each bin                
+            for lbin in range(level * level): 
+                inds, = np.where(bin_idx == lbin)
+                hist.append(bow_histogram(data[inds], codebook, pts=pts[inds], shape=shape))
+
+        # Stack all histograms together
+        return np.hstack(hist)
+
+
 class BoWVectorizer(object): 
     default_params = AttrDict(K=64, levels=(1,2,4), 
                               method='vlad', quantizer='kdtree', norm_method='square-rooting')
@@ -134,7 +226,7 @@ class BoWVectorizer(object):
         """
         if self.method == 'vq' or self.method == 'bow': 
             code = self.get_code(data)
-            code_hist = self.bow(data, code)
+            code_hist = self.bow(data, code, self.K)
         elif self.method == 'vlad': 
             code = self.get_code(data)
             code_hist = self.vlad(data, code)
@@ -189,50 +281,11 @@ class BoWVectorizer(object):
             
     @staticmethod
     def normalize(hist, norm_method='global-l2'): 
-        """
-        Various normalization methods
+        return normalize_hist(hist, norm_method=norm_method)
 
-        Refer to: 
-        [1] Improving the Fisher Kernel for Large-Scale Image Classifcation, Perronnin et al
-        http://www.robots.ox.ac.uk/~vgg/rg/papers/peronnin_etal_ECCV10.pdf
-        
-        [2] Segmentation Driven Object Detection with Fisher Vectors, Cinbis et al
-
-        """
-
-        # Component-wise mass normalization 
-        if norm_method == 'component-wise-mass': 
-            raise NotImplementedError('Component-wise-mass normalization_method not implemented')
-
-        # Component-wise L2 normalization
-        elif norm_method == 'component-wise-l2': 
-            return hist / np.max(np.linalg.norm(hist, axis=1), 1e-12)
-
-        # Global L2 normalization
-        elif norm_method == 'global-l2': 
-            return hist / (np.linalg.norm(hist) + 1e-12)
-
-        # Square rooting / Power Normalization with alpha = 0.5
-        elif norm_method == 'square-rooting': 
-            # Power-normalization followed by L2 normalization as in [2]
-            hist = np.sign(hist) * np.sqrt(np.fabs(hist))
-            return hist / (np.linalg.norm(hist) + 1e-12)
-
-        else: 
-            raise NotImplementedError('Unknown normalization_method %s' % norm_method)            
-
-    def bow(self, data, code): 
-        """
-        BoW histogram with L2 normalization
-        """
-        code_hist, bin_edges = np.histogram(code, bins=np.arange(self.K+1) - 0.5)
-        
-        # Normalize
-        code_hist = BoWVectorizer.normalize(code_hist.astype(np.float32), norm_method='global-l2')
-
-        # Vectorize [1 x K]
-        return code_hist.ravel()
-        
+    @staticmethod
+    def bow(data, code, K): 
+        return bow(data, code, K)
 
     def vlad(self, data, code): 
         """

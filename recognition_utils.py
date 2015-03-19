@@ -3,7 +3,7 @@ import cv2, os, time, random
 from itertools import izip, chain
 
 from bot_vision.image_utils import im_resize, gaussian_blur, median_blur, box_blur
-from bot_vision.bow_utils import BoWVectorizer
+from bot_vision.bow_utils import BoWVectorizer, bow_project
 import bot_vision.mser_utils as mser_utils
 
 import bot_utils.io_utils as io_utils
@@ -14,6 +14,7 @@ from bot_utils.itertools_recipes import chunks
 import sklearn.metrics as metrics
 from sklearn.decomposition import PCA, RandomizedPCA
 from sklearn.svm import LinearSVC, SVC
+from sklearn.ensemble import GradientBoostingClassifier, ExtraTreesClassifier
 from sklearn.linear_model import SGDClassifier
 from sklearn.grid_search import GridSearchCV
 from sklearn.cross_validation import train_test_split, ShuffleSplit
@@ -39,6 +40,9 @@ class HomogenousKernelMap(AdditiveChi2Sampler):
         return sgn * psix
 
 def get_dense_detector(step=4, levels=7, scale=np.sqrt(2)): 
+    """
+    Standalone dense detector instantiation
+    """
     detector = cv2.FeatureDetector_create('Dense')
     detector.setInt('initXyStep', step)
     # detector.setDouble('initFeatureScale', 0.5)
@@ -62,7 +66,8 @@ def im_detect_and_describe(img, mask=None, detector='dense', descriptor='SIFT', 
     
     kpts = detector.detect(img, mask=mask)
     kpts, desc = extractor.compute(img, kpts)
-    return kpts, desc
+    pts = np.vstack([kp.pt for kp in kpts]).astype(np.int32)
+    return pts, desc
 
 def im_describe(*args, **kwargs): 
     kpts, desc = im_detect_and_describe(*args, **kwargs)
@@ -142,7 +147,6 @@ class ImageClassifier(object):
         training=training_params, descriptor=descriptor_params, bow=bow_params, cache=cache_params
     )
     def __init__(self, dataset=None, 
-                 max_test_size=10, 
                  process_cb=lambda fn: dict(img=cv2.imread(fn), mask=None), 
                  params = default_params): 
 
@@ -153,7 +157,7 @@ class ImageClassifier(object):
 
         # Optionally setup training testing
         if dataset is not None: 
-            self.setup_training_testing(max_test_size)
+            self.setup_training_testing()
 
             # Persist, and retrieve db if available
             if not io_utils.path_exists(self.params.cache.detector_path) or self.params.cache.overwrite: 
@@ -181,33 +185,23 @@ class ImageClassifier(object):
 
         # Setup classifier
         print 'Building Classifier'
-        # cv_params = {'loss':['hinge'], 'alpha':[0.01, 0.1, 1.0, 10.0], 'class_weight':['auto']}
-        # self._clf = SGDClassifier(loss='hinge', n_jobs=4)
+        # self.clf_hyparams = {'loss':['hinge'], 'alpha':[0.0001, 0.001, 0.01, 0.1, 1.0, 10.0], 'class_weight':['auto']}
+        # self.clf = SGDClassifier(loss='hinge', n_jobs=4, n_iter=10)
 
         # Linear SVM
-        self.clf_hyparams = {'C':[0.01, 0.1, 0.5, 1.0, 10.0]}
-        self.clf = LinearSVC(random_state=1, tol=1e-4)
+        self.clf_hyparams = {'C':[0.01, 0.1, 0.2, 0.5, 1.0, 2.0, 4.0, 5.0, 10.0]}
+        self.clf = LinearSVC(random_state=1)
 
-    def setup_training_testing(self, max_test_size): 
+        # self.clf_hyparams = {'learning_rate':[0.01, 0.1, 0.2, 0.5]}
+        # self.clf = GradientBoostingClassifier()
+
+        # self.clf_hyparams = {'n_estimators':[10, 20, 40, 100]}
+        # self.clf = ExtraTreesClassifier()
+
+
+    def setup_training_testing(self): 
         # Split up training and test
         self.X_train, self.y_train, self.X_test, self.y_test = self.dataset.get_train_test_split()
-
-        # self.X_train, self.X_test, self.y_train, self.y_test = [], [], [], []
-        # print np.unique(self.dataset.target)
-        # for y_t in np.unique(self.dataset.target): 
-
-        #     inds, = np.where(self.dataset.target == y_t)
-        #     data, target = self.dataset.data[inds], self.dataset.target[inds]
-
-        #     # Split train, and test (complement of test)
-        #     X_train, X_test, y_train, y_test = train_test_split(data, target, **self.params.training)
-
-        #     # Only allow max testing size
-        #     self.X_train.extend(X_train), self.X_test.extend(X_test[:max_test_size])
-        #     self.y_train.extend(y_train), self.y_test.extend(y_test[:max_test_size])
-
-        self.X_all = list(chain(self.X_train, self.X_test))
-        self.y_all = list(chain(self.y_train, self.y_test))
 
     def extract_features(self): 
         if self.clf_pretrained: 
@@ -221,18 +215,23 @@ class ImageClassifier(object):
             print '====> [COMPUTE] TRAINING: Feature Extraction '        
             st = time.time()
             features_db = IterDB(filename=self.params.cache.train_path, mode='w', 
-                                 fields=['train_desc', 'train_target', 'vocab_desc'], batch_size=50)
+                                 fields=['train_desc', 'train_target', 'train_pts', 'train_shapes', 'vocab_desc'], batch_size=50)
 
             # Parallel Processing
             for chunk in chunks(izip(self.X_train, self.y_train), 50): 
                 res = Parallel(n_jobs=8, verbose=5) (
-                    delayed(im_describe)
+                    delayed(im_detect_and_describe)
                     (**dict(self.process_cb(x_t), **self.params.descriptor)) for (x_t,_) in chunk
                 )
 
-                for im_desc, (_, y_t) in izip(res, chunk): 
+                for (pts, im_desc), (x_t, y_t) in izip(res, chunk): 
                     features_db.append('train_desc', im_desc)
+                    features_db.append('train_pts', pts)
+                    features_db.append('train_shapes', np.array([np.min(pts[:,0]), np.min(pts[:,1]), np.max(pts[:,0]), np.max(pts[:,1])]))
                     features_db.append('train_target', y_t)
+
+                    # im_shape = (self.process_cb(x_t))['img'].shape[:2]
+                    # features_db.append('train_shapes', [0, 0, im_shape[1], im_shape[0]])
 
                     # Randomly sample from descriptors for vocab construction
                     inds = np.random.permutation(int(min(len(im_desc), self.params.vocab.num_per_image)))
@@ -259,18 +258,20 @@ class ImageClassifier(object):
             print '====> [COMPUTE] TESTING: Feature Extraction '        
             st = time.time()
             features_db = IterDB(filename=self.params.cache.test_path, mode='w', 
-                                 fields=['test_desc', 'test_target'], batch_size=50)
+                                 fields=['test_desc', 'test_target', 'test_pts', 'test_shapes'], batch_size=50)
 
 
             # Parallel Processing
             for chunk in chunks(izip(self.X_test, self.y_test), 50): 
                 res = Parallel(n_jobs=8, verbose=5) (
-                    delayed(im_describe)
+                    delayed(im_detect_and_describe)
                     (**dict(self.process_cb(x_t), **self.params.descriptor)) for (x_t,_) in chunk
                 )
-                for im_desc, (_, y_t) in izip(res, chunk): 
+                for (pts, im_desc), (_, y_t) in izip(res, chunk): 
                     features_db.append('test_desc', im_desc)
+                    features_db.append('test_pts', pts)
                     features_db.append('test_target', y_t)
+                    features_db.append('test_shapes', np.array([np.min(pts[:,0]), np.min(pts[:,1]), np.max(pts[:,0]), np.max(pts[:,1])]))
 
             # Serial Processing
             # for (x_t,y_t) in izip(self.X_test, self.y_test): 
@@ -298,22 +299,23 @@ class ImageClassifier(object):
 
         # Extract features, only if not already available
         if not os.path.isdir(self.params.cache.train_path): 
-            print '====> [COMPUTE] Feature Extraction '        
-            features_db = IterDB(filename=self.params.cache.train_path, mode='w', 
-                                 fields=['train_desc', 'train_target', 'vocab_desc'])
-            # Serial Processing
-            for (x_t,y_t) in izip(self.X_train, self.y_train): 
-                # Extract and add descriptors to db
-                im_desc = self.image_descriptor.describe(**self.process_cb(x_t))
-                features_db.append('train_desc', im_desc)
-                features_db.append('train_target', y_t)
+            pass
+            # print '====> [COMPUTE] Feature Extraction '        
+            # features_db = IterDB(filename=self.params.cache.train_path, mode='w', 
+            #                      fields=['train_desc', 'train_target', 'vocab_desc'])
+            # # Serial Processing
+            # for (x_t,y_t) in izip(self.X_train, self.y_train): 
+            #     # Extract and add descriptors to db
+            #     im_desc = self.image_descriptor.describe(**self.process_cb(x_t))
+            #     features_db.append('train_desc', im_desc)
+            #     features_db.append('train_target', y_t)
 
-                # Randomly sample from descriptors for vocab construction
-                inds = np.random.permutation(int(min(len(im_desc), self.params.vocab.num_per_image)))
-                features_db.append('vocab_desc', im_desc[inds])
+            #     # Randomly sample from descriptors for vocab construction
+            #     inds = np.random.permutation(int(min(len(im_desc), self.params.vocab.num_per_image)))
+            #     features_db.append('vocab_desc', im_desc[inds])
 
-            features_db.finalize()
-            print 'Descriptor extraction took %5.3f s' % (time.time() - st)    
+            # features_db.finalize()
+            # print 'Descriptor extraction took %5.3f s' % (time.time() - st)    
         else: 
             print '====> [LOAD] Feature Extraction'        
             features_db = IterDB(filename=self.params.cache.train_path, mode='r')
@@ -328,10 +330,10 @@ class ImageClassifier(object):
 
             # Apply dimensionality reduction
             # Fit PCA to subset of data computed
-            print '====> [REDUCE] PCA dim. reduction before: %4.3f MB' % (vocab_desc.nbytes / 1024 / 1024.0) 
+            print '====> [REDUCE] PCA dim. reduction before: %s %4.3f MB' % (vocab_desc.shape, vocab_desc.nbytes / 1024 / 1024.0) 
             if self.params.do_pca: 
                 vocab_desc = self.pca.fit_transform(vocab_desc)
-            print '====> [REDUCE] PCA dim. reduction after: %4.3f MB' % (vocab_desc.nbytes / 1024 / 1024.0) 
+            print '====> [REDUCE] PCA dim. reduction after: %s %4.3f MB' % (vocab_desc.shape, vocab_desc.nbytes / 1024 / 1024.0) 
 
             print '====> MEMORY: Codebook construction: %4.3f MB' % (vocab_desc.nbytes / 1024 / 1024.0) 
             self.bow.build(vocab_desc)
@@ -349,9 +351,22 @@ class ImageClassifier(object):
         if not os.path.exists(self.params.cache.train_hists_path): #  or self.params.cache.overwrite: 
             print '====> [COMPUTE] BoVW / VLAD projection '
             train_target = np.array(self.y_train, dtype=np.int32)
-            train_histogram = np.vstack([self.bow.project(
-                self.pca.transform(desc) if self.params.do_pca else desc
-            ) for desc in features_db.itervalues('train_desc', verbose=True)])
+
+            # Serial Processing
+            # train_histogram = np.vstack([self.bow.project(
+            #     self.pca.transform(desc) if self.params.do_pca else desc, pts=pts, shape=shape
+            # ) for (desc, pts, shape) in features_db.iter_keys_values(['train_desc', 'train_pts', 'train_shapes'], verbose=True)])
+
+            # Parallel Processing
+            train_histogram = []
+            for chunk in chunks(features_db.iter_keys_values(['train_desc', 'train_pts', 'train_shapes'], verbose=True), 50): 
+                res_desc = [self.pca.transform(desc) for (desc, _, _) in chunk]
+                res_hist = Parallel(n_jobs=8, verbose=5) (
+                    delayed(bow_project)
+                    (desc, self.bow.codebook, pts=pts, shape=shape, levels=self.params.bow.levels) for desc, (_, pts, shape) in izip(res_desc, chunk)
+                )
+                train_histogram.extend(res_hist)
+            train_histogram = np.vstack(train_histogram)
 
             hists_db = AttrDict(train_target=train_target, train_histogram=train_histogram)
             hists_db.save(self.params.cache.train_hists_path)
@@ -380,10 +395,11 @@ class ImageClassifier(object):
         st_clf = time.time()
 
         # Grid search cross-val
-        cv = ShuffleSplit(len(train_histogram), n_iter=10, test_size=0.3, random_state=4)
-        self.clf = GridSearchCV(self.clf, self.clf_hyparams, cv=cv, n_jobs=8, verbose=1)
+        cv = ShuffleSplit(len(train_histogram), n_iter=20, test_size=0.5, random_state=4)
+        self.clf = GridSearchCV(self.clf, self.clf_hyparams, cv=cv, n_jobs=8, verbose=4)
         self.clf.fit(train_histogram, train_target)
-        self.clf = self.clf.best_estimator_
+        print 'BEST: ', self.clf.best_score_, self.clf.best_params_
+        # self.clf = self.clf.best_estimator_
         pred_target = self.clf.predict(train_histogram)
 
         print 'Training Classifier took %5.3f s' % (time.time() - st_clf)
@@ -432,9 +448,23 @@ class ImageClassifier(object):
         if not os.path.exists(self.params.cache.test_hists_path): #  or self.params.cache.overwrite: 
             print '====> [COMPUTE] BoVW / VLAD projection '
             test_target = self.y_test
-            test_histogram = np.vstack([self.bow.project(
-                self.pca.transform(desc) if self.params.do_pca else desc
-            ) for desc in features_db.itervalues('test_desc', verbose=True)])
+
+            # # Serial Processing
+            # test_histogram = np.vstack([self.bow.project(
+            #     self.pca.transform(desc) if self.params.do_pca else desc, pts=pts, shape=shape
+            # ) for (desc, pts, shape) in features_db.iter_keys_values(['test_desc', 'test_pts', 'test_shapes'], verbose=True)])
+
+            # Parallel Processing
+            test_histogram = []
+            for chunk in chunks(features_db.iter_keys_values(['test_desc', 'test_pts', 'test_shapes'], verbose=True), 50): 
+                res_desc = [self.pca.transform(desc) for (desc, _, _) in chunk]
+                res_hist = Parallel(n_jobs=8, verbose=5) (
+                    delayed(bow_project)
+                    (desc, self.bow.codebook, pts=pts, shape=shape, levels=self.params.bow.levels) for desc, (_, pts, shape) in izip(res_desc, chunk)
+                )
+                test_histogram.extend(res_hist)
+            test_histogram = np.vstack(test_histogram)
+
             hists_db = AttrDict(test_target=test_target, test_histogram=test_histogram)
             hists_db.save(self.params.cache.test_hists_path)
             print '====> MEMORY: Histogram: %s %4.3f MB' % (test_histogram.shape, 
@@ -509,7 +539,7 @@ class ImageClassifier(object):
         return cls.from_dict(db)
         
     def save(self, path): 
-        db = AttrDict(params=self.params, bow=self.bow.to_dict(), clf=self.clf)
+        db = AttrDict(params=self.params, bow=self.bow.to_dict(), clf=self.clf, pca=self.pca)
         db.save(path)
 
         
