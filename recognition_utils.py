@@ -2,6 +2,9 @@ import numpy as np
 import cv2, os, time, random
 from itertools import izip, chain
 
+import pprint
+import datetime
+
 from bot_vision.image_utils import im_resize, gaussian_blur, median_blur, box_blur
 from bot_vision.bow_utils import BoWVectorizer, bow_project
 import bot_vision.mser_utils as mser_utils
@@ -63,11 +66,15 @@ def get_detector(detector='dense', step=4, levels=7, scale=np.sqrt(2)):
 def im_detect_and_describe(img, mask=None, detector='dense', descriptor='SIFT', step=4, levels=7, scale=np.sqrt(2)): 
     detector = get_detector(detector=detector, step=step, levels=levels, scale=scale)
     extractor = cv2.DescriptorExtractor_create(descriptor)
-    
-    kpts = detector.detect(img, mask=mask)
-    kpts, desc = extractor.compute(img, kpts)
-    pts = np.vstack([kp.pt for kp in kpts]).astype(np.int32)
-    return pts, desc
+
+    try:     
+        kpts = detector.detect(img, mask=mask)
+        kpts, desc = extractor.compute(img, kpts)
+        pts = np.vstack([kp.pt for kp in kpts]).astype(np.int32)
+        return pts, desc
+    except Exception as e: 
+        print e
+        return None, None
 
 def im_describe(*args, **kwargs): 
     kpts, desc = im_detect_and_describe(*args, **kwargs)
@@ -154,7 +161,7 @@ class ImageClassifier(object):
         self.dataset = dataset
         self.process_cb = process_cb
         self.params = AttrDict(params)
-        self.BATCH_SIZE = 15
+        self.BATCH_SIZE = 10
 
         # Optionally setup training testing
         if dataset is not None: 
@@ -493,7 +500,11 @@ class ImageClassifier(object):
 
         # print ' Confusion matrix (Test): %s' % (metrics.confusion_matrix(test_target, pred_target))
         print '=========================================================> '
-        print 'Params: ', self.params
+        print '\n ===> Classification @ ', datetime.datetime.now()
+        print 'Params: \n'
+        pp = pprint.PrettyPrinter(indent=4)
+        pp.pprint(self.params)
+        print '\n'
         print '-----------------------------------------------------------'
         print ' Accuracy score (Test): %4.3f' % (metrics.accuracy_score(test_target, pred_target))
         print ' Report (Test):\n %s' % (metrics.classification_report(test_target, pred_target, 
