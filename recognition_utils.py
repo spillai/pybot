@@ -154,6 +154,7 @@ class ImageClassifier(object):
         self.dataset = dataset
         self.process_cb = process_cb
         self.params = AttrDict(params)
+        self.BATCH_SIZE = 15
 
         # Optionally setup training testing
         if dataset is not None: 
@@ -215,10 +216,10 @@ class ImageClassifier(object):
             print '====> [COMPUTE] TRAINING: Feature Extraction '        
             st = time.time()
             features_db = IterDB(filename=self.params.cache.train_path, mode='w', 
-                                 fields=['train_desc', 'train_target', 'train_pts', 'train_shapes', 'vocab_desc'], batch_size=50)
+                                 fields=['train_desc', 'train_target', 'train_pts', 'train_shapes', 'vocab_desc'], batch_size=self.BATCH_SIZE)
 
             # Parallel Processing
-            for chunk in chunks(izip(self.X_train, self.y_train), 50): 
+            for chunk in chunks(izip(self.X_train, self.y_train), self.BATCH_SIZE): 
                 res = Parallel(n_jobs=8, verbose=5) (
                     delayed(im_detect_and_describe)
                     (**dict(self.process_cb(x_t), **self.params.descriptor)) for (x_t,_) in chunk
@@ -258,11 +259,11 @@ class ImageClassifier(object):
             print '====> [COMPUTE] TESTING: Feature Extraction '        
             st = time.time()
             features_db = IterDB(filename=self.params.cache.test_path, mode='w', 
-                                 fields=['test_desc', 'test_target', 'test_pts', 'test_shapes'], batch_size=50)
+                                 fields=['test_desc', 'test_target', 'test_pts', 'test_shapes'], batch_size=self.BATCH_SIZE)
 
 
             # Parallel Processing
-            for chunk in chunks(izip(self.X_test, self.y_test), 50): 
+            for chunk in chunks(izip(self.X_test, self.y_test), self.BATCH_SIZE): 
                 res = Parallel(n_jobs=8, verbose=5) (
                     delayed(im_detect_and_describe)
                     (**dict(self.process_cb(x_t), **self.params.descriptor)) for (x_t,_) in chunk
@@ -359,7 +360,7 @@ class ImageClassifier(object):
 
             # Parallel Processing
             train_histogram = []
-            for chunk in chunks(features_db.iter_keys_values(['train_desc', 'train_pts', 'train_shapes'], verbose=True), 50): 
+            for chunk in chunks(features_db.iter_keys_values(['train_desc', 'train_pts', 'train_shapes'], verbose=True), self.BATCH_SIZE): 
                 res_desc = [self.pca.transform(desc) for (desc, _, _) in chunk]
                 res_hist = Parallel(n_jobs=8, verbose=5) (
                     delayed(bow_project)
@@ -456,7 +457,7 @@ class ImageClassifier(object):
 
             # Parallel Processing
             test_histogram = []
-            for chunk in chunks(features_db.iter_keys_values(['test_desc', 'test_pts', 'test_shapes'], verbose=True), 50): 
+            for chunk in chunks(features_db.iter_keys_values(['test_desc', 'test_pts', 'test_shapes'], verbose=True), self.BATCH_SIZE): 
                 res_desc = [self.pca.transform(desc) for (desc, _, _) in chunk]
                 res_hist = Parallel(n_jobs=8, verbose=5) (
                     delayed(bow_project)
