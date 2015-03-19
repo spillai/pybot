@@ -64,7 +64,7 @@ class Quaternion(object):
 
     def rotate(self, v):
         """ Rotate a vector with this quaternion in reverse """
-        qx, qy, qz, qw = q
+        qx, qy, qz, qw = self.q
 
         ab  =  qw*qx
         ac  =  qw*qy
