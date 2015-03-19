@@ -27,6 +27,22 @@ def create_path_if_not_exists(filename):
         return True
     return False
 
+def read_config(conf_path, section): 
+    """
+    Recipe mostly taken from
+    http://blog.vwelch.com/2011/04/combining-configparser-and-argparse.html 
+    """
+    # Try reading the conf file
+    try: 
+        config = ConfigParser.SafeConfigParser()
+        config.read([conf_path])
+        defaults = dict(config.items(section))
+    except Exception as e: 
+        raise RuntimeError('Failed reading %s: %s' % (conf_path, e))
+
+    return defaults
+
+
 def config_and_args_parser(conf_path, section, description=''): 
     """
     Recipe mostly taken from
