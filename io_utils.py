@@ -19,16 +19,17 @@ def path_exists(path):
     return os.path.exists(os.path.expanduser(path))
 
 def create_path_if_not_exists(filename): 
+    """ Create directory path if it doesn't exist """
+    
     fn_path, fn_file = os.path.split(filename)    
     if not path_exists(fn_path): 
-        # print 'Making directory path %s' % fn_path
         mkdir_p(fn_path)
         return True
     return False
 
 def config_and_args_parser(conf_path, section, description=''): 
     """
-    Recipe mostly stolen from
+    Recipe mostly taken from
     http://blog.vwelch.com/2011/04/combining-configparser-and-argparse.html 
     """
     
@@ -64,6 +65,7 @@ def memory_usage_psutil():
     return mem
 
 class Tee(object):
+    """ General purpose tee-ing object that allows to split  stdout """
     def __init__(self, *files):
         self.files = files
 
@@ -73,6 +75,15 @@ class Tee(object):
 
     def flush(self): 
         pass
+
+def tee_stdout(filename): 
+    """ Redirect output to log, and stderr """
+
+    create_path_if_not_exists(filename)
+    log_file = open(filename, 'w', 0)
+    orig_stdout = sys.stdout
+    sys.stdout = Tee(sys.stdout, log_file)
+
 
 class Capturing(list):
     def __enter__(self):
