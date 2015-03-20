@@ -49,8 +49,10 @@ def get_dense_detector(step=4, levels=7, scale=np.sqrt(2)):
     detector = cv2.FeatureDetector_create('Dense')
     detector.setInt('initXyStep', step)
     # detector.setDouble('initFeatureScale', 0.5)
+
     detector.setDouble('featureScaleMul', scale)
     detector.setInt('featureScaleLevels', levels)
+
     detector.setBool('varyImgBoundWithScale', True)
     detector.setBool('varyXyStepWithScale', False)
 
@@ -61,16 +63,79 @@ def get_detector(detector='dense', step=4, levels=7, scale=np.sqrt(2)):
     if detector == 'dense': 
         return get_dense_detector(step=step, levels=levels, scale=scale)
     else: 
-        return cv2.FeatureDetector_create(detector)
+        detector = cv2.FeatureDetector_create(detector)
+        return cv2.PyramidAdaptedFeatureDetector(detector, maxLevel=levels)
+
+# from pybot_vlfeat import vl_dsift
+# def im_detect_and_describe(img, mask=None, detector='dense', descriptor='SIFT', step=4, levels=7, scale=np.sqrt(2)): 
+
+#     try:     
+#         all_pts, all_desc = [], []
+#         for l in range(levels): 
+#             if l == 0:
+#                 im = img.copy()
+#                 mask_im = mask.copy() if mask is not None else None
+#             else: 
+#                 im = im_resize(im, scale=1./scale)
+#                 mask_im = im_resize(mask, scale=1./scale) if mask_im is not None else None
+
+#             # Convert to HSV
+#             # im = cv2.cvtColor(im, cv2.COLOR_BGR2LAB)
+#             cur_scale = scale ** l  
+
+#             # Lab-SIFT
+#             ch_desc = []
+#             for ch in range(im.shape[2]): 
+#                 pts, desc = vl_dsift(im[:,:,])
+#                 ch_desc.append(desc)
+
+#             pts, desc = (pts * cur_scale).astype(np.int32), (np.hstack(ch_desc)).astype(np.uint8)
+#             all_pts.extend(pts)
+#             all_desc.append(desc)
+
+#         pts = np.vstack(all_pts).astype(np.int32)
+#         desc = np.vstack(all_desc)
+
+#         return pts, desc
+#     except Exception as e: 
+#         print e
+#         return None, None
+
 
 def im_detect_and_describe(img, mask=None, detector='dense', descriptor='SIFT', step=4, levels=7, scale=np.sqrt(2)): 
     detector = get_detector(detector=detector, step=step, levels=levels, scale=scale)
     extractor = cv2.DescriptorExtractor_create(descriptor)
 
     try:     
+        # all_pts, all_desc = [], []
+        # for l in range(levels): 
+        #     if l == 0:
+        #         im = img.copy()
+        #         mask_im = mask.copy() if mask is not None else None
+        #     else: 
+        #         im = im_resize(im, scale=1./scale)
+        #         mask_im = im_resize(mask, scale=1./scale) if mask_im is not None else None
+            
+        #     kpts = detector.detect(im, mask=mask_im)
+        #     kpts, desc = extractor.compute(im, kpts)
+        #     # pts = np.vstack([kp.pt * scale for kp in kpts]).astype(np.int32)
+
+        #     cur_scale = scale ** l
+        #     pts = cur_scale * np.vstack([kp.pt for kp in kpts])
+        #     all_pts.append(pts)
+        #     all_desc.append(desc)
+            
+        #     # print desc.shape, all_pts[-1].shape
+        #     # print len(all_desc[-1]), len(all_pts[-1])
+
+        # # print len(all_pts), len(all_desc)
+        # pts = np.vstack(all_pts).astype(np.int32)
+        # desc = np.vstack(all_desc)
+
         kpts = detector.detect(img, mask=mask)
         kpts, desc = extractor.compute(img, kpts)
         pts = np.vstack([kp.pt for kp in kpts]).astype(np.int32)
+
         return pts, desc
     except Exception as e: 
         print e
@@ -161,7 +226,7 @@ class ImageClassifier(object):
         self.dataset = dataset
         self.process_cb = process_cb
         self.params = AttrDict(params)
-        self.BATCH_SIZE = 10
+        self.BATCH_SIZE = 5
 
         # Optionally setup training testing
         if dataset is not None: 
@@ -302,8 +367,8 @@ class ImageClassifier(object):
         st = time.time()
 
         # Extract features
-        if not self.params.cache.features_dir: 
-            raise RuntimeError('Setup features_dir before running training')
+        if not self.params.cache.results_dir: 
+            raise RuntimeError('Setup results_dir before running training')
 
         # Extract features, only if not already available
         if not os.path.isdir(self.params.cache.train_path): 
