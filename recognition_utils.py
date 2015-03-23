@@ -10,7 +10,7 @@ from bot_vision.bow_utils import BoWVectorizer, bow_project
 import bot_vision.mser_utils as mser_utils
 
 import bot_utils.io_utils as io_utils
-from bot_utils.io_utils import memory_usage_psutil
+from bot_utils.io_utils import memory_usage_psutil, format_time
 from bot_utils.db_utils import AttrDict, IterDB
 from bot_utils.itertools_recipes import chunks
 
@@ -25,6 +25,102 @@ from sklearn.kernel_approximation import AdditiveChi2Sampler, RBFSampler
 from sklearn.pipeline import Pipeline
 
 from sklearn.externals.joblib import Parallel, delayed
+
+def classification_report(y_true, y_pred, labels=None, target_names=None,
+                          sample_weight=None):
+    """Build a text report showing the main classification metrics
+
+    Parameters
+    ----------
+    y_true : array-like or label indicator matrix
+        Ground truth (correct) target values.
+
+    y_pred : array-like or label indicator matrix
+        Estimated targets as returned by a classifier.
+
+    labels : array, shape = [n_labels]
+        Optional list of label indices to include in the report.
+
+    target_names : list of strings
+        Optional display names matching the labels (same order).
+
+    sample_weight : array-like of shape = [n_samples], optional
+        Sample weights.
+
+    Returns
+    -------
+    report : string
+        Text summary of the precision, recall, F1 score for each class.
+
+    Examples
+    --------
+    >>> from sklearn.metrics import classification_report
+    >>> y_true = [0, 1, 2, 2, 2]
+    >>> y_pred = [0, 0, 2, 2, 1]
+    >>> target_names = ['class 0', 'class 1', 'class 2']
+    >>> print(classification_report(y_true, y_pred, target_names=target_names))
+                 precision    recall  f1-score   support
+    <BLANKLINE>
+        class 0       0.50      1.00      0.67         1
+        class 1       0.00      0.00      0.00         1
+        class 2       1.00      0.67      0.80         3
+    <BLANKLINE>
+    avg / total       0.70      0.60      0.61         5
+    <BLANKLINE>
+
+    """
+
+    from sklearn.metrics import precision_recall_fscore_support
+    from sklearn.utils.multiclass import unique_labels
+
+    if labels is None:
+        labels = unique_labels(y_true, y_pred)
+    else:
+        labels = np.asarray(labels)
+
+    last_line_heading = 'avg / total'
+
+    if target_names is None:
+        width = len(last_line_heading)
+        target_names = ['%s' % l for l in labels]
+    else:
+        width = max(len(cn) for cn in target_names)
+        width = max(width, len(last_line_heading))
+
+    headers = ["precision", "recall", "f1-score", "support"]
+    fmt = '%% %ds' % width  # first column: class name
+    fmt += '  '
+    fmt += ' '.join(['% 9s' for _ in headers])
+    fmt += '\n'
+
+    headers = [""] + headers
+    report = fmt % tuple(headers)
+    report += '\n'
+
+    p, r, f1, s = precision_recall_fscore_support(y_true, y_pred,
+                                                  labels=labels,
+                                                  average=None,
+                                                  sample_weight=sample_weight)
+
+    for i, label in enumerate(labels):
+        values = [target_names[i]]
+        for v in (p[i], r[i], f1[i]):
+            values += ["{0:0.3f}".format(v)]
+        values += ["{0}".format(s[i])]
+        report += fmt % tuple(values)
+
+    report += '\n'
+
+    # compute averages
+    values = [last_line_heading]
+    for v in (np.average(p, weights=s),
+              np.average(r, weights=s),
+              np.average(f1, weights=s)):
+        values += ["{0:0.3f}".format(v)]
+    values += ['{0}'.format(np.sum(s))]
+    report += fmt % tuple(values)
+    return report
+
 
 class HomogenousKernelMap(AdditiveChi2Sampler): 
     def __init__(self, sample_steps=2, sample_interval=None): 
@@ -322,7 +418,7 @@ class ImageClassifier(object):
             #     features_db.append('vocab_desc', im_desc[inds])
 
             features_db.finalize()
-            print '[TRAIN] Descriptor extraction took %5.3f s' % (time.time() - st)    
+            print '[TRAIN] Descriptor extraction took %s' % (format_time(time.time() - st))    
 
         print '-------------------------------'
 
@@ -352,7 +448,7 @@ class ImageClassifier(object):
             #     features_db.append('test_target', y_t)
 
             features_db.finalize()
-            print '[TEST] Descriptor extraction took %5.3f s' % (time.time() - st)    
+            print '[TEST] Descriptor extraction took %s' % (format_time(time.time() - st))    
         print '-------------------------------'
 
 
@@ -475,15 +571,15 @@ class ImageClassifier(object):
         # self.clf = self.clf.best_estimator_
         pred_target = self.clf.predict(train_histogram)
 
-        print 'Training Classifier took %5.3f s' % (time.time() - st_clf)
+        print 'Training Classifier took %s' % (format_time(time.time() - st_clf))
         print '-------------------------------'        
 
 
         print ' Accuracy score (Training): %4.3f' % (metrics.accuracy_score(train_target, pred_target))
-        print ' Report (Training):\n %s' % (metrics.classification_report(train_target, pred_target, 
-                                                                          target_names=self.dataset.target_names))
+        print ' Report (Training):\n %s' % (classification_report(train_target, pred_target, 
+                                                                  target_names=self.dataset.target_names))
 
-        print 'Training took %5.3f s' % (time.time() - st)
+        print 'Training took %s' % format_time(time.time() - st)
 
         print '====> Saving classifier '
         self.save(self.params.cache.detector_path)
@@ -507,7 +603,7 @@ class ImageClassifier(object):
             print '====> [LOAD] Feature Extraction'        
             features_db = IterDB(filename=self.params.cache.test_path, mode='r')
         print '-------------------------------'
-        print 'Descriptor extraction took %5.3f s' % (time.time() - st)    
+        print 'Descriptor extraction took %s' % format_time(time.time() - st)    
 
         # Load Vocabulary
         if os.path.exists(self.params.cache.vocab_path):
@@ -572,10 +668,10 @@ class ImageClassifier(object):
         print '\n'
         print '-----------------------------------------------------------'
         print ' Accuracy score (Test): %4.3f' % (metrics.accuracy_score(test_target, pred_target))
-        print ' Report (Test):\n %s' % (metrics.classification_report(test_target, pred_target, 
-                                                                      target_names=self.dataset.target_names))
+        print ' Report (Test):\n %s' % (classification_report(test_target, pred_target, 
+                                                              target_names=self.dataset.target_names))
 
-        print 'Testing took %5.3f s' % (time.time() - st)
+        print 'Testing took %s' % format_time(time.time() - st)
 
         return AttrDict(test_target=test_target, pred_target=pred_target, pred_score=pred_score, 
                         target_names=self.dataset.target_names)
