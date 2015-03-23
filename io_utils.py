@@ -9,6 +9,12 @@ import joblib
 from cStringIO import StringIO
 from bot_vision.image_utils import im_resize
 
+def format_time(t):
+    if t > 60:
+        return "%5.2fmin" % (t / 60.)
+    else:
+        return " %6.2fs" % (t)
+
 def mkdir_p(path):
     try:
         os.makedirs(os.path.expanduser(path))
