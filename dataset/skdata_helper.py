@@ -1,4 +1,6 @@
 import numpy as np
+from itertools import izip
+from bot_utils.db_utils import AttrDict
 
 class skdataHelper(object): 
     """
@@ -62,12 +64,14 @@ class skdataHelper(object):
         fn, target = zip(*data)
         return np.array(fn), np.array(target, dtype=np.int32)
 
+    def _prepare_dataset(self, X, y): 
+        return (AttrDict(filename=x_t, target=y_t) for (x_t, y_t) in izip(X, y))
+
     def get_train_test_split(self): 
         for split_idx in range(0, self._dataset.num_splits): 
             X_train, y_train = self._split(split='train_%i' % split_idx)
             X_test, y_test = self._split(split='test_%i' % split_idx)
-            return X_train, y_train, X_test, y_test
-            
+            return self._prepare_dataset(X_train, y_train), self._prepare_dataset(X_test, y_test)
 
 
 

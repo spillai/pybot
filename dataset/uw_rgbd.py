@@ -1,4 +1,4 @@
-import os
+import os, time
 import numpy as np
 import cv2
 from itertools import izip, imap
@@ -187,8 +187,10 @@ class UWRGBDObjectDataset(UWRGBDDataset):
 
         # Fusing all object instances of a category into a single key
         print 'Train targets, ', targets
+        st = time.time()
         self._dataset = read_dir(os.path.expanduser(directory), pattern='*.png', 
                                  recursive=False, expected=targets, verbose=False)
+        print 'Time taken to read_dir %5.3f s' % (time.time() - st)
         print 'Classes: %i' % len(targets), self._dataset.keys()
 
         # Instantiate a reader for each of the objects

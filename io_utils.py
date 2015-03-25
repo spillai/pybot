@@ -129,7 +129,7 @@ class VideoWriter:
     def write(self, im):
         if self.writer is None: 
             h, w = im.shape[:2]
-            self.writer = cv2.VideoWriter(self.filename, cv2.cv.CV_FOURCC(*'xvid'), 
+            self.writer = cv2.VideoWriter(self.filename, cv2.cv.CV_FOURCC(*'x264'), 
                                           25.0, (w, h), im.ndim == 3)
             print 'Creating writer: %s (%i,%i)' % (self.filename, w, h)
         self.writer.write(im)
