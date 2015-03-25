@@ -12,8 +12,10 @@ import pprint
 import datetime
 
 from bot_vision.image_utils import im_resize, gaussian_blur, median_blur, box_blur
-from bot_vision.bow_utils import BoWVectorizer, bow_project
-import bot_vision.mser_utils as mser_utils
+from bot_vision.bow_utils import BoWVectorizer, bow_codebook, bow_project, flair_project
+from pybot_vision import FLAIR_code
+# import bot_vision.mser_utils as mser_utils
+
 
 import bot_utils.io_utils as io_utils
 from bot_utils.io_utils import memory_usage_psutil, format_time
@@ -31,6 +33,8 @@ from sklearn.kernel_approximation import AdditiveChi2Sampler, RBFSampler
 from sklearn.pipeline import Pipeline
 
 from sklearn.externals.joblib import Parallel, delayed
+
+
 
 # =====================================================================
 # Generic utility functions for object recognition
@@ -308,8 +312,10 @@ class BOWClassifier(object):
         # 3. Bag-of-words VLAD/VQ
         # a. Traditional BOW, b. FLAIR
         if (self.params_.bow_method).lower() == 'flair': 
-            self.flair_ = FLAIR_code(**self.params_.flair) 
-            raise Exception('FLAIR not setup correctly')
+            self.bow_ = BoWVectorizer(**self.params_.bow)
+
+            # self.flair_ = FLAIR_code(**self.params_.flair) 
+            # raise Exception('FLAIR not setup correctly')
 
             # if codebook is not None: 
             #     W=UWRGBDDataset.default_rgb_shape[1], H=UWRGBDDataset.default_rgb_shape[0], K=self.bow.dictionary_size, 
@@ -423,8 +429,9 @@ class BOWClassifier(object):
 
             # BOW construction
             if (self.params_.bow_method).lower() == 'flair': 
-                codebook = bow_codebook(vocab_desc, K=self.params_.flair.K)
-                self.flair_.setVocabulary(codebook.astype(np.float32))
+                # codebook = bow_codebook(vocab_desc, K=self.params_.bow.K)
+                # self.flair_.setVocabulary(codebook.astype(np.float32))
+                self.bow_.build(vocab_desc)
             elif (self.params_.bow_method).lower() == 'bow': 
                 self.bow_.build(vocab_desc)
             else: 
@@ -465,7 +472,13 @@ class BOWClassifier(object):
                     desc_red = [self.pca_.transform(desc) if self.pca_ is not None else desc for (target, desc, _, _) in chunk] 
 
                     if (self.params_.bow_method).lower() == 'flair': 
-                        raise RuntimeError('Unimplemented')
+                        # raise RuntimeError('Not implemented for parallel %s' % self.params_.bow_method)
+                        res_hist = Parallel(n_jobs=8, verbose=5) (
+                            delayed(flair_project)
+                            (desc, self.bow_.codebook, pts=pts, shape=shape, 
+                             levels=self.params_.bow.levels, method=self.params_.bow.method, step=self.params_.descriptor.step) for desc, (_, _, pts, shape) in izip(desc_red, chunk)
+                        )
+
                     elif (self.params_.bow_method).lower() == 'bow': 
                         res_hist = Parallel(n_jobs=8, verbose=5) (
                             delayed(bow_project)
@@ -484,12 +497,13 @@ class BOWClassifier(object):
                 for (target, desc, pts, shape) in features_db.iter_keys_values(
                         [mode_prefix('target'), mode_prefix('desc'), mode_prefix('pts'), mode_prefix('shapes')], verbose=True): 
                     if (self.params_.bow_method).lower() == 'flair': 
-                        raise RuntimeError('Unimplemented')
+                        desc = flair_project(desc, self.bow_.codebook, pts=pts, shape=shape, 
+                                             levels=self.params_.bow.levels, method=self.params_.bow.method, step=self.params_.descriptor.step)
                     elif (self.params_.bow_method).lower() == 'bow': 
                         desc = self.bow_.project(self.pca_.transform(desc) if self.pca_ is not None else desc, pts=pts, shape=shape)
-                        hists_db.append(mode_prefix('histogram'), desc)
                     else: 
                         raise RuntimeError('Unknown bow method %s' % self.params_.bow_method)
+                    hists_db.append(mode_prefix('histogram'), desc)
                     hists_db.append(mode_prefix('target'), target)
                 hists_db.finalize()
         print '-------------------------------'
