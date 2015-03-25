@@ -496,14 +496,15 @@ class BOWClassifier(object):
                 # Serial Processing
                 for (target, desc, pts, shape) in features_db.iter_keys_values(
                         [mode_prefix('target'), mode_prefix('desc'), mode_prefix('pts'), mode_prefix('shapes')], verbose=True): 
+                    desc_red = self.pca_.transform(desc) if self.pca_ is not None else desc
                     if (self.params_.bow_method).lower() == 'flair': 
-                        desc = flair_project(desc, self.bow_.codebook, pts=pts, shape=shape, 
+                        hist = flair_project(desc_red, self.bow_.codebook, pts=pts, shape=shape, 
                                              levels=self.params_.bow.levels, method=self.params_.bow.method, step=self.params_.descriptor.step)
                     elif (self.params_.bow_method).lower() == 'bow': 
-                        desc = self.bow_.project(self.pca_.transform(desc) if self.pca_ is not None else desc, pts=pts, shape=shape)
+                        hist = self.bow_.project(desc_red, pts=pts, shape=shape)
                     else: 
                         raise RuntimeError('Unknown bow method %s' % self.params_.bow_method)
-                    hists_db.append(mode_prefix('histogram'), desc)
+                    hists_db.append(mode_prefix('histogram'), hist)
                     hists_db.append(mode_prefix('target'), target)
                 hists_db.finalize()
         print '-------------------------------'
