@@ -35,10 +35,10 @@ class UWRGBDDataset(object):
     target_hash = dict(zip(class_names, class_ids))
     target_unhash = dict(zip(class_ids, class_names))
 
-    # train_names = ["cereal_box", "cap", "background"]
+    train_names = ["cereal_box", "cap", "background"]
     # train_names = ["bowl", "cap", "cereal_box", "background"]
     # train_names = ["cap", "cereal_box", "coffee_mug", "soda_can", "background"]
-    train_names = ["bowl", "cap", "cereal_box", "coffee_mug", "soda_can", "background"]
+    # train_names = ["bowl", "cap", "cereal_box", "coffee_mug", "soda_can", "background"]
     # train_names = ["bowl", "cap", "cereal_box", "coffee_mug", "flashlight", 
     #                 "keyboard", "kleenex", "scissors",  "soda_can", 
     #                 "stapler", "background"]
@@ -76,6 +76,19 @@ class UWRGBDDataset(object):
                                             directory=os.path.join(scene_dir, 'background')) \
             if scene_dir is not None else None
         )
+
+    @classmethod
+    def get_object_dataset(cls, object_dir, targets=train_names, version='v1'): 
+        return UWRGBDObjectDataset(directory=object_dir, targets=targets)
+
+    @classmethod
+    def get_scene_dataset(cls, scene_dir, version='v1'): 
+        return UWRGBDSceneDataset(version=version, directory=scene_dir)
+
+    @classmethod
+    def get_background(cls, scene_dir, version='v1'): 
+        return  UWRGBDSceneDataset(version=version, 
+                                   directory=os.path.join(scene_dir, 'background')) \
     
 class UWRGBDObjectDataset(UWRGBDDataset):
     """
