@@ -113,10 +113,10 @@ def bow_codebook(data, K=64):
     return km.cluster_centers_
 
 def flair_project(data, codebook, pts=None, shape=None, method='bow', levels=(1,2,4), step=4): 
-    _, _, W, H = shape
+    W, H = np.max(shape[:, -2:], axis=0)
 
     return flair_code(descriptors=data.astype(np.float32), pts=pts.astype(np.int32), 
-                      rects=np.array([shape], dtype=np.float32), codebook=codebook.astype(np.float32), 
+                      rects=shape.astype(np.float32), codebook=codebook.astype(np.float32), 
                       W=int(W+5), H=int(H+5), K=codebook.shape[0], 
                       step=step, levels=np.array(list(levels), dtype=np.int32), encoding={'bow':0, 'vlad':1, 'fisher':2}[method])
 

@@ -367,6 +367,12 @@ class BOWClassifier(object):
             # Initialize features_db
             features_db = IterDB(filename=features_dir, mode='w', fields=fields, batch_size=batch_size)
 
+            def add_item_to_features_db(features_db, im_desc, target, pts, shapes): 
+                features_db.append(mode_prefix('desc'), im_desc)
+                features_db.append(mode_prefix('target'), target)
+                features_db.append(mode_prefix('pts'), pts)
+                features_db.append(mode_prefix('shapes'), shapes) 
+
             # Parallel Processing (in chunks of batch_size)
             if batch_size is not None and batch_size > 1: 
                 for chunk in chunks(data_iterable, batch_size): 
@@ -375,12 +381,8 @@ class BOWClassifier(object):
                         (**dict(self.process_cb_(frame), **self.params_.descriptor)) for frame in chunk
                     )
                     for (pts, im_desc), frame in izip(res, chunk): 
-                        features_db.append(mode_prefix('desc'), im_desc)
-                        features_db.append(mode_prefix('target'), frame.target)
-                        features_db.append(mode_prefix('pts'), pts)
-                        features_db.append(mode_prefix('shapes'), np.array([np.min(pts[:,0]), np.min(pts[:,1]), np.max(pts[:,0]), np.max(pts[:,1])]))
-                    
-
+                        add_item_to_features_db(features_db, im_desc, frame.target, pts, 
+                                                np.array([[np.min(pts[:,0]), np.min(pts[:,1]), np.max(pts[:,0]), np.max(pts[:,1])]]))
                         # Randomly sample from descriptors for vocab construction
                         if mode == 'train': 
                             inds = np.random.permutation(int(min(len(im_desc), self.params_.vocab.num_per_image)))
@@ -390,10 +392,12 @@ class BOWClassifier(object):
                 for frame in data_iterable: 
                     # Extract and add descriptors to db
                     pts, im_desc = self.image_descriptor_.detect_and_describe(**self.process_cb_(frame))
-                    features_db.append(mode_prefix('desc'), im_desc)
-                    features_db.append(mode_prefix('target'), frame.target)
-                    features_db.append(mode_prefix('pts'), pts)
-                    features_db.append(mode_prefix('shapes'), np.array([np.min(pts[:,0]), np.min(pts[:,1]), np.max(pts[:,0]), np.max(pts[:,1])]))
+                    add_item_to_features_db(features_db, im_desc, frame.target, pts, 
+                                            np.array([[np.min(pts[:,0]), np.min(pts[:,1]), np.max(pts[:,0]), np.max(pts[:,1])]]))
+                    # features_db.append(mode_prefix('desc'), im_desc)
+                    # features_db.append(mode_prefix('target'), frame.target)
+                    # features_db.append(mode_prefix('pts'), pts)
+                    # features_db.append(mode_prefix('shapes'), np.array([[np.min(pts[:,0]), np.min(pts[:,1]), np.max(pts[:,0]), np.max(pts[:,1])]]))
 
                     # Randomly sample from descriptors for vocab construction
                     if mode == 'train': 
@@ -611,7 +615,7 @@ class BOWClassifier(object):
         # 4. Kernel approximate and linear classification training
         self._train()
 
-    def eval(self, data_iterable, batch_size=10): 
+    def evaluate(self, data_iterable, batch_size=10): 
         # 1. Extract D-SIFT features 
         self._extract(data_iterable, mode='test', batch_size=batch_size)        
 
