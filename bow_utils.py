@@ -7,8 +7,11 @@ from scipy.spatial import cKDTree
 from sklearn.cluster import KMeans, MiniBatchKMeans
 from sklearn.mixture import GMM
 
-
 from bot_utils.db_utils import AttrDict
+
+# =====================================================================
+# Generic utility functions for bag-of-visual-words computation
+# ---------------------------------------------------------------------
 
 def normalize_hist(hist, norm_method='global-l2'): 
     """
@@ -101,6 +104,15 @@ def bow_project(data, codebook, pts=None, shape=None, levels=(1,2,4)):
         # Stack all histograms together
         return np.hstack(hist)
 
+def bow_codebook(data, K=64): 
+    km = MiniBatchKMeans(n_clusters=K, init='k-means++', 
+                         compute_labels=False, batch_size=1000, max_iter=150, max_no_improvement=30, 
+                         verbose=False).fit(data)
+    return km.cluster_centers_
+
+# =====================================================================
+# General-purpose bag-of-words interfaces
+# ---------------------------------------------------------------------
 
 class BoWVectorizer(object): 
     default_params = AttrDict(K=64, levels=(1,2,4), 
@@ -117,23 +129,7 @@ class BoWVectorizer(object):
         Build [K x D] codebook/vocabulary from data
         """
         st = time.time()
-
-        # Scipy: 1x
-        # self.codebook, self.labels = kmeans2(data, self.K)
-
-        # Scikit-learn: 2x
-        km = MiniBatchKMeans(n_clusters=self.K, init='k-means++', 
-                             compute_labels=False, batch_size=1000, max_iter=150, max_no_improvement=30, 
-                             verbose=False).fit(data)
-        # Alternate
-        # km = KMeans(n_clusters=self.K, n_jobs=4, tol=0.01, verbose=True).fit(data)
-        self.codebook = km.cluster_centers_
-
-        # # Opencv: 1x
-        # term_crit = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_MAX_ITER, 1, 10)
-        # ret, labels, self.codebook = cv2.kmeans(data, self.K, criteria=term_crit, 
-        #                                         attempts=10, flags=cv2.KMEANS_PP_CENTERS)
-
+        self.codebook = bow_codebook(data, K=self.K)
         print 'Vocab construction from data %s (%s KB, %s) => codebook %s took %5.3f s' % \
             (data.shape, data.nbytes / 1024, data.dtype, self.codebook.shape, time.time() - st)
         print 'Codebook: %s' % ('GOOD' if np.isfinite(self.codebook).all() else 'BAD')
@@ -198,7 +194,7 @@ class BoWVectorizer(object):
         return cls.from_dict(db)
 
     def to_dict(self): 
-        return AttrDict(codebook=self.codebook, params=AttrDict(K=self.K, method=self.method, norm_method=self.norm_method))
+        return AttrDict(codebook=self.codebook, params=AttrDict(K=self.K, levels=self.levels, method=self.method, norm_method=self.norm_method))
 
     def save(self, path): 
         db = self.to_dict()
