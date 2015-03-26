@@ -36,12 +36,12 @@ class UWRGBDDataset(object):
     target_unhash = dict(zip(class_ids, class_names))
 
     # train_names = ["cereal_box", "cap", "background"]
-    train_names = ["bowl", "cap", "cereal_box"] # , "background"]
+    # train_names = ["bowl", "cap", "cereal_box", "background"]
     # train_names = ["cap", "cereal_box", "coffee_mug", "soda_can", "background"]
     # train_names = ["bowl", "cap", "cereal_box", "coffee_mug", "soda_can", "background"]
-    # train_names = ["bowl", "cap", "cereal_box", "coffee_mug", "flashlight", 
-    #                 "keyboard", "kleenex", "scissors",  "soda_can", 
-    #                 "stapler", "background"]
+    train_names = ["bowl", "cap", "cereal_box", "coffee_mug", "flashlight", 
+                   "keyboard", "kleenex", "scissors",  "soda_can", 
+                   "stapler", "background"]
     # train_names = class_names
 
     train_ids = [target_hash[name] for name in train_names]
