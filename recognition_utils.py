@@ -375,7 +375,7 @@ class BOWClassifier(object):
             # Parallel Processing (in chunks of batch_size)
             if batch_size is not None and batch_size > 1: 
                 for chunk in chunks(data_iterable, batch_size): 
-                    res = Parallel(n_jobs=8, verbose=5) (
+                    res = Parallel(n_jobs=6, verbose=5) (
                         delayed(im_detect_and_describe)
                         (**dict(self.process_cb_(frame), **self.params_.descriptor)) for frame in chunk
                     )
@@ -495,14 +495,14 @@ class BOWClassifier(object):
 
                     if (self.params_.bow_method).lower() == 'flair': 
                         # raise RuntimeError('Not implemented for parallel %s' % self.params_.bow_method)
-                        res_hist = Parallel(n_jobs=8, verbose=5) (
+                        res_hist = Parallel(n_jobs=6, verbose=5) (
                             delayed(flair_project)
                             (desc, self.bow_.codebook, pts=pts, shape=shape, 
                              levels=self.params_.bow.levels, method=self.params_.bow.method, step=self.params_.descriptor.step) for desc, (_, _, pts, shape) in izip(desc_red, chunk)
                         )
 
                     elif (self.params_.bow_method).lower() == 'bow': 
-                        res_hist = Parallel(n_jobs=8, verbose=5) (
+                        res_hist = Parallel(n_jobs=6, verbose=5) (
                             delayed(bow_project)
                             (desc, self.bow_.codebook, pts=pts, shape=shape, levels=self.params_.bow.levels) for desc, (_, _, pts, shape) in izip(desc_red, chunk)
                         )
@@ -555,7 +555,7 @@ class BOWClassifier(object):
 
         # Grid search cross-val
         cv = ShuffleSplit(len(train_hists), n_iter=20, test_size=0.5, random_state=4)
-        self.clf_ = GridSearchCV(self.clf_, self.clf_hyparams_, cv=cv, n_jobs=8, verbose=4)
+        self.clf_ = GridSearchCV(self.clf_, self.clf_hyparams_, cv=cv, n_jobs=4, verbose=4)
         self.clf_.fit(train_hists, train_targets)
         print 'BEST: ', self.clf_.best_score_, self.clf_.best_params_
         # self.clf = self.clf_.best_estimator_
