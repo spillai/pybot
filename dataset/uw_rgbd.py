@@ -35,8 +35,8 @@ class UWRGBDDataset(object):
     target_hash = dict(zip(class_names, class_ids))
     target_unhash = dict(zip(class_ids, class_names))
 
-    train_names = ["cereal_box", "cap", "background"]
-    # train_names = ["bowl", "cap", "cereal_box", "background"]
+    # train_names = ["cereal_box", "cap", "background"]
+    train_names = ["bowl", "cap", "cereal_box"] # , "background"]
     # train_names = ["cap", "cereal_box", "coffee_mug", "soda_can", "background"]
     # train_names = ["bowl", "cap", "cereal_box", "coffee_mug", "soda_can", "background"]
     # train_names = ["bowl", "cap", "cereal_box", "coffee_mug", "flashlight", 
@@ -170,6 +170,7 @@ class UWRGBDObjectDataset(UWRGBDDataset):
                 yield AttrDict(img=rgb, depth=depth, mask=mask, 
                                bbox=[{'left':loc[0], 'right':loc[0]+mask_im.shape[1], 
                                       'top':loc[1], 'bottom':loc[1]+mask_im.shape[0], 
+                                      'target':self.target, 
                                       'category':UWRGBDDataset.get_category_name(self.target), 
                                       'instance':self.instance}])
 
@@ -250,6 +251,7 @@ class UWRGBDSceneDataset(UWRGBDDataset):
             if version == 'v2': 
                 print '\n\n===> Version v1 and v2 have discrepancies in depth values, FIX!! <===\n\n'
 
+            self.version = version
             rgb_files, depth_files = UWRGBDSceneDataset._reader.scene_files(files, version)
             assert(len(depth_files) == len(rgb_files))
 
@@ -343,6 +345,7 @@ class UWRGBDSceneDataset(UWRGBDDataset):
             """ Retrieve bounding boxes for each scene """
             if version == 'v1': 
                 bboxes = loadmat(fn, squeeze_me=True, struct_as_record=True)['bboxes']
+                
                 return [ [bbox] 
                          if bbox is not None and bbox.size == 1 else bbox
                          for bbox in bboxes ]
@@ -467,9 +470,19 @@ class UWRGBDSceneDataset(UWRGBDDataset):
         def _process_items(self, index, rgb_im, depth_im, bbox, pose): 
             # print 'Processing pose', pose, bbox
 
+            def _process_bbox(bbox): 
+                return dict(category=bbox['category'], target=UWRGBDDataset.target_hash[str(bbox['category'])], 
+                            left=bbox['left'], right=bbox['right'], top=bbox['top'], bottom=bbox['bottom'])
+
             # Compute bbox from pose and map (v2 support)
-            if bbox is None and hasattr(self, 'map_info'): 
-                bbox = self.get_bboxes(pose)
+            if self.version == 'v1': 
+                if bbox is not None: 
+                    bbox = [_process_bbox(bb) for bb in bbox]
+                    bbox = filter(lambda bb: bb['target'] in UWRGBDDataset.train_ids_set, bbox)
+
+            if self.version == 'v2': 
+                if bbox is None and hasattr(self, 'map_info'): 
+                    bbox = self.get_bboxes(pose)
 
             # print 'Processing pose', pose, bbox
             return AttrDict(index=index, img=rgb_im, depth=depth_im, 
