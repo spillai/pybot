@@ -178,7 +178,7 @@ def im_detect_and_describe(img, mask=None, detector='dense', descriptor='SIFT',
 
         return pts, desc
     except Exception as e: 
-        print e
+        print 'im_detect_and_describe', e
         return None, None
 
 def im_describe(*args, **kwargs): 
@@ -252,11 +252,10 @@ class ImageDescription(object):
             kpts = self.detector.detect(img, mask=mask)
             kpts, desc = self.extractor.compute(img, kpts)
             pts = np.vstack([kp.pt for kp in kpts]).astype(np.int32)
-
             return pts, desc
-
         except Exception as e: 
-            print e
+            # Catch when masks are small, and insufficient description
+            print 'detect_and_describe', e
             return None, None
 
     def describe(self, img, mask=None): 
@@ -381,8 +380,20 @@ class BOWClassifier(object):
                         (**dict(self.process_cb_(frame), **self.params_.descriptor)) for frame in chunk
                     )
                     for (pts, im_desc), frame in izip(res, chunk): 
-                        add_item_to_features_db(features_db, im_desc, frame.target, pts, 
-                                                np.array([[np.min(pts[:,0]), np.min(pts[:,1]), np.max(pts[:,0]), np.max(pts[:,1])]]))
+                        if im_desc is None: continue
+
+                        if hasattr(frame, 'bbox'): 
+                            # Single image, multiple ROIs/targets
+                            target = np.array([bbox['target'] for bbox in frame.bbox], dtype=np.int32)
+                            shapes = np.vstack([ [bbox['left'], bbox['top'], bbox['right'], bbox['bottom']] for bbox in frame.bbox] )
+
+                            add_item_to_features_db(features_db, im_desc, target, pts, shapes)
+                        elif hasattr(frame, 'target'): 
+                            # Single image, single target
+                            add_item_to_features_db(features_db, im_desc, frame.target, pts, np.array([[0, 0, frame.img.shape[1]-1, frame.img.shape[0]-1]]))
+                        else: 
+                            raise RuntimeError('Unknown extraction policy')
+
                         # Randomly sample from descriptors for vocab construction
                         if mode == 'train': 
                             inds = np.random.permutation(int(min(len(im_desc), self.params_.vocab.num_per_image)))
@@ -392,12 +403,19 @@ class BOWClassifier(object):
                 for frame in data_iterable: 
                     # Extract and add descriptors to db
                     pts, im_desc = self.image_descriptor_.detect_and_describe(**self.process_cb_(frame))
-                    add_item_to_features_db(features_db, im_desc, frame.target, pts, 
-                                            np.array([[np.min(pts[:,0]), np.min(pts[:,1]), np.max(pts[:,0]), np.max(pts[:,1])]]))
-                    # features_db.append(mode_prefix('desc'), im_desc)
-                    # features_db.append(mode_prefix('target'), frame.target)
-                    # features_db.append(mode_prefix('pts'), pts)
-                    # features_db.append(mode_prefix('shapes'), np.array([[np.min(pts[:,0]), np.min(pts[:,1]), np.max(pts[:,0]), np.max(pts[:,1])]]))
+                    if im_desc is None: continue
+
+                    if hasattr(frame, 'bbox'): 
+                        # Single image, multiple ROIs/targets
+                        target = np.array([bbox['target'] for bbox in frame.bbox], dtype=np.int32)
+                        shapes = np.vstack([ [bbox['left'], bbox['top'], bbox['right'], bbox['bottom']] for bbox in frame.bbox] )
+
+                        add_item_to_features_db(features_db, im_desc, target, pts, shapes)
+                    elif hasattr(frame, 'target'): 
+                        # Single image, single target
+                        add_item_to_features_db(features_db, im_desc, frame.target, pts, np.array([[0, 0, frame.img.shape[1]-1, frame.img.shape[0]-1]]))
+                    else: 
+                        raise RuntimeError('Unknown extraction policy')
 
                     # Randomly sample from descriptors for vocab construction
                     if mode == 'train': 
@@ -523,7 +541,7 @@ class BOWClassifier(object):
 
         # Homogeneous Kernel map
         train_hists = np.vstack([item for item in hists_db.itervalues('train_histogram', verbose=True)]) 
-        train_targets = np.array([item for item in hists_db.itervalues('train_target', verbose=True)], dtype=np.int32) 
+        train_targets = np.hstack([item for item in hists_db.itervalues('train_target', verbose=True)]).astype(np.int32) 
         if self.kernel_tf_ is not None: 
             print '====> [COMPUTE] TRAIN Kernel Approximator '
             # inds = np.random.permutation(hists_db.length('train_histogram'))[:self.params_.vocab.num_images]
@@ -567,7 +585,7 @@ class BOWClassifier(object):
 
         # Homogeneous Kernel map
         test_hists = np.vstack([item for item in hists_db.itervalues('test_histogram', verbose=True)]) 
-        test_targets = np.array([item for item in hists_db.itervalues('test_target', verbose=True)], dtype=np.int32) 
+        test_targets = np.hstack([item for item in hists_db.itervalues('test_target', verbose=True)]).astype(np.int32)
         if self.kernel_tf_ is not None: 
             print '====> [COMPUTE] Kernel Approximator '
             test_hists = self.kernel_tf_.transform(test_hists)
@@ -617,7 +635,7 @@ class BOWClassifier(object):
 
     def evaluate(self, data_iterable, batch_size=10): 
         # 1. Extract D-SIFT features 
-        self._extract(data_iterable, mode='test', batch_size=batch_size)        
+        self._extract(data_iterable, mode='test', batch_size=batch_size)
 
         # 2. Reduce dimensionality and project onto 
         #    histogram with spatial pyramid pooling
@@ -658,12 +676,12 @@ class BOWClassifier(object):
     def save(self, path): 
         db = AttrDict(params=self.params_, 
                       bow=self.bow_.to_dict(), pca=self.pca_, kernel_tf=self.kernel_tf_, 
-                      clf=self.clf_, clf_hyparams=self.clf_hyparams_)
+                      clf=self.clf_, clf_hyparams=self.clf_hyparams_, target_names=self.target_names_)
         db.save(path)
 
     @classmethod
     def from_dict(cls, db): 
-        c = cls()
+        c = cls(params=db.params, target_names=db.target_names)
         c._setup_from_dict(db)
         return c
 
