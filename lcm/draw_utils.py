@@ -32,10 +32,10 @@ class VisualizationMsgsPub:
         self.lc = lcm.LCM()
         self.log = logging.getLogger(__name__)
 
-        # kinect_pose = RigidTransform.from_roll_pitch_yaw_x_y_z(-np.pi/2, 0, -np.pi/2, 
-        #                                                        0.15, 0.2, 1.48, axes='sxyz')
-        kinect_pose = RigidTransform.from_roll_pitch_yaw_x_y_z(-np.pi/2 - np.pi * 20/180, 0, -np.pi/2, 
-                                                               0.15, 0.2, 0.5, axes='sxyz')
+        kinect_pose = RigidTransform.from_roll_pitch_yaw_x_y_z(-np.pi/2, 0, -np.pi/2, 
+                                                               0.15, 0.2, 1.48, axes='sxyz')
+        # kinect_pose = RigidTransform.from_roll_pitch_yaw_x_y_z(-np.pi/2 - np.pi * 20/180, 0, -np.pi/2, 
+        #                                                        0.15, 0.2, 0.5, axes='sxyz')
 
         self.publish_sensor_frame('KINECT', pose=kinect_pose)
 
@@ -297,14 +297,14 @@ def _publish_pose_list(pub_channel, _poses, texts=[], frame_id='KINECT'):
     global g_viz_pub
     poses = deepcopy(_poses)
     frame_pose = g_viz_pub.get_sensor_pose(frame_id)
-
+    
     # pose list collection msg
     pose_list_msg = vs.obj_collection_t();
     pose_list_msg.id = g_viz_pub.channel_uid(pub_channel)
     pose_list_msg.name = pub_channel;
     pose_list_msg.type = getattr(vs.obj_collection_t, 'AXIS3D');
     pose_list_msg.reset = True;
-
+    
     nposes = len(poses); 
 
     # fill out points
