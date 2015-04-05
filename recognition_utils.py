@@ -40,6 +40,56 @@ from sklearn.externals.joblib import Parallel, delayed
 # Generic utility functions for object recognition
 # ---------------------------------------------------------------------
 
+def plot_precision_recall(y_score, y_test, target_names): 
+    import matplotlib.pyplot as plt
+    from sklearn.metrics import precision_recall_curve
+    from sklearn.metrics import average_precision_score
+    from sklearn.preprocessing import label_binarize
+
+    # Compute Precision-Recall and plot curve
+    precision = dict()
+    recall = dict()
+    average_precision = dict()
+    
+    unique = np.unique(y_test)
+    y_test_multi = label_binarize(y_test, classes=unique)
+    N, n_classes = y_score.shape[:2]
+    for i,name in enumerate(target_names):
+        precision[name], recall[name], _ = precision_recall_curve(y_test_multi[:, i],
+                                                                  y_score[:, i])
+        average_precision[name] = average_precision_score(y_test_multi[:, i], y_score[:, i])
+
+    # Compute micro-average ROC curve and ROC area
+    precision["micro"], recall["micro"], _ = precision_recall_curve(y_test_multi.ravel(),
+        y_score.ravel())
+    average_precision["micro"] = average_precision_score(y_test_multi, y_score,
+                                                         average="micro")
+
+    # Plot Precision-Recall curve for each class
+    plt.clf()
+    plt.plot(recall["micro"], precision["micro"],
+             label='Micro-average PR curve (area = {0:0.2f})'
+                   ''.format(average_precision["micro"]))
+    plt.xlabel('Recall')
+    plt.ylabel('Precision')
+    plt.ylim([0.0, 1.05])
+    plt.xlim([0.0, 1.0])
+    plt.legend(loc="lower left")
+    plt.show()
+
+    for i,name in enumerate(target_names):
+        plt.plot(recall[name], precision[name],
+                 label='PR curve of class {0} (area = {1:0.2f})'
+                       ''.format(name, average_precision[name]))
+
+    plt.xlim([0.0, 1.0])
+    plt.ylim([0.0, 1.05])
+    plt.xlabel('Recall')
+    plt.ylabel('Precision')
+    plt.title('Precision-Recall curve')
+    plt.legend(loc="lower right")
+    plt.show(block=True)
+
 def classification_report(y_true, y_pred, labels=None, target_names=None,
                           sample_weight=None):
     """Build a text report showing the main classification metrics
@@ -556,7 +606,7 @@ class BOWClassifier(object):
         # Grid search cross-val
         cv = ShuffleSplit(len(train_hists), n_iter=20, test_size=0.5, random_state=4)
         self.clf_ = GridSearchCV(self.clf_, self.clf_hyparams_, cv=cv, n_jobs=4, verbose=4)
-        self.clf_.fit(train_hists, train_targets)
+        train_scores = self.clf_.fit(train_hists, train_targets)
         print 'BEST: ', self.clf_.best_score_, self.clf_.best_params_
         # self.clf = self.clf_.best_estimator_
         pred_targets = self.clf_.predict(train_hists)
@@ -567,7 +617,6 @@ class BOWClassifier(object):
         print ' Accuracy score (Training): %4.3f' % (metrics.accuracy_score(train_targets, pred_targets))
         print ' Report (Training):\n %s' % (classification_report(train_targets, pred_targets, 
                                                                   target_names=self.target_names_))
-
         print 'Training took %s' % format_time(time.time() - st_clf)
 
         print '====> Saving classifier '
@@ -609,6 +658,7 @@ class BOWClassifier(object):
         print ' Accuracy score (Test): %4.3f' % (metrics.accuracy_score(test_targets, pred_targets))
         print ' Report (Test):\n %s' % (classification_report(test_targets, pred_targets, 
                                                               target_names=self.target_names_))
+        print ' PR (Test) curve:\n ', plot_precision_recall(pred_scores, test_targets, self.target_names_)
         print 'Testing took %s' % format_time(time.time() - st_clf)
 
         return AttrDict(test_targets=test_targets, pred_targets=pred_targets, pred_scores=pred_scores, 
