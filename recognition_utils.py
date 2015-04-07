@@ -25,6 +25,7 @@ from bot_utils.itertools_recipes import chunks
 import sklearn.metrics as metrics
 from sklearn.decomposition import PCA, RandomizedPCA
 from sklearn.svm import LinearSVC, SVC
+from sklearn.calibration import CalibratedClassifierCV
 from sklearn.ensemble import GradientBoostingClassifier, ExtraTreesClassifier
 from sklearn.linear_model import SGDClassifier
 from sklearn.grid_search import GridSearchCV
@@ -40,7 +41,7 @@ from sklearn.externals.joblib import Parallel, delayed
 # Generic utility functions for object recognition
 # ---------------------------------------------------------------------
 
-def plot_precision_recall(y_score, y_test, target_names): 
+def plot_precision_recall(y_score, y_test, target_names=None): 
     import matplotlib.pyplot as plt
     from sklearn.metrics import precision_recall_curve
     from sklearn.metrics import average_precision_score
@@ -52,6 +53,9 @@ def plot_precision_recall(y_score, y_test, target_names):
     average_precision = dict()
     
     unique = np.unique(y_test)
+    if target_names is None: 
+        target_names = unique
+
     y_test_multi = label_binarize(y_test, classes=unique)
     N, n_classes = y_score.shape[:2]
     for i,name in enumerate(target_names):
@@ -603,13 +607,22 @@ class BOWClassifier(object):
         print '====> Train classifier '
         st_clf = time.time()
 
-        # Grid search cross-val
-        cv = ShuffleSplit(len(train_hists), n_iter=20, test_size=0.5, random_state=4)
+        # Grid search cross-val (best C param)
+        cv = ShuffleSplit(len(train_hists), n_iter=2, test_size=0.3, random_state=4)
+
+        print 'Training Classifier (with grid search hyperparam tuning) .. '
         self.clf_ = GridSearchCV(self.clf_, self.clf_hyparams_, cv=cv, n_jobs=4, verbose=4)
-        train_scores = self.clf_.fit(train_hists, train_targets)
+        self.clf_.fit(train_hists, train_targets)
         print 'BEST: ', self.clf_.best_score_, self.clf_.best_params_
-        # self.clf = self.clf_.best_estimator_
+
+        # Setting clf to best estimator
+        self.clf_ = self.clf_.best_estimator_
         pred_targets = self.clf_.predict(train_hists)
+
+        # Calibrating classifier
+        print 'Calibrating Classifier ... '
+        self.clf_prob_ = CalibratedClassifierCV(self.clf_, cv=cv, method='isotonic')
+        self.clf_prob_.fit(train_hists, train_targets)        
 
         print 'Training Classifier took %s' % (format_time(time.time() - st_clf))
         print '-------------------------------'        
@@ -658,7 +671,7 @@ class BOWClassifier(object):
         print ' Accuracy score (Test): %4.3f' % (metrics.accuracy_score(test_targets, pred_targets))
         print ' Report (Test):\n %s' % (classification_report(test_targets, pred_targets, 
                                                               target_names=self.target_names_))
-        print ' PR (Test) curve:\n ', plot_precision_recall(pred_scores, test_targets, self.target_names_)
+        # print ' PR (Test) curve:\n ', plot_precision_recall(pred_scores, test_targets, self.target_names_)
         print 'Testing took %s' % format_time(time.time() - st_clf)
 
         return AttrDict(test_targets=test_targets, pred_targets=pred_targets, pred_scores=pred_scores, 
@@ -694,23 +707,111 @@ class BOWClassifier(object):
         # 4. Kernel approximate and linear classification eval
         self._classify()
 
-    def classify_with_mask(self, img, mask=None): 
-        """ Describe image (with mask) with a BOW histogram  """
-        test_desc = self.image_descriptor_.describe(img, mask=mask) 
-        if self.pca_ is not None: 
-            test_desc = self.pca_.transform(test_desc)
-        test_hist = self.bow_.project(test_desc_red)
-        if self.kernel_tf_ is not None: 
-            test_hist = self.kernel_tf.transform(test_hist) 
-        # pred_target_proba = self.clf_.decision_function(test_histogram)
-        pred_target, = self.clf_.predict(test_histogram)
+    # def classify_with_mask(self, img, mask=None): 
+    #     """ Describe image (with mask) with a BOW histogram  """
+    #     test_desc = self.image_descriptor_.describe(img, mask=mask) 
+    #     if self.pca_ is not None: 
+    #         test_desc = self.pca_.transform(test_desc)
+    #     test_hist = self.bow_.project(test_desc_red)
+    #     if self.kernel_tf_ is not None: 
+    #         test_hist = self.kernel_tf.transform(test_hist) 
+    #     # pred_target_proba = self.clf_.decision_function(test_histogram)
+    #     pred_target, = self.clf_.predict(test_histogram)
 
-        return pred_target
+    #     return pred_target
 
-    def describe_with_bboxes(self, img, bboxes): 
-        raise RuntimeError('FLAIR not supported yet!')
-        pass
+    def setup_flair(self, W, H): 
+        if not hasattr(self.bow_, 'codebook') or \
+           not hasattr(self.bow_, 'dictionary_size') or \
+           not hasattr(self.params_.descriptor, 'step' ) or \
+           not hasattr(self.params_.bow, 'levels') or \
+           not hasattr(self.params_.bow, 'method'): 
+            raise RuntimeError('unknown params for flair setup')
 
+        if self.bow_.codebook is None: 
+            raise RuntimeError('Vocabulary not setup')
+
+        # Setup flair encoding
+        self.flair_ = FLAIR_code(W=W, H=H, 
+                                 K=self.bow_.dictionary_size, step=self.params_.descriptor.step, 
+                                 levels=np.array(self.params_.bow.levels, dtype=np.int32), 
+                                 encoding={'bow':0, 'vlad':1, 'fisher':2}[self.params_.bow.method])
+        
+        # Provide vocab for flair encoding
+        self.flair_.setVocabulary(self.bow_.codebook.astype(np.float32))
+
+    def describe(self, img, bboxes): 
+        """ 
+        Describe img regions defined by the bboxes
+        FLAIR classification (one-time descriptor evaluation)
+
+        Params: 
+             img:    np.uint8
+             bboxes: np.float32 [bbox['left'], bbox['top'], bbox['right'], bbox['bottom'], ...] 
+
+        """
+        if not hasattr(self, 'flair_'): 
+            raise RuntimeError('FLAIR not setup yet, run setup_flair() first!')
+
+        # Construct rectangle info
+        im_rect = np.vstack([[bbox['left'], bbox['top'], 
+                              bbox['right'], bbox['bottom']] \
+                             for bbox in bboxes]).astype(np.float32)
+        
+        try: 
+            # Extract image features
+            # if self.params_.profile: self.profiler[self.params_.descriptor.descriptor].start()
+            pts, desc = self.image_descriptor_.detect_and_describe(img=img, mask=None)
+            # if self.params_.profile: self.profiler[self.params_.descriptor.descriptor].stop()
+
+            # Reduce dimensionality
+            # if self.params_.profile: self.profiler['dim_red'].start()
+            if self.params_.do_pca: 
+                desc = self.pca_.transform(desc)
+            # if self.params_.profile: self.profiler['dim_red'].stop()
+
+            # Extract histogram
+            # pts: int32, desc: float32, im_rect: float32
+            # if self.params_.profile: self.profiler['FLAIR'].start()
+            hists = self.flair_.process(pts.astype(np.int32), desc.astype(np.float32), im_rect)
+            # if self.params_.profile: self.profiler['FLAIR'].stop()
+
+            # Transform histogram using kernel feature map
+            if self.params_.do_kernel_approximation: 
+                hists = self.kernel_tf_.transform(hists)
+        except Exception as e: 
+            # if self.params_.profile: self.profiler[self.params_.descriptor.descriptor].stop(force=True)
+            print 'Failed to extract FLAIR and process', e
+            return None
+
+        return hists
+
+    def process(self, img, bboxes): 
+        """ 
+        Describe img and predict with corresponding bboxes 
+        """
+        if not len(bboxes): 
+            return None, None
+
+        # Batch predict targets and visualize
+        hists = self.describe(img, bboxes)
+
+        if hists is None: 
+            return None, None
+
+        pred_target = self.clf_.predict(hists)
+        # if self.params.profile: self.profiler['predict'].start()
+        pred_prob = self.clf_prob_.predict_proba(hists) 
+        # if self.params.profile: self.profiler['predict'].stop()
+        # pred_score = self.clf_.decision_function(hists)
+
+        return pred_prob, pred_target
+    
+    def get_catgory_id(self, col_ind): 
+        return self.clf_.classes_.take(np.asarray(col_ind, dtype=np.intp)) 
+
+    def get_categories(self): 
+        return self.clf_.classes_
 
     def _setup_from_dict(self, db): 
         try: 
@@ -720,13 +821,15 @@ class BOWClassifier(object):
             self.pca_ = db.pca
             self.kernel_tf_ = db.kernel_tf
             self.clf_, self.clf_hyparams_ = db.clf, db.clf_hyparams
+            self.clf_prob_ = db.clf_prob
         except KeyError: 
             raise RuntimeError('DB not setup correctly, try re-training!')
         
     def save(self, path): 
         db = AttrDict(params=self.params_, 
                       bow=self.bow_.to_dict(), pca=self.pca_, kernel_tf=self.kernel_tf_, 
-                      clf=self.clf_, clf_hyparams=self.clf_hyparams_, target_names=self.target_names_)
+                      clf=self.clf_, clf_hyparams=self.clf_hyparams_, 
+                      clf_prob=self.clf_prob_, target_names=self.target_names_)
         db.save(path)
 
     @classmethod
