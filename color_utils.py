@@ -1,7 +1,7 @@
 import cv2
 import numpy as np
 import matplotlib.pylab as plt
-from matplotlib.colors import colorConverter
+from matplotlib.colors import colorConverter, ListedColormap
 
 def colormap(im, min_threshold=0.01):
     mask = im<min_threshold
@@ -14,9 +14,20 @@ def colormap(im, min_threshold=0.01):
     return bgr
 
 def get_color_by_label(labels, default='b', colormap='jet'): 
-    lo, hi = np.min(labels), np.max(labels)
-    colormap_func = getattr(plt.cm, colormap)
-    return colormap_func((labels - lo) * 1.0 / (hi - lo)) if labels is not None else default    
+    if labels is None: 
+        return default
+
+    if colormap == 'random':
+        np.random.seed(1)
+        inds = np.arange(10)
+        np.random.shuffle(inds)
+        labels_ = inds[labels % 10]
+        colormap_func = getattr(plt.cm, 'jet')
+        return colormap_func(labels_ * 1.0 / (len(inds) + 1))
+    else: 
+        lo, hi = np.min(labels), np.max(labels)
+        colormap_func = getattr(plt.cm, colormap)
+        return colormap_func((labels - lo) * 1.0 / (hi - lo))
 
 def color_from_string(c, n): 
     return np.tile(np.array(colorConverter.to_rgb(c)), [n,1])
