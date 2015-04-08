@@ -240,7 +240,8 @@ def get_object_bbox(camera, pts, subsample=10, scale=1.0, min_height=10, min_wid
         # Transform points in camera frame, and check z-vector: 
         # [p_c = T_cw * p_w]
         depth = np.median((camera * pts[::subsample])[:,2])
-        assert(depth >= 0), "Depth is less than zero, add check for this."
+        if depth < 0: return [None] * 3
+        # assert(depth >= 0), "Depth is less than zero, add check for this."
 
         # if visualize: 
         #     draw_utils.publish_cloud('obj_cloud', pts[::subsample], c='r', frame_id='KINECT')
