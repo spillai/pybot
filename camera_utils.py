@@ -29,7 +29,7 @@ def construct_K(fx=500.0, fy=500.0, cx=319.5, cy=239.5):
     return K
 
 class CameraIntrinsic(object): 
-    def __init__(self, K, D=np.zeros(4, dtype=np.float64)): 
+    def __init__(self, K, D=np.zeros(4, dtype=np.float64), shape=None): 
         """
         Default init
         """
@@ -37,6 +37,7 @@ class CameraIntrinsic(object):
         self.D = D                         # Distortion
         self.cx, self.cy = K[0,2], K[1,2]  # Camera center.
         self.fx, self.fy = K[0,0], K[1,1]  # Focal length
+        self.shape = shape                 # Image size (H,W,C): (480,640,3)
 
     @classmethod
     def simluate(cls): 
@@ -88,8 +89,8 @@ class CameraExtrinsic(RigidTransform):
         return cls.identity()
 
 class Camera(CameraIntrinsic, CameraExtrinsic): 
-    def __init__(self, K, R, t, D=np.zeros(4, dtype=np.float64)): 
-        CameraIntrinsic.__init__(self, K, D)
+    def __init__(self, K, R, t, D=np.zeros(4, dtype=np.float64), shape=None): 
+        CameraIntrinsic.__init__(self, K, D, shape=shape)
         CameraExtrinsic.__init__(self, R, t)
 
     @property
@@ -106,7 +107,7 @@ class Camera(CameraIntrinsic, CameraExtrinsic):
 
     @classmethod
     def from_intrinsics_extrinsics(cls, intrinsic, extrinsic): 
-        return cls(intrinsic.K, extrinsic.R, extrinsic.t, intrinsic.D)
+        return cls(intrinsic.K, extrinsic.R, extrinsic.t, D=intrinsic.D, shape=intrinsic.shape)
 
     def project(self, X):
         """
@@ -206,8 +207,8 @@ def check_visibility(camera, pts):
     Check if points are visible given fov of camera
     camera: type Camera
     """
-    # Hack: only check min of the fovs
-    fov = np.min(camera.fov)
+    # Hack: only check max of the fovs
+    fov = np.max(camera.fov)
     lookat = camera.R[:,2]
 
     v = pts - camera.tvec
@@ -220,14 +221,27 @@ def check_visibility(camera, pts):
 
 def get_object_bbox(camera, pts, subsample=10, scale=1.0, min_height=10, min_width=10, visualize=False): 
     pts2d = camera.project(pts[::subsample].astype(np.float32))
-    x0, x1 = int(np.min(pts2d[:,0])), int(np.max(pts2d[:,0]))
-    y0, y1 = int(np.min(pts2d[:,1])), int(np.max(pts2d[:,1]))
-    if (x0 >= 0 and y0 >= 0 and x0 <= camera.cx * 2 and y0 < camera.cy * 2) and \
-       (x1 >= 0 and y1 >= 0 and x1 <= camera.cx * 2 and y1 < camera.cy * 2) and \
+
+    # Min-max bounds
+    x0, x1 = int(max(0, np.min(pts2d[:,0]))), int(min(camera.shape[1]-1, np.max(pts2d[:,0])))
+    y0, y1 = int(max(0, np.min(pts2d[:,1]))), int(min(camera.shape[0]-1, np.max(pts2d[:,1])))
+
+    # Only return points within-image bounds
+    valid = np.bitwise_and(np.bitwise_and(pts2d[:,0] >= 0, pts2d[:,0] < camera.shape[1]), \
+                           np.bitwise_and(pts2d[:,1] >= 0, pts2d[:,1] < camera.shape[0]))
+    pts2d = pts2d[valid]
+
+    # Check median center 
+    xmed, ymed = np.median(pts2d[:,0]), np.median(pts2d[:,1])
+    if (xmed >= 0 and ymed >= 0 and xmed <= camera.shape[1] and ymed < camera.shape[0]) and \
        (y1-y0) >= min_height and (x1-x0) >= min_width: 
 
-        # Median depth of the candidate object 
-        depth = np.linalg.norm(camera.tvec - np.median(pts[::subsample], axis=0))
+        # Median depth of the candidate object
+        # Transform points in camera frame, and check z-vector: 
+        # [p_c = T_cw * p_w]
+        depth = np.median((camera * pts[::subsample])[:,2])
+        assert(depth >= 0), "Depth is less than zero, add check for this."
+
         # if visualize: 
         #     draw_utils.publish_cloud('obj_cloud', pts[::subsample], c='r', frame_id='KINECT')
         #     draw_utils.publish_point_type('obj_distance', 
@@ -237,8 +251,8 @@ def get_object_bbox(camera, pts, subsample=10, scale=1.0, min_height=10, min_wid
 
         if scale != 1.0: 
             w2, h2 = (scale-1.0) * (x1-x0) / 2, (scale-1.0) * (y1-y0) / 2
-            x0, x1 = int(max(0, x0 - w2)), int(min(x1 + w2, camera.cx * 2))
-            y0, y1 = int(max(0, y0 - h2)), int(min(y1 + h2, camera.cy * 2))
+            x0, x1 = int(max(0, x0 - w2)), int(min(x1 + w2, camera.shape[1]-1))
+            y0, y1 = int(max(0, y0 - h2)), int(min(y1 + h2, camera.shape[0]-1))
         return pts2d.astype(np.int32), {'left':x0, 'right':x1, 'top':y0, 'bottom':y1}, depth
     else: 
         return [None] * 3
