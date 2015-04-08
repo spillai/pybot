@@ -249,7 +249,7 @@ class UWRGBDSceneDataset(UWRGBDDataset):
         """
         def __init__(self, files, meta_file, aligned_file, version): 
             if version == 'v2': 
-                print '\n\n===> Version v1 and v2 have discrepancies in depth values, FIX!! <===\n\n'
+                print '\n===> Version v1 and v2 have discrepancies in depth values, FIX!! <===\n'
 
             self.version = version
             rgb_files, depth_files = UWRGBDSceneDataset._reader.scene_files(files, version)
@@ -269,8 +269,10 @@ class UWRGBDSceneDataset(UWRGBDDataset):
             # Version 2 only supported! Version 1 support for rgbd scene (unclear)
             self.poses = UWRGBDSceneDataset._reader.load_poses(aligned_file.pose, version) \
                          if aligned_file is not None and version == 'v2' else [None] * len(rgb_files)
-            # print 'Aligned: ', aligned_file
+            print 'Aligned: ', aligned_file
+            print len(self.poses), len(rgb_files)
             assert(len(self.poses) == len(rgb_files))
+
 
             if aligned_file: 
                 # ALIGNED POINT CLOUD
@@ -506,8 +508,7 @@ class UWRGBDSceneDataset(UWRGBDDataset):
                 yield self._process_items(index, rgb_im, depth_im, bbox, pose)
 
 
-    def __init__(self, version, directory='', targets=None, num_targets=None, 
-                 blacklist=[''], aligned_directory=None):
+    def __init__(self, version, directory='', targets=None, num_targets=None, blacklist=['']):
         if version not in ['v1', 'v2']: 
             raise ValueError('Version %s not supported. '''
                              '''Check dataset and choose either v1 or v2 scene dataset''' % version)
@@ -515,9 +516,15 @@ class UWRGBDSceneDataset(UWRGBDDataset):
         self.blacklist = blacklist
 
         self._dataset = read_dir(os.path.expanduser(directory), pattern='*.png', recursive=False)
-        self._meta = UWRGBDSceneDataset._reader.meta_files(directory, version)
-        self._aligned = UWRGBDSceneDataset._reader.aligned_files(aligned_directory, version) \
-                        if aligned_directory else None
+
+        if version == 'v1': 
+            self._meta = UWRGBDSceneDataset._reader.meta_files(directory, version)
+        elif version == 'v2': 
+            self._meta = UWRGBDSceneDataset._reader.meta_files(os.path.join(directory, 'imgs'), version)
+            self._aligned = UWRGBDSceneDataset._reader.aligned_files(os.path.join(directory, 'pc'), version)
+        else: 
+            raise ValueError('Version %s not supported. '''
+                             '''Check dataset and choose either v1 or v2 scene dataset''' % version)
 
         # # Instantiate a reader for each of the objects
         # self.data = {}
