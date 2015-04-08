@@ -639,11 +639,13 @@ def test_uw_rgbd_scene(version='v1'):
     else: 
         raise RuntimeError('''Version %s not supported. '''
                            '''Check dataset and choose v1/v2 scene dataset''' % version)
-        
-    for f in rgbd_data_uw.iteritems(every_k_frames=5): 
-        vis = rgbd_data_uw.annotate(f)
-        imshow_cv('frame', np.hstack([f.img, vis]), text='Image')
-        imshow_cv('depth', (f.depth / 16).astype(np.uint8), text='Depth')
-        cv2.waitKey(100)
+
+    return rgbd_data_uw
+
+    # for f in rgbd_data_uw.iteritems(every_k_frames=5): 
+    #     vis = rgbd_data_uw.annotate(f)
+    #     imshow_cv('frame', np.hstack([f.img, vis]), text='Image')
+    #     imshow_cv('depth', (f.depth / 16).astype(np.uint8), text='Depth')
+    #     cv2.waitKey(100)
 
 
