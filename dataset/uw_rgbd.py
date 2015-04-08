@@ -289,7 +289,7 @@ class UWRGBDSceneDataset(UWRGBDDataset):
                 unique_centers = np.vstack([np.mean(ply_xyz[ply_label == l], axis=0) for l in unique_labels])
 
                 # FIX: Needs to be re-worked to use arbitrary camera matrix
-                intrinsic = CameraIntrinsic(K=UWRGBDSceneDataset.camera_params.K_rgb)
+                intrinsic = CameraIntrinsic(K=UWRGBDSceneDataset.camera_params.K_rgb, shape=UWRGBDDataset.default_rgb_shape)
                 camera = Camera.from_intrinsics_extrinsics(intrinsic, CameraExtrinsic.identity())
                 self.map_info = AttrDict(
                     points=ply_xyz, color=ply_rgb, labels=ply_label, 
