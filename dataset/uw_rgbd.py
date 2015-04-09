@@ -1,6 +1,13 @@
+"""
+UW-RGB-D Object/Scene Dataset reader
+"""
+# Author: Sudeep Pillai <spillai@csail.mit.edu>
+# License: MIT 
+
 import os, time
 import numpy as np
 import cv2
+
 from itertools import izip, imap
 from collections import defaultdict
 
@@ -11,12 +18,18 @@ from bot_utils.db_utils import AttrDict
 from bot_utils.dataset_readers import read_dir, read_files, natural_sort, \
     DatasetReader, ImageDatasetReader
 
-from bot_vision.camera_utils import kinect_v1_params, Camera, CameraIntrinsic, CameraExtrinsic, \
+from bot_vision.camera_utils import kinect_v1_params, \
+    Camera, CameraIntrinsic, CameraExtrinsic, \
     check_visibility, get_object_bbox
+
 from bot_geometry.rigid_transform import Quaternion, RigidTransform
 from bot_externals.plyfile import PlyData
 
 # __categories__ = ['flashlight', 'cap', 'cereal_box', 'coffee_mug', 'soda_can']
+
+# =====================================================================
+# Generic UW-RGBD Dataset class
+# ---------------------------------------------------------------------
 
 class UWRGBDDataset(object): 
     default_rgb_shape = (480,640,3)
@@ -37,8 +50,8 @@ class UWRGBDDataset(object):
 
     # train_names = ["cereal_box", "cap", "background"]
     # train_names = ["bowl", "cap", "cereal_box", "background"]
-    train_names = ["cap", "cereal_box", "coffee_mug", "soda_can", "background"]
-    # train_names = ["bowl", "cap", "cereal_box", "coffee_mug", "soda_can", "background"]
+    # train_names = ["cap", "cereal_box", "coffee_mug", "soda_can", "background"]
+    train_names = ["bowl", "cap", "cereal_box", "coffee_mug", "soda_can", "background"]
     # train_names = ["bowl", "cap", "cereal_box", "coffee_mug", "flashlight", 
     #                "keyboard", "kleenex", "scissors",  "soda_can", 
     #                "stapler", "background"]
@@ -89,6 +102,10 @@ class UWRGBDDataset(object):
     def get_background(cls, scene_dir, version='v1'): 
         return  UWRGBDSceneDataset(version=version, 
                                    directory=os.path.join(scene_dir, 'background')) \
+
+# =====================================================================
+# UW-RGBD Object Dataset Reader
+# ---------------------------------------------------------------------
     
 class UWRGBDObjectDataset(UWRGBDDataset):
     """
@@ -202,14 +219,14 @@ class UWRGBDObjectDataset(UWRGBDDataset):
         # Fusing all object instances of a category into a single key
         print 'Train targets, ', targets
         st = time.time()
-        self._dataset = read_dir(os.path.expanduser(directory), pattern='*.png', 
+        self.dataset_ = read_dir(os.path.expanduser(directory), pattern='*.png', 
                                  recursive=False, expected=targets, verbose=False)
         print 'Time taken to read_dir %5.3f s' % (time.time() - st)
-        print 'Classes: %i' % len(targets), self._dataset.keys()
+        print 'Classes: %i' % len(targets), self.dataset_.keys()
 
         # Instantiate a reader for each of the objects
         self.data = {}
-        for key, files in self._dataset.iteritems(): 
+        for key, files in self.dataset_.iteritems(): 
             if (targets is not None and get_category(key) not in targets) or key in blacklist: 
                 continue
             target_id = self.target_hash[get_category(key)]
@@ -231,6 +248,10 @@ class UWRGBDObjectDataset(UWRGBDDataset):
                 yield frame
         if verbose: pbar.finish()
 
+
+# =====================================================================
+# UW-RGBD Scene Dataset Reader
+# ---------------------------------------------------------------------
 
 class UWRGBDSceneDataset(UWRGBDDataset):
     """
@@ -273,43 +294,65 @@ class UWRGBDSceneDataset(UWRGBDDataset):
             print len(self.poses), len(rgb_files)
             assert(len(self.poses) == len(rgb_files))
 
+            # Aligned point cloud
+            if aligned_file is not None: 
+                if version != 'v2': 
+                    raise RuntimeError('Version v2 is only supported')
 
-            if aligned_file: 
-                # ALIGNED POINT CLOUD
-                # Version 2 only supported! 
-                print '\n===> Un-optimized load_plylabel. Takes too long. FIX!! <===\n\n' 
+                print '\n===> Un-optimized load_plylabel. Takes too long. FIX!! <===\n' 
                 ply_xyz, ply_rgb = UWRGBDSceneDataset._reader.load_ply(aligned_file.ply, version)
                 ply_label = UWRGBDSceneDataset._reader.load_plylabel(aligned_file.label, version)
 
                 # Remapping to v1 index
                 ply_label = np.array([UWRGBDSceneDataset.v2_to_v1[l] for l in ply_label], dtype=np.int32)
 
-                # 1b. Plot centers with poses and text
-                unique_labels = np.unique(ply_label)
+                # Get object info
+                object_info = UWRGBDSceneDataset._reader.cluster_ply_labels(ply_xyz[::30], ply_rgb[::30], ply_label[::30])
 
-                # 1c. Determine centroid of each cluster
-                unique_centers = np.vstack([np.mean(ply_xyz[ply_label == l], axis=0) for l in unique_labels])
-
-                # FIX: Needs to be re-worked to use arbitrary camera matrix
+                # Add camera info
                 intrinsic = CameraIntrinsic(K=UWRGBDSceneDataset.camera_params.K_rgb, shape=UWRGBDDataset.default_rgb_shape)
                 camera = Camera.from_intrinsics_extrinsics(intrinsic, CameraExtrinsic.identity())
-                self.map_info = AttrDict(
-                    points=ply_xyz, color=ply_rgb, labels=ply_label, 
-                    unique_labels=unique_labels, unique_centers=unique_centers, camera=camera
-                ) if aligned_file is not None and version == 'v2' else None
+                self.map_info = AttrDict(camera=camera, objects=object_info)
+
+                # # 1c. Determine centroid of each cluster
+                # unique_centers = np.vstack([np.mean(ply_xyz[ply_label == l], axis=0) for l in unique_labels])
+
+                # self.map_info = AttrDict(
+                #     points=ply_xyz, color=ply_rgb, labels=ply_label, 
+                #     unique_labels=unique_labels, unique_centers=unique_centers, camera=camera
+                # ) 
                 assert(len(ply_xyz) == len(ply_rgb))
 
-        # @staticmethod
-        # def cluster_pts(all_pts): 
-        #     from pybot_pcl import euclidean_clustering
+        @staticmethod
+        def cluster_ply_labels(ply_xyz, ply_rgb, ply_label): 
+            """
+            Separate multiple object instances cleanly, otherwise, 
+            candidate projection becomes inconsistent
+            """
+            from pybot_pcl import euclidean_clustering            
 
-        #     splits = []
-        #     labels = euclidean_clustering(all_pts.astype(np.float32), tolerance=0.2, scale=1.0, min_cluster_size=10, max_cluster_size=10000000)
-        #     for label in np.unique(labels): 
-        #         if label < 0: continue
-        #         inds, = np.where(labels == label)
-        #         splits.append(all_pts[inds])
-        #     return splits
+            object_info = []
+
+            unique_labels = np.unique(ply_label)
+            for l in unique_labels: 
+
+                # Only add clusters that are in target/train and not background
+                if l not in UWRGBDDataset.train_ids or l == UWRGBDDataset.target_hash['background']: 
+                    continue
+
+                l_xyz = ply_xyz[ply_label == l]
+                l_rgb = ply_rgb[ply_label == l]
+                # print 'Clustering: ', l_xyz.shape, l_rgb.shape
+
+                linds = euclidean_clustering(l_xyz.astype(np.float32), tolerance=0.1, scale=1.0, min_cluster_size=10)
+                unique_linds = np.unique(linds)
+                # print 'Output ', unique_linds
+                object_info.extend([ AttrDict(label=l, 
+                                              points=l_xyz[linds == lind], colors=l_rgb[linds == lind], 
+                                              center=np.mean(l_xyz[linds == lind], axis=0)) for lind in unique_linds ])                  
+            print 'Total unique objects in dataset: ', len(object_info)
+
+            return object_info
 
         def get_bboxes(self, pose): 
             # 1. Get pose for a particular frame, 
@@ -321,25 +364,17 @@ class UWRGBDSceneDataset(UWRGBDDataset):
                 print 'Failed to find pose'
                 return None
 
-            # 2. Get all cluster centers that are visible from camera's view
-            visible_inds = check_visibility(self.map_info.camera, self.map_info.unique_centers)
-            visible_labels = self.map_info.unique_labels[visible_inds]
-
-            # 3. Determine bounding boxes for each of the visible clusters
+            # 2. Determine bounding boxes for visible clusters
             object_candidates = []
-            for label in visible_labels:
-                label_pts = self.map_info.points[label == self.map_info.labels]
-                pts2d, bbox, depth = get_object_bbox(self.map_info.camera, label_pts, subsample=3)
+            for obj in self.map_info.objects:
+                # Check visibility of cluster center
+                if not check_visibility(self.map_info.camera, obj.center): 
+                    continue
+                pts2d, bbox, depth = get_object_bbox(self.map_info.camera, obj.points, subsample=3)
                 if bbox is not None: 
-                    bbox['label'], bbox['depth'] = label, depth
+                    bbox['label'], bbox['depth'] = obj.label, depth
                     object_candidates.append(bbox)
 
-                    # Might need FIXING 
-                    # object_candidates.append(AttrDict(label=label, bbox=bbox, depth=depth))
-
-                # label_pts_list = UWRGBDSceneDataset._reader.cluster_pts(label_pts_all)
-                # print 'Unique Splits: ', len(label_pts_list)
-                # for label_pts in label_pts_list: 
             return object_candidates
 
         @staticmethod
@@ -469,6 +504,20 @@ class UWRGBDSceneDataset(UWRGBDDataset):
                 raise ValueError('''Version %s not supported. '''
                                  '''Check dataset and choose v1 scene dataset''' % version)
 
+
+        def visualize_ground_truth(self): 
+            import bot_externals.draw_utils as draw_utils
+
+            # Publish ground truth poses, and aligned point clouds
+            draw_utils.publish_pose_list('ground_truth_poses', self.poses)
+
+            # carr = get_color_by_label(scene.map_info.labels) 
+            draw_utils.publish_cloud('aligned_cloud', [obj.points for obj in self.map_info.objects], 
+                                     c=[obj.colors for obj in self.map_info.objects]) 
+            draw_utils.publish_pose_list('aligned_poses', [RigidTransform(tvec=obj.center) for obj in self.map_info.objects], 
+                                         texts=[str(obj.label) for obj in self.map_info.objects])
+
+
         def _process_items(self, index, rgb_im, depth_im, bbox, pose): 
             # print 'Processing pose', pose, bbox
 
@@ -508,36 +557,26 @@ class UWRGBDSceneDataset(UWRGBDDataset):
                 yield self._process_items(index, rgb_im, depth_im, bbox, pose)
 
 
-    def __init__(self, version, directory='', targets=None, num_targets=None, blacklist=['']):
+    def __init__(self, version, directory, targets=None, num_targets=None, blacklist=['']):
         if version not in ['v1', 'v2']: 
             raise ValueError('Version %s not supported. '''
                              '''Check dataset and choose either v1 or v2 scene dataset''' % version)
         self.version = version
         self.blacklist = blacklist
 
-        self._dataset = read_dir(os.path.expanduser(directory), pattern='*.png', recursive=False)
+        # Recursively read, and categorize items based on folder
+        self.dataset_ = read_dir(os.path.expanduser(directory), pattern='*.png', recursive=False)
 
+        # Setup meta data
         if version == 'v1': 
-            self._meta = UWRGBDSceneDataset._reader.meta_files(directory, version)
+            self.meta_ = UWRGBDSceneDataset._reader.meta_files(directory, version)
+            self.aligned_ = None
         elif version == 'v2': 
-            self._meta = UWRGBDSceneDataset._reader.meta_files(os.path.join(directory, 'imgs'), version)
-            self._aligned = UWRGBDSceneDataset._reader.aligned_files(os.path.join(directory, 'pc'), version)
+            self.meta_ = UWRGBDSceneDataset._reader.meta_files(os.path.join(directory, 'imgs'), version)
+            self.aligned_ = UWRGBDSceneDataset._reader.aligned_files(os.path.join(directory, 'pc'), version)
         else: 
             raise ValueError('Version %s not supported. '''
                              '''Check dataset and choose either v1 or v2 scene dataset''' % version)
-
-        # # Instantiate a reader for each of the objects
-        # self.data = {}
-        # for key, files in self._dataset.iteritems(): 
-        #     if (targets is not None and key not in targets) or key in blacklist: 
-        #         continue
-
-        #     # Get mat file for each scene
-        #     meta_file = self._meta.get(key, None)
-        #     aligned_file = self._aligned.get(key, None)
-        #     print key, meta_file, aligned_file
-        #     # target_id = self.target_hash[key]
-        #     self.data[key] = UWRGBDSceneDataset._reader(files, meta_file, aligned_file, version)
 
     # @classmethod
     # def get_v2_category_name(cls, target_id): 
@@ -551,7 +590,7 @@ class UWRGBDSceneDataset(UWRGBDDataset):
 
 
     def iteritems(self, every_k_frames=1, verbose=False): 
-        pbar = setup_pbar(len(self._dataset)) if verbose else None
+        pbar = setup_pbar(len(self.dataset_)) if verbose else None
         print 'Scenes: %i %s' % (len(self.scenes()), self.scenes())
         for key, frames in self.iterscenes(verbose=verbose): 
             if verbose: 
@@ -562,29 +601,31 @@ class UWRGBDSceneDataset(UWRGBDDataset):
                 yield frame
         if verbose: pbar.finish()
 
-    def scene(self, key): 
+    def scene(self, key, with_ground_truth=False): 
         if key in self.blacklist: 
             raise RuntimeError('Key %s is in blacklist, are you sure you want this!' % key)
 
-        # Get mat file for each scene
-        files = self._dataset[key]
-        meta_file = self._meta.get(key, None)
-        aligned_file = self._aligned.get(key, None) if self._aligned else None
-        # print key, meta_file, aligned_file
+        # Get scene files
+        files = self.dataset_[key]
+
+        # Get meta data 
+        meta_file = self.meta_.get(key, None)
+        aligned_file = self.aligned_.get(key, None) if (self.aligned_ and with_ground_truth) else None
+
         return UWRGBDSceneDataset._reader(files, meta_file, aligned_file, self.version)
 
     def scenes(self): 
-        return self._dataset.keys()
+        return self.dataset_.keys()
 
-    def iterscenes(self, targets=None, blacklist=None, verbose=False): 
-        pbar = setup_pbar(len(self._dataset)) if verbose else None
-        for key in self._dataset.iterkeys(): 
+    def iterscenes(self, targets=None, blacklist=None, verbose=False, with_ground_truth=False): 
+        pbar = setup_pbar(len(self.dataset_)) if verbose else None
+        for key in self.dataset_.iterkeys(): 
             # Optionally only iterate over targets, and avoid blacklist
             if (targets is not None and key not in targets) or \
                (blacklist is not None and key in blacklist): 
                 continue
             if verbose: pbar.increment()
-            yield key, self.scene(key)
+            yield key, self.scene(key, with_ground_truth=with_ground_truth)
         if verbose: pbar.finish()
 
     @staticmethod
