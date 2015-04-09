@@ -55,4 +55,11 @@ def imshow_cv(label, im, block=False, text=None):
         sys.exit(1)
 
 
+def annotate_bbox(vis, bbox, color=(0,200,0), title=''): 
+    # Bounding Box and top header
+    cv2.rectangle(vis, (bbox['left'], bbox['top']), (bbox['right'], bbox['bottom']), color, 2)
+    cv2.rectangle(vis, (bbox['left']-1, bbox['top']-15), (bbox['right']+1, bbox['top']), color, -1)
+
+    cv2.putText(vis, '%s' % title, (bbox['left'], bbox['top']-5), 
+                cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), thickness=1, lineType=cv2.CV_AA)
 
