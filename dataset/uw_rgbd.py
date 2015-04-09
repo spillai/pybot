@@ -17,7 +17,7 @@ from bot_utils.misc import setup_pbar
 from bot_utils.db_utils import AttrDict
 from bot_utils.dataset_readers import read_dir, read_files, natural_sort, \
     DatasetReader, ImageDatasetReader
-
+from bot_vision.imshow_utils import annotate_bbox
 from bot_vision.camera_utils import kinect_v1_params, \
     Camera, CameraIntrinsic, CameraExtrinsic, \
     check_visibility, get_object_bbox
@@ -365,11 +365,12 @@ class UWRGBDSceneDataset(UWRGBDDataset):
                 return None
 
             # 2. Determine bounding boxes for visible clusters
+            object_centers = np.vstack([obj.center for obj in self.map_info.objects])
+            visible_inds, = np.where(check_visibility(self.map_info.camera, object_centers))
+
             object_candidates = []
-            for obj in self.map_info.objects:
-                # Check visibility of cluster center
-                if not check_visibility(self.map_info.camera, obj.center): 
-                    continue
+            for ind in visible_inds:
+                obj = self.map_info.objects[ind]
                 pts2d, bbox, depth = get_object_bbox(self.map_info.camera, obj.points, subsample=3)
                 if bbox is not None: 
                     bbox['label'], bbox['depth'] = obj.label, depth
@@ -632,11 +633,13 @@ class UWRGBDSceneDataset(UWRGBDDataset):
     def annotate_bboxes(vis, bboxes, target_names): # , box_color=lambda target: (0, 200, 0) if UWRGBDDataset.get_category_name(target) != 'background' else (100, 100, 100)): 
         for bbox,target_name in izip(bboxes, target_names): 
             box_color = (0, 200, 0) # if UWRGBDDataset.get_category_name(target) != 'background' else (100, 100, 100)
-            cv2.rectangle(vis, (bbox['left'], bbox['top']), (bbox['right'], bbox['bottom']), box_color, 2) 
-            cv2.rectangle(vis, (bbox['left']-1, bbox['top']-15), (bbox['right']+1, bbox['top']), box_color, -1)
-            cv2.putText(vis, '%s' % (target_name.title().replace('_', ' ')), 
-                        (bbox['left'], bbox['top']-5), 
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 0, 0), thickness=1, lineType=cv2.CV_AA)
+            annotate_bbox(vis, bbox, color=box_color, title=target_name.title().replace('_', ' '))
+
+            # cv2.rectangle(vis, (bbox['left'], bbox['top']), (bbox['right'], bbox['bottom']), box_color, 2) 
+            # cv2.rectangle(vis, (bbox['left']-1, bbox['top']-15), (bbox['right']+1, bbox['top']), box_color, -1)
+            # cv2.putText(vis, '%s' % (), 
+            #             (bbox['left'], bbox['top']-5), 
+            #             cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), thickness=1, lineType=cv2.CV_AA)
         return vis
 
     @staticmethod
