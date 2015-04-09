@@ -207,6 +207,9 @@ def check_visibility(camera, pts):
     Check if points are visible given fov of camera
     camera: type Camera
     """
+    # Ensure 2D
+    pts = pts.reshape(-1, 3)
+
     # Hack: only check max of the fovs
     fov = np.max(camera.fov)
     lookat = camera.R[:,2]
