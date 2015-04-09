@@ -54,7 +54,6 @@ def imshow_cv(label, im, block=False, text=None):
     elif ch == 27 or ch == ord('q'):
         sys.exit(1)
 
-
 def annotate_bbox(vis, bbox, color=(0,200,0), title=''): 
     # Bounding Box and top header
     cv2.rectangle(vis, (bbox['left'], bbox['top']), (bbox['right'], bbox['bottom']), color, 2)

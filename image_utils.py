@@ -2,12 +2,13 @@ import cv2
 import numpy as np
 
 def im_resize(im, scale=0.5, interpolation=cv2.INTER_AREA): 
-    return cv2.resize(im, None, fx=scale, fy=scale, interpolation=interpolation)
+    return (cv2.resize(im, None, fx=scale, fy=scale, interpolation=interpolation) \
+            if scale != 1.0 else im)
 
 def im_sample(im, sample=2): 
     return im[::2,::2]
 
-def im_mosaic(*args): 
+def im_mosaic(*args, **kwargs): 
     items = list(args)
     H, W = items[0].shape[:2]
     sz = np.ceil(np.sqrt(len(items))).astype(int)
@@ -16,7 +17,7 @@ def im_mosaic(*args):
 
     chunks = lambda l, n: [l[x: x+n] for x in xrange(0, len(l), n)]
     mosaic = np.vstack([np.hstack(chunk) for chunk in chunks(items, sz)])
-    return mosaic
+    return im_resize(mosaic, scale=kwargs['scale'] if 'scale' in kwargs else 1.0)
         
 
 def to_color(im): 
