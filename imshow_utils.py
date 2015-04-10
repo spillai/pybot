@@ -36,13 +36,15 @@ def bar_plt(label, ys, block=False):
     plt.draw()
     plt.show(block=block)
 
-
-def imshow_cv(label, im, block=False, text=None): 
-    vis = im.copy()
+def print_status(vis, text=None): 
     if text is not None:
         cv2.rectangle(vis, (0, vis.shape[0]-18), (len(text) * 8, vis.shape[0]), (50, 50, 50), -1)
         cv2.putText(vis, '%s' % text, (2, vis.shape[0] - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.4, 
                     (240, 240, 240), thickness = 1)
+
+def imshow_cv(label, im, block=False, text=None): 
+    vis = im.copy()
+    print_status(vis, text=text)
     cv2.imshow(label, vis)
     ch = cv2.waitKey(0 if block else 1) & 0xFF
     if ch == ord(' '):
