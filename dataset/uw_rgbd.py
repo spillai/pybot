@@ -684,9 +684,7 @@ def test_uw_rgbd_scene(version='v1'):
                                           directory=os.path.join(v1_directory, 'rgbd-scenes'), 
                                           aligned_directory=os.path.join(v1_directory, 'rgbd-scenes-aligned'))
     elif version == 'v2': 
-        rgbd_data_uw = UWRGBDSceneDataset(version='v2', 
-                                          directory=os.path.join(v2_directory, 'imgs'), 
-                                          aligned_directory=os.path.join(v2_directory, 'pc'))
+        rgbd_data_uw = UWRGBDSceneDataset(version='v2', directory=v2_directory)
     else: 
         raise RuntimeError('''Version %s not supported. '''
                            '''Check dataset and choose v1/v2 scene dataset''' % version)
