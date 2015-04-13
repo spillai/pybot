@@ -347,14 +347,18 @@ class BOWClassifier(object):
       target:       [class_id, ... ]
       target_ids:   [0, 1, 2, ..., 101]
       target_names: [car, bike, ... ]
-    
+
     """
-    def __init__(self, params=None, 
-                 process_cb=lambda f: dict(img=cv2.imread(f.filename), mask=None), target_names=None): 
+    def __init__(self, params, target_ids, 
+                 process_cb=lambda f: dict(img=cv2.imread(f.filename), mask=None), 
+                 target_names=None): 
+
         # Setup Params
         self.params_ = params
         self.process_cb_ = process_cb
         self.target_names_ = target_names
+        self.target_ids_ = (np.unique(target_ids)).astype(np.int32)
+        self.epoch_no_ = 0
 
         # 1. Image description using Dense SIFT/Descriptor
         self.image_descriptor_ = ImageDescription(**self.params_.descriptor)
@@ -389,8 +393,13 @@ class BOWClassifier(object):
             self.clf_hyparams_ = {'C':[0.01, 0.1, 0.2, 0.5, 1.0, 2.0, 4.0, 5.0, 10.0]}
             self.clf_ = LinearSVC(random_state=1)
         elif self.params_.classifier == 'sgd': 
-            self.clf_hyparams_ = {'loss':['hinge'], 'alpha':[0.0001, 0.001, 0.01, 0.1, 1.0, 10.0], 'class_weight':['auto']}
-            self.clf_ = SGDClassifier(loss='hinge', n_jobs=4, n_iter=10)
+            self.clf_hyparams_ = {'alpha':[0.0001, 0.001, 0.01, 0.1, 1.0, 10.0], 'class_weight':['auto']} # 'loss':['hinge'], 
+            cweights = {cid: 1.0 for cidx,cid in enumerate(self.target_ids_)}
+            cweights[51] = 0.1
+            # cweights[-1] = 0.1
+
+            print 'weights: ', self.target_ids_, cweights
+            self.clf_ = SGDClassifier(loss='hinge', n_jobs=4, n_iter=1)
         elif self.params_.classifier == 'gradient-boosting': 
             self.clf_hyparams_ = {'learning_rate':[0.01, 0.1, 0.2, 0.5]}
             self.clf_ = GradientBoostingClassifier()
@@ -403,28 +412,64 @@ class BOWClassifier(object):
 
     def _extract(self, data_iterable, mode, batch_size=10): 
         """ Supports train/test modes """
-        if not (mode == 'train' or mode == 'test'): 
+        if not (mode == 'train' or mode == 'test' or mode == 'neg'): 
             raise Exception('Unknown mode %s' % mode)
 
         # Extract features, only if not already available
         features_dir = getattr(self.params_.cache, '%s_features_dir' % mode)
+        features_dir = features_dir.replace('EPOCHNO', '%i' % self.epoch_no_)
         mode_prefix = lambda name: ''.join(['%s_' % mode, name])
 
         if not os.path.isdir(features_dir): 
             print '====> [COMPUTE] %s: Feature Extraction ' % mode.upper()
             st = time.time()
-            # Add vocab_desc as training field
+            # Add fields for training 
             fields = [mode_prefix('desc'), mode_prefix('target'), mode_prefix('pts'), mode_prefix('shapes')]
+
+            # Add vocab_desc only for training
             if mode == 'train': fields.append('vocab_desc')
 
             # Initialize features_db
             features_db = IterDB(filename=features_dir, mode='w', fields=fields, batch_size=batch_size)
 
+            # Closure for sugared item addition
             def add_item_to_features_db(features_db, im_desc, target, pts, shapes): 
                 features_db.append(mode_prefix('desc'), im_desc)
                 features_db.append(mode_prefix('target'), target)
                 features_db.append(mode_prefix('pts'), pts)
                 features_db.append(mode_prefix('shapes'), shapes) 
+
+            # Closure for providing ROI to extracted features in image, 
+            # and optionally adding to training set for vocab constr.
+            def add_bbox(features_db, frame, pts, im_desc, mode, vocab_num_per_image): 
+                if hasattr(frame, 'bbox') and len(frame.bbox): 
+                    # Single image, multiple ROIs/targets
+                    target = np.array([bbox['target'] for bbox in frame.bbox], dtype=np.int32)
+                    shapes = np.vstack([ [bbox['left'], bbox['top'], bbox['right'], bbox['bottom']] for bbox in frame.bbox] )
+
+                    add_item_to_features_db(features_db, im_desc, target, pts, shapes)
+
+                elif hasattr(frame, 'target'): 
+                    # Single image, single target
+                    add_item_to_features_db(features_db, im_desc, frame.target, pts, np.array([[0, 0, frame.img.shape[1]-1, frame.img.shape[0]-1]]))
+
+                elif mode == 'neg' and hasattr(frame, 'bbox_extract') and hasattr(frame, 'bbox_extract_target'): 
+                    assert mode == 'neg', "Mode should be neg to continue, not %s" % mode
+                    bboxes = frame.bbox_extract(frame)
+                    shapes = (bboxes.reshape(-1,4)).astype(np.int32)
+                    target = np.ones(len(bboxes), dtype=np.int32) * frame.bbox_extract_target
+
+                    # Add all bboxes extracted via object proposals as bbox_extract_target
+                    add_item_to_features_db(features_db, im_desc, target, pts, shapes)
+                else: 
+                    # print 'Nothing to do, frame.bbox is empty'
+                    return 
+                    
+
+                # Randomly sample from descriptors for vocab construction
+                if mode == 'train': 
+                    inds = np.random.permutation(int(min(len(im_desc), vocab_num_per_image)))
+                    features_db.append('vocab_desc', im_desc[inds])
 
             # Parallel Processing (in chunks of batch_size)
             if batch_size is not None and batch_size > 1: 
@@ -436,22 +481,9 @@ class BOWClassifier(object):
                     for (pts, im_desc), frame in izip(res, chunk): 
                         if im_desc is None: continue
 
-                        if hasattr(frame, 'bbox'): 
-                            # Single image, multiple ROIs/targets
-                            target = np.array([bbox['target'] for bbox in frame.bbox], dtype=np.int32)
-                            shapes = np.vstack([ [bbox['left'], bbox['top'], bbox['right'], bbox['bottom']] for bbox in frame.bbox] )
+                        # Add bbox info to features db
+                        add_bbox(features_db, frame, pts, im_desc, mode, self.params_.vocab.num_per_image)
 
-                            add_item_to_features_db(features_db, im_desc, target, pts, shapes)
-                        elif hasattr(frame, 'target'): 
-                            # Single image, single target
-                            add_item_to_features_db(features_db, im_desc, frame.target, pts, np.array([[0, 0, frame.img.shape[1]-1, frame.img.shape[0]-1]]))
-                        else: 
-                            raise RuntimeError('Unknown extraction policy')
-
-                        # Randomly sample from descriptors for vocab construction
-                        if mode == 'train': 
-                            inds = np.random.permutation(int(min(len(im_desc), self.params_.vocab.num_per_image)))
-                            features_db.append('vocab_desc', im_desc[inds])
             else: 
                 # Serial Processing                    
                 for frame in data_iterable: 
@@ -459,22 +491,8 @@ class BOWClassifier(object):
                     pts, im_desc = self.image_descriptor_.detect_and_describe(**self.process_cb_(frame))
                     if im_desc is None: continue
 
-                    if hasattr(frame, 'bbox'): 
-                        # Single image, multiple ROIs/targets
-                        target = np.array([bbox['target'] for bbox in frame.bbox], dtype=np.int32)
-                        shapes = np.vstack([ [bbox['left'], bbox['top'], bbox['right'], bbox['bottom']] for bbox in frame.bbox] )
-
-                        add_item_to_features_db(features_db, im_desc, target, pts, shapes)
-                    elif hasattr(frame, 'target'): 
-                        # Single image, single target
-                        add_item_to_features_db(features_db, im_desc, frame.target, pts, np.array([[0, 0, frame.img.shape[1]-1, frame.img.shape[0]-1]]))
-                    else: 
-                        raise RuntimeError('Unknown extraction policy')
-
-                    # Randomly sample from descriptors for vocab construction
-                    if mode == 'train': 
-                        inds = np.random.permutation(int(min(len(im_desc), self.params_.vocab.num_per_image)))
-                        features_db.append('vocab_desc', im_desc[inds])
+                    # Add bbox info to features db
+                    add_bbox(features_db, frame, pts, im_desc, mode, self.params_.vocab.num_per_image)
 
             features_db.finalize()
             print '[%s] Descriptor extraction took %s' % (mode.upper(), format_time(time.time() - st))    
@@ -523,6 +541,7 @@ class BOWClassifier(object):
     def _project(self, mode, batch_size=10): 
 
         features_dir = getattr(self.params_.cache, '%s_features_dir' % mode)
+        features_dir = features_dir.replace('EPOCHNO', '%i' % self.epoch_no_)
         if os.path.exists(self.params_.cache.vocab_path) and os.path.isdir(features_dir): 
             print '====> [LOAD] Vocabulary Construction'
             features_db = IterDB(filename=features_dir, mode='r')
@@ -534,6 +553,7 @@ class BOWClassifier(object):
 
         # Histogram of features
         hists_dir = getattr(self.params_.cache, '%s_hists_dir' % mode)
+        hists_dir = hists_dir.replace('EPOCHNO', '%i' % self.epoch_no_)
         mode_prefix = lambda name: ''.join(['%s_' % mode, name])
         if not os.path.exists(hists_dir):
             print '====> [COMPUTE] BoVW / VLAD projection '
@@ -544,7 +564,7 @@ class BOWClassifier(object):
                 # Parallel Processing
                 for chunk in chunks(features_db.iter_keys_values([
                         mode_prefix('target'), mode_prefix('desc'), mode_prefix('pts'), mode_prefix('shapes')
-                ], verbose=True), batch_size): 
+                ], verbose=False), batch_size): 
                     desc_red = [self.pca_.transform(desc) if self.pca_ is not None else desc for (target, desc, _, _) in chunk] 
 
                     if (self.params_.bow_method).lower() == 'flair': 
@@ -552,7 +572,8 @@ class BOWClassifier(object):
                         res_hist = Parallel(n_jobs=6, verbose=5) (
                             delayed(flair_project)
                             (desc, self.bow_.codebook, pts=pts, shape=shape, 
-                             levels=self.params_.bow.levels, method=self.params_.bow.method, step=self.params_.descriptor.step) for desc, (_, _, pts, shape) in izip(desc_red, chunk)
+                             levels=self.params_.bow.levels, method=self.params_.bow.method, step=self.params_.descriptor.step)
+                            for desc, (_, _, pts, shape) in izip(desc_red, chunk)
                         )
 
                     elif (self.params_.bow_method).lower() == 'bow': 
@@ -586,43 +607,109 @@ class BOWClassifier(object):
         print '-------------------------------'
 
 
-    def _train(self): 
+    def _train(self, first_fit=True): 
+
         if os.path.isdir(self.params_.cache.train_hists_dir): 
             print '====> [LOAD] TRAIN BoVW / VLAD projection '
-            hists_db = IterDB(filename=self.params_.cache.train_hists_dir, mode='r')
+
+            # Fit the training data on the first training pass
+            if first_fit: 
+                hists_db = IterDB(filename=self.params_.cache.train_hists_dir, mode='r')
+            else: 
+                hists_dir = getattr(self.params_.cache, 'neg_hists_dir')
+                hists_dir = hists_dir.replace('EPOCHNO', '%i' % self.epoch_no_)
+                if os.path.isdir(hists_dir): 
+                    hists_db = IterDB(filename=hists_dir, mode='r')
+                else: 
+                    raise RuntimeError('Hard Negative histograms not available %s' % hists_dir)
+                
         else: 
             raise RuntimeError('Trained histograms not available %s' % self.params_.cache.train_hists_dir)
 
-        # Homogeneous Kernel map
-        train_hists = np.vstack([item for item in hists_db.itervalues('train_histogram', verbose=True)]) 
-        train_targets = np.hstack([item for item in hists_db.itervalues('train_target', verbose=True)]).astype(np.int32) 
-        if self.kernel_tf_ is not None: 
-            print '====> [COMPUTE] TRAIN Kernel Approximator '
-            # inds = np.random.permutation(hists_db.length('train_histogram'))[:self.params_.vocab.num_images]
-            # hists = np.vstack([item for item in hists_db.itervalues('train_histogram', inds=inds, verbose=True)])
-            train_hists = self.kernel_tf_.fit_transform(train_hists)
-            print '-------------------------------'        
+        # Retrieve mode
+        mode = 'train' if first_fit else 'neg'
+        mode_prefix = lambda name: ''.join(['%s_' % mode, name])
+        print 'ModePrefix: ', mode_prefix('histogram')
+
+        # =================================================
+        # Batch-wise (out-of-core) training
 
         # Train/Predict one-vs-all classifier
-        print '====> Train classifier '
+        print '====> Train classifier First fit: %s' % first_fit
         st_clf = time.time()
 
-        # Grid search cross-val (best C param)
-        cv = ShuffleSplit(len(train_hists), n_iter=2, test_size=0.3, random_state=4)
+        pred_targets, train_targets = [], []
+        for hists_chunk, targets_chunk in izip(chunks(hists_db.itervalues(mode_prefix('histogram')), 100), 
+                                               chunks(hists_db.itervalues(mode_prefix('target')), 100)):
+            train_hists_chunk = np.vstack([self.kernel_tf_.fit_transform(hist) 
+                                           if self.kernel_tf_ is not None else hist for hist in hists_chunk])
+            train_targets_chunk = np.hstack([ target for target in targets_chunk]).astype(np.int32)
 
-        print 'Training Classifier (with grid search hyperparam tuning) .. '
-        self.clf_ = GridSearchCV(self.clf_, self.clf_hyparams_, cv=cv, n_jobs=4, verbose=4)
-        self.clf_.fit(train_hists, train_targets)
-        print 'BEST: ', self.clf_.best_score_, self.clf_.best_params_
+            # Negative mining, add only top k falsely predicted instances
+            # ninds: inconsistent targets
+            # Otherwise, add all relevant training data
+            if mode == 'neg': 
+                clf_pred_scores = self.clf_.decision_function(train_hists_chunk)
+                clf_pred_targets = self.clf_.predict(train_hists_chunk)
+                ninds, = np.where(clf_pred_targets != train_targets_chunk)
 
-        # Setting clf to best estimator
-        self.clf_ = self.clf_.best_estimator_
-        pred_targets = self.clf_.predict(train_hists)
+                # Pick top 10 predictions (last 10)
+                inds = np.argsort(np.max(clf_pred_scores[ninds], axis=1), axis=0)[-10:]
+                inds = ninds[inds]
+
+                train_hists_chunk = train_hists_chunk[inds]
+                train_targets_chunk = train_targets_chunk[inds]
+
+            # Provide all unique targets the classifier will expect, in the first fit
+            self.clf_.partial_fit(train_hists_chunk, train_targets_chunk, 
+                                  classes=self.target_ids_ if first_fit else None, 
+                                  sample_weight=np.ones(len(train_hists_chunk)) * 0.001 if not first_fit else None)
+
+            # Predict targets
+            pred_targets_chunk = self.clf_.predict(train_hists_chunk)
+            pred_targets.append(pred_targets_chunk)
+            train_targets.append(train_targets_chunk)
+
+        pred_targets = np.hstack(pred_targets)
+        train_targets = np.hstack(train_targets)
+            
+
+        # # =================================================
+        # # Batch (in-memory) training
+
+        # # Homogeneous Kernel map
+        # train_hists = np.vstack([item for item in hists_db.itervalues('train_histogram', verbose=True)]) 
+        # train_targets = np.hstack([item for item in hists_db.itervalues('train_target', verbose=True)]).astype(np.int32) 
+
+        # if self.kernel_tf_ is not None: 
+        #     print '====> [COMPUTE] TRAIN Kernel Approximator '
+        #     # inds = np.random.permutation(hists_db.length('train_histogram'))[:self.params_.vocab.num_images]
+        #     # hists = np.vstack([item for item in hists_db.itervalues('train_histogram', inds=inds, verbose=True)])
+        #     train_hists = self.kernel_tf_.fit_transform(train_hists)
+        #     print '-------------------------------'        
+
+        # # Train/Predict one-vs-all classifier
+        # print '====> Train classifier '
+        # st_clf = time.time()
+
+        # # # Grid search cross-val (best C param)
+        # # cv = ShuffleSplit(len(train_hists), n_iter=2, test_size=0.3, random_state=4)
+        # # self.clf_ = GridSearchCV(self.clf_, self.clf_hyparams_, cv=cv, n_jobs=4, verbose=4)
+        # # print 'Training Classifier (with grid search hyperparam tuning) .. '
+
+        # # Provide all unique targets the classifier will expect, in the first fit
+        # if first_fit: 
+        #     self.clf_.partial_fit(train_hists, train_targets, classes=unique_targets)
+        # # print 'BEST: ', self.clf_.best_score_, self.clf_.best_params_
+
+        # # Setting clf to best estimator
+        # # self.clf_ = self.clf_.best_estimator_
+        # pred_targets = self.clf_.predict(train_hists)
 
         # Calibrating classifier
         print 'Calibrating Classifier ... '
-        self.clf_prob_ = CalibratedClassifierCV(self.clf_, cv=cv, method='isotonic')
-        self.clf_prob_.fit(train_hists, train_targets)        
+        self.clf_prob_ = None # CalibratedClassifierCV(self.clf_, cv=cv, method='isotonic')
+        # self.clf_prob_.fit(train_hists, train_targets)        
 
         print 'Training Classifier took %s' % (format_time(time.time() - st_clf))
         print '-------------------------------'        
@@ -660,17 +747,17 @@ class BOWClassifier(object):
         pred_scores = self.clf_.decision_function(test_hists)
         print '-------------------------------'
 
-        # print ' Confusion matrix (Test): %s' % (metrics.confusion_matrix(test_target, pred_target))
         print '=========================================================> '
         print '\n ===> Classification @ ', datetime.datetime.now()
-        print 'Params: \n'
-        pp = pprint.PrettyPrinter(indent=4)
-        pp.pprint(self.params_)
-        print '\n'
+        # print 'Params: \n'
+        # pp = pprint.PrettyPrinter(indent=4)
+        # pp.pprint(self.params_)
+        # print '\n'
         print '-----------------------------------------------------------'
         print ' Accuracy score (Test): %4.3f' % (metrics.accuracy_score(test_targets, pred_targets))
         print ' Report (Test):\n %s' % (classification_report(test_targets, pred_targets, 
                                                               target_names=self.target_names_))
+        print ' Confusion matrix (Test): \n%s' % (metrics.confusion_matrix(test_targets, pred_targets))
         # print ' PR (Test) curve:\n ', plot_precision_recall(pred_scores, test_targets, self.target_names_)
         print 'Testing took %s' % format_time(time.time() - st_clf)
 
@@ -678,9 +765,11 @@ class BOWClassifier(object):
                         target_names=self.target_names_)
 
 
-    def preprocess(self, train_data_iterable, test_data_iterable, batch_size=10): 
+    def preprocess(self, train_data_iterable, test_data_iterable, bg_data_iterable, batch_size=10): 
+        # Extract training and testing features via self.process_cb_
         self._extract(train_data_iterable, mode='train', batch_size=batch_size)
-        self._extract(test_data_iterable, mode='test', batch_size=batch_size)        
+        self._extract(test_data_iterable, mode='test', batch_size=batch_size)
+        self._extract(bg_data_iterable, mode='neg', batch_size=batch_size)
 
     def train(self, data_iterable, batch_size=10): 
         # 1. Extract D-SIFT features 
@@ -693,8 +782,28 @@ class BOWClassifier(object):
         #    histogram with spatial pyramid pooling
         self._project(mode='train', batch_size=batch_size)
 
-        # 4. Kernel approximate and linear classification training
-        self._train()
+        # 4. Kernel approximation and linear classification training
+        self._train(first_fit=True)
+
+    def neg_train(self, bg_data_iterable, batch_size=10): 
+
+        # 5. Hard-neg mining
+        for epoch in np.arange(self.params_.neg_epochs): 
+            self.epoch_no_ = epoch
+            print 'Processing epoch %i' % (epoch)
+
+            # 1. Extract features
+            self._extract(bg_data_iterable, mode='neg', batch_size=batch_size)
+
+            # 2. Project
+            self._project(mode='neg', batch_size=batch_size)
+
+            # 3. Re-train
+            self._train(first_fit=False)
+
+            # training = self._hard_negative_mining(training, epoch)
+            # training.save(os.path.join(conf.results_dir, 'training-epoch-%i.h5' % (epoch)))
+
 
     def evaluate(self, data_iterable, batch_size=10): 
         # 1. Extract D-SIFT features 
