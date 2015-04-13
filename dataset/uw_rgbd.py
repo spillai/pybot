@@ -42,16 +42,16 @@ class UWRGBDDataset(object):
                    "lime", "marker", "mushroom", "notebook", "onion", "orange", "peach", "pear", "pitcher", 
                    "plate", "pliers", "potato", "rubber_eraser", "scissors", "shampoo", "soda_can", 
                    "sponge", "stapler", "tomato", "toothbrush", "toothpaste", "water_bottle", "background", "sofa", "table", "office_chair", "coffee_table"]
-    # Added more v2 objects into v1
 
+    # Added more v2 objects into v1
     class_ids = np.arange(len(class_names), dtype=np.int)    
     target_hash = dict(zip(class_names, class_ids))
     target_unhash = dict(zip(class_ids, class_names))
 
-    # train_names = ["cereal_box", "cap", "background"]
+    train_names = ["cereal_box", "cap", "background"]
     # train_names = ["bowl", "cap", "cereal_box", "background"]
     # train_names = ["cap", "cereal_box", "coffee_mug", "soda_can", "background"]
-    train_names = ["bowl", "cap", "cereal_box", "coffee_mug", "soda_can", "background"]
+    # train_names = ["bowl", "cap", "cereal_box", "coffee_mug", "soda_can", "background"]
     # train_names = ["bowl", "cap", "cereal_box", "coffee_mug", "flashlight", 
     #                "keyboard", "kleenex", "scissors",  "soda_can", 
     #                "stapler", "background"]
@@ -290,8 +290,8 @@ class UWRGBDSceneDataset(UWRGBDDataset):
             # Version 2 only supported! Version 1 support for rgbd scene (unclear)
             self.poses = UWRGBDSceneDataset._reader.load_poses(aligned_file.pose, version) \
                          if aligned_file is not None and version == 'v2' else [None] * len(rgb_files)
-            print 'Aligned: ', aligned_file
-            print len(self.poses), len(rgb_files)
+            # print 'Aligned: ', aligned_file
+            # print len(self.poses), len(rgb_files)
             assert(len(self.poses) == len(rgb_files))
 
             # Aligned point cloud
