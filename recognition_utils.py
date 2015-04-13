@@ -417,9 +417,9 @@ class BOWClassifier(object):
 
         # Extract features, only if not already available
         features_dir = getattr(self.params_.cache, '%s_features_dir' % mode)
-        features_dir = features_dir.replace('EPOCHNO', '%i' % self.epoch_no_)
+        # features_dir = features_dir.replace('EPOCHNO', '%i' % self.epoch_no_)
         mode_prefix = lambda name: ''.join(['%s_' % mode, name])
-
+        print ''
         if not os.path.isdir(features_dir): 
             print '====> [COMPUTE] %s: Feature Extraction ' % mode.upper()
             st = time.time()
@@ -541,7 +541,7 @@ class BOWClassifier(object):
     def _project(self, mode, batch_size=10): 
 
         features_dir = getattr(self.params_.cache, '%s_features_dir' % mode)
-        features_dir = features_dir.replace('EPOCHNO', '%i' % self.epoch_no_)
+        # features_dir = features_dir.replace('EPOCHNO', '%i' % self.epoch_no_)
         if os.path.exists(self.params_.cache.vocab_path) and os.path.isdir(features_dir): 
             print '====> [LOAD] Vocabulary Construction'
             features_db = IterDB(filename=features_dir, mode='r')
@@ -553,7 +553,7 @@ class BOWClassifier(object):
 
         # Histogram of features
         hists_dir = getattr(self.params_.cache, '%s_hists_dir' % mode)
-        hists_dir = hists_dir.replace('EPOCHNO', '%i' % self.epoch_no_)
+        # hists_dir = hists_dir.replace('EPOCHNO', '%i' % self.epoch_no_)
         mode_prefix = lambda name: ''.join(['%s_' % mode, name])
         if not os.path.exists(hists_dir):
             print '====> [COMPUTE] BoVW / VLAD projection '
@@ -617,24 +617,24 @@ class BOWClassifier(object):
                 hists_db = IterDB(filename=self.params_.cache.train_hists_dir, mode='r')
             else: 
                 hists_dir = getattr(self.params_.cache, 'neg_hists_dir')
-                hists_dir = hists_dir.replace('EPOCHNO', '%i' % self.epoch_no_)
+                # hists_dir = hists_dir.replace('EPOCHNO', '%i' % self.epoch_no_)
                 if os.path.isdir(hists_dir): 
                     hists_db = IterDB(filename=hists_dir, mode='r')
                 else: 
                     raise RuntimeError('Hard Negative histograms not available %s' % hists_dir)
-                
+
         else: 
             raise RuntimeError('Trained histograms not available %s' % self.params_.cache.train_hists_dir)
 
         # Retrieve mode
         mode = 'train' if first_fit else 'neg'
         mode_prefix = lambda name: ''.join(['%s_' % mode, name])
-        print 'ModePrefix: ', mode_prefix('histogram')
 
         # =================================================
         # Batch-wise (out-of-core) training
 
         # Train/Predict one-vs-all classifier
+        print '-------------------------------'        
         print '====> Train classifier First fit: %s' % first_fit
         st_clf = time.time()
 
@@ -670,8 +670,13 @@ class BOWClassifier(object):
             pred_targets.append(pred_targets_chunk)
             train_targets.append(train_targets_chunk)
 
-        pred_targets = np.hstack(pred_targets)
-        train_targets = np.hstack(train_targets)
+            print 'Adding %i,%i negative samples ' % (len(pred_targets_chunk), len(train_targets_chunk))
+
+        try: 
+            pred_targets = np.hstack(pred_targets)
+            train_targets = np.hstack(train_targets)
+        except: 
+            return
             
 
         # # =================================================
@@ -785,22 +790,24 @@ class BOWClassifier(object):
         # 4. Kernel approximation and linear classification training
         self._train(first_fit=True)
 
-    def neg_train(self, bg_data_iterable, batch_size=10): 
+    def neg_train(self, bg_data_iterable, batch_size=10, viz_cb=lambda e: None): 
 
         # 5. Hard-neg mining
         for epoch in np.arange(self.params_.neg_epochs): 
             self.epoch_no_ = epoch
             print 'Processing epoch %i' % (epoch)
 
-            # 1. Extract features
-            self._extract(bg_data_iterable, mode='neg', batch_size=batch_size)
+            if epoch == 0:
+                # 1. Extract features
+                self._extract(bg_data_iterable, mode='neg', batch_size=batch_size)
 
-            # 2. Project
-            self._project(mode='neg', batch_size=batch_size)
+                # 2. Project
+                self._project(mode='neg', batch_size=batch_size)
 
             # 3. Re-train
             self._train(first_fit=False)
 
+            viz_cb(epoch)
             # training = self._hard_negative_mining(training, epoch)
             # training.save(os.path.join(conf.results_dir, 'training-epoch-%i.h5' % (epoch)))
 

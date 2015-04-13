@@ -18,18 +18,18 @@ def im_mosaic(*args, **kwargs):
     items = list(args)
     N = len(items)
 
-    print 'Items: ', N, items
+    # print 'Items: ', N, items
     assert N>0, 'No items to mosaic!'
 
     sz = np.ceil(np.sqrt(N)).astype(int)
     if shape is not None: 
         sz_w, sz_h = shape[1] / sz, shape[0] / sz
     else: 
-        sz_w, sz_h = 1200, 900
+        sz_w, sz_h = 800 / sz, 600 / sz
 
     for j in range(sz * sz): 
         if j < N: 
-            items[j] = im_resize(items[j], shape=(sz_w, sz_h))
+            items[j] = to_color(im_resize(items[j], shape=(sz_w, sz_h)))
         else: 
             items.append(np.zeros_like(items[-1]))
 
