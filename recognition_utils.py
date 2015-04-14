@@ -371,13 +371,6 @@ class BOWClassifier(object):
         if (self.params_.bow_method).lower() == 'flair': 
             self.bow_ = BoWVectorizer(**self.params_.bow)
 
-            # self.flair_ = FLAIR_code(**self.params_.flair) 
-            # raise Exception('FLAIR not setup correctly')
-
-            # if codebook is not None: 
-            #     W=UWRGBDDataset.default_rgb_shape[1], H=UWRGBDDataset.default_rgb_shape[0], K=self.bow.dictionary_size, 
-            #     step=self.params.descriptor.step, levels=np.array(self.params.bow.levels, dtype=np.int32), encoding={'bow':0, 'vlad':1, 'fisher':2}[self.params.bow.method])
-
         elif (self.params_.bow_method).lower() == 'bow': 
             self.bow_ = BoWVectorizer(**self.params_.bow)
 
@@ -390,12 +383,12 @@ class BOWClassifier(object):
         # 5. Setup classifier
         print '-------------------------------'        
         print '====> Building Classifier, setting class weights' 
-        print 'Weights: ', self.target_ids_, cweights
         cweights = {cid: 10.0 for cidx,cid in enumerate(self.target_ids_)}
         cweights[51] = 1.0
+        print 'Weights: ', self.target_ids_, cweights
 
         if self.params_.classifier == 'svm': 
-            self.clf_hyparams_ = {'C':[0.01, 0.1, 0.2, 0.5, 1.0, 2.0, 4.0, 5.0, 10.0], 'class_weight': ['auto', cweights]}
+            self.clf_hyparams_ = {'C':[0.01, 0.1, 0.2, 0.5, 1.0, 2.0, 4.0, 5.0, 10.0], 'class_weight': ['auto']}
             self.clf_base_ = LinearSVC(random_state=1)
         elif self.params_.classifier == 'sgd': 
             self.clf_hyparams_ = {'alpha':[0.0001, 0.001, 0.01, 0.1, 1.0, 10.0], 'class_weight':['auto']} # 'loss':['hinge'], 
@@ -524,8 +517,6 @@ class BOWClassifier(object):
 
             # BOW construction
             if (self.params_.bow_method).lower() == 'flair': 
-                # codebook = bow_codebook(vocab_desc, K=self.params_.bow.K)
-                # self.flair_.setVocabulary(codebook.astype(np.float32))
                 self.bow_.build(vocab_desc)
             elif (self.params_.bow_method).lower() == 'bow': 
                 self.bow_.build(vocab_desc)
@@ -751,13 +742,19 @@ class BOWClassifier(object):
                     neg_hists.append(orig_hists_chunk[inds])
                     neg_targets.append(neg_targets_chunk[inds])
 
+                neg_hists_db.finalize()
+
                 try: 
+                    # Stack and train
                     train_hists = np.vstack([train_hists, np.vstack(neg_hists)])
                     train_targets = np.hstack([train_targets, np.hstack(neg_targets)])
+
+                    # Shuffle data
+                    np.random.shuffle(train_hists)
+                    np.random.shuffle(train_targets)
+
                 except Exception as e: 
                     print e
-
-                neg_hists_db.finalize()
 
             # Kernel approximation
             if self.kernel_tf_ is not None: 
