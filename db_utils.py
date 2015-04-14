@@ -15,6 +15,11 @@ from bot_utils.itertools_recipes import grouper
 # Pytables helpers
 # =============================================================================
 
+# Avoids printing natural name warning when writing 
+# dictionaries with ints as keys
+import warnings
+warnings.filterwarnings('ignore', category=tb.NaturalNameWarning)
+
 def load_pickled_dict(fn): 
     return pickle.load(open(os.path.expanduser(fn), 'rb'))
 
