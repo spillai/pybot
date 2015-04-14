@@ -388,17 +388,17 @@ class BOWClassifier(object):
         self.kernel_tf_ = HomogenousKernelMap(2) if self.params_.do_kernel_approximation else None
 
         # 5. Setup classifier
-        print 'Building Classifier'
+        print '-------------------------------'        
+        print '====> Building Classifier, setting class weights' 
+        print 'Weights: ', self.target_ids_, cweights
+        cweights = {cid: 10.0 for cidx,cid in enumerate(self.target_ids_)}
+        cweights[51] = 1.0
+
         if self.params_.classifier == 'svm': 
-            self.clf_hyparams_ = {'C':[0.01, 0.1, 0.2, 0.5, 1.0, 2.0, 4.0, 5.0, 10.0]}
+            self.clf_hyparams_ = {'C':[0.01, 0.1, 0.2, 0.5, 1.0, 2.0, 4.0, 5.0, 10.0], 'class_weight': ['auto', cweights]}
             self.clf_base_ = LinearSVC(random_state=1)
         elif self.params_.classifier == 'sgd': 
             self.clf_hyparams_ = {'alpha':[0.0001, 0.001, 0.01, 0.1, 1.0, 10.0], 'class_weight':['auto']} # 'loss':['hinge'], 
-            cweights = {cid: 1.0 for cidx,cid in enumerate(self.target_ids_)}
-            cweights[51] = 0.1
-            # cweights[-1] = 0.1
-
-            print 'weights: ', self.target_ids_, cweights
             self.clf_ = SGDClassifier(loss='log', n_jobs=4, n_iter=1, verbose=1)
         elif self.params_.classifier == 'gradient-boosting': 
             self.clf_hyparams_ = {'learning_rate':[0.01, 0.1, 0.2, 0.5]}
@@ -409,6 +409,8 @@ class BOWClassifier(object):
         else: 
             raise Exception('Unknown classifier type %s. Choose from [sgd, svm, gradient-boosting, extra-trees]' 
                             % self.params_.classifier)
+
+
 
     def _extract(self, data_iterable, mode, batch_size=10): 
         """ Supports train/test modes """
