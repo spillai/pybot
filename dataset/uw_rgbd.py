@@ -61,6 +61,9 @@ class UWRGBDDataset(object):
     train_ids = [target_hash[name] for name in train_names]
     train_names_set, train_ids_set = set(train_names), set(train_ids)
 
+    train_hash = dict(zip(train_names, train_ids))
+    train_unhash = dict(zip(train_ids, train_names))
+
     @classmethod
     def get_category_name(cls, target_id): 
         tid = int(target_id)
@@ -355,29 +358,6 @@ class UWRGBDSceneDataset(UWRGBDDataset):
 
             return object_info
 
-        def get_bboxes(self, pose): 
-            # 1. Get pose for a particular frame, 
-            # and set camera extrinsic
-            try: 
-                self.map_info.camera.set_pose(pose.inverse())
-            except: 
-                # Otherwise break from detection loop
-                print 'Failed to find pose'
-                return None
-
-            # 2. Determine bounding boxes for visible clusters
-            object_centers = np.vstack([obj.center for obj in self.map_info.objects])
-            visible_inds, = np.where(check_visibility(self.map_info.camera, object_centers))
-
-            object_candidates = []
-            for ind in visible_inds:
-                obj = self.map_info.objects[ind]
-                pts2d, bbox, depth = get_object_bbox(self.map_info.camera, obj.points, subsample=3)
-                if bbox is not None: 
-                    bbox['label'], bbox['depth'] = obj.label, depth
-                    object_candidates.append(bbox)
-
-            return object_candidates
 
         @staticmethod
         def load_bboxes(fn, version): 
@@ -519,6 +499,29 @@ class UWRGBDSceneDataset(UWRGBDDataset):
             draw_utils.publish_pose_list('aligned_poses', [RigidTransform(tvec=obj.center) for obj in self.map_info.objects], 
                                          texts=[str(obj.label) for obj in self.map_info.objects])
 
+        def get_bboxes(self, pose): 
+            # 1. Get pose for a particular frame, 
+            # and set camera extrinsic
+            try: 
+                self.map_info.camera.set_pose(pose.inverse())
+            except: 
+                # Otherwise break from detection loop
+                print 'Failed to find pose'
+                return None
+
+            # 2. Determine bounding boxes for visible clusters
+            object_centers = np.vstack([obj.center for obj in self.map_info.objects])
+            visible_inds, = np.where(check_visibility(self.map_info.camera, object_centers))
+
+            object_candidates = []
+            for ind in visible_inds:
+                obj = self.map_info.objects[ind]
+                pts2d, bbox, depth = get_object_bbox(self.map_info.camera, obj.points, subsample=3, scale=1.2)
+                if bbox is not None: 
+                    bbox['target'], bbox['depth'] = obj.label, depth
+                    object_candidates.append(bbox)
+
+            return object_candidates
 
         def _process_items(self, index, rgb_im, depth_im, bbox, pose): 
             # print 'Processing pose', pose, bbox
@@ -591,15 +594,15 @@ class UWRGBDSceneDataset(UWRGBDDataset):
     #         # if target_name in cls.train_names_set else cls.target_hash['background']
 
 
-    def iteritems(self, every_k_frames=1, verbose=False): 
+    def iteritems(self, every_k_frames=1, verbose=False, with_ground_truth=False): 
         pbar = setup_pbar(len(self.dataset_)) if verbose else None
         print 'Scenes: %i %s' % (len(self.scenes()), self.scenes())
-        for key, frames in self.iterscenes(verbose=verbose): 
+        for key, scene in self.iterscenes(verbose=verbose, with_ground_truth=with_ground_truth): 
             if verbose: 
                 pbar.increment()
                 # print 'Processing: %s' % key
 
-            for frame in frames.iteritems(every_k_frames=every_k_frames): 
+            for frame in scene.iteritems(every_k_frames=every_k_frames): 
                 yield frame
         if verbose: pbar.finish()
 
