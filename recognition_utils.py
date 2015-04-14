@@ -637,17 +637,12 @@ class BOWClassifier(object):
                     # Negative hists from each epoch
                     ep_hists_dir = getattr(self.params_.cache, 'neg_hists_dir')
 
-                    for j in np.arange(self.epoch_no_)-1: 
+                    for j in np.arange(self.epoch_no_): 
                         epj_hists_dir = ep_hists_dir.replace('EPOCH', '%i' % j)
 
                         neg_db = IterDB(filename=epj_hists_dir, mode='r')
                         hists_iterable = chain(hists_iterable, neg_db.itervalues('neg_histogram'))
                         targets_iterable = chain(targets_iterable, neg_db.itervalues('neg_target'))
-
-                    # Newly introduced negative examples into training
-                    epcurr_hists_dir = ep_hists_dir.replace('EPOCH', '%i' % self.epoch_no_)
-                    neg_hists_db = IterDB(filename=epcurr_hists_dir, 
-                                          fields=['neg_histogram', 'neg_target'], mode='w', batch_size=10)
 
                     # All the negative hists
                     allneg_hists_db = IterDB(filename=hists_dir, mode='r')
@@ -673,8 +668,8 @@ class BOWClassifier(object):
             clf_pred_targets = clf.predict(hists)
             ninds, = np.where(clf_pred_targets != targets)
 
-            # Pick top 5 predictions (last 5)
-            inds = np.argsort(np.max(clf_pred_scores[ninds], axis=1), axis=0)[-5:]
+            # Pick top 20 predictions
+            inds = np.argsort(np.max(clf_pred_scores[ninds], axis=1), axis=0)[-20:]
             inds = ninds[inds]
 
             return inds
@@ -732,6 +727,13 @@ class BOWClassifier(object):
 
             # Find false negatives from negative samples
             if mode == 'neg': 
+
+                # Newly introduced negative examples into training
+                ep_hists_dir = getattr(self.params_.cache, 'neg_hists_dir')
+                epcurr_hists_dir = ep_hists_dir.replace('EPOCH', '%i' % self.epoch_no_)
+                neg_hists_db = IterDB(filename=epcurr_hists_dir, 
+                                      fields=['neg_histogram', 'neg_target'], mode='w', batch_size=10)
+
                 neg_hists, neg_targets = [], []
                 for hists_chunk, targets_chunk in izip(chunks(allneg_hists_iterable, 100), 
                                                        chunks(allneg_targets_iterable, 100)):
@@ -752,6 +754,8 @@ class BOWClassifier(object):
                     train_targets = np.hstack([train_targets, np.hstack(neg_targets)])
                 except Exception as e: 
                     print e
+
+                neg_hists_db.finalize()
 
             # Kernel approximation
             if self.kernel_tf_ is not None: 
