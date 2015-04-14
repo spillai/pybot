@@ -23,7 +23,7 @@ def im_mosaic(*args, **kwargs):
 
     sz = np.ceil(np.sqrt(N)).astype(int)
     if shape is not None: 
-        sz_w, sz_h = shape[1] / sz, shape[0] / sz
+        sz_w, sz_h = shape[0] / sz, shape[1] / sz
     else: 
         sz_w, sz_h = 800 / sz, 600 / sz
 

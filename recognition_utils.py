@@ -399,7 +399,7 @@ class BOWClassifier(object):
             # cweights[-1] = 0.1
 
             print 'weights: ', self.target_ids_, cweights
-            self.clf_ = SGDClassifier(loss='hinge', n_jobs=4, n_iter=1)
+            self.clf_ = SGDClassifier(loss='log', n_jobs=4, n_iter=1, verbose=1)
         elif self.params_.classifier == 'gradient-boosting': 
             self.clf_hyparams_ = {'learning_rate':[0.01, 0.1, 0.2, 0.5]}
             self.clf_ = GradientBoostingClassifier()
@@ -417,7 +417,6 @@ class BOWClassifier(object):
 
         # Extract features, only if not already available
         features_dir = getattr(self.params_.cache, '%s_features_dir' % mode)
-        # features_dir = features_dir.replace('EPOCHNO', '%i' % self.epoch_no_)
         mode_prefix = lambda name: ''.join(['%s_' % mode, name])
         print ''
         if not os.path.isdir(features_dir): 
@@ -541,7 +540,6 @@ class BOWClassifier(object):
     def _project(self, mode, batch_size=10): 
 
         features_dir = getattr(self.params_.cache, '%s_features_dir' % mode)
-        # features_dir = features_dir.replace('EPOCHNO', '%i' % self.epoch_no_)
         if os.path.exists(self.params_.cache.vocab_path) and os.path.isdir(features_dir): 
             print '====> [LOAD] Vocabulary Construction'
             features_db = IterDB(filename=features_dir, mode='r')
@@ -553,7 +551,7 @@ class BOWClassifier(object):
 
         # Histogram of features
         hists_dir = getattr(self.params_.cache, '%s_hists_dir' % mode)
-        # hists_dir = hists_dir.replace('EPOCHNO', '%i' % self.epoch_no_)
+        hists_dir = hists_dir.replace('EPOCH', 'all')
         mode_prefix = lambda name: ''.join(['%s_' % mode, name])
         if not os.path.exists(hists_dir):
             print '====> [COMPUTE] BoVW / VLAD projection '
@@ -607,114 +605,175 @@ class BOWClassifier(object):
         print '-------------------------------'
 
 
-    def _train(self, first_fit=True): 
+    def _train(self, mode='train'): 
+        # Retrieve mode
+        mode_prefix = lambda name: ''.join(['%s_' % mode, name])
 
         if os.path.isdir(self.params_.cache.train_hists_dir): 
             print '====> [LOAD] TRAIN BoVW / VLAD projection '
 
             # Fit the training data on the first training pass
-            if first_fit: 
-                hists_db = IterDB(filename=self.params_.cache.train_hists_dir, mode='r')
-            else: 
-                hists_dir = getattr(self.params_.cache, 'neg_hists_dir')
-                # hists_dir = hists_dir.replace('EPOCHNO', '%i' % self.epoch_no_)
-                if os.path.isdir(hists_dir): 
-                    hists_db = IterDB(filename=hists_dir, mode='r')
-                else: 
-                    raise RuntimeError('Hard Negative histograms not available %s' % hists_dir)
 
+            hists_dir = getattr(self.params_.cache, '%s_hists_dir' % mode)
+            hists_dir = hists_dir.replace('EPOCH', 'all')
+            if not os.path.isdir(hists_dir): 
+                raise RuntimeError('Hard Negative histograms not available %s' % hists_dir)
+
+            if self.params_.classifier == 'sgd': 
+                hists_db = IterDB(filename=hists_dir, mode='r')
+                hists_iterable = hists_db.itervalues(mode_prefix('histogram'))
+                targets_iterable = hists_db.itervalues(mode_prefix('target'))
+            elif self.params_.classifier == 'svm': 
+                # hists_db = IterDB(filename=hists_dir, mode='r')
+                # hists_iterable = hists_db.itervalues(mode_prefix('histogram'))
+                # targets_iterable = hists_db.itervalues(mode_prefix('target'))
+
+                # Existing samples
+                train_db = IterDB(filename=self.params_.cache.train_hists_dir, mode='r')
+                hists_iterable = train_db.itervalues('train_histogram')
+                targets_iterable = train_db.itervalues('train_target')
+
+                if mode == 'neg': 
+                    # Negative hists from each epoch
+                    ep_hists_dir = getattr(self.params_.cache, 'neg_hists_dir')
+
+                    for j in np.arange(self.epoch_no_)-1: 
+                        epj_hists_dir = ep_hists_dir.replace('EPOCH', '%i' % j)
+
+                        neg_db = IterDB(filename=epj_hists_dir, mode='r')
+                        hists_iterable = chain(hists_iterable, neg_db.itervalues('neg_histogram'))
+                        targets_iterable = chain(targets_iterable, neg_db.itervalues('neg_target'))
+
+                    # Newly introduced negative examples into training
+                    epcurr_hists_dir = ep_hists_dir.replace('EPOCH', '%i' % self.epoch_no_)
+                    neg_hists_db = IterDB(filename=epcurr_hists_dir, 
+                                          fields=['neg_histogram', 'neg_target'], mode='w', batch_size=10)
+
+                    # All the negative hists
+                    allneg_hists_db = IterDB(filename=hists_dir, mode='r')
+                    allneg_hists_iterable = allneg_hists_db.itervalues(mode_prefix('histogram'))
+                    allneg_targets_iterable = allneg_hists_db.itervalues(mode_prefix('target'))
+            
+            else: 
+                raise RuntimeError('Unknown classifier mode %s' % self.params_.classifier)
+        
         else: 
             raise RuntimeError('Trained histograms not available %s' % self.params_.cache.train_hists_dir)
-
-        # Retrieve mode
-        mode = 'train' if first_fit else 'neg'
-        mode_prefix = lambda name: ''.join(['%s_' % mode, name])
 
         # =================================================
         # Batch-wise (out-of-core) training
 
-        # Train/Predict one-vs-all classifier
+        # Train one-vs-all classifier
         print '-------------------------------'        
-        print '====> Train classifier First fit: %s' % first_fit
+        print '====> Train classifier : %s' % (mode)
         st_clf = time.time()
 
-        pred_targets, train_targets = [], []
-        for hists_chunk, targets_chunk in izip(chunks(hists_db.itervalues(mode_prefix('histogram')), 100), 
-                                               chunks(hists_db.itervalues(mode_prefix('target')), 100)):
-            train_hists_chunk = np.vstack([self.kernel_tf_.fit_transform(hist) 
-                                           if self.kernel_tf_ is not None else hist for hist in hists_chunk])
-            train_targets_chunk = np.hstack([ target for target in targets_chunk]).astype(np.int32)
+        def pick_top_false_positives(clf, hists, targets): 
+            clf_pred_scores = clf.decision_function(hists)
+            clf_pred_targets = clf.predict(hists)
+            ninds, = np.where(clf_pred_targets != targets)
 
-            # Negative mining, add only top k falsely predicted instances
-            # ninds: inconsistent targets
-            # Otherwise, add all relevant training data
-            if mode == 'neg': 
-                clf_pred_scores = self.clf_.decision_function(train_hists_chunk)
-                clf_pred_targets = self.clf_.predict(train_hists_chunk)
-                ninds, = np.where(clf_pred_targets != train_targets_chunk)
+            # Pick top 5 predictions (last 5)
+            inds = np.argsort(np.max(clf_pred_scores[ninds], axis=1), axis=0)[-5:]
+            inds = ninds[inds]
 
-                # Pick top 10 predictions (last 10)
-                inds = np.argsort(np.max(clf_pred_scores[ninds], axis=1), axis=0)[-10:]
-                inds = ninds[inds]
+            return inds
 
-                train_hists_chunk = train_hists_chunk[inds]
-                train_targets_chunk = train_targets_chunk[inds]
+        if self.params_.classifier == 'sgd': 
 
-            # Provide all unique targets the classifier will expect, in the first fit
-            self.clf_.partial_fit(train_hists_chunk, train_targets_chunk, 
-                                  classes=self.target_ids_ if first_fit else None, 
-                                  sample_weight=np.ones(len(train_hists_chunk)) * 0.001 if not first_fit else None)
+            pred_targets, train_targets = [], []
+            for hists_chunk, targets_chunk in izip(chunks(hists_iterable, 100), 
+                                                   chunks(targets_iterable, 100)):
+                train_hists_chunk = np.vstack([self.kernel_tf_.fit_transform(hist) 
+                                               if self.kernel_tf_ is not None else hist for hist in hists_chunk])
+                train_targets_chunk = np.hstack([ target for target in targets_chunk]).astype(np.int32)
 
-            # Predict targets
-            pred_targets_chunk = self.clf_.predict(train_hists_chunk)
-            pred_targets.append(pred_targets_chunk)
-            train_targets.append(train_targets_chunk)
+                # Shuffle data
+                np.random.shuffle(train_hists_chunk)
+                np.random.shuffle(train_targets_chunk)
 
-            print 'Adding %i,%i negative samples ' % (len(pred_targets_chunk), len(train_targets_chunk))
+                # Negative mining, add only top k falsely predicted instances
+                # ninds: inconsistent targets
+                # Otherwise, add all relevant training data
+                if mode == 'neg': 
+                    # Pick top false positives
+                    inds = pick_top_false_positives(self.clf_, train_hists_chunk, train_targets_chunk)
 
-        try: 
-            pred_targets = np.hstack(pred_targets)
-            train_targets = np.hstack(train_targets)
-        except: 
-            return
+                    train_hists_chunk = train_hists_chunk[inds]
+                    train_targets_chunk = train_targets_chunk[inds]
+
+                # Provide all unique targets the classifier will expect, in the first fit
+                self.clf_.partial_fit(train_hists_chunk, train_targets_chunk, 
+                                      classes=self.target_ids_, #  if mode == 'train' else None, 
+                                      sample_weight=np.ones(len(train_hists_chunk)) * 0.001 if mode == 'neg' else None)
+
+                # Predict targets
+                pred_targets_chunk = self.clf_.predict(train_hists_chunk)
+                pred_targets.append(pred_targets_chunk)
+                train_targets.append(train_targets_chunk)
+
+                print 'Adding %i,%i negative samples ' % (len(pred_targets_chunk), len(train_targets_chunk))
+
+            try: 
+                pred_targets = np.hstack(pred_targets)
+                train_targets = np.hstack(train_targets)
+            except: 
+                return
             
 
-        # # =================================================
-        # # Batch (in-memory) training
+        # =================================================
+        # Batch (in-memory) training
 
-        # # Homogeneous Kernel map
-        # train_hists = np.vstack([item for item in hists_db.itervalues('train_histogram', verbose=True)]) 
-        # train_targets = np.hstack([item for item in hists_db.itervalues('train_target', verbose=True)]).astype(np.int32) 
+        elif self.params_.classifier == 'svm': 
 
-        # if self.kernel_tf_ is not None: 
-        #     print '====> [COMPUTE] TRAIN Kernel Approximator '
-        #     # inds = np.random.permutation(hists_db.length('train_histogram'))[:self.params_.vocab.num_images]
-        #     # hists = np.vstack([item for item in hists_db.itervalues('train_histogram', inds=inds, verbose=True)])
-        #     train_hists = self.kernel_tf_.fit_transform(train_hists)
-        #     print '-------------------------------'        
+            # Setup train hists, and targets
+            train_hists = np.vstack([item for item in hists_iterable]) 
+            train_targets = np.hstack([item for item in targets_iterable]).astype(np.int32) 
 
-        # # Train/Predict one-vs-all classifier
-        # print '====> Train classifier '
-        # st_clf = time.time()
+            # Find false negatives from negative samples
+            if mode == 'neg': 
+                neg_hists, neg_targets = [], []
+                for hists_chunk, targets_chunk in izip(chunks(allneg_hists_iterable, 100), 
+                                                       chunks(allneg_targets_iterable, 100)):
+                    orig_hists_chunk = np.vstack([hist for hist in hists_chunk])
+                    neg_hists_chunk = self.kernel_tf_.fit_transform(orig_hists_chunk) \
+                                      if self.kernel_tf_ else orig_hists_chunk
+                    neg_targets_chunk = np.hstack([ target for target in targets_chunk]).astype(np.int32)
+                
+                    inds = pick_top_false_positives(self.clf_, neg_hists_chunk, neg_targets_chunk)
+                    neg_hists_db.append(mode_prefix('histogram'), orig_hists_chunk[inds])
+                    neg_hists_db.append(mode_prefix('target'), neg_targets_chunk[inds])
 
-        # # # Grid search cross-val (best C param)
-        # # cv = ShuffleSplit(len(train_hists), n_iter=2, test_size=0.3, random_state=4)
-        # # self.clf_ = GridSearchCV(self.clf_, self.clf_hyparams_, cv=cv, n_jobs=4, verbose=4)
-        # # print 'Training Classifier (with grid search hyperparam tuning) .. '
+                    neg_hists.append(orig_hists_chunk[inds])
+                    neg_targets.append(neg_targets_chunk[inds])
 
-        # # Provide all unique targets the classifier will expect, in the first fit
-        # if first_fit: 
-        #     self.clf_.partial_fit(train_hists, train_targets, classes=unique_targets)
-        # # print 'BEST: ', self.clf_.best_score_, self.clf_.best_params_
+                try: 
+                    train_hists = np.vstack([train_hists, np.vstack(neg_hists)])
+                    train_targets = np.hstack([train_targets, np.hstack(neg_targets)])
+                except Exception as e: 
+                    print e
 
-        # # Setting clf to best estimator
-        # # self.clf_ = self.clf_.best_estimator_
-        # pred_targets = self.clf_.predict(train_hists)
+            # Kernel approximation
+            if self.kernel_tf_ is not None: 
+                print '====> [COMPUTE] TRAIN Kernel Approximator '
+                train_hists = self.kernel_tf_.fit_transform(train_hists)
+                print '-------------------------------'        
 
-        # Calibrating classifier
-        print 'Calibrating Classifier ... '
-        self.clf_prob_ = None # CalibratedClassifierCV(self.clf_, cv=cv, method='isotonic')
-        # self.clf_prob_.fit(train_hists, train_targets)        
+            # Grid search cross-val (best C param)
+            cv = ShuffleSplit(len(train_hists), n_iter=5, test_size=0.3, random_state=4)
+            self.clf_ = GridSearchCV(self.clf_, self.clf_hyparams_, cv=cv, n_jobs=4, verbose=4)
+            print 'Training Classifier (with grid search hyperparam tuning) .. '
+            self.clf_.fit(train_hists, train_targets)
+            # print 'BEST: ', self.clf_.best_score_, self.clf_.best_params_
+
+            # Setting clf to best estimator
+            self.clf_ = self.clf_.best_estimator_
+            pred_targets = self.clf_.predict(train_hists)
+
+            # Calibrating classifier
+            print 'Calibrating Classifier ... '
+            self.clf_prob_ = None # CalibratedClassifierCV(self.clf_, cv=cv, method='isotonic')
+            # self.clf_prob_.fit(train_hists, train_targets)        
 
         print 'Training Classifier took %s' % (format_time(time.time() - st_clf))
         print '-------------------------------'        
@@ -735,22 +794,52 @@ class BOWClassifier(object):
         else: 
             raise RuntimeError('Test histograms not available %s' % self.params_.cache.test_hists_dir)
 
+        # =================================================
+        # Batch-wise (out-of-core) evaluation
+
+        # Predict using classifier
         print '-------------------------------'
-
-        # Homogeneous Kernel map
-        test_hists = np.vstack([item for item in hists_db.itervalues('test_histogram', verbose=True)]) 
-        test_targets = np.hstack([item for item in hists_db.itervalues('test_target', verbose=True)]).astype(np.int32)
-        if self.kernel_tf_ is not None: 
-            print '====> [COMPUTE] Kernel Approximator '
-            test_hists = self.kernel_tf_.transform(test_hists)
-            print '-------------------------------'        
-
         print '====> Predict using classifer '
         st_clf = time.time()
 
-        pred_targets = self.clf_.predict(test_hists)
-        pred_scores = self.clf_.decision_function(test_hists)
-        print '-------------------------------'
+        if self.params_.classifier == 'sgd': 
+
+            pred_targets, pred_scores, test_targets = [], [], []
+            for hists_chunk, targets_chunk in izip(chunks(hists_db.itervalues('test_histogram'), 100), 
+                                                   chunks(hists_db.itervalues('test_target'), 100)):
+                test_hists_chunk = np.vstack([self.kernel_tf_.transform(hist) 
+                                               if self.kernel_tf_ is not None else hist for hist in hists_chunk])
+                test_targets_chunk = np.hstack([ target for target in targets_chunk]).astype(np.int32)
+
+                # Predict targets
+                pred_targets_chunk = self.clf_.predict(test_hists_chunk)
+                pred_scores_chunk = self.clf_.decision_function(test_hists_chunk)
+                pred_targets.append(pred_targets_chunk)
+                pred_scores.append(pred_scores_chunk)
+                test_targets.append(test_targets_chunk)
+
+            pred_scores = np.vstack(pred_scores)
+            pred_targets = np.hstack(pred_targets)
+            test_targets = np.hstack(test_targets)
+            print '-------------------------------'
+
+
+        # =================================================
+        # Batch (in-memory) evaluation
+
+        elif self.params_.classifier == 'svm': 
+            
+            # Homogeneous Kernel map
+            test_hists = np.vstack([item for item in hists_db.itervalues('test_histogram', verbose=False)]) 
+            test_targets = np.hstack([item for item in hists_db.itervalues('test_target', verbose=False)]).astype(np.int32)
+            if self.kernel_tf_ is not None: 
+                print '====> [COMPUTE] Kernel Approximator '
+                test_hists = self.kernel_tf_.transform(test_hists)
+                print '-------------------------------'        
+
+            pred_targets = self.clf_.predict(test_hists)
+            pred_scores = self.clf_.decision_function(test_hists)
+            print '-------------------------------'
 
         print '=========================================================> '
         print '\n ===> Classification @ ', datetime.datetime.now()
@@ -788,7 +877,7 @@ class BOWClassifier(object):
         self._project(mode='train', batch_size=batch_size)
 
         # 4. Kernel approximation and linear classification training
-        self._train(first_fit=True)
+        self._train(mode='train')
 
     def neg_train(self, bg_data_iterable, batch_size=10, viz_cb=lambda e: None): 
 
@@ -805,7 +894,7 @@ class BOWClassifier(object):
                 self._project(mode='neg', batch_size=batch_size)
 
             # 3. Re-train
-            self._train(first_fit=False)
+            self._train(mode='neg')
 
             viz_cb(epoch)
             # training = self._hard_negative_mining(training, epoch)
@@ -958,454 +1047,3 @@ class BOWClassifier(object):
     def load(cls, path): 
         db = AttrDict.load(path)
         return cls.from_dict(db)
-        
-
-# class ImageClassifier(object): 
-#     training_params = AttrDict(train_size=10, random_state=1)
-#     descriptor_params = AttrDict(detector='dense', descriptor='SIFT', step=2, levels=4, scale=2)
-#     bow_params = AttrDict(K=64, method='vlad', quantizer='kdtree', norm_method='square-rooting')
-#     cache_params = AttrDict(detector_path='detector.h5', overwrite=False)
-#     default_params = AttrDict(
-#         training=training_params, descriptor=descriptor_params, bow=bow_params, cache=cache_params
-#     )
-#     def __init__(self, dataset=None, batch=True, 
-#                  process_cb=lambda fn: dict(img=cv2.imread(fn), mask=None), 
-#                  params = default_params): 
-
-#         # Save dataset
-#         self.dataset_ = dataset_
-#         self.process_cb_ = process_cb
-#         self.params_ = AttrDict(params)
-
-#         # Train in batches or one-by-one
-#         self.batch_ = batch
-#         self.BATCH_SIZE_ = 5
-
-#         # Setup recognition 
-#         self._setup_recognition()
-
-#         # # Optionally setup training testing
-#         # if dataset is not None: 
-#         #     self.setup_training_testing()
-
-#         #     # Persist, and retrieve db if available
-#         #     if not io_utils.path_exists(self.params.cache.detector_path) or self.params.cache.overwrite: 
-#         #         self.setup_recognition()
-#         #         self.clf_pretrained = False
-#         #     else: 
-#         #         db = AttrDict.load(self.params.cache.detector_path)
-#         #         self.setup_recognition_from_dict(db)
-#         #         self.clf_pretrained = True
-
-    # def _setup_recognition(self): 
-        
-    #     # Support for parallel processing
-    #     if not self.batch_: 
-    #         # Image description using Dense SIFT/Descriptor
-    #         # Bag-of-words VLAD/VQ
-    #         self.image_descriptor_ = ImageDescription(**self.params_.descriptor)
-    #         self.bow_ = BoWVectorizer(**self.params_.bow)
-
-    #     # Setup dim. red
-    #     # Setup kernel feature map
-    #     self.pca_ = RandomizedPCA(**self.params_.pca) if self.params_.do_pca else None
-    #     self.kernel_tf_ = HomogenousKernelMap(2) if self.params_.do_kernel_approximation else None
-
-    #     # Setup classifier
-    #     print 'Building Classifier'
-    #     if self.params_.classifier == 'svm': 
-    #         self.clf_hyparams_ = {'C':[0.01, 0.1, 0.2, 0.5, 1.0, 2.0, 4.0, 5.0, 10.0]}
-    #         self.clf_ = LinearSVC(random_state=1)
-    #     elif self.params_.classifier == 'sgd': 
-    #         self.clf_hyparams_ = {'loss':['hinge'], 'alpha':[0.0001, 0.001, 0.01, 0.1, 1.0, 10.0], 'class_weight':['auto']}
-    #         self.clf_ = SGDClassifier(loss='hinge', n_jobs=4, n_iter=10)
-    #     elif self.params_.classifier == 'gradient-boosting': 
-    #         self.clf_hyparams_ = {'learning_rate':[0.01, 0.1, 0.2, 0.5]}
-    #         self.clf_ = GradientBoostingClassifier()
-    #     elif self.params_.classifier == 'extra-trees':             
-    #         self.clf_hyparams_ = {'n_estimators':[10, 20, 40, 100]}
-    #         self.clf_ = ExtraTreesClassifier()
-    #     else: 
-    #         raise Exception('Unknown classifier type %s. Choose from [sgd, svm, gradient-boosting, extra-trees]' 
-    #                         % self.params_.classifier)
-
-    # def extract_features(self): 
-    #     if not self.dataset_: 
-    #         raise RuntimeError('Training cannot proceed. Setup dataset first!')            
-
-    #     # Extract training features, only if not already available
-    #     if not os.path.isdir(self.params_.cache.train_path): 
-    #         print '====> [COMPUTE] TRAINING: Feature Extraction '        
-    #         st = time.time()
-    #         features_db = IterDB(filename=self.params_.cache.train_path, mode='w', 
-    #                              fields=['train_desc', 'train_target', 'train_pts', 'train_shapes', 'vocab_desc'], batch_size=self.BATCH_SIZE)
-
-    #         # Parallel Processing (in chunks of BATCH_SIZE)
-    #         if self.batch_: 
-    #             for chunk in chunks(self.dataset_, self.BATCH_SIZE): 
-    #                 res = Parallel(n_jobs=8, verbose=5) (
-    #                     delayed(im_detect_and_describe)
-    #                     (**dict(self.process_cb_(x_t), **self.params_.descriptor)) for (x_t,_) in chunk
-    #                 )
-
-    #                 for (pts, im_desc), (x_t, y_t) in izip(res, chunk): 
-    #                     features_db.append('train_desc', im_desc)
-    #                     features_db.append('train_pts', pts)
-    #                     features_db.append('train_shapes', np.array([np.min(pts[:,0]), np.min(pts[:,1]), np.max(pts[:,0]), np.max(pts[:,1])]))
-    #                     features_db.append('train_target', y_t)
-
-    #                     # im_shape = (self.process_cb(x_t))['img'].shape[:2]
-    #                     # features_db.append('train_shapes', [0, 0, im_shape[1], im_shape[0]])
-
-    #                     # Randomly sample from descriptors for vocab construction
-    #                     inds = np.random.permutation(int(min(len(im_desc), self.params_.vocab.num_per_image)))
-    #                     features_db.append('vocab_desc', im_desc[inds])
-    #         else: 
-    #             # Serial Processing                    
-    #             for (x_t,y_t) in izip(self.X_train, self.y_train): 
-    #                 # Extract and add descriptors to db
-    #                 im_desc = self.image_descriptor.describe(**self.process_cb(x_t))
-    #                 features_db.append('train_desc', im_desc)
-    #                 features_db.append('train_target', y_t)
-
-    #                 # Randomly sample from descriptors for vocab construction
-    #                 inds = np.random.permutation(int(min(len(im_desc), self.params_.vocab.num_per_image)))
-    #                 features_db.append('vocab_desc', im_desc[inds])
-
-    #         features_db.finalize()
-    #         print '[TRAIN] Descriptor extraction took %s' % (format_time(time.time() - st))    
-
-    #     print '-------------------------------'
-
-    #     # Extract test features
-    #     if not os.path.isdir(self.params.cache.test_path): 
-    #         print '====> [COMPUTE] TESTING: Feature Extraction '        
-    #         st = time.time()
-    #         features_db = IterDB(filename=self.params.cache.test_path, mode='w', 
-    #                              fields=['test_desc', 'test_target', 'test_pts', 'test_shapes'], batch_size=self.BATCH_SIZE)
-
-
-    #         # Parallel Processing
-    #         for chunk in chunks(izip(self.X_test, self.y_test), self.BATCH_SIZE): 
-    #             res = Parallel(n_jobs=8, verbose=5) (
-    #                 delayed(im_detect_and_describe)
-    #                 (**dict(self.process_cb(x_t), **self.params.descriptor)) for (x_t,_) in chunk
-    #             )
-    #             for (pts, im_desc), (_, y_t) in izip(res, chunk): 
-    #                 features_db.append('test_desc', im_desc)
-    #                 features_db.append('test_pts', pts)
-    #                 features_db.append('test_target', y_t)
-    #                 features_db.append('test_shapes', np.array([np.min(pts[:,0]), np.min(pts[:,1]), np.max(pts[:,0]), np.max(pts[:,1])]))
-
-    #         # Serial Processing
-    #         # for (x_t,y_t) in izip(self.X_test, self.y_test): 
-    #         #     features_db.append('test_desc', self.image_descriptor.describe(**self.process_cb(x_t)))
-    #         #     features_db.append('test_target', y_t)
-
-    #         features_db.finalize()
-    #         print '[TEST] Descriptor extraction took %s' % (format_time(time.time() - st))    
-    #     print '-------------------------------'
-
-
-    # def train(self): 
-    #     if self.clf_pretrained: 
-    #         return 
-
-    #     if not hasattr(self, 'X_train') or not hasattr(self, 'y_train'): 
-    #         raise RuntimeError('Training cannot proceed. Setup training and testing samples first!')            
-
-    #     print '===> Training '
-    #     st = time.time()
-
-    #     # Extract features
-    #     if not self.params.cache.results_dir: 
-    #         raise RuntimeError('Setup results_dir before running training')
-
-        # # Extract features, only if not already available
-        # if not os.path.isdir(self.params.cache.train_path): 
-        #     pass
-        #     # print '====> [COMPUTE] Feature Extraction '        
-        #     # features_db = IterDB(filename=self.params.cache.train_path, mode='w', 
-        #     #                      fields=['train_desc', 'train_target', 'vocab_desc'])
-        #     # # Serial Processing
-        #     # for (x_t,y_t) in izip(self.X_train, self.y_train): 
-        #     #     # Extract and add descriptors to db
-        #     #     im_desc = self.image_descriptor.describe(**self.process_cb(x_t))
-        #     #     features_db.append('train_desc', im_desc)
-        #     #     features_db.append('train_target', y_t)
-
-        #     #     # Randomly sample from descriptors for vocab construction
-        #     #     inds = np.random.permutation(int(min(len(im_desc), self.params.vocab.num_per_image)))
-        #     #     features_db.append('vocab_desc', im_desc[inds])
-
-        #     # features_db.finalize()
-        #     # print 'Descriptor extraction took %5.3f s' % (time.time() - st)    
-        # else: 
-        #     print '====> [LOAD] Feature Extraction'        
-        #     features_db = IterDB(filename=self.params.cache.train_path, mode='r')
-        # print '-------------------------------'
-
-        # # Build BOW
-        # if not os.path.exists(self.params.cache.vocab_path): # or self.params.cache.overwrite: 
-        #     print '====> [COMPUTE] Vocabulary Construction'
-        #     inds = np.random.permutation(len(self.X_train))[:self.params.vocab.num_images]
-        #     vocab_desc = np.vstack([item for item in features_db.itervalues('vocab_desc', inds=inds, verbose=True)])
-        #     print 'Codebook data: %i, %i' % (len(inds), len(vocab_desc))
-
-        #     # Apply dimensionality reduction
-        #     # Fit PCA to subset of data computed
-        #     print '====> MEMORY: PCA dim. reduction before: %4.3f MB' % (vocab_desc.nbytes / 1024 / 1024.0) 
-        #     if self.params.do_pca: 
-        #         vocab_desc = self.pca.fit_transform(vocab_desc)
-        #     print '====> MEMORY: PCA dim. reduction after: %4.3f MB' % (vocab_desc.nbytes / 1024 / 1024.0) 
-
-        #     print '====> MEMORY: Codebook construction: %4.3f MB' % (vocab_desc.nbytes / 1024 / 1024.0) 
-        #     self.bow.build(vocab_desc)
-
-        #     vocab_desc = None
-        #     vocab_db = AttrDict(params=self.params, bow=self.bow.to_dict(), kernel_tf=self.kernel_tf)
-        #     vocab_db.save(self.params.cache.vocab_path)
-        #     print 'Codebook: %s' % ('GOOD' if np.isfinite(self.bow.codebook).all() else 'BAD')
-        # else: 
-        #     print '====> [LOAD] Vocabulary Construction'
-        #     vocab_db = AttrDict.load(self.params.cache.vocab_path)
-        #     self.bow = BoWVectorizer.from_dict(vocab_db.bow)
-        # print '-------------------------------'
-
-        # # Histogram of trained features
-        # if not os.path.exists(self.params.cache.train_hists_path): #  or self.params.cache.overwrite: 
-        #     print '====> [COMPUTE] BoVW / VLAD projection '
-        #     train_target = np.array(self.y_train, dtype=np.int32)
-
-        #     # Serial Processing
-        #     # train_histogram = np.vstack([self.bow.project(
-        #     #     self.pca.transform(desc) if self.params.do_pca else desc, pts=pts, shape=shape
-        #     # ) for (desc, pts, shape) in features_db.iter_keys_values(['train_desc', 'train_pts', 'train_shapes'], verbose=True)])
-
-        #     # Parallel Processing
-        #     train_histogram = []
-        #     for chunk in chunks(features_db.iter_keys_values(['train_desc', 'train_pts', 'train_shapes'], verbose=True), self.BATCH_SIZE): 
-        #         res_desc = [self.pca.transform(desc) for (desc, _, _) in chunk]
-        #         res_hist = Parallel(n_jobs=8, verbose=5) (
-        #             delayed(bow_project)
-        #             (desc, self.bow.codebook, pts=pts, shape=shape, levels=self.params.bow.levels) for desc, (_, pts, shape) in izip(res_desc, chunk)
-        #         )
-        #         train_histogram.extend(res_hist)
-        #     train_histogram = np.vstack(train_histogram)
-
-        #     hists_db = AttrDict(train_target=train_target, train_histogram=train_histogram)
-        #     hists_db.save(self.params.cache.train_hists_path)
-        #     print '====> MEMORY: Histogram: %s %4.3f MB' % (train_histogram.shape, 
-        #                                                     train_histogram.nbytes / 1024 / 1024.0) 
-        # else: 
-        #     print '====> [LOAD] BoVW / VLAD projection '
-        #     hists_db = AttrDict.load(self.params.cache.train_hists_path)
-        #     train_target, train_histogram = hists_db.train_target, hists_db.train_histogram
-        # print '-------------------------------'
-
-        # # PCA dim. red
-        # if self.params.do_pca: 
-        #     print '====> PCA '            
-        #     train_histogram = self.pca.fit_transform(train_histogram)
-        #     print '-------------------------------'        
-
-        # # Homogeneous Kernel map
-        # if self.params.do_kernel_approximation: 
-        #     print '====> Kernel Approximation '
-        #     train_histogram = self.kernel_tf.fit_transform(train_histogram)
-        #     print '-------------------------------'        
-
-        # # Train/Predict one-vs-all classifier
-        # print '====> Train classifier '
-        # st_clf = time.time()
-
-        # # Grid search cross-val
-        # cv = ShuffleSplit(len(train_histogram), n_iter=20, test_size=0.5, random_state=4)
-        # self.clf_ = GridSearchCV(self.clf_, self.clf_hyparams_, cv=cv, n_jobs=8, verbose=4)
-        # self.clf_.fit(train_histogram, train_target)
-        # print 'BEST: ', self.clf_.best_score_, self.clf_.best_params_
-        # # self.clf = self.clf_.best_estimator_
-        # pred_target = self.clf_.predict(train_histogram)
-
-        # print 'Training Classifier took %s' % (format_time(time.time() - st_clf))
-        # print '-------------------------------'        
-
-
-        # print ' Accuracy score (Training): %4.3f' % (metrics.accuracy_score(train_target, pred_target))
-        # print ' Report (Training):\n %s' % (classification_report(train_target, pred_target, 
-        #                                                           target_names=self.dataset.target_names))
-
-        # print 'Training took %s' % format_time(time.time() - st)
-
-        # print '====> Saving classifier '
-        # self.save(self.params.cache.detector_path)
-        # print '-------------------------------'
-        # return
-
-    # def classify(self): 
-    #     print '===> Classification '
-    #     st = time.time()
-
-    #     # Extract features
-    #     if not os.path.isdir(self.params.cache.test_path): 
-    #         print '====> [COMPUTE] Feature Extraction '        
-    #         features_db = IterDB(filename=self.params.cache.test_path, mode='w', 
-    #                              fields=['test_desc', 'test_target'], batch_size=5)
-    #         for (x_t,y_t) in izip(self.X_test, self.y_test): 
-    #             features_db.append('test_desc', self.image_descriptor.describe(**self.process_cb(x_t)))
-    #             features_db.append('test_target', y_t)
-    #         features_db.finalize()
-    #     else: 
-    #         print '====> [LOAD] Feature Extraction'        
-    #         features_db = IterDB(filename=self.params.cache.test_path, mode='r')
-    #     print '-------------------------------'
-    #     print 'Descriptor extraction took %s' % format_time(time.time() - st)    
-
-    #     # Load Vocabulary
-    #     if os.path.exists(self.params.cache.vocab_path):
-    #         print '====> [LOAD] Vocabulary Construction'
-    #         vocab_db = AttrDict.load(self.params.cache.vocab_path)
-    #         self.bow = BoWVectorizer.from_dict(vocab_db.bow)
-    #     else: 
-    #         raise RuntimeError('Vocabulary not built %s' % self.params.cache.vocab_path)
-
-    #     # Histogram of trained features
-    #     if not os.path.exists(self.params.cache.test_hists_path): #  or self.params.cache.overwrite: 
-    #         print '====> [COMPUTE] BoVW / VLAD projection '
-    #         test_target = self.y_test
-
-    #         # # Serial Processing
-    #         # test_histogram = np.vstack([self.bow.project(
-    #         #     self.pca.transform(desc) if self.params.do_pca else desc, pts=pts, shape=shape
-    #         # ) for (desc, pts, shape) in features_db.iter_keys_values(['test_desc', 'test_pts', 'test_shapes'], verbose=True)])
-
-    #         # Parallel Processing
-    #         test_histogram = []
-    #         for chunk in chunks(features_db.iter_keys_values(['test_desc', 'test_pts', 'test_shapes'], verbose=True), self.BATCH_SIZE): 
-    #             res_desc = [self.pca.transform(desc) for (desc, _, _) in chunk]
-    #             res_hist = Parallel(n_jobs=8, verbose=5) (
-    #                 delayed(bow_project)
-    #                 (desc, self.bow.codebook, pts=pts, shape=shape, levels=self.params.bow.levels) for desc, (_, pts, shape) in izip(res_desc, chunk)
-    #             )
-    #             test_histogram.extend(res_hist)
-    #         test_histogram = np.vstack(test_histogram)
-
-    #         hists_db = AttrDict(test_target=test_target, test_histogram=test_histogram)
-    #         hists_db.save(self.params.cache.test_hists_path)
-    #         print '====> MEMORY: Histogram: %s %4.3f MB' % (test_histogram.shape, 
-    #                                                         test_histogram.nbytes / 1024 / 1024.0) 
-    #     else: 
-    #         print '====> [LOAD] BoVW / VLAD projection '
-    #         hists_db = AttrDict.load(self.params.cache.test_hists_path)
-    #         test_target, test_histogram = hists_db.test_target, hists_db.test_histogram
-    #     print '-------------------------------'
-
-    #     # # PCA dim. red
-    #     # if self.params.do_pca: 
-    #     #     print '====> PCA '            
-    #     #     test_histogram = self.pca.transform(test_histogram)
-    #     #     print '-------------------------------'        
-
-    #     if self.params.do_kernel_approximation: 
-    #         # Apply homogeneous transform
-    #         test_histogram = self.kernel_tf.transform(test_histogram)
-
-    #     print '====> Predict using classifer '
-    #     pred_target = self.clf_.predict(test_histogram)
-    #     pred_score = self.clf_.decision_function(test_histogram)
-    #     print '-------------------------------'
-
-    #     # print ' Confusion matrix (Test): %s' % (metrics.confusion_matrix(test_target, pred_target))
-    #     print '=========================================================> '
-    #     print '\n ===> Classification @ ', datetime.datetime.now()
-    #     print 'Params: \n'
-    #     pp = pprint.PrettyPrinter(indent=4)
-    #     pp.pprint(self.params)
-    #     print '\n'
-    #     print '-----------------------------------------------------------'
-    #     print ' Accuracy score (Test): %4.3f' % (metrics.accuracy_score(test_target, pred_target))
-    #     print ' Report (Test):\n %s' % (classification_report(test_target, pred_target, 
-    #                                                           target_names=self.dataset.target_names))
-
-    #     print 'Testing took %s' % format_time(time.time() - st)
-
-    #     return AttrDict(test_target=test_target, pred_target=pred_target, pred_score=pred_score, 
-    #                     target_names=self.dataset.target_names)
-
-
-    # def classify_one(self, img, mask): 
-    #     print '===> Classification one '
-    #     st = time.time()
-
-    #     # Extract features
-    #     test_desc = self.image_descriptor_.describe(img, mask=mask) 
-    #     test_histogram = self.bow_.project(test_desc)
-    #     pred_target_proba = self.clf_.decision_function(test_histogram)
-    #     pred_target, = self.clf_.predict(test_histogram)
-    #     # print pred_target_proba, pred_target
-
-    #     return self.dataset.target_unhash[pred_target]
-
-    # def setup_recognition_from_dict(self, db): 
-    #     try: 
-    #         self.params = db.params
-    #         self.image_descriptor = ImageDescription(**db.params.descriptor)
-    #         self.bow = BoWVectorizer.from_dict(db.bow)
-    #         self.clf = db.clf
-    #     except KeyError: 
-    #         raise RuntimeError('DB not setup correctly, try re-training!')
-            
-
-    # @classmethod
-    # def from_dict(cls, db): 
-    #     c = cls()
-    #     c.setup_recognition_from_dict(db)
-    #     return c
-
-    # @classmethod
-    # def load(cls, path): 
-    #     db = AttrDict.load(path)
-    #     return cls.from_dict(db)
-        
-    # def save(self, path): 
-    #     db = AttrDict(params=self.params_, bow=self.bow.to_dict(), clf=self.clf, pca=self.pca)
-    #     db.save(path)
-
-        
-
-
-
-# from pybot_vlfeat import vl_dsift
-# def im_detect_and_describe(img, mask=None, detector='dense', descriptor='SIFT', step=4, levels=7, scale=np.sqrt(2)): 
-
-#     try:     
-#         all_pts, all_desc = [], []
-#         for l in range(levels): 
-#             if l == 0:
-#                 im = img.copy()
-#                 mask_im = mask.copy() if mask is not None else None
-#             else: 
-#                 im = im_resize(im, scale=1./scale)
-#                 mask_im = im_resize(mask, scale=1./scale) if mask_im is not None else None
-
-#             # Convert to HSV
-#             # im = cv2.cvtColor(im, cv2.COLOR_BGR2LAB)
-#             cur_scale = scale ** l  
-
-#             # Lab-SIFT
-#             ch_desc = []
-#             for ch in range(im.shape[2]): 
-#                 pts, desc = vl_dsift(im[:,:,])
-#                 ch_desc.append(desc)
-
-#             pts, desc = (pts * cur_scale).astype(np.int32), (np.hstack(ch_desc)).astype(np.uint8)
-#             all_pts.extend(pts)
-#             all_desc.append(desc)
-
-#         pts = np.vstack(all_pts).astype(np.int32)
-#         desc = np.vstack(all_desc)
-
-#         return pts, desc
-#     except Exception as e: 
-#         print e
-#         return None, None
