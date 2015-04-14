@@ -23,6 +23,7 @@ from bot_utils.db_utils import AttrDict, IterDB
 from bot_utils.itertools_recipes import chunks
 
 import sklearn.metrics as metrics
+from sklearn.preprocessing import normalize
 from sklearn.decomposition import PCA, RandomizedPCA
 from sklearn.svm import LinearSVC, SVC
 from sklearn.calibration import CalibratedClassifierCV
@@ -215,9 +216,17 @@ def get_detector(detector='dense', step=4, levels=7, scale=np.sqrt(2)):
         detector = cv2.FeatureDetector_create(detector)
         return cv2.PyramidAdaptedFeatureDetector(detector, maxLevel=levels)
 
+def root_sift(kpts, desc, eps=1e-7): 
+    """ Compute Root-SIFT on descriptor """
+    desc = desc.astype(np.float32)
+    desc = np.sqrt(desc / (np.sum(desc, axis=1)[:,np.newaxis] + eps))
+    # desc /= (np.linalg.norm(desc, axis=1)[:,np.newaxis] + eps)
 
+    inds, = np.where(np.isfinite(desc).all(axis=1))
+    kpts, desc = [kpts[ind] for ind in inds], desc[inds]
+    return kpts, desc
 
-def im_detect_and_describe(img, mask=None, detector='dense', descriptor='SIFT', 
+def im_detect_and_describe(img, mask=None, detector='dense', descriptor='SIFT', colorspace='gray',
                            step=4, levels=7, scale=np.sqrt(2)): 
     """ 
     Describe image using dense sampling / specific detector-descriptor combination. 
@@ -228,9 +237,13 @@ def im_detect_and_describe(img, mask=None, detector='dense', descriptor='SIFT',
     try:     
         kpts = detector.detect(img, mask=mask)
         kpts, desc = extractor.compute(img, kpts)
-        pts = np.vstack([kp.pt for kp in kpts]).astype(np.int32)
 
+        if descriptor == 'SIFT': 
+            kpts, desc = root_sift(kpts, desc)
+
+        pts = np.vstack([kp.pt for kp in kpts]).astype(np.int32)
         return pts, desc
+
     except Exception as e: 
         print 'im_detect_and_describe', e
         return None, None
@@ -242,13 +255,6 @@ def im_describe(*args, **kwargs):
     """
     kpts, desc = im_detect_and_describe(*args, **kwargs)
     return desc
-
-def root_sift(kpts, desc): 
-    """ Compute Root-SIFT on descriptor """
-    desc = np.sqrt(desc.astype(np.float32) / (np.sum(desc, axis=1)).reshape(-1,1))
-    inds, = np.where(np.isfinite(desc).all(axis=1))
-    kpts, desc = [kpts[ind] for ind in inds], desc[inds]
-    return kpts, desc
 
 # def color_codes(img, kpts): 
 #     # Extract color information (Lab)
@@ -282,10 +288,11 @@ class HomogenousKernelMap(AdditiveChi2Sampler):
         return sgn * psix
 
 class ImageDescription(object):  
-    def __init__(self, detector='dense', descriptor='SIFT', step=4, levels=7, scale=np.sqrt(2)): 
+    def __init__(self, detector='dense', descriptor='SIFT', colorspace='gray', step=4, levels=7, scale=np.sqrt(2)): 
         self.step = step
         self.levels = levels
         self.scale = scale
+        self.colorspace = colorspace
         
         # Setup feature detector
         self.detector = get_dense_detector(step=step, levels=levels, scale=scale)
@@ -351,12 +358,12 @@ class BOWClassifier(object):
     """
     def __init__(self, params, target_ids, 
                  process_cb=lambda f: dict(img=cv2.imread(f.filename), mask=None), 
-                 target_names=None): 
+                 target_map=None): 
 
         # Setup Params
         self.params_ = params
         self.process_cb_ = process_cb
-        self.target_names_ = target_names
+        self.target_map_ = target_map
         self.target_ids_ = (np.unique(target_ids)).astype(np.int32)
         self.epoch_no_ = 0
 
@@ -388,7 +395,7 @@ class BOWClassifier(object):
         print 'Weights: ', self.target_ids_, cweights
 
         if self.params_.classifier == 'svm': 
-            self.clf_hyparams_ = {'C':[0.01, 0.1, 0.2, 0.5, 1.0, 2.0, 4.0, 5.0, 10.0], 'class_weight': ['auto']}
+            self.clf_hyparams_ = {'C':[0.01, 0.1, 0.5, 1.0, 4.0, 5.0, 10.0], 'class_weight': ['auto']}
             self.clf_base_ = LinearSVC(random_state=1)
         elif self.params_.classifier == 'sgd': 
             self.clf_hyparams_ = {'alpha':[0.0001, 0.001, 0.01, 0.1, 1.0, 10.0], 'class_weight':['auto']} # 'loss':['hinge'], 
@@ -505,7 +512,7 @@ class BOWClassifier(object):
             print '====> [COMPUTE] Vocabulary Construction'
             inds = np.random.permutation(features_db.length('train_desc'))[:self.params_.vocab.num_images]
             vocab_desc = np.vstack([item for item in features_db.itervalues('vocab_desc', inds=inds, verbose=True)])
-            print 'Codebook data: %i, %i' % (len(inds), len(vocab_desc))
+            print 'Codebook data: nimages (%i), vocab(%s)' % (len(inds), vocab_desc.shape)
 
             # Apply dimensionality reduction
             # Fit PCA to subset of data computed
@@ -762,12 +769,15 @@ class BOWClassifier(object):
                 train_hists = self.kernel_tf_.fit_transform(train_hists)
                 print '-------------------------------'        
 
+
             # Grid search cross-val (best C param)
             cv = ShuffleSplit(len(train_hists), n_iter=5, test_size=0.3, random_state=4)
             clf_cv = GridSearchCV(self.clf_base_, self.clf_hyparams_, cv=cv, n_jobs=4, verbose=4)
-            print 'Training Classifier (with grid search hyperparam tuning) .. '
+
+            print '====> Training Classifier (with grid search hyperparam tuning) .. '
+            print '====> BATCH Training (in-memory): %4.3f MB' % (train_hists.nbytes / 1024 / 1024.0) 
             clf_cv.fit(train_hists, train_targets)
-            # print 'BEST: ', self.clf_.best_score_, self.clf_.best_params_
+            print 'BEST: ', clf_cv.best_score_, clf_cv.best_params_
 
             # Setting clf to best estimator
             self.clf_ = clf_cv.best_estimator_
@@ -783,7 +793,8 @@ class BOWClassifier(object):
 
         print ' Accuracy score (Training): %4.3f' % (metrics.accuracy_score(train_targets, pred_targets))
         print ' Report (Training):\n %s' % (classification_report(train_targets, pred_targets, 
-                                                                  target_names=self.target_names_))
+                                                                  labels=self.target_map_.keys(), 
+                                                                  target_names=self.target_map_.values()))
         print 'Training took %s' % format_time(time.time() - st_clf)
 
         print '====> Saving classifier '
@@ -805,44 +816,24 @@ class BOWClassifier(object):
         print '====> Predict using classifer '
         st_clf = time.time()
 
-        if self.params_.classifier == 'sgd': 
+        pred_targets, pred_scores, test_targets = [], [], []
+        for hists_chunk, targets_chunk in izip(chunks(hists_db.itervalues('test_histogram'), 100), 
+                                               chunks(hists_db.itervalues('test_target'), 100)):
+            test_hists_chunk = np.vstack([self.kernel_tf_.transform(hist) 
+                                           if self.kernel_tf_ is not None else hist for hist in hists_chunk])
+            test_targets_chunk = np.hstack([ target for target in targets_chunk]).astype(np.int32)
 
-            pred_targets, pred_scores, test_targets = [], [], []
-            for hists_chunk, targets_chunk in izip(chunks(hists_db.itervalues('test_histogram'), 100), 
-                                                   chunks(hists_db.itervalues('test_target'), 100)):
-                test_hists_chunk = np.vstack([self.kernel_tf_.transform(hist) 
-                                               if self.kernel_tf_ is not None else hist for hist in hists_chunk])
-                test_targets_chunk = np.hstack([ target for target in targets_chunk]).astype(np.int32)
+            # Predict targets
+            pred_targets_chunk = self.clf_.predict(test_hists_chunk)
+            pred_scores_chunk = self.clf_.decision_function(test_hists_chunk)
+            pred_targets.append(pred_targets_chunk)
+            pred_scores.append(pred_scores_chunk)
+            test_targets.append(test_targets_chunk)
 
-                # Predict targets
-                pred_targets_chunk = self.clf_.predict(test_hists_chunk)
-                pred_scores_chunk = self.clf_.decision_function(test_hists_chunk)
-                pred_targets.append(pred_targets_chunk)
-                pred_scores.append(pred_scores_chunk)
-                test_targets.append(test_targets_chunk)
-
-            pred_scores = np.vstack(pred_scores)
-            pred_targets = np.hstack(pred_targets)
-            test_targets = np.hstack(test_targets)
-            print '-------------------------------'
-
-
-        # =================================================
-        # Batch (in-memory) evaluation
-
-        elif self.params_.classifier == 'svm': 
-            
-            # Homogeneous Kernel map
-            test_hists = np.vstack([item for item in hists_db.itervalues('test_histogram', verbose=False)]) 
-            test_targets = np.hstack([item for item in hists_db.itervalues('test_target', verbose=False)]).astype(np.int32)
-            if self.kernel_tf_ is not None: 
-                print '====> [COMPUTE] Kernel Approximator '
-                test_hists = self.kernel_tf_.transform(test_hists)
-                print '-------------------------------'        
-
-            pred_targets = self.clf_.predict(test_hists)
-            pred_scores = self.clf_.decision_function(test_hists)
-            print '-------------------------------'
+        pred_scores = np.vstack(pred_scores)
+        pred_targets = np.hstack(pred_targets)
+        test_targets = np.hstack(test_targets)
+        print '-------------------------------'
 
         print '=========================================================> '
         print '\n ===> Classification @ ', datetime.datetime.now()
@@ -853,20 +844,22 @@ class BOWClassifier(object):
         print '-----------------------------------------------------------'
         print ' Accuracy score (Test): %4.3f' % (metrics.accuracy_score(test_targets, pred_targets))
         print ' Report (Test):\n %s' % (classification_report(test_targets, pred_targets, 
-                                                              target_names=self.target_names_))
+                                                              labels=self.target_map_.keys(), 
+                                                              target_names=self.target_map_.values()))
         print ' Confusion matrix (Test): \n%s' % (metrics.confusion_matrix(test_targets, pred_targets))
         # print ' PR (Test) curve:\n ', plot_precision_recall(pred_scores, test_targets, self.target_names_)
         print 'Testing took %s' % format_time(time.time() - st_clf)
 
         return AttrDict(test_targets=test_targets, pred_targets=pred_targets, pred_scores=pred_scores, 
-                        target_names=self.target_names_)
+                        target_map=self.target_map_)
 
 
     def preprocess(self, train_data_iterable, test_data_iterable, bg_data_iterable, batch_size=10): 
         # Extract training and testing features via self.process_cb_
         self._extract(train_data_iterable, mode='train', batch_size=batch_size)
         self._extract(test_data_iterable, mode='test', batch_size=batch_size)
-        self._extract(bg_data_iterable, mode='neg', batch_size=batch_size)
+        if self.params_.neg_epochs: 
+            self._extract(bg_data_iterable, mode='neg', batch_size=batch_size)
 
     def train(self, data_iterable, batch_size=10): 
         # 1. Extract D-SIFT features 
@@ -1037,12 +1030,12 @@ class BOWClassifier(object):
         db = AttrDict(params=self.params_, 
                       bow=self.bow_.to_dict(), pca=self.pca_, kernel_tf=self.kernel_tf_, 
                       clf=self.clf_, clf_base=self.clf_base_, clf_hyparams=self.clf_hyparams_, 
-                      clf_prob=self.clf_prob_, target_names=self.target_names_)
+                      clf_prob=self.clf_prob_, target_map=self.target_map_)
         db.save(path)
 
     @classmethod
     def from_dict(cls, db): 
-        c = cls(params=db.params, target_names=db.target_names)
+        c = cls(params=db.params, target_map=db.target_map)
         c._setup_from_dict(db)
         return c
 
