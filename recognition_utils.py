@@ -391,7 +391,7 @@ class BOWClassifier(object):
         print 'Building Classifier'
         if self.params_.classifier == 'svm': 
             self.clf_hyparams_ = {'C':[0.01, 0.1, 0.2, 0.5, 1.0, 2.0, 4.0, 5.0, 10.0]}
-            self.clf_ = LinearSVC(random_state=1)
+            self.clf_base_ = LinearSVC(random_state=1)
         elif self.params_.classifier == 'sgd': 
             self.clf_hyparams_ = {'alpha':[0.0001, 0.001, 0.01, 0.1, 1.0, 10.0], 'class_weight':['auto']} # 'loss':['hinge'], 
             cweights = {cid: 1.0 for cidx,cid in enumerate(self.target_ids_)}
@@ -402,10 +402,10 @@ class BOWClassifier(object):
             self.clf_ = SGDClassifier(loss='log', n_jobs=4, n_iter=1, verbose=1)
         elif self.params_.classifier == 'gradient-boosting': 
             self.clf_hyparams_ = {'learning_rate':[0.01, 0.1, 0.2, 0.5]}
-            self.clf_ = GradientBoostingClassifier()
+            self.clf_base_ = GradientBoostingClassifier()
         elif self.params_.classifier == 'extra-trees':             
             self.clf_hyparams_ = {'n_estimators':[10, 20, 40, 100]}
-            self.clf_ = ExtraTreesClassifier()
+            self.clf_base_ = ExtraTreesClassifier()
         else: 
             raise Exception('Unknown classifier type %s. Choose from [sgd, svm, gradient-boosting, extra-trees]' 
                             % self.params_.classifier)
@@ -765,13 +765,13 @@ class BOWClassifier(object):
 
             # Grid search cross-val (best C param)
             cv = ShuffleSplit(len(train_hists), n_iter=5, test_size=0.3, random_state=4)
-            self.clf_ = GridSearchCV(self.clf_, self.clf_hyparams_, cv=cv, n_jobs=4, verbose=4)
+            clf_cv = GridSearchCV(self.clf_base_, self.clf_hyparams_, cv=cv, n_jobs=4, verbose=4)
             print 'Training Classifier (with grid search hyperparam tuning) .. '
-            self.clf_.fit(train_hists, train_targets)
+            clf_cv.fit(train_hists, train_targets)
             # print 'BEST: ', self.clf_.best_score_, self.clf_.best_params_
 
             # Setting clf to best estimator
-            self.clf_ = self.clf_.best_estimator_
+            self.clf_ = clf_cv.best_estimator_
             pred_targets = self.clf_.predict(train_hists)
 
             # Calibrating classifier
@@ -1029,7 +1029,7 @@ class BOWClassifier(object):
             self.bow_ = BoWVectorizer.from_dict(db.bow)
             self.pca_ = db.pca
             self.kernel_tf_ = db.kernel_tf
-            self.clf_, self.clf_hyparams_ = db.clf, db.clf_hyparams
+            self.clf_base_, self.clf_, self.clf_hyparams_ = db.clf_base, db.clf, db.clf_hyparams
             self.clf_prob_ = db.clf_prob
         except KeyError: 
             raise RuntimeError('DB not setup correctly, try re-training!')
@@ -1037,7 +1037,7 @@ class BOWClassifier(object):
     def save(self, path): 
         db = AttrDict(params=self.params_, 
                       bow=self.bow_.to_dict(), pca=self.pca_, kernel_tf=self.kernel_tf_, 
-                      clf=self.clf_, clf_hyparams=self.clf_hyparams_, 
+                      clf=self.clf_, clf_base=self.clf_base_, clf_hyparams=self.clf_hyparams_, 
                       clf_prob=self.clf_prob_, target_names=self.target_names_)
         db.save(path)
 
