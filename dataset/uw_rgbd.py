@@ -51,6 +51,7 @@ class UWRGBDDataset(object):
     # train_names = ["cereal_box", "cap", "background"]
     # train_names = ["bowl", "cap", "cereal_box", "background"]
     # train_names = ["cap", "cereal_box", "coffee_mug", "soda_can", "background"]
+    # train_names = ["bowl", "cap", "cereal_box", "soda_can", "background"]
     train_names = ["bowl", "cap", "cereal_box", "coffee_mug", "soda_can", "background"]
     # train_names = ["bowl", "cap", "cereal_box", "coffee_mug", "soda_can"]
     # train_names = ["bowl", "cap", "cereal_box", "coffee_mug", "flashlight", 
