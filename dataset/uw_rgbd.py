@@ -274,9 +274,6 @@ class UWRGBDSceneDataset(UWRGBDDataset):
         Given mask, depth, and rgb files build an read iterator with appropriate process_cb
         """
         def __init__(self, files, meta_file, aligned_file, version): 
-            if version == 'v2': 
-                print '\n===> Version v1 and v2 have discrepancies in depth values, FIX!! <===\n'
-
             self.version = version
             rgb_files, depth_files = UWRGBDSceneDataset._reader.scene_files(files, version)
             assert(len(depth_files) == len(rgb_files))
