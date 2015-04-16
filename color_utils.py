@@ -13,6 +13,10 @@ def colormap(im, min_threshold=0.01):
     bgr[mask] = 0
     return bgr
 
+def get_color(val, colormap='jet'): 
+    colormap_func = getattr(plt.cm, colormap)
+    return colormap_func(val)
+
 def get_color_by_label(labels, default='b', colormap='jet'): 
     if labels is None: 
         return default

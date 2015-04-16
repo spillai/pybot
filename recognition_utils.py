@@ -42,7 +42,7 @@ from sklearn.externals.joblib import Parallel, delayed
 # Generic utility functions for object recognition
 # ---------------------------------------------------------------------
 
-def plot_precision_recall(y_score, y_test, target_names=None): 
+def plot_precision_recall(y_score, y_test, target_map): 
     import matplotlib.pyplot as plt
     from sklearn.metrics import precision_recall_curve
     from sklearn.metrics import average_precision_score
@@ -53,11 +53,10 @@ def plot_precision_recall(y_score, y_test, target_names=None):
     recall = dict()
     average_precision = dict()
     
-    unique = np.unique(y_test)
-    if target_names is None: 
-        target_names = unique
+    unique_ids = np.unique(y_test)
+    target_names = map(lambda uid: target_map[uid], unique_ids)
 
-    y_test_multi = label_binarize(y_test, classes=unique)
+    y_test_multi = label_binarize(y_test, classes=unique_ids)
     N, n_classes = y_score.shape[:2]
     for i,name in enumerate(target_names):
         precision[name], recall[name], _ = precision_recall_curve(y_test_multi[:, i],
@@ -73,8 +72,9 @@ def plot_precision_recall(y_score, y_test, target_names=None):
     # Plot Precision-Recall curve for each class
     plt.clf()
     plt.plot(recall["micro"], precision["micro"],
-             label='Micro-average PR curve (area = {0:0.2f})'
-                   ''.format(average_precision["micro"]))
+             label='Average')
+             # label='Average (area = {0:0.2f})'
+             #       ''.format(average_precision["micro"]))
     plt.xlabel('Recall')
     plt.ylabel('Precision')
     plt.ylim([0.0, 1.05])
@@ -84,8 +84,9 @@ def plot_precision_recall(y_score, y_test, target_names=None):
 
     for i,name in enumerate(target_names):
         plt.plot(recall[name], precision[name],
-                 label='PR curve of class {0} (area = {1:0.2f})'
-                       ''.format(name, average_precision[name]))
+                 label='{0}'.format(name.title().replace('_', ' ')))
+                 # label='{0} (area = {1:0.2f})'
+                 #       ''.format(name.title().replace('_', ' '), average_precision[name]))
 
     plt.xlim([0.0, 1.0])
     plt.ylim([0.0, 1.05])
@@ -356,15 +357,14 @@ class BOWClassifier(object):
       target_names: [car, bike, ... ]
 
     """
-    def __init__(self, params, target_ids, 
-                 process_cb=lambda f: dict(img=cv2.imread(f.filename), mask=None), 
-                 target_map=None): 
+    def __init__(self, params, target_map, 
+                 process_cb=lambda f: dict(img=cv2.imread(f.filename), mask=None)): 
 
         # Setup Params
         self.params_ = params
         self.process_cb_ = process_cb
         self.target_map_ = target_map
-        self.target_ids_ = (np.unique(target_ids)).astype(np.int32)
+        self.target_ids_ = (np.unique(target_map.keys())).astype(np.int32)
         self.epoch_no_ = 0
 
         # 1. Image description using Dense SIFT/Descriptor
@@ -785,8 +785,8 @@ class BOWClassifier(object):
 
             # Calibrating classifier
             print 'Calibrating Classifier ... '
-            self.clf_prob_ = None # CalibratedClassifierCV(self.clf_, cv=cv, method='isotonic')
-            # self.clf_prob_.fit(train_hists, train_targets)        
+            self.clf_prob_ = CalibratedClassifierCV(self.clf_, cv=cv, method='sigmoid')
+            self.clf_prob_.fit(train_hists, train_targets)        
 
         print 'Training Classifier took %s' % (format_time(time.time() - st_clf))
         print '-------------------------------'        
@@ -846,8 +846,12 @@ class BOWClassifier(object):
         print ' Report (Test):\n %s' % (classification_report(test_targets, pred_targets, 
                                                               labels=self.target_map_.keys(), 
                                                               target_names=self.target_map_.values()))
-        print ' Confusion matrix (Test): \n%s' % (metrics.confusion_matrix(test_targets, pred_targets))
-        # print ' PR (Test) curve:\n ', plot_precision_recall(pred_scores, test_targets, self.target_names_)
+        cmatrix = metrics.confusion_matrix(test_targets, pred_targets, labels=self.target_map_.keys())
+        # print ' Confusion matrix (Test): \n%s' % (''.join(['{:15s} {:3s}\n'.format(name, cmatrix[idx]) 
+        #                                                    for idx,name in enumerate(self.target_map_.values())]))
+        print ' Confusion matrix (Test): \n%s' % (cmatrix)
+
+        # plot_precision_recall(pred_scores, test_targets, self.target_map_)
         print 'Testing took %s' % format_time(time.time() - st_clf)
 
         return AttrDict(test_targets=test_targets, pred_targets=pred_targets, pred_scores=pred_scores, 
@@ -1035,7 +1039,7 @@ class BOWClassifier(object):
 
     @classmethod
     def from_dict(cls, db): 
-        c = cls(params=db.params, target_map=db.target_map)
+        c = cls(params=db.params, target_map=dict((int(key), item) for key,item in db.target_map.iteritems()))
         c._setup_from_dict(db)
         return c
 
