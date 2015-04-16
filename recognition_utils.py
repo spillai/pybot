@@ -395,7 +395,7 @@ class BOWClassifier(object):
         print 'Weights: ', self.target_ids_, cweights
 
         if self.params_.classifier == 'svm': 
-            self.clf_hyparams_ = {'C':[0.01, 0.1, 0.5, 1.0, 4.0, 5.0, 10.0], 'class_weight': ['auto']}
+            self.clf_hyparams_ = {'C':[0.01, 0.1, 0.5, 1.0, 4.0, 5.0, 10.0]} # , 'class_weight': ['auto']}
             self.clf_base_ = LinearSVC(random_state=1)
         elif self.params_.classifier == 'sgd': 
             self.clf_hyparams_ = {'alpha':[0.0001, 0.001, 0.01, 0.1, 1.0, 10.0], 'class_weight':['auto']} # 'loss':['hinge'], 
@@ -669,7 +669,7 @@ class BOWClassifier(object):
             ninds, = np.where(clf_pred_targets != targets)
 
             # Pick top 20 predictions
-            inds = np.argsort(np.max(clf_pred_scores[ninds], axis=1), axis=0)[-20:]
+            inds = np.argsort(np.max(clf_pred_scores[ninds], axis=1), axis=0)[:20] # -20:
             inds = ninds[inds]
 
             return inds
@@ -683,9 +683,7 @@ class BOWClassifier(object):
                                                if self.kernel_tf_ is not None else hist for hist in hists_chunk])
                 train_targets_chunk = np.hstack([ target for target in targets_chunk]).astype(np.int32)
 
-                # Shuffle data
-                np.random.shuffle(train_hists_chunk)
-                np.random.shuffle(train_targets_chunk)
+                # TODO: Shuffle data
 
                 # Negative mining, add only top k falsely predicted instances
                 # ninds: inconsistent targets
@@ -700,7 +698,7 @@ class BOWClassifier(object):
                 # Provide all unique targets the classifier will expect, in the first fit
                 self.clf_.partial_fit(train_hists_chunk, train_targets_chunk, 
                                       classes=self.target_ids_, #  if mode == 'train' else None, 
-                                      sample_weight=np.ones(len(train_hists_chunk)) * 0.001 if mode == 'neg' else None)
+                                      sample_weight=None) # np.ones(len(train_hists_chunk)) * 0.01 if mode == 'neg' else None)
 
                 # Predict targets
                 pred_targets_chunk = self.clf_.predict(train_hists_chunk)
@@ -756,10 +754,6 @@ class BOWClassifier(object):
                     train_hists = np.vstack([train_hists, np.vstack(neg_hists)])
                     train_targets = np.hstack([train_targets, np.hstack(neg_targets)])
 
-                    # Shuffle data
-                    np.random.shuffle(train_hists)
-                    np.random.shuffle(train_targets)
-
                 except Exception as e: 
                     print e
 
@@ -771,7 +765,7 @@ class BOWClassifier(object):
 
 
             # Grid search cross-val (best C param)
-            cv = ShuffleSplit(len(train_hists), n_iter=5, test_size=0.3, random_state=4)
+            cv = ShuffleSplit(len(train_hists), n_iter=10, test_size=0.3, random_state=4)
             clf_cv = GridSearchCV(self.clf_base_, self.clf_hyparams_, cv=cv, n_jobs=4, verbose=4)
 
             print '====> Training Classifier (with grid search hyperparam tuning) .. '
