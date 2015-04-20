@@ -669,7 +669,7 @@ class BOWClassifier(object):
             ninds, = np.where(clf_pred_targets != targets)
 
             # Pick top 20 predictions
-            inds = np.argsort(np.max(clf_pred_scores[ninds], axis=1), axis=0)[:20] # -20:
+            inds = np.argsort(np.max(clf_pred_scores[ninds], axis=1), axis=0)[-100:]
             inds = ninds[inds]
 
             return inds
@@ -753,6 +753,8 @@ class BOWClassifier(object):
                     # Stack and train
                     train_hists = np.vstack([train_hists, np.vstack(neg_hists)])
                     train_targets = np.hstack([train_targets, np.hstack(neg_targets)])
+
+                    # TODO: Shuffle data
 
                 except Exception as e: 
                     print e

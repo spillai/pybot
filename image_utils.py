@@ -3,9 +3,9 @@ import numpy as np
 
 def im_resize(im, shape=None, scale=0.5, interpolation=cv2.INTER_AREA): 
     if shape is not None: 
-        return cv2.resize(im, shape, interpolation=interpolation)
+        return cv2.resize(im, shape=shape, interpolation=interpolation)
     else: 
-        return (cv2.resize(im, shape, fx=scale, fy=scale, interpolation=interpolation) \
+        return (cv2.resize(im, None, fx=scale, fy=scale, interpolation=interpolation) \
                 if scale != 1.0 else im)
 
 def im_sample(im, sample=2): 
