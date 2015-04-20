@@ -159,7 +159,7 @@ class ImageDatasetReader(DatasetReader):
     @staticmethod
     def imread_process_cb(scale=1.0):
         if scale != 1.0: 
-            return lambda fn: im_resize(cv2.imread(fn, -1), scale)
+            return lambda fn: im_resize(cv2.imread(fn, -1), scale=scale)
         else: 
             return lambda fn: cv2.imread(fn, -1)
 
