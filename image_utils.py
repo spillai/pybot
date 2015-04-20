@@ -3,7 +3,7 @@ import numpy as np
 
 def im_resize(im, shape=None, scale=0.5, interpolation=cv2.INTER_AREA): 
     if shape is not None: 
-        return cv2.resize(im, shape=shape, interpolation=interpolation)
+        return cv2.resize(im, shape=shape, fx=None, fy=None, interpolation=interpolation)
     else: 
         return (cv2.resize(im, None, fx=scale, fy=scale, interpolation=interpolation) \
                 if scale != 1.0 else im)
@@ -22,14 +22,19 @@ def im_mosaic(*args, **kwargs):
     assert N>0, 'No items to mosaic!'
 
     sz = np.ceil(np.sqrt(N)).astype(int)
-    if shape is not None: 
-        sz_w, sz_h = shape[0] / sz, shape[1] / sz
-    else: 
-        sz_w, sz_h = 800 / sz, 600 / sz
+    # if shape is not None: 
+    #     sz_win = (shape[0] / sz, shape[1] / sz)
+    # else: 
+    #     sz_win = None # (1600 / sz, 900 / sz)
+
+    # print sz_win
 
     for j in range(sz * sz): 
         if j < N: 
-            items[j] = to_color(im_resize(items[j], shape=(sz_w, sz_h)))
+            if shape is not None: 
+                items[j] = to_color(im_resize(items[j], shape=shape))
+            else: 
+                items[j] = to_color(im_resize(items[j], scale=scale))
         else: 
             items.append(np.zeros_like(items[-1]))
 
@@ -38,7 +43,7 @@ def im_mosaic(*args, **kwargs):
 
     chunks = lambda l, n: [l[x: x+n] for x in xrange(0, len(l), n)]
     mosaic = np.vstack([np.hstack(chunk) for chunk in chunks(items, sz)])
-
+    
     return im_resize(mosaic, scale=scale)
         
 
