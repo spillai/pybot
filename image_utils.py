@@ -8,12 +8,16 @@ def im_resize(im, shape=None, scale=0.5, interpolation=cv2.INTER_AREA):
         return (cv2.resize(im, None, fx=scale, fy=scale, interpolation=interpolation) \
                 if scale != 1.0 else im)
 
+def im_pad(im, pad=3, value=0): 
+    return cv2.copyMakeBorder(im, pad, pad, pad, pad, cv2.BORDER_CONSTANT, value)
+
 def im_sample(im, sample=2): 
     return im[::2,::2]
 
 def im_mosaic(*args, **kwargs): 
     scale = kwargs.get('scale', 1.0)
     shape = kwargs.get('shape', None)
+    pad = kwargs.get('pad', 0)
 
     items = list(args)
     N = len(items)
@@ -22,27 +26,18 @@ def im_mosaic(*args, **kwargs):
     assert N>0, 'No items to mosaic!'
 
     sz = np.ceil(np.sqrt(N)).astype(int)
-    # if shape is not None: 
-    #     sz_win = (shape[0] / sz, shape[1] / sz)
-    # else: 
-    #     sz_win = None # (1600 / sz, 900 / sz)
-
-    # print sz_win
-
     for j in range(sz * sz): 
         if j < N: 
             if shape is not None: 
                 items[j] = to_color(im_resize(items[j], shape=shape))
             else: 
                 items[j] = to_color(im_resize(items[j], scale=scale))
+
         else: 
             items.append(np.zeros_like(items[-1]))
 
-    # for j in range(sz*sz - len(items)): 
-    #     items.append(np.zeros_like(items[0]))
-
     chunks = lambda l, n: [l[x: x+n] for x in xrange(0, len(l), n)]
-    mosaic = np.vstack([np.hstack(chunk) for chunk in chunks(items, sz)])
+    mosaic = im_pad(np.vstack([np.hstack(chunk) for chunk in chunks(items, sz)]), pad=3)
     
     return im_resize(mosaic, scale=scale)
         
