@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 import os, fnmatch, time
 import re
-from itertools import izip, imap
+from itertools import izip, imap, chain
 from collections import defaultdict, namedtuple
 
 from bot_utils.db_utils import AttrDict
@@ -37,7 +37,7 @@ def read_files(directory, pattern='*.png'):
 
     return matched_files
 
-def read_dir(directory, pattern='*.png', recursive=True, expected=None, verbose=False): 
+def read_dir(directory, pattern='*.png', recursive=True, expected=None, verbose=False, flatten=False): 
     """
     Recursively read a directory and return a dictionary tree 
     that match file pattern. 
@@ -76,6 +76,8 @@ def read_dir(directory, pattern='*.png', recursive=True, expected=None, verbose=
         else: 
             fn_map[os.path.basename(root)] = matches
 
+    if flatten: 
+        return list(chain([fn for fns in fn_map.values() for fn in fns]))
     return fn_map
 
 class DatasetReader(object): 
@@ -194,6 +196,13 @@ class StereoDatasetReader(object):
                                        start_idx=start_idx, max_files=max_files, scale=scale)
         self.right = ImageDatasetReader(template=os.path.join(os.path.expanduser(directory),right_template), 
                                         start_idx=start_idx, max_files=max_files, scale=scale)
+
+    @classmethod 
+    def from_filenames(cls, left_files, right_files, **kwargs): 
+        c = cls()
+        c.left = ImageDatasetReader.from_filenames(left_files, **kwargs)
+        c.right = ImageDatasetReader.from_filenames(right_files, **kwargs)
+        return c
 
     def iteritems(self, *args, **kwargs): 
         return izip(self.left.iteritems(*args, **kwargs), 
