@@ -33,6 +33,9 @@ def create_path_if_not_exists(filename):
         return True
     return False
 
+def number_of_files(directory): 
+    return len([item for item in os.listdir(directory) if os.path.isfile(os.path.join(directory, item))])
+
 def read_config(conf_path, section): 
     """
     Recipe mostly taken from
