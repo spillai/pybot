@@ -37,6 +37,12 @@ def im_mosaic(*args, **kwargs):
             items.append(np.zeros_like(items[-1]))
 
     chunks = lambda l, n: [l[x: x+n] for x in xrange(0, len(l), n)]
+    print len(items)
+    # print [len(chunk) for chunk in chunks(items, sz)]
+    print [map(lambda ch: ch.shape, chunk) for chunk in chunks(items, sz)]
+
+    print [(np.hstack(chunk)).shape for chunk in chunks(items, sz)]
+        
     mosaic = im_pad(np.vstack([np.hstack(chunk) for chunk in chunks(items, sz)]), pad=3)
     
     return im_resize(mosaic, scale=scale)
