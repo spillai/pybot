@@ -120,16 +120,35 @@ class Capturing(list):
         sys.stdout = self._stdout
 
 class VideoWriter: 
-    def __init__(self, filename): 
-        create_path_if_not_exists(filename)
+    def __init__(self, filename, as_images=False): 
+        if as_images: 
+            directory = os.path.join(''.join([filename, '-imgs']))
+            create_path_if_not_exists(os.path.join(directory, 'movie.avi'))
+        else: 
+            directory = None
+            create_path_if_not_exists(filename)
+
+        self.as_images = as_images
         self.filename = filename
+        self.directory = directory
         self.writer = None
+        self.idx = 0
 
     def __del__(self): 
         self.close()
         print 'Closing video writer and saving %s' % self.filename
 
-    def write(self, im):
+    def write(self, im): 
+        if self.as_images: 
+            return self._write_images(im)
+        else: 
+            return self._write_video(im)
+
+    def _write_images(self, im): 
+        cv2.imwrite(os.path.join(self.directory, 'imgs-%06i.png' % self.idx), im)
+        self.idx += 1
+
+    def _write_video(self, im):
         if self.writer is None: 
             h, w = im.shape[:2]
             self.writer = cv2.VideoWriter(self.filename, cv2.cv.CV_FOURCC(*'mp42'), 
@@ -138,15 +157,18 @@ class VideoWriter:
         self.writer.write(im)
 
     def close(self): 
+        if self.as_images: 
+            # ffmpeg?
+            pass
         if self.writer is not None: 
             self.writer.release()
 
 global g_fn_map
 g_fn_map = {}
-def write_video(fn, im, scale=1.0): 
+def write_video(fn, im, scale=1.0, as_images=True): 
     global g_fn_map
     if fn not in g_fn_map: 
-        g_fn_map[fn] = VideoWriter(fn)
+        g_fn_map[fn] = VideoWriter(fn, as_images=as_images)
     im_scaled = im_resize(im, scale=scale) if scale != 1.0 else im
     g_fn_map[fn].write(im_scaled)
 
