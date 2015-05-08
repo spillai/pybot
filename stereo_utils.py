@@ -5,9 +5,9 @@ from collections import deque
 import bot_vision.color_utils as color_utils 
 import bot_vision.image_utils as image_utils 
 
-from pybot_vision import VoxelStereoBM as _VoxelStereoBM
-from pybot_vision import EdgeStereoBM as _EdgeStereoBM
-from pybot_vision import EdgeStereo as _EdgeStereo
+# from pybot_vision import VoxelStereoBM as _VoxelStereoBM
+# from pybot_vision import EdgeStereoBM as _EdgeStereoBM
+# from pybot_vision import EdgeStereo as _EdgeStereo
 
 from pybot_externals import StereoELAS # , OrderedCostVolumeStereo
 # from pybot_externals import fast_cost_volume_filtering, ordered_row_disparity
@@ -68,52 +68,52 @@ class StereoBM:
     def compute(self, left, right): 
         return self.bm.compute(left, right).astype(np.float32) / 16.0
 
-class VoxelStereoBM: 
-    def __init__(self, discretize=1, do_sgm=True): 
-        self.discretize = discretize
-        if discretize > 1: 
-            # Initilize stereo block matching
-            self.stereo = _VoxelStereoBM(discretize=discretize, 
-                                         do_sgm=do_sgm,
-                                         preset=cv2.STEREO_BM_BASIC_PRESET, 
-                                         ndisparities=64, SAD_window_size=5)
+# class VoxelStereoBM: 
+#     def __init__(self, discretize=1, do_sgm=True): 
+#         self.discretize = discretize
+#         if discretize > 1: 
+#             # Initilize stereo block matching
+#             self.stereo = _VoxelStereoBM(discretize=discretize, 
+#                                          do_sgm=do_sgm,
+#                                          preset=cv2.STEREO_BM_BASIC_PRESET, 
+#                                          ndisparities=64, SAD_window_size=5)
 
-            # self.stereo = StereoBM() # **self.params)
-            # self.stereo.process = lambda l,r: self.stereo.compute(l,r)
-        else: 
-            raise RuntimeError("Discretization less than 1 not supported!")
+#             # self.stereo = StereoBM() # **self.params)
+#             # self.stereo.process = lambda l,r: self.stereo.compute(l,r)
+#         else: 
+#             raise RuntimeError("Discretization less than 1 not supported!")
 
-    def compute(self, left, right): 
-        # Compute stereo disparity
-        disp = (self.stereo.process(left, right)).astype(np.float32) / 16
-        disp = cv2.medianBlur(disp, 3)
+#     def compute(self, left, right): 
+#         # Compute stereo disparity
+#         disp = (self.stereo.process(left, right)).astype(np.float32) / 16
+#         disp = cv2.medianBlur(disp, 3)
 
-        # Re-scale disparity image
-        disp_out = cv2.resize(disp.astype(np.float32), (left.shape[1],left.shape[0]), 
-                              fx=self.discretize, 
-                              fy=self.discretize, 
-                              interpolation=cv2.INTER_NEAREST)
+#         # Re-scale disparity image
+#         disp_out = cv2.resize(disp.astype(np.float32), (left.shape[1],left.shape[0]), 
+#                               fx=self.discretize, 
+#                               fy=self.discretize, 
+#                               interpolation=cv2.INTER_NEAREST)
 
-        return disp_out
-
-
-class EdgeStereoBM: 
-    def __init__(self): 
-        # Initilize stereo block matching
-        self.stereo = _EdgeStereoBM(preset=cv2.STEREO_BM_BASIC_PRESET, 
-                                    ndisparities=64, SAD_window_size=5)
-
-    def compute(self, left, right): 
-        return self.stereo.process(left, right).astype(np.float32) / 16.0
+#         return disp_out
 
 
-class EdgeStereo: 
-    def __init__(self): 
-        # Initilize stereo block matching
-        self.stereo = _EdgeStereo()
+# class EdgeStereoBM: 
+#     def __init__(self): 
+#         # Initilize stereo block matching
+#         self.stereo = _EdgeStereoBM(preset=cv2.STEREO_BM_BASIC_PRESET, 
+#                                     ndisparities=64, SAD_window_size=5)
 
-    def compute(self, left, right): 
-        return self.stereo.process(left, right).astype(np.float32) / 16.0
+#     def compute(self, left, right): 
+#         return self.stereo.process(left, right).astype(np.float32) / 16.0
+
+
+# class EdgeStereo: 
+#     def __init__(self): 
+#         # Initilize stereo block matching
+#         self.stereo = _EdgeStereo()
+
+#     def compute(self, left, right): 
+#         return self.stereo.process(left, right).astype(np.float32) / 16.0
 
 
 # ================================
