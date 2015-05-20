@@ -222,7 +222,7 @@ def publish_pose_list(pub_ns, _poses, texts=[], stamp=None, size=0.05, frame_id=
     # Point width, and height
     N = len(poses)
 
-    markers = vis_msg.Marker(type=Marker.LINE_LIST, ns=pub_ns, action=vis_msg.Marker.ADD)
+    markers = vis_msg.Marker(type=vis_msg.Marker.LINE_LIST, ns=pub_ns, action=vis_msg.Marker.ADD)
 
     markers.header.frame_id = frame_id
     markers.header.stamp = stamp if stamp is not None else rospy.Time.now()
