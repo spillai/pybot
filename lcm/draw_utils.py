@@ -32,10 +32,10 @@ class VisualizationMsgsPub:
         self.lc = lcm.LCM()
         self.log = logging.getLogger(__name__)
 
-        # kinect_pose = RigidTransform.from_roll_pitch_yaw_x_y_z(-np.pi/2, 0, -np.pi/2, 
-        #                                                        0.15, 0.2, 1.48, axes='sxyz')
-        kinect_pose = RigidTransform.from_roll_pitch_yaw_x_y_z(-np.pi/2 - np.pi * 20/180, 0, -np.pi/2, 
-                                                               0.15, 0.2, 0.5, axes='sxyz')
+        kinect_pose = RigidTransform.from_roll_pitch_yaw_x_y_z(-np.pi/2, 0, -np.pi/2, 
+                                                               0.15, 0.2, 1.48, axes='sxyz')
+        # kinect_pose = RigidTransform.from_roll_pitch_yaw_x_y_z(-np.pi/2 - np.pi * 20/180, 0, -np.pi/2, 
+        #                                                        0.15, 0.2, 0.5, axes='sxyz')
 
         self.publish_sensor_frame('KINECT', pose=kinect_pose)
 
@@ -82,6 +82,10 @@ class VisualizationMsgsPub:
 
 global g_viz_pub
 g_viz_pub = VisualizationMsgsPub()
+
+def publish_sensor_frame(frame_id, pose): 
+    global g_viz_pub
+    g_viz_pub.publish_sensor_frame(frame_id, pose)
 
 def publish_image_t(pub_channel, im, jpeg=False, flip_rb=True): 
     global g_viz_pub
