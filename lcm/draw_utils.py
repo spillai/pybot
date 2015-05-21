@@ -4,6 +4,7 @@ import numpy as np
 
 from itertools import izip
 from copy import deepcopy
+from collections import deque
 
 # LCM libs
 import lcm, vs
@@ -240,7 +241,7 @@ def arr_msg(arr, carr, frame_uid, element_id):
 
 
 def _publish_point_type(pub_channel, _arr, c='r', point_type='POINT', flip_rb=False, 
-                        frame_id='KINECT', element_id=0):
+                        frame_id='KINECT', element_id=0, reset=True):
     """
     Publish point cloud on:
     pub_channel: Channel on which the cloud will be published
@@ -258,41 +259,44 @@ def _publish_point_type(pub_channel, _arr, c='r', point_type='POINT', flip_rb=Fa
     pc_list_msg.id = g_viz_pub.channel_uid(pub_channel)
     pc_list_msg.name = pub_channel;
     pc_list_msg.type = getattr(vs.point3d_list_collection_t, point_type);
-    pc_list_msg.reset = True;
+    pc_list_msg.reset = reset
     pc_list_msg.point_lists = []
 
     # Create the point cloud msg
-    if isinstance(_arr, list): 
+    if isinstance(_arr, list) or isinstance(_arr, deque): 
         element_ids = element_id if isinstance(element_id, list) else [0] * len(_arr) 
+        # print 'Multiple elements: ', element_ids
         assert(len(c) == len(_arr))
         for element_id, _arr_item, _carr_item in izip(element_ids, _arr, c): 
             arr, carr = copy_pointcloud_data(_arr_item, _carr_item, flip_rb=flip_rb)
             pc_msg = arr_msg(arr, carr=carr, 
                              frame_uid=g_viz_pub.channel_uid(frame_id), element_id=element_id)
+            print arr.shape, _arr_item.shape
             pc_list_msg.point_lists.append(pc_msg)
     else: 
+        # print 'Single element: ', element_id
         arr, carr = copy_pointcloud_data(_arr, c, flip_rb=flip_rb)
         pc_msg = arr_msg(arr, carr=carr, frame_uid=g_viz_pub.channel_uid(frame_id), element_id=element_id)
         pc_list_msg.point_lists.append(pc_msg)
 
     # add to point cloud list                
     # print 'published %i lists' % len(_arr)
-    pc_list_msg.nlists = len(pc_list_msg.point_lists); 
+    pc_list_msg.nlists = len(pc_list_msg.point_lists)
     g_viz_pub.lc.publish("POINTS_COLLECTION", pc_list_msg.encode())
     # g_log.debug('Published %i points' % (tpoints))
 
 # @run_async
 def publish_point_type(pub_channel, arr, c='r', point_type='POINT', 
-                       flip_rb=False, frame_id='KINECT', element_id=0):
+                       flip_rb=False, frame_id='KINECT', element_id=0, reset=True):
     _publish_point_type(pub_channel, deepcopy(arr), c=deepcopy(c), point_type=point_type, 
-                        flip_rb=flip_rb, frame_id=frame_id, element_id=element_id)
+                        flip_rb=flip_rb, frame_id=frame_id, element_id=element_id, reset=reset)
 
 # @run_async
-def publish_cloud(pub_channel, arr, c='r', flip_rb=False, frame_id='KINECT', element_id=0):
+def publish_cloud(pub_channel, arr, c='r', flip_rb=False, frame_id='KINECT', element_id=0, reset=True):
     _publish_point_type(pub_channel, deepcopy(arr), c=deepcopy(c), point_type='POINT', 
-                        flip_rb=flip_rb, frame_id=frame_id, element_id=element_id)
+                        flip_rb=flip_rb, frame_id=frame_id, element_id=element_id, reset=reset)
 
-def _publish_pose_list(pub_channel, _poses, texts=[], frame_id='KINECT'):
+def _publish_pose_list(pub_channel, _poses, texts=[], frame_id='KINECT', reset=True):
     """
     Publish Pose List on:
     pub_channel: Channel on which the cloud will be published
@@ -303,18 +307,18 @@ def _publish_pose_list(pub_channel, _poses, texts=[], frame_id='KINECT'):
     frame_pose = g_viz_pub.get_sensor_pose(frame_id)
     
     # pose list collection msg
-    pose_list_msg = vs.obj_collection_t();
+    pose_list_msg = vs.obj_collection_t()
     pose_list_msg.id = g_viz_pub.channel_uid(pub_channel)
-    pose_list_msg.name = pub_channel;
-    pose_list_msg.type = getattr(vs.obj_collection_t, 'AXIS3D');
-    pose_list_msg.reset = True;
+    pose_list_msg.name = pub_channel
+    pose_list_msg.type = getattr(vs.obj_collection_t, 'AXIS3D')
+    pose_list_msg.reset = reset
     
-    nposes = len(poses); 
+    nposes = len(poses)
 
     # fill out points
-    pose_list_msg.objs = [vs.obj_t() for j in range(0,nposes)];
-    pose_list_msg.nobjs = nposes;             
-    inds = np.arange(0,nposes);
+    pose_list_msg.objs = [vs.obj_t() for j in range(0,nposes)]
+    pose_list_msg.nobjs = nposes
+    inds = np.arange(0,nposes)
 
     arr = np.zeros((len(poses),3))
     for j,pose in enumerate(poses): 
@@ -349,10 +353,10 @@ def _publish_pose_list(pub_channel, _poses, texts=[], frame_id='KINECT'):
 
 def publish_text_list(pub_channel, poses, texts=[], frame_id='KINECT'):
     text_list_msg = vs.text_collection_t()
-    text_list_msg.name = pub_channel+'-text';
+    text_list_msg.name = pub_channel+'-text'
     text_list_msg.id = g_viz_pub.channel_uid(text_list_msg.name)
-    text_list_msg.type = 1; # doesn't matter
-    text_list_msg.reset = True;
+    text_list_msg.type = 1 # doesn't matter
+    text_list_msg.reset = True
 
     assert(len(poses) == len(texts))
     nposes = len(texts)
@@ -370,8 +374,8 @@ def publish_text_list(pub_channel, poses, texts=[], frame_id='KINECT'):
 
 
 # @run_async
-def publish_pose_list(pub_channel, poses, texts=[], frame_id='KINECT'):
-    _publish_pose_list(pub_channel, deepcopy(poses), texts=texts, frame_id=frame_id)
+def publish_pose_list(pub_channel, poses, texts=[], frame_id='KINECT', reset=True):
+    _publish_pose_list(pub_channel, deepcopy(poses), texts=texts, frame_id=frame_id, reset=True)
 
 # ===== Tangents drawing ====
 def _publish_line_segments(pub_channel, _arr1, _arr2, c='r', flip_rb=False, frame_id='KINECT'):
@@ -395,11 +399,11 @@ def _publish_line_segments(pub_channel, _arr1, _arr2, c='r', flip_rb=False, fram
     frame_pose = g_viz_pub.get_sensor_pose(frame_id)
 
     # point3d list collection msg
-    pc_list_msg = vs.point3d_list_collection_t();
+    pc_list_msg = vs.point3d_list_collection_t()
     pc_list_msg.id = g_viz_pub.channel_uid(pub_channel)
-    pc_list_msg.name = pub_channel;
-    pc_list_msg.type = vs.point3d_list_collection_t.LINES;
-    pc_list_msg.reset = True;
+    pc_list_msg.name = pub_channel
+    pc_list_msg.type = vs.point3d_list_collection_t.LINES
+    pc_list_msg.reset = True
     pc_list_msg.point_lists = []
 
     arr1s, arr2s, carrs = [arr1], [arr2], [carr]
@@ -432,7 +436,7 @@ def _publish_line_segments(pub_channel, _arr1, _arr2, c='r', flip_rb=False, fram
         tpoints += npoints
     
         # Get the colors
-        carr = get_color_arr(c, npoints);
+        carr = get_color_arr(c, npoints)
         ch, cw = carr.shape
         carr = np.hstack([carr, carr]).reshape((-1,cw))
 
@@ -444,13 +448,13 @@ def _publish_line_segments(pub_channel, _arr1, _arr2, c='r', flip_rb=False, fram
 
         pc_list_msg.point_lists.append(pc_msg)
 
-    # pc_msg.normals = [vs.point3d_t() for j in range(0,npoints)];    
-    # pc_msg.nnormals = len(pc_msg.normals);
+    # pc_msg.normals = [vs.point3d_t() for j in range(0,npoints)]   
+    # pc_msg.nnormals = len(pc_msg.normals)
     # for j in range(0,npoints):
-    #     pc_msg.normals[j].x, pc_msg.normals[j].y, pc_msg.normals[j].z = tarr[j,0], tarr[j,1], tarr[j,2];
+    #     pc_msg.normals[j].x, pc_msg.normals[j].y, pc_msg.normals[j].z = tarr[j,0], tarr[j,1], tarr[j,2]
 
     # add to point cloud list    
-    pc_list_msg.nlists = len(pc_list_msg.point_lists); 
+    pc_list_msg.nlists = len(pc_list_msg.point_lists)
     g_viz_pub.lc.publish("POINTS_COLLECTION", pc_list_msg.encode())
     # g_log.debug('Published %i normals' % (tpoints))
 
@@ -473,26 +477,26 @@ def publish_line_segments(pub_channel, arr1, arr2, c='r', flip_rb=False, frame_i
 # #     """
 # #     global frame_pose  
 # #     # pose list collection msg
-# #     pose_list_msg = vs.obj_collection_t();
-# #     pose_list_msg.id = hash(pub_channel) >> 32;
-# #     pose_list_msg.name = pub_channel;
-# #     pose_list_msg.type = vs.obj_collection_t.AXIS3D;
-# #     pose_list_msg.reset = True;
+# #     pose_list_msg = vs.obj_collection_t()
+# #     pose_list_msg.id = hash(pub_channel) >> 32
+# #     pose_list_msg.name = pub_channel
+# #     pose_list_msg.type = vs.obj_collection_t.AXIS3D
+# #     pose_list_msg.reset = True
 
 # #     # # pose msg
 # #     # pose_msg = vs.obj_t()
-# #     # pose_msg.id = int(time.time() * 1e6);
-# #     # pose_msg.collection = hash('KINECT_FRAME') >> 32;  # comes from the sensor_frames_msg published earlier
-# #     # pose_msg.element_id = 1;
+# #     # pose_msg.id = int(time.time() * 1e6)
+# #     # pose_msg.collection = hash('KINECT_FRAME') >> 32  # comes from the sensor_frames_msg published earlier
+# #     # pose_msg.element_id = 1
 
 # #     # ensure arr is in (N x 7) format
 # #     # carr in (N x 3) format
-# #     nposes = arr.shape[0]; 
+# #     nposes = arr.shape[0] 
 
 # #     # fill out points
-# #     pose_list_msg.objs = [vs.obj_t() for j in range(0,nposes)];
-# #     pose_list_msg.nobjs = nposes;             
-# #     inds = np.arange(0,nposes);
+# #     pose_list_msg.objs = [vs.obj_t() for j in range(0,nposes)]
+# #     pose_list_msg.nobjs = nposes             
+# #     inds = np.arange(0,nposes)
 
 # #     sensor_pose = tf.quaternion_from_euler(frame_pose.roll, frame_pose.pitch, frame_pose.yaw)
 # #     sensorT = tf.quaternion_matrix(sensor_pose)
@@ -513,7 +517,7 @@ def publish_line_segments(pub_channel, arr1, arr2, c='r', flip_rb=False, frame_i
 
 # #         pose_list_msg.objs[j].x = obsTw[0,3]
 # #         pose_list_msg.objs[j].y = obsTw[1,3]
-# #         pose_list_msg.objs[j].z = obsTw[2,3];
+# #         pose_list_msg.objs[j].z = obsTw[2,3]
 
 # #         pose_list_msg.objs[j].roll = rpy[0]
 # #         pose_list_msg.objs[j].pitch = rpy[1]
@@ -538,23 +542,23 @@ def publish_line_segments(pub_channel, arr1, arr2, c='r', flip_rb=False, frame_i
 #     assert(frame_id is not None)
 
 #     # # pose list collection msg
-#     # pose_list_msg = vs.obj_collection_t();
+#     # pose_list_msg = vs.obj_collection_t()
 #     # pose_list_msg.id = get_frame_id(pub_channel+'-text')
-#     # pose_list_msg.name = pub_channel+'-text';
-#     # pose_list_msg.type = vs.obj_collection_t.AXIS3D;
-#     # pose_list_msg.reset = True;
+#     # pose_list_msg.name = pub_channel+'-text'
+#     # pose_list_msg.type = vs.obj_collection_t.AXIS3D
+#     # pose_list_msg.reset = True
 
 #     text_list_msg = vs.text_collection_t()
-#     text_list_msg.name = pub_channel;
+#     text_list_msg.name = pub_channel
 #     text_list_msg.id = frame_id
-#     text_list_msg.type = 1; # doesn't matter
-#     text_list_msg.reset = True;
+#     text_list_msg.type = 1 # doesn't matter
+#     text_list_msg.reset = True
     
-#     # nposes = len(arr); 
+#     # nposes = len(arr) 
 
 #     # # fill out points
-#     # pose_list_msg.objs = [vs.obj_t() for j in range(0,nposes)];
-#     # pose_list_msg.nobjs = nposes;             
+#     # pose_list_msg.objs = [vs.obj_t() for j in range(0,nposes)]
+#     # pose_list_msg.nobjs = nposes             
     
 #     nposes = len(texts)
 #     text_list_msg.texts = [vs.text_t() for j in range(0,nposes)]
@@ -576,11 +580,11 @@ def publish_line_segments(pub_channel, arr1, arr2, c='r', flip_rb=False, frame_i
 
 #         # pose_list_msg.objs[j].x = obsTw[0,3]
 #         # pose_list_msg.objs[j].y = obsTw[1,3]
-#         # pose_list_msg.objs[j].z = obsTw[2,3];
+#         # pose_list_msg.objs[j].z = obsTw[2,3]
 
-#         # pose_list_msg.objs[j].roll = 0; # rpy[0]
-#         # pose_list_msg.objs[j].pitch = 0; # rpy[1]
-#         # pose_list_msg.objs[j].yaw = 0; # rpy[2]
+#         # pose_list_msg.objs[j].roll = 0 # rpy[0]
+#         # pose_list_msg.objs[j].pitch = 0 # rpy[1]
+#         # pose_list_msg.objs[j].yaw = 0 # rpy[2]
 
 #         text_list_msg.texts[j].id = j
 #         text_list_msg.texts[j].collection_id = get_frame_id(ref_channel)
