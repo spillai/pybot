@@ -22,3 +22,7 @@ def erode_dilate(im, iterations=1):
 
 def dilate_erode(im, iterations=1): 
     return erode(dilate(im, iterations=iterations), iterations)
+
+def canny(im, blur=3): 
+    im_blur = cv2.blur(im, (blur,blur))
+    return cv2.Canny(im_blur, 50, 150, blur)
