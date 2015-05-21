@@ -8,7 +8,7 @@ from collections import deque
 
 # LCM libs
 import lcm, vs
-from bot_core import image_t
+from bot_core import image_t, pose_t
 
 # Plotting
 import matplotlib.pylab as plt
@@ -87,6 +87,16 @@ g_viz_pub = VisualizationMsgsPub()
 def publish_sensor_frame(frame_id, pose): 
     global g_viz_pub
     g_viz_pub.publish_sensor_frame(frame_id, pose)
+
+def publish_pose_t(channel, pose, frame_id='KINECT'): 
+    global g_viz_pub
+    frame_pose = g_viz_pub.get_sensor_pose(frame_id)
+    out_pose = frame_pose.oplus(pose)
+
+    p = pose_t()
+    p.orientation = list(out_pose.quat.to_wxyz())
+    p.pos = out_pose.tvec.tolist()
+    g_viz_pub.lc.publish(channel, p.encode())
 
 def publish_image_t(pub_channel, im, jpeg=False, flip_rb=True): 
     global g_viz_pub
