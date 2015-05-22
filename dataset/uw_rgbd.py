@@ -1,6 +1,7 @@
 """
 UW-RGB-D Object/Scene Dataset reader
 """
+
 # Author: Sudeep Pillai <spillai@csail.mit.edu>
 # License: MIT 
 
