@@ -7,11 +7,22 @@ from bot_utils.db_utils import AttrDict
 from bot_vision.camera_utils import construct_K, DepthCamera
 from bot_vision.imshow_utils import imshow_cv
 
+import bot_core.image_t as image_t
+
 from kinect.frame_msg_t import frame_msg_t
 from kinect.image_msg_t import image_msg_t
 from kinect.depth_msg_t import depth_msg_t
 
 from pybot_pcl import compute_normals, fast_bilateral_filter, median_filter
+
+class ImageDecoder(object): 
+    def __init__(self, channel='CAMERA', scale=1.): 
+        self.channel = channel
+
+    def decode(self, data): 
+        msg = image_t.decode(data)
+        im = cv2.imdecode(np.asarray(bytearray(msg.data), dtype=np.uint8), -1)
+        return im
 
 class KinectFrame: 
     def __init__(self, timestamp=None, img=None, depth=None, X=None): 
