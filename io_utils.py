@@ -194,9 +194,15 @@ class VideoSink(object) :
             self.p.stdin.close()            
 
 class VideoCapture(object): 
-    def __init__(self, filename=-1, fps=30, process_cb=None): 
+    def __init__(self, filename=-1, fps=30, size=(640,480), process_cb=None): 
         self.cap = cv2.VideoCapture(filename)
-        self.cap.set(cv2.cv.CV_CAP_PROP_FPS, fps)
+
+        if fps: 
+            self.cap.set(cv2.cv.CV_CAP_PROP_FPS, fps)
+        else: 
+            self.cap.set(cv2.cv.CV_CAP_PROP_FRAME_WIDTH, size[0])
+            self.cap.set(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT, size[1])
+
         self.process_cb = process_cb
 
     def run(self): 
