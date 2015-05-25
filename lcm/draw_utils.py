@@ -677,8 +677,8 @@ def draw_camera(pose, depth=0.1, fov=np.deg2rad(60)):
     
     return (faces, np.hstack([pts[:-1], pts[1:]]).reshape((-1,3)))
 
-def publish_cameras(pub_channel, poses, c='y', texts=[], frame_id='KINECT', draw_faces=True, draw_edges=True):
-    cam_feats = [draw_camera(pose, depth=0.05) for pose in poses]
+def publish_cameras(pub_channel, poses, c='y', texts=[], frame_id='KINECT', draw_faces=True, draw_edges=True, size=1):
+    cam_feats = [draw_camera(pose, depth=0.05 * size) for pose in poses]
     cam_faces = map(lambda x: x[0], cam_feats)
     cam_edges = map(lambda x: x[1], cam_feats)
 
