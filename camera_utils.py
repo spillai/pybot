@@ -202,25 +202,25 @@ def compute_essential(F, K):
     """ Compute the Essential matrix, and R1, R2 """
     return K.T * npm.mat(F) * K
 
-def check_visibility(camera, pts): 
+def check_visibility(camera, pts_w): 
     """
     Check if points are visible given fov of camera
     camera: type Camera
     """
-    # Ensure 2D
-    pts = pts.reshape(-1, 3)
+    # Transform points in to camera's reference
+    # Camera: p_cw
+    pts_c = camera * pts_w.reshape(-1, 3)
 
     # Hack: only check max of the fovs
-    fov = np.max(camera.fov)
-    lookat = camera.R[:,2]
+    hfov = np.max(camera.fov) / 2
 
-    v = pts - camera.tvec
-    thetas = np.arccos(np.sum( np.multiply(
-        np.tile(lookat, (len(pts), 1)), 
-        v / np.linalg.norm(v, axis=1).reshape(-1, 1)), axis=1))
+    # Determine look-at vector, and check angle 
+    # subtended with camera's z-vector (3rd column)
+    v = pts_c / np.linalg.norm(pts_c, axis=1).reshape(-1, 1)
+    thetas = np.arccos(v[:,2])
 
     # Provides inds mask for all points that are within fov
-    return thetas < fov
+    return thetas < hfov
 
 def get_object_bbox(camera, pts, subsample=10, scale=1.0, min_height=10, min_width=10, visualize=False): 
     pts2d = camera.project(pts[::subsample].astype(np.float32))
