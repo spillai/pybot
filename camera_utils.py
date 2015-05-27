@@ -222,27 +222,51 @@ def check_visibility(camera, pts_w):
     # Provides inds mask for all points that are within fov
     return thetas < hfov
 
-def get_object_bbox(camera, pts, subsample=10, scale=1.0, min_height=10, min_width=10, visualize=False): 
-    pts2d = camera.project(pts[::subsample].astype(np.float32))
+def get_median_depth(camera, pts, subsample=10): 
+    """ 
+    Get the median depth of points for a camera reference
+      Transform points in camera frame, and check z-vector: 
+      [p_c = T_cw * p_w]
+    
+    """
+    return np.median((camera * pts[::subsample])[:,2])
 
-    # Min-max bounds
-    x0, x1 = int(max(0, np.min(pts2d[:,0]))), int(min(camera.shape[1]-1, np.max(pts2d[:,0])))
-    y0, y1 = int(max(0, np.min(pts2d[:,1]))), int(min(camera.shape[0]-1, np.max(pts2d[:,1])))
+def get_bounded_projection(camera, pts, subsample=10, min_height=10, min_width=10): 
+    """ Project points and only return points that are within image bounds """
+
+    # Project points
+    pts2d = camera.project(pts[::subsample].astype(np.float32))
 
     # Only return points within-image bounds
     valid = np.bitwise_and(np.bitwise_and(pts2d[:,0] >= 0, pts2d[:,0] < camera.shape[1]), \
                            np.bitwise_and(pts2d[:,1] >= 0, pts2d[:,1] < camera.shape[0]))
-    pts2d = pts2d[valid]
+    return pts2d[valid]
+
+def get_discretized_projection(camera, pts, subsample=10, discretize=4): 
+    pts2d = get_bounded_projection(camera, pts, subsample=subsample)
+    pts2d = pts2d.astype(np.int32) / discretize
+
+    vis = np.ones(shape=(camera.shape[0]/discretize, camera.shape[1]/discretize), dtype=np.float32) * 10000.0
+    depth = get_median_depth(camera, pts, subsample=subsample)
+    vis[pts2d[:,1], pts2d[:,0]] = depth 
+    return vis
+
+def get_object_bbox(camera, pts, subsample=10, scale=1.0, min_height=10, min_width=10, visualize=False): 
+    pts2d = get_bounded_projection(camera, pts, subsample=subsample)
+
+    if not len(pts2d): 
+        return [None] * 3
+
+    # Min-max bounds
+    x0, x1 = int(max(0, np.min(pts2d[:,0]))), int(min(camera.shape[1]-1, np.max(pts2d[:,0])))
+    y0, y1 = int(max(0, np.min(pts2d[:,1]))), int(min(camera.shape[0]-1, np.max(pts2d[:,1])))
 
     # Check median center 
     xmed, ymed = np.median(pts2d[:,0]), np.median(pts2d[:,1])
     if (xmed >= 0 and ymed >= 0 and xmed <= camera.shape[1] and ymed < camera.shape[0]) and \
        (y1-y0) >= min_height and (x1-x0) >= min_width: 
 
-        # Median depth of the candidate object
-        # Transform points in camera frame, and check z-vector: 
-        # [p_c = T_cw * p_w]
-        depth = np.median((camera * pts[::subsample])[:,2])
+        depth = get_median_depth(camera, pts, subsample=subsample)
         if depth < 0: return [None] * 3
         # assert(depth >= 0), "Depth is less than zero, add check for this."
 
