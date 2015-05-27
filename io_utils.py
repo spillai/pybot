@@ -165,7 +165,7 @@ class VideoWriter:
 
 global g_fn_map
 g_fn_map = {}
-def write_video(fn, im, scale=1.0, as_images=True): 
+def write_video(fn, im, scale=1.0, as_images=False): 
     global g_fn_map
     if fn not in g_fn_map: 
         g_fn_map[fn] = VideoWriter(fn, as_images=as_images)
