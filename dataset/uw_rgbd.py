@@ -274,8 +274,10 @@ class UWRGBDSceneDataset(UWRGBDDataset):
         RGB-D reader 
         Given mask, depth, and rgb files build an read iterator with appropriate process_cb
         """
-        def __init__(self, files, meta_file, aligned_file, version): 
+        def __init__(self, files, meta_file, aligned_file, version, name=''): 
+            self.name = name
             self.version = version
+
             rgb_files, depth_files = UWRGBDSceneDataset._reader.scene_files(files, version)
             assert(len(depth_files) == len(rgb_files))
 
@@ -325,6 +327,10 @@ class UWRGBDSceneDataset(UWRGBDDataset):
                 #     unique_labels=unique_labels, unique_centers=unique_centers, camera=camera
                 # ) 
                 assert(len(ply_xyz) == len(ply_rgb))
+
+        @property
+        def scene_name(self): 
+            return self.name
 
         @staticmethod
         def cluster_ply_labels(ply_xyz, ply_rgb, ply_label): 
@@ -485,7 +491,6 @@ class UWRGBDSceneDataset(UWRGBDDataset):
                 raise ValueError('''Version %s not supported. '''
                                  '''Check dataset and choose v1 scene dataset''' % version)
 
-
         def visualize_ground_truth(self): 
             import bot_externals.draw_utils as draw_utils
 
@@ -616,7 +621,7 @@ class UWRGBDSceneDataset(UWRGBDDataset):
         meta_file = self.meta_.get(key, None)
         aligned_file = self.aligned_.get(key, None) if (self.aligned_ and with_ground_truth) else None
 
-        return UWRGBDSceneDataset._reader(files, meta_file, aligned_file, self.version)
+        return UWRGBDSceneDataset._reader(files, meta_file, aligned_file, self.version, key)
 
     def scenes(self): 
         return self.dataset_.keys()
