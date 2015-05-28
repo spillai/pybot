@@ -246,12 +246,13 @@ def get_discretized_projection(camera, pts, subsample=10, discretize=4):
     pts2d = get_bounded_projection(camera, pts, subsample=subsample)
     pts2d = pts2d.astype(np.int32) / discretize
 
+    
     vis = np.ones(shape=(camera.shape[0]/discretize, camera.shape[1]/discretize), dtype=np.float32) * 10000.0
     depth = get_median_depth(camera, pts, subsample=subsample)
     vis[pts2d[:,1], pts2d[:,0]] = depth 
-    return vis
+    return vis, depth
 
-def get_object_bbox(camera, pts, subsample=10, scale=1.0, min_height=10, min_width=10, visualize=False): 
+def get_object_bbox(camera, pts, subsample=10, scale=1.0, min_height=10, min_width=10): 
     pts2d = get_bounded_projection(camera, pts, subsample=subsample)
 
     if not len(pts2d): 
@@ -270,13 +271,6 @@ def get_object_bbox(camera, pts, subsample=10, scale=1.0, min_height=10, min_wid
         if depth < 0: return [None] * 3
         # assert(depth >= 0), "Depth is less than zero, add check for this."
 
-        # if visualize: 
-        #     draw_utils.publish_cloud('obj_cloud', pts[::subsample], c='r', frame_id='KINECT')
-        #     draw_utils.publish_point_type('obj_distance', 
-        #                                   np.vstack([camera.inverse().tvec.reshape(-1,3), 
-        #                                              pts[0].reshape(-1,3)]), 
-        #                                   c='r', point_type='LINES', frame_id='KINECT')
-
         if scale != 1.0: 
             w2, h2 = (scale-1.0) * (x1-x0) / 2, (scale-1.0) * (y1-y0) / 2
             x0, x1 = int(max(0, x0 - w2)), int(min(x1 + w2, camera.shape[1]-1))
@@ -284,6 +278,7 @@ def get_object_bbox(camera, pts, subsample=10, scale=1.0, min_height=10, min_wid
         return pts2d.astype(np.int32), {'left':x0, 'right':x1, 'top':y0, 'bottom':y1}, depth
     else: 
         return [None] * 3
+
 
 # def plot_epipolar_line(im, F, x, epipole=None, show_epipole=True):
 #   """
