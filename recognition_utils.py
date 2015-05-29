@@ -42,8 +42,7 @@ from sklearn.externals.joblib import Parallel, delayed
 # Generic utility functions for object recognition
 # ---------------------------------------------------------------------
 
-def plot_precision_recall(y_score, y_test, target_map): 
-    import matplotlib.pyplot as plt
+def multilabel_precision_recall(y_score, y_test, target_map): 
     from sklearn.metrics import precision_recall_curve
     from sklearn.metrics import average_precision_score
     from sklearn.preprocessing import label_binarize
@@ -52,14 +51,12 @@ def plot_precision_recall(y_score, y_test, target_map):
     precision = dict()
     recall = dict()
     average_precision = dict()
-    
+
     target_ids = target_map.keys()
     target_names = target_map.values()
-    # map(lambda uid: target_map[uid], unique_ids)
+    print target_names
 
     y_test_multi = label_binarize(y_test, classes=target_ids)
-    print y_test_multi.shape, target_ids
-
     N, n_classes = y_score.shape[:2]
     for i,name in enumerate(target_names):
         precision[name], recall[name], _ = precision_recall_curve(y_test_multi[:, i],
@@ -67,20 +64,31 @@ def plot_precision_recall(y_score, y_test, target_map):
         average_precision[name] = average_precision_score(y_test_multi[:, i], y_score[:, i])
 
     # Compute micro-average ROC curve and ROC area
-    precision["micro"], recall["micro"], _ = precision_recall_curve(y_test_multi.ravel(),
+    precision["average"], recall["average"], _ = precision_recall_curve(y_test_multi.ravel(),
         y_score.ravel())
     average_precision["micro"] = average_precision_score(y_test_multi, y_score,
                                                          average="micro")
+    return precision, recall, average_precision
+
+
+def plot_precision_recall(y_score, y_test, target_map, title='Precision-Recall curve'): 
+    import matplotlib.pyplot as plt
+
+    target_ids = target_map.keys()
+    target_names = target_map.values()
+
+    # Get multilabel precision recall curve
+    precision, recall, average_precision = multilabel_precision_recall(y_score, y_test, target_map)
 
     # Plot Precision-Recall curve for each class
     plt.clf()
-    plt.plot(recall["micro"], precision["micro"],
-             label='Average')
+    plt.plot(recall["average"], precision["average"],
+             label='Average', linewidth=3)
              # label='Average (area = {0:0.2f})'
              #       ''.format(average_precision["micro"]))
     plt.xlabel('Recall')
     plt.ylabel('Precision')
-    plt.ylim([0.0, 1.05])
+    plt.ylim([0.0, 1.0])
     plt.xlim([0.0, 1.0])
     plt.legend(loc="lower left")
     plt.show()
@@ -92,12 +100,64 @@ def plot_precision_recall(y_score, y_test, target_map):
                  #       ''.format(name.title().replace('_', ' '), average_precision[name]))
 
     plt.xlim([0.0, 1.0])
-    plt.ylim([0.0, 1.05])
+    plt.ylim([0.0, 1.0])
     plt.xlabel('Recall')
     plt.ylabel('Precision')
-    plt.title('Precision-Recall curve')
+    plt.title(title)
+    plt.legend(loc="lower left")
+    plt.show(block=False)
+
+def plot_roc(y_score, y_test, target_map, title='ROC curve'): 
+    import matplotlib.pyplot as plt
+    from sklearn.metrics import roc_curve, auc, precision_recall_curve
+    from sklearn.preprocessing import label_binarize
+
+    # Compute Precision-Recall and plot curve
+    fpr = dict()
+    tpr = dict()
+    roc_auc = dict()
+    
+    target_ids = target_map.keys()
+    target_names = target_map.values()
+    print target_names
+
+    y_test_multi = label_binarize(y_test, classes=target_ids)
+    N, n_classes = y_score.shape[:2]
+    for i,name in enumerate(target_names):
+        fpr[name], tpr[name], _ = roc_curve(y_test_multi[:, i], y_score[:, i])
+        roc_auc[name] = auc(fpr[name], tpr[name]) 
+
+    # Compute micro-average ROC curve and ROC area
+    fpr["micro"], tpr["micro"], _ = roc_curve(y_test_multi.ravel(), y_score.ravel())
+    roc_auc["micro"] = auc(fpr["micro"], tpr["micro"]) 
+
+    # Plot Precision-Recall curve for each class
+    plt.clf()
+    plt.plot([0, 1], [0, 1], 'k--')
+    plt.plot(fpr["micro"], tpr["micro"],
+             label='ROC curve (area = {0:0.2f})'
+                   ''.format(roc_auc["micro"]), linewidth=3)
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('True Positive Rate')
+    plt.ylim([0.0, 1.0])
+    plt.xlim([0.0, 1.0])
     plt.legend(loc="lower right")
-    plt.show(block=True)
+    plt.show()
+
+    for i,name in enumerate(target_names):
+        plt.plot(fpr[name], tpr[name],
+                 label='{0}'.format(name.title().replace('_', ' ')))
+                 # label='{0} (area = {1:0.2f})'
+                 #       ''.format(name.title().replace('_', ' '), roc_auc[name]))
+
+    plt.xlim([0.0, 1.0])
+    plt.ylim([0.0, 1.0])
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('True Positive Rate')
+    plt.title(title)
+    plt.legend(loc="lower right")
+    plt.show(block=False)
+
 
 def classification_report(y_true, y_pred, labels=None, target_names=None,
                           sample_weight=None):
