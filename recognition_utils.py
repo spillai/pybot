@@ -53,10 +53,13 @@ def plot_precision_recall(y_score, y_test, target_map):
     recall = dict()
     average_precision = dict()
     
-    unique_ids = np.unique(y_test)
-    target_names = map(lambda uid: target_map[uid], unique_ids)
+    target_ids = target_map.keys()
+    target_names = target_map.values()
+    # map(lambda uid: target_map[uid], unique_ids)
 
-    y_test_multi = label_binarize(y_test, classes=unique_ids)
+    y_test_multi = label_binarize(y_test, classes=target_ids)
+    print y_test_multi.shape, target_ids
+
     N, n_classes = y_score.shape[:2]
     for i,name in enumerate(target_names):
         precision[name], recall[name], _ = precision_recall_curve(y_test_multi[:, i],
