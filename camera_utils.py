@@ -240,20 +240,26 @@ def get_bounded_projection(camera, pts, subsample=10, min_height=10, min_width=1
     # Only return points within-image bounds
     valid = np.bitwise_and(np.bitwise_and(pts2d[:,0] >= 0, pts2d[:,0] < camera.shape[1]), \
                            np.bitwise_and(pts2d[:,1] >= 0, pts2d[:,1] < camera.shape[0]))
-    return pts2d[valid]
+    return pts2d[valid], valid
 
 def get_discretized_projection(camera, pts, subsample=10, discretize=4): 
-    pts2d = get_bounded_projection(camera, pts, subsample=subsample)
-    pts2d = pts2d.astype(np.int32) / discretize
 
-    
     vis = np.ones(shape=(camera.shape[0]/discretize, camera.shape[1]/discretize), dtype=np.float32) * 10000.0
-    depth = get_median_depth(camera, pts, subsample=subsample)
-    vis[pts2d[:,1], pts2d[:,0]] = depth 
+    pts2d, valid = get_bounded_projection(camera, pts, subsample=subsample)
+
+    if True: 
+        pts3d = pts[valid]
+        depth = (camera * pts3d[::subsample])[:,2]
+        vis[pts2d[::subsample,1], pts2d[::subsample,0]] = depth 
+    else: 
+        pts2d = pts2d.astype(np.int32) / discretize
+        depth = get_median_depth(camera, pts, subsample=subsample)
+        vis[pts2d[:,1], pts2d[:,0]] = depth 
+
     return vis, depth
 
 def get_object_bbox(camera, pts, subsample=10, scale=1.0, min_height=10, min_width=10): 
-    pts2d = get_bounded_projection(camera, pts, subsample=subsample)
+    pts2d, valid = get_bounded_projection(camera, pts, subsample=subsample)
 
     if not len(pts2d): 
         return [None] * 3
