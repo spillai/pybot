@@ -101,7 +101,6 @@ def publish_pose_t(channel, pose, frame_id='KINECT'):
 def publish_image_t(pub_channel, im, jpeg=False, flip_rb=True): 
     global g_viz_pub
     out = image_t()
-    assert(im.ndim == 3)
 
     # Populate appropriate fields
     h,w = im.shape[:2]
