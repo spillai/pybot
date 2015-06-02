@@ -67,7 +67,9 @@ def multilabel_precision_recall(y_score, y_test, target_map):
     precision["average"], recall["average"], _ = precision_recall_curve(y_test_multi.ravel(),
         y_score.ravel())
     average_precision["micro"] = average_precision_score(y_test_multi, y_score,
-                                                         average="micro")
+                                                         average="micro") 
+    average_precision["macro"] = average_precision_score(y_test_multi, y_score,
+                                                         average="macro") 
     return precision, recall, average_precision
 
 
