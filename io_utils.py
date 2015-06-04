@@ -197,13 +197,27 @@ class VideoCapture(object):
     def __init__(self, filename=-1, fps=30, size=(640,480), process_cb=None): 
         self.cap = cv2.VideoCapture(filename)
 
-        if fps: 
-            self.cap.set(cv2.cv.CV_CAP_PROP_FPS, fps)
-        else: 
-            self.cap.set(cv2.cv.CV_CAP_PROP_FRAME_WIDTH, size[0])
-            self.cap.set(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT, size[1])
+        self.cap.set(cv2.cv.CV_CAP_PROP_FRAME_WIDTH, size[0])
+        self.cap.set(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT, size[1])
+        self.cap.set(cv2.cv.CV_CAP_PROP_FPS, fps)
 
         self.process_cb = process_cb
+
+    # def __enter__(self): 
+    #     return self.cap
+
+    # def __exit__(self): 
+    #     pass
+
+    def iteritems(self): 
+        while True: 
+            try: 
+                ret, im = self.cap.read()
+                if not ret: break
+                yield im
+            except KeyboardInterrupt: 
+                break
+        
 
     def run(self): 
         assert(self.process_cb is not None)
