@@ -63,8 +63,12 @@ def tf_compose(R, t):
 ###############################################################################
 class RigidTransform(object):
     """
-    Quaternion quat within this class is interpreted as xyzw, 
-    similar to ros_quaternion.py file
+    SE(3) rigid transform class that allows compounding of 6-DOF poses
+    and provides common transformations that are commonly seen in geometric problems.
+    
+    quat: Quaternion/Rotation (xyzw)
+    tvec: Translation (xyz)
+    
     """
     def __init__(self, xyzw=[0.,0.,0.,1.], tvec=[0.,0.,0.]):
         """ Initialize a RigidTransform with Quaternion and 3D Position """
@@ -96,11 +100,6 @@ class RigidTransform(object):
         if isinstance(other, RigidTransform):
             t = self.quat.rotate(other.tvec) + self.tvec
             r = self.quat * other.quat
-
-            # assert(tf_isequal(np.dot(self.to_homogeneous_matrix(), 
-            #                          other.to_homogeneous_matrix()), 
-            #        RigidTransform(r,t).to_homogeneous_matrix()))
-
             return RigidTransform(r, t)
 
         # multiply with N x 3
@@ -135,10 +134,6 @@ class RigidTransform(object):
         else: 
             assert(v.ndim == 1 or (v.ndim == 2 and v.shape[0] == 1))
             return self.quat.rotate(v)
-
-    @classmethod
-    def from_bot_core_pose_t(cls, pose): 
-        return cls(Quaternion.from_wxyz(pose.orientation), pose.pos)
 
     @classmethod
     def from_roll_pitch_yaw_x_y_z(cls, r, p, yaw, x, y, z, axes='rxyz'):
@@ -217,35 +212,16 @@ class Pose(RigidTransform):
         return 'Pose ID: %i, quat: %s, rpy: %s tvec: %s' % \
             (self.id, self.quat, self.quat.to_roll_pitch_yaw(), self.tvec)
 
-#     @classmethod
-#     def from_triad(cls, pid, pos, v1, v2):
-#         rt = RigidTransform.from_triad(pos,v1,v2)
-#         return cls(pid, rt.quat, rt.tvec)
-
-#     @classmethod
-#     def from_rigid_transform(cls, pid, rt):
-#         # Quat: [x y z w]
-#         return cls(pid, rt.quat, rt.tvec)
-
-#     # @classmethod
-#     # def from_vec(cls, pid, vec):
-#     #     # print vec[-4:], vec[:3]
-#     #     return cls(pid, vec[-4:], vec[:3])
-        
-#     # def to_vec(self):
-#     #     return np.hstack([self.tvec, self.quat.q])
-
-
-import random
-def make_random_transform(t=1):
-    q_wxyz = [ random.random(), random.random(), random.random(), random.random() ]
-    qmag = np.sqrt(sum([x*x for x in q_wxyz]))
-    q_wxyz = [ x / qmag for x in q_wxyz ]
-    translation = [ random.uniform(-t, t), random.uniform(-t, t), random.uniform(-t, t) ]
-    return RigidTransform(Quaternion.from_wxyz(q_wxyz), translation)
-
-
 if __name__ == "__main__":
+
+    def make_random_transform(t=1):
+        import random
+        q_wxyz = [ random.random(), random.random(), random.random(), random.random() ]
+        qmag = np.sqrt(sum([x*x for x in q_wxyz]))
+        q_wxyz = [ x / qmag for x in q_wxyz ]
+        translation = [ random.uniform(-t, t), random.uniform(-t, t), random.uniform(-t, t) ]
+        return RigidTransform(Quaternion.from_wxyz(q_wxyz), translation)
+
 
     q = Quaternion.identity()
     t = [ 1, 2, 3 ]
