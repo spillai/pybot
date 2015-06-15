@@ -7,7 +7,6 @@ General-purpose class for quaternion / rotation transformations.
 import math
 import numpy as np
 import transformations as tf
-from tf_tests import tf_isequal
 
 ###############################################################################
 class Quaternion(object):
@@ -251,6 +250,6 @@ if __name__ == "__main__":
     for _ in range(100): 
         q = make_random_quaternion()
         t = q.to_matrix()
-        assert(tf_isequal(q.inverse().to_matrix(), t.T))
+        assert(tf.is_same_transform(q.inverse().to_matrix(), t.T))
 
     print "OK"

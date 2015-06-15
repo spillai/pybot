@@ -7,7 +7,6 @@ General-purpose class for rigid-body transformations.
 import numpy as np
 import transformations as tf
 from quaternion import Quaternion
-from tf_tests import tf_isequal
 
 ###############################################################################
 def normalize_vec(v): 
@@ -273,7 +272,7 @@ if __name__ == "__main__":
         t = m.to_homogeneous_matrix()
         tinv = np.linalg.inv(t) # tf_compose(t[:3,:3].T, np.dot(t[:3,:3],-t[:3,3]))
         print tinv, '\n', tf_compose(t[:3,:3].T, np.dot(t[:3,:3],-t[:3,3]))
-        assert(tf_isequal(tinv, m.inverse().to_homogeneous_matrix()))
+        assert(tf.is_same_transform(tinv, m.inverse().to_homogeneous_matrix()))
 
 
     print "Testing composition"
@@ -322,6 +321,6 @@ if __name__ == "__main__":
     print np.dot(b, a), b * a
 
     # retrieve relative pose 
-    assert(tf_isequal((ba * a.inverse()).to_homogeneous_matrix(), b.to_homogeneous_matrix()))
+    assert(tf.is_same_transform((ba * a.inverse()).to_homogeneous_matrix(), b.to_homogeneous_matrix()))
 
     print "OK"
