@@ -249,7 +249,7 @@ if __name__ == "__main__":
     print 'Check inverse'
     for _ in range(100): 
         q = make_random_quaternion()
-        t = q.to_matrix()
-        assert(tf.is_same_transform(q.inverse().to_matrix(), t.T))
+        t = q.to_homogeneous_matrix()
+        assert(tf.is_same_transform(q.inverse().to_homogeneous_matrix(), t.T))
 
     print "OK"

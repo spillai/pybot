@@ -213,8 +213,9 @@ class Pose(RigidTransform):
 
 if __name__ == "__main__":
 
+    import random
+
     def make_random_transform(t=1):
-        import random
         q_wxyz = [ random.random(), random.random(), random.random(), random.random() ]
         qmag = np.sqrt(sum([x*x for x in q_wxyz]))
         q_wxyz = [ x / qmag for x in q_wxyz ]
