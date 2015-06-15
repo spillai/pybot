@@ -7,5 +7,5 @@ translation) and some support for Sim(3) motions.
 
 **Dependencies: numpy**
 
-**LICENCE: MIT**
+**License: MIT**
 
