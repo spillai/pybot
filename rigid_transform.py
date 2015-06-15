@@ -95,26 +95,22 @@ class RigidTransform(object):
         return T[:3,:3].copy(), T[:3,3].copy()
 
     def __mul__(self, other):
-        """ Left-multiply RigidTransform with another """
-        if isinstance(other, RigidTransform):
-            t = self.quat.rotate(other.tvec) + self.tvec
-            r = self.quat * other.quat
-            return RigidTransform(r, t)
+        """ 
+        Left-multiply RigidTransform with another rigid transform
+        
+        Two variants: 
+           RigidTransform: Identical to oplus operation
+           ndarray: transform [N x 3] point set (X_2 = p_21 * X_1)
 
-        # multiply with N x 3
-        else:
+        """
+        if isinstance(other, RigidTransform):
+            return self.oplus(other)
+        else:          
             X = np.hstack([other, np.ones((len(other),1))]).T
             return (np.dot(self.to_homogeneous_matrix(), X).T)[:,:3]
-            # olen = len(other)
-            # if olen == 3:
-            #     r = np.array(self.quat.rotate(other))
-            #     return r + self.tvec
-            # elif olen == 4:
-            #     return np.dot(self.to_homogeneous_matrix(), other)
-        # else:
-        #         raise ValueError()
+
     def __rmul__(self, other): 
-        raise AssertionError()                    
+        raise NotImplementedError('Right multiply not implemented yet!')                    
 
     def oplus(self, other): 
         if not isinstance(other, RigidTransform): 
