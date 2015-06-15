@@ -2,7 +2,7 @@
 General-purpose class for rigid-body transformations.
 """
 # Author: Sudeep Pillai <spillai@csail.mit.edu>
-# License: TODO
+# License: MIT
 
 import numpy as np
 import transformations as tf

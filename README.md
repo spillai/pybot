@@ -9,4 +9,4 @@ translation) and some support for Sim(3) motions.
 numpy
 
 ### LICENCE
-TODO
+MIT

@@ -2,7 +2,7 @@
 General-purpose class for quaternion / rotation transformations.
 """
 # Author: Sudeep Pillai <spillai@csail.mit.edu>
-# License: TODO
+# License: MIT
 
 import math
 import numpy as np
