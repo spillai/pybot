@@ -46,7 +46,7 @@ def imshow_cv(label, im, block=False, text=None):
     vis = im.copy()
     print_status(vis, text=text)
     cv2.imshow(label, vis)
-    ch = cv2.waitKey(0 if block else 5) & 0xFF
+    ch = cv2.waitKey(0 if block else 1) & 0xFF
     if ch == ord(' '):
         cv2.waitKey(0)
     if ch == ord('s'):
