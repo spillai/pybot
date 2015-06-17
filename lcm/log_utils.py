@@ -9,9 +9,13 @@ from bot_vision.imshow_utils import imshow_cv
 
 import bot_core.image_t as image_t
 
-from kinect.frame_msg_t import frame_msg_t
-from kinect.image_msg_t import image_msg_t
-from kinect.depth_msg_t import depth_msg_t
+# from kinect.frame_msg_t import frame_msg_t
+# from kinect.image_msg_t import image_msg_t
+# from kinect.depth_msg_t import depth_msg_t
+
+from openni.frame_msg_t import frame_msg_t
+from openni.image_msg_t import image_msg_t
+from openni.depth_msg_t import depth_msg_t
 
 from pybot_pcl import compute_normals, fast_bilateral_filter, median_filter
 
@@ -72,12 +76,12 @@ class KinectDecoder(object):
         w, h = data.image.width, data.image.height;
         if data.image.image_data_format == image_msg_t.VIDEO_RGB_JPEG: 
             img = cv2.imdecode(np.asarray(bytearray(data.image.image_data), dtype=np.uint8), -1)
-            bgr = img.reshape((h,w,3))[::self.skip, ::self.skip, :]             
+            rgb = img.reshape((h,w,3))[::self.skip, ::self.skip, :]             
         else: 
             img = np.fromstring(data.image.image_data, dtype=np.uint8)
             rgb = img.reshape((h,w,3))[::self.skip, ::self.skip, :] 
-            bgr = cv2.cvtColor(rgb, cv2.COLOR_BGR2RGB)
-            
+
+        bgr = cv2.cvtColor(rgb, cv2.COLOR_BGR2RGB)
         return bgr
 
     def decode_depth(self, data):
