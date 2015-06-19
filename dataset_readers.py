@@ -5,7 +5,6 @@ import re
 from itertools import izip, imap, chain
 from collections import defaultdict, namedtuple
 
-from bot_utils.db_utils import AttrDict
 from bot_vision.image_utils import im_resize
 
 def natural_sort(l): 

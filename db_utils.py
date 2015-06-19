@@ -118,14 +118,6 @@ def flush_pytable(h5f, data=None, group=None, table=None, force=True):
             # self.log.debug('Attempting to save ndarray %s' % type(v))
             table[k] = h5f.createArray(group._gp, k, v)
             # self.log.debug('Out Table: %s' % table[k])
-        # elif isinstance(v,io_utils.TableWriter):
-        #     self.log.debug('Attempting to save with custom writer')
-        #     table[k] = self.h5f.createTable(group._gp, name=k, 
-        #                                     description=v.description, 
-        #                                     title='%s-data' % (k) )
-        #     v.write(table[k])
-        #     # print 'Creating table with group:%s name:%s desc:%s' % (group._gp, k, writer.description)
-        #     # print 'Out Table: ', table[k]
         else: 
             # print 'Attempting to save arbitrary type %s' % type(v), k, group._gp
             try: 
@@ -175,13 +167,6 @@ class AttrDict(dict):
 
     def __setstate__(self): 
         pass
-
-    # def __repr__(self): 
-    #     # try: 
-    #     import json
-    #     return '__repr__' + json.dumps(self.copy(), sort_keys=True, indent=4)
-    #     # # except: 
-    #     #     return ''
 
     @staticmethod
     def load_dict(fn): 
@@ -390,69 +375,6 @@ class IterDB(object):
         for k, v in self.data_.iteritems(): 
             self.data_[k] = []
         self.chunk_idx_ += 1
-
-        
-            
-
-        
-
-# class AttrDictDB(AttrDict): 
-#     def __init__(self, filename=None, flags='w'): 
-#         super(AttrDictDB, self).__init__(*args, **kwargs)
-
-#     @staticmethod
-#     def load(fn, flags='r'): 
-#         pass
-        
-#     def save(self, fn): 
-#         pass
-
-
-# class AttrDict(dict):
-#     def __init__(self, *args, **kwargs):
-#         super(AttrDict, self).__init__(*args, **kwargs)
-#         # self.__dict__ = self
-#         # self.__getattr__ = self.__getitem__
-#         # self.__setattr__ = self.__setitem__
-#         # self.__detitem__ = self.__delattr__
-        
-# class AttrDictDB(dict): 
-#     def __init__(self, *args, **kwargs): 
-#         super(AttrDict, self).__init__(*args, **kwargs)
-#         self.__dict__ = self
-
-# class AttrDictDB(object): 
-#     def __init__(self, *args, **kwargs): 
-#         self = shelve.open(*args, **kwargs)
-
-#         self.__getattr__ = self.__getitem__
-#         self.__setattr__ = self.__setitem__
-
-
-# if __name__ == "__main__": 
-#     print '\nTesting AttrDict()'
-#     a = AttrDictDB('test.db', flag='c')
-#     a.a = 1
-#     a.b = 'string'
-#     a.c = np.arange(10)
-#     a.d = np.arange(36).reshape((6,6))
-
-#     print dir(a)
-#     a['test'] = 'test'
-#     a.close()
-
-# class AttrDB(shelve.DbfilenameShelf): 
-#     def __init__(self, *args, **kwargs): 
-#         shelve.DbfilenameShelf.__init__(self, *args, **kwargs)
-#         self.__getattr__ = self.__getitem__
-#         self.__setattr__ = self.__setitem__        
-
-# def persistent_db(*args, **kwargs): 
-#     import shelve
-#     d = shelve.open(*args, **kwargs)
-#     d.__getattr__ = d.__getitem__
-#     d.__setattr__ = d.__setitem__
-#     return d
 
 class AttrDictDB(object):
     # Set up tables first and then flush

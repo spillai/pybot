@@ -203,12 +203,6 @@ class VideoCapture(object):
 
         self.process_cb = process_cb
 
-    # def __enter__(self): 
-    #     return self.cap
-
-    # def __exit__(self): 
-    #     pass
-
     def iteritems(self): 
         while True: 
             try: 
