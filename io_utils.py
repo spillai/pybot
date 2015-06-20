@@ -197,9 +197,13 @@ class VideoCapture(object):
     def __init__(self, filename=-1, fps=30, size=(640,480), process_cb=None): 
         self.cap = cv2.VideoCapture(filename)
 
-        self.cap.set(cv2.cv.CV_CAP_PROP_FRAME_WIDTH, size[0])
-        self.cap.set(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT, size[1])
-        self.cap.set(cv2.cv.CV_CAP_PROP_FPS, fps)
+        if size: 
+            self.cap.set(cv2.cv.CV_CAP_PROP_FRAME_WIDTH, size[0])
+            self.cap.set(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT, size[1])
+        if fps: 
+            self.cap.set(cv2.cv.CV_CAP_PROP_FPS, fps)
+
+        self.cap.set(cv2.cv.CV_CAP_PROP_MODE, 70) # MODE_640x480_MONO16
 
         self.process_cb = process_cb
 
