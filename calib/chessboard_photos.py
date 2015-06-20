@@ -2,7 +2,7 @@
 """
 Module for finding chessboards with a stereo rig.
 
-python chessboard_photos.py --rows 6 --columns 8 --square-size 9.3 --calibration-folder calib_output 0 1 64 data
+python chessboard_photos.py --rows 8 --columns 6 --square-size 9.3 --calibration-folder calib_output 0 1 64 data
 
 """
 

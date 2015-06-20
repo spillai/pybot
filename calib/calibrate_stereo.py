@@ -7,6 +7,8 @@ Module for calibrating stereo cameras from a images with chessboards.
 See stereo_match.tune_calib_pair in the OpenCV examples for some additional tips on
 converting the generated 3D coordinates into a point cloud. I borrowed some
 numpy magic from there.
+
+python calibrate_stereo.py --rows 8 --columns 6 --square-size 9.3 --show-chessboards data/ calib_output 
 """
 
 import argparse
@@ -169,6 +171,7 @@ class StereoCalibrator(object):
         corner_coordinates = np.zeros((np.prod(pattern_size), 3), np.float32)
         corner_coordinates[:, :2] = np.indices(pattern_size).T.reshape(-1, 2)
         corner_coordinates *= self.square_size
+
         #: Real world corner coordinates found in each image
         self.corner_coordinates = corner_coordinates
         #: Array of real world corner coordinates to match the corners found
@@ -230,10 +233,10 @@ class StereoCalibrator(object):
         """Calibrate cameras based on found chessboard corners."""
         criteria = (cv2.TERM_CRITERIA_MAX_ITER + cv2.TERM_CRITERIA_EPS,
                     100, 1e-5)
-        # flags = (cv2.CALIB_FIX_ASPECT_RATIO + cv2.CALIB_ZERO_TANGENT_DIST +
-        #          cv2.CALIB_SAME_FOCAL_LENGTH)
-        flags = (cv2.CALIB_FIX_ASPECT_RATIO + 
+        flags = (cv2.CALIB_FIX_ASPECT_RATIO + cv2.CALIB_ZERO_TANGENT_DIST +
                  cv2.CALIB_SAME_FOCAL_LENGTH)
+        # flags = (cv2.CALIB_ZERO_TANGENT_DIST +
+        #          cv2.CALIB_SAME_FOCAL_LENGTH)
 
         calib = StereoCalibration()
         (calib.cam_mats["left"], calib.dist_coefs["left"],
@@ -263,15 +266,14 @@ class StereoCalibrator(object):
                                                         calib.dist_coefs[side],
                                                         calib.rect_trans[side],
                                                         calib.proj_mats[side],
-                                                        self.image_size,
-                                                        cv2.CV_32FC1)
+                                                        self.image_size, cv2.CV_32FC1)
         # This is replaced because my results were always bad. Estimates are
         # taken from the OpenCV samples.
         width, height = self.image_size
-        focal_length = 0.8 * width
+        # focal_length = 0.8 * width
         calib.disp_to_depth_mat = np.float32([[1, 0, 0, -0.5 * width],
                                               [0, -1, 0, 0.5 * height],
-                                              [0, 0, 0, -focal_length],
+                                              [0, 0, 0, -calib.cam_mats["left"][0,0]],
                                               [0, 0, 1, 0]])
         return calib
     def check_calibration(self, calibration):
@@ -334,8 +336,7 @@ def calibrate_folder(args):
     print("Reading input files...")
     while args.input_files:
         left, right = args.input_files[:2]
-        # im_left, im_right = cv2.imread(left), cv2.imread(right)
-        im_right, im_left = cv2.imread(left), cv2.imread(right)
+        im_left, im_right = cv2.imread(left), cv2.imread(right)
         calibrator.add_corners((im_left, im_right),
                                write_path=os.path.join(args.output_folder, os.path.basename(left).replace('left', 'debug_%s')))
         args.input_files = args.input_files[2:]

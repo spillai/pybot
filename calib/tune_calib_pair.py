@@ -188,7 +188,7 @@ def main():
         block_matcher = StereoBM()
     else:
         block_matcher = StereoSGBM()
-    image_pair = [cv2.imread(image) for image in input_files[:2]][::-1]
+    image_pair = [cv2.imread(image) for image in input_files[:2]]
     input_files = input_files[2:]
     rectified_pair = calibration.rectify(image_pair)
     imshow_cv('rectified', np.hstack(list(rectified_pair)))
