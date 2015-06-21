@@ -43,9 +43,9 @@ class ChessboardFinder(webcams.BumblebeeStereoPair):
                 cv2.drawChessboardCorners(fvis[i], (columns, rows), corners, found_chessboard[i])
 
             vis = np.hstack(fvis)
-            label = np.tile(np.uint8([[[0,255,0]]]), (10, vis.shape[1], 1)) \
-                   if all(found_chessboard) else np.tile(np.uint8([[[0,0,255]]]), (10, vis.shape[1], 1))
-            imshow_cv('Checkerboard', np.vstack([vis, label]))
+            label = np.tile(np.uint8([[[0,255,0]]]), (20, vis.shape[1], 1)) \
+                   if all(found_chessboard) else np.tile(np.uint8([[[0,0,255]]]), (20, vis.shape[1], 1))
+            imshow_cv('Checkerboard', im_resize(np.vstack([vis, label]), scale=0.75))
         return frames
 
 PROGRAM_DESCRIPTION=(
