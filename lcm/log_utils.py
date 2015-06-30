@@ -9,13 +9,13 @@ from bot_vision.imshow_utils import imshow_cv
 
 import bot_core.image_t as image_t
 
-# from kinect.frame_msg_t import frame_msg_t
-# from kinect.image_msg_t import image_msg_t
-# from kinect.depth_msg_t import depth_msg_t
+from kinect.frame_msg_t import frame_msg_t
+from kinect.image_msg_t import image_msg_t
+from kinect.depth_msg_t import depth_msg_t
 
-from openni.frame_msg_t import frame_msg_t
-from openni.image_msg_t import image_msg_t
-from openni.depth_msg_t import depth_msg_t
+# from openni.frame_msg_t import frame_msg_t
+# from openni.image_msg_t import image_msg_t
+# from openni.depth_msg_t import depth_msg_t
 
 from pybot_pcl import compute_normals, fast_bilateral_filter, median_filter
 
