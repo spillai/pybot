@@ -46,7 +46,7 @@ class KinectFrame:
 class KinectDecoder(object): 
     kinect_params = AttrDict(fx=576.09757860, fy=576.09757860, cx=319.50, cy=239.50)
     def __init__(self, channel='KINECT_FRAME', scale=1., 
-                 extract_rgb=True, extract_depth=True, extract_X=True, properties=[]):
+                 extract_rgb=True, extract_depth=True, extract_X=True, bgr=True):
         self.channel = channel
         self.skip = int(1.0 / scale);
         
@@ -54,8 +54,8 @@ class KinectDecoder(object):
         self.extract_rgb = extract_rgb
         self.extract_depth = extract_depth    
         self.extract_X = extract_X
-        self.props = properties
-        
+        self.bgr = bgr
+
         if self.extract_X: 
             K = construct_K(**KinectDecoder.kinect_params)
             self.camera = DepthCamera(K=K, shape=(480,640), skip=self.skip)
@@ -76,13 +76,15 @@ class KinectDecoder(object):
         w, h = data.image.width, data.image.height;
         if data.image.image_data_format == image_msg_t.VIDEO_RGB_JPEG: 
             img = cv2.imdecode(np.asarray(bytearray(data.image.image_data), dtype=np.uint8), -1)
-            rgb = img.reshape((h,w,3))[::self.skip, ::self.skip, :]             
+            bgr = img.reshape((h,w,3))[::self.skip, ::self.skip, :]             
         else: 
             img = np.fromstring(data.image.image_data, dtype=np.uint8)
             rgb = img.reshape((h,w,3))[::self.skip, ::self.skip, :] 
-
-        bgr = cv2.cvtColor(rgb, cv2.COLOR_BGR2RGB)
-        return bgr
+            bgr = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
+        if not self.bgr: 
+            return cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
+        else: 
+            return bgr
 
     def decode_depth(self, data):
         # Extract depth image
