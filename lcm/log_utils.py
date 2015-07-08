@@ -98,7 +98,7 @@ class KinectDecoder(object):
         return depth
 
 class LCMLogReader(object): 
-    def __init__(self, filename=None, decoder=None, every_k_frames=1):
+    def __init__(self, filename=None, decoder=None, every_k_frames=1, index=True):
         filename = os.path.expanduser(filename)
         if filename is None or not os.path.exists(os.path.expanduser(filename)):
             raise Exception('Invalid Filename: %s' % filename)
@@ -114,9 +114,12 @@ class LCMLogReader(object):
         self._log = lcm.EventLog(self.filename, "r")
 
         # Build index
-        self.index()
+        if index: 
+            self._index()
+        else: 
+            self.index = None
 
-    def index(self): 
+    def _index(self): 
         utimes = np.array([ev.timestamp for ev in self._log], dtype=np.int64)
         inds = np.array([idx
                          for idx, ev in enumerate(self._log) 
@@ -140,23 +143,25 @@ class LCMLogReader(object):
         return self.get_frame_with_timestamp(self.index[idx])
 
     def iteritems(self, reverse=False): 
-        if reverse: 
-            for t in self.index[::-1]: 
-                frame = self.get_frame_with_timestamp(t)
-                yield frame
+        if self.index is not None: 
+            if reverse: 
+                for t in self.index[::-1]: 
+                    frame = self.get_frame_with_timestamp(t)
+                    yield frame
+            else: 
+                for t in self.index: 
+                    frame = self.get_frame_with_timestamp(t)
+                    yield frame
         else: 
-            for t in self.index: 
-                frame = self.get_frame_with_timestamp(t)
-                yield frame
+            if reverse: 
+                raise RuntimeError('Cannot provide items in reverse when file is not indexed')
 
-        # No-seek: should be faster
-        # else: 
-        #     idx = 0
-        #     for ev in self._log: 
-        #         if ev.channel == self.decoder.channel: 
-        #             idx += 1
-        #             if idx % self.every_k_frames == 0: 
-        #                 yield self.decoder.decode(ev.data)
+            idx = 0
+            for ev in self._log: 
+                if ev.channel == self.decoder.channel: 
+                    idx += 1
+                    if idx % self.every_k_frames == 0: 
+                        yield self.decoder.decode(ev.data)
 
     def iter_frames(self):
         return self.iteritems()
