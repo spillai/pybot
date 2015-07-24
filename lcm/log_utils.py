@@ -25,8 +25,13 @@ class ImageDecoder(object):
 
     def decode(self, data): 
         msg = image_t.decode(data)
-        im = cv2.imdecode(np.asarray(bytearray(msg.data), dtype=np.uint8), -1)
-        return im
+        if msg.pixelformat == image_t.PIXEL_FORMAT_GRAY: 
+            return np.asarray(bytearray(msg.data), dtype=np.uint8).reshape(msg.height, msg.width)
+        elif msg.pixelformat == image_t.PIXEL_FORMAT_MJPEG: 
+            im = cv2.imdecode(np.asarray(bytearray(msg.data), dtype=np.uint8), -1)
+            return im
+        else: 
+            raise RuntimeError('Unknown pixelformat for ImageDecoder')
 
 class KinectFrame: 
     def __init__(self, timestamp=None, img=None, depth=None, X=None): 
