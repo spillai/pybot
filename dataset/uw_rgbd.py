@@ -522,7 +522,7 @@ class UWRGBDSceneDataset(UWRGBDDataset):
                 obj = self.map_info.objects[ind]
                 pts2d, bbox, depth = get_object_bbox(self.map_info.camera, obj.points, subsample=3, scale=1.2)
                 if bbox is not None: 
-                    bbox['target'], bbox['depth'] = obj.label, depth
+                    bbox['target'], bbox['category'], bbox['depth'] = obj.label, UWRGBDDataset.target_unhash[obj.label], depth
                     object_candidates.append(bbox)
 
             return object_candidates
