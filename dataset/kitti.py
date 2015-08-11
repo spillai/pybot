@@ -50,6 +50,9 @@ class KITTIDatasetReader(object):
 
         print 'Initialized stereo dataset reader with %f scale' % scale
 
+    def iteritems(self, *args, **kwargs): 
+        return self.stereo.left.iteritems(*args, **kwargs)
+
     def iter_stereo_frames(self, *args, **kwargs): 
         return self.stereo.iteritems(*args, **kwargs)
 
