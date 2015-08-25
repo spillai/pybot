@@ -17,7 +17,7 @@ from bot_vision.imshow_utils import imshow_cv
 
 def colorize_stereo_disparity(disp, im=None): 
     # Display colored disparity
-    disp_color = color_utils.colormap(disp.astype(np.float32) / 16) 
+    disp_color = color_utils.colormap(disp.astype(np.float32) / 256) 
     if im is None: 
         return disp_color 
     else: 
