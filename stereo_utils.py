@@ -210,4 +210,38 @@ class StereoReconstruction(object):
                         np.copy(X[::sample,::sample]).reshape(-1,3)
         return im_pub, X_pub
 
+class CalibratedStereo(object): 
+    def __init__(self, stereo, calib_params, rectify=True): 
+        self.stereo_ = stereo
+        self.calib_set_ = False
+        self.rectify = rectify
+        self.set_calibration = lambda H,W: self.stereo_.set_calib(calib_params.P0[:3,:3], 
+                                                                  calib_params.P1[:3,:3], # K0, K1
+                                                                  np.zeros(5), np.zeros(5),
+                                                                  # calib_params.D1, calib_params.D0, # D0, D1
+                                                                  np.eye(3), np.eye(3),
+                                                                  # calib_params.R0, calib_params.R1, 
+                                                                  calib_params.P0, calib_params.P1, 
+                                                                  calib_params.Q, calib_params.T1, 
+                                                                  W, H # round to closest multiple of 16
+                                                              )
+
+    def strip(self, left_im, right_im): 
+        sz = np.array(list(left_im.shape)) - np.array(list(left_im.shape)) % 16
+        if not self.calib_set_: 
+            self.set_calibration(sz[0], sz[1])
+            self.calib_set_ = True
+        return left_im[:sz[0],:sz[1]], right_im[:sz[0],:sz[1]]
+
+    def process(self, left_im, right_im): 
+        if self.rectify: 
+            left_im, right_im = self.calibration.rectify([left_im, right_im])
+
+        lim, rim = self.strip(left_im, right_im)
+        sz = np.array(list(left_im.shape)) - np.array(list(left_im.shape)) % 16
+
+        disp = np.zeros(shape=left_im.shape, dtype=np.float32)
+        disp[:sz[0],:sz[1]] = self.stereo_.process(lim, rim)
+        return disp
+
         
