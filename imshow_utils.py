@@ -6,8 +6,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 from collections import OrderedDict
 
-global figures
+global figures, trackbars
 figures = OrderedDict()
+trackbars = dict()
 
 def imshow_plt(label, im, block=True):
     global figures
@@ -55,6 +56,26 @@ def imshow_cv(label, im, block=False, text=None):
         cv2.imwrite(fn, vis)
     elif ch == 27 or ch == ord('q'):
         sys.exit(1)
+
+def trackbar_update(_=None): 
+    global trackbars
+    for k,v in trackbars.iteritems(): 
+        trackbars[k]['value'] = cv2.getTrackbarPos(v['label'], v['win_name'])    
+
+def trackbar_create(label, win_name, v, maxv, scale=1.0): 
+    global trackbars
+    if label in trackbars:     
+        raise RuntimeError('Duplicate key. %s already created' % label)
+    trackbars[label] = dict(label=label, win_name=win_name, value=v, scale=scale)
+
+    cv2.namedWindow(win_name)
+    cv2.createTrackbar(label, win_name, v, maxv, trackbar_update)
+
+def trackbar_value(key=None): 
+    global trackbars
+    if key not in trackbars: 
+        raise KeyError('%s not in trackbars' % key)
+    return trackbars[key]['value'] * trackbars[key]['scale']
 
 def annotate_bbox(vis, bbox, color=(0,200,0), title=''): 
     # Bounding Box and top header
