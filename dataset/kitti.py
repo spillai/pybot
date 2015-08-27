@@ -64,6 +64,10 @@ class KITTIDatasetReader(object):
                     self.right.iteritems(*args, **kwargs), 
                     self.velodyne.iteritems(*args, **kwargs))
 
+    def iter_frames(self, *args, **kwargs): 
+        for (left, right), pose in izip(self.iter_stereo_frames(*args, **kwargs), self.poses): 
+            yield AttrDict(left=left, right=right, velodyne=None, pose=pose)
+
     @property
     def stereo_frames(self): 
         return self.iter_stereo_frames()
