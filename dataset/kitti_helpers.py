@@ -1,40 +1,13 @@
 import os, cv2
 import numpy as np
 
+from bot_vision.camera_utils import get_calib_params
 from bot_geometry.rigid_transform import RigidTransform
 from bot_utils.db_utils import AttrDict
 # Q = [ 1 0 0      -c_x
 #       0 1 0      -c_y
 #       0 0 0      f
 #       0 0 -1/T_x (c_x - c_x')/T_x ]')]
-
-def get_calib_params(fx, fy, cx, cy, baseline=None, baseline_px=None): 
-    assert(baseline is not None or baseline_px is not None)
-    if baseline is not None: 
-        baseline_px = baseline * fx
-    elif baseline_px is not None: 
-        baseline = baseline_px / fx
-    else: 
-        raise AssertionError('Ambiguous baseline and baseline_px values. Provide either, not both')
-        
-    q43 = -1/baseline
-    P0 = np.float32([fx, 0.0, cx, 0.0, 
-                     0.0, fy, cy, 0.0, 
-                     0.0, 0.0, 1.0, 0.0]).reshape((3,4))
-    P1 = np.float32([fx, 0.0, cx, -baseline_px, 
-                     0.0, fy, cy, 0.0, 
-                     0.0, 0.0, 1.0, 0.0]).reshape((3,4))
-
-    R0, R1 = np.eye(3), np.eye(3)
-    T0, T1 = np.zeros(3), np.float32([-baseline_px, 0, 0])
-
-    Q = np.float32([[-1, 0, 0, cx],
-                    [0, -1, 0, cy], 
-                    [0, 0, 0, -fx], 
-                    [0, 0, q43,0]])
-
-    return AttrDict(R0=R0, R1=R1, P0=P0, P1=P1, Q=Q, T0=T0, T1=T1, 
-                    fx=fx, fy=fy, cx=cx, cy=cy, baseline=baseline)
 
 def kitti_stereo_calib_params(scale=1.0): 
     f = 718.856*scale
