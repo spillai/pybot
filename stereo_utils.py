@@ -12,6 +12,7 @@ import bot_vision.image_utils as image_utils
 from pybot_externals import StereoELAS # , OrderedCostVolumeStereo
 # from pybot_externals import fast_cost_volume_filtering, ordered_row_disparity
 
+from bot_vision.camera_utils import get_calib_params
 from bot_vision.image_utils import im_resize, gaussian_blur
 from bot_vision.imshow_utils import imshow_cv
 
@@ -215,16 +216,31 @@ class CalibratedStereo(object):
         self.stereo_ = stereo
         self.calib_set_ = False
         self.rectify = rectify
-        self.set_calibration = lambda H,W: self.stereo_.set_calib(calib_params.P0[:3,:3], 
-                                                                  calib_params.P1[:3,:3], # K0, K1
-                                                                  np.zeros(5), np.zeros(5),
-                                                                  # calib_params.D1, calib_params.D0, # D0, D1
-                                                                  np.eye(3), np.eye(3),
-                                                                  # calib_params.R0, calib_params.R1, 
-                                                                  calib_params.P0, calib_params.P1, 
-                                                                  calib_params.Q, calib_params.T1, 
-                                                                  W, H # round to closest multiple of 16
-                                                              )
+        
+        # Set fake calibration parameters if None
+        if calib_params is None: 
+            def calibration_lambda(H,W): 
+                new_calib_params = get_calib_params(1000, 1000, W/2-0.5, H/2-0.5, 0.120)
+                return self.stereo_.set_calib(new_calib_params.P0[:3,:3], 
+                                                          new_calib_params.P1[:3,:3], # K0, K1
+                                                          np.zeros(5), np.zeros(5),
+                                                          np.eye(3), np.eye(3),
+                                                          new_calib_params.P0, new_calib_params.P1, 
+                                                          new_calib_params.Q, new_calib_params.T1, 
+                                                          W, H # round to closest multiple of 16
+                )
+            self.set_calibration = lambda H,W: calibration_lambda(H,W)
+        else: 
+            self.set_calibration = lambda H,W: self.stereo_.set_calib(calib_params.P0[:3,:3], 
+                                                                      calib_params.P1[:3,:3], # K0, K1
+                                                                      np.zeros(5), np.zeros(5),
+                                                                      # calib_params.D1, calib_params.D0, # D0, D1
+                                                                      np.eye(3), np.eye(3),
+                                                                      # calib_params.R0, calib_params.R1, 
+                                                                      calib_params.P0, calib_params.P1, 
+                                                                      calib_params.Q, calib_params.T1, 
+                                                                      W, H # round to closest multiple of 16
+                                                                  )
 
     def strip(self, left_im, right_im): 
         sz = np.array(list(left_im.shape)) - np.array(list(left_im.shape)) % 16
@@ -239,7 +255,7 @@ class CalibratedStereo(object):
 
         lim, rim = self.strip(left_im, right_im)
         sz = np.array(list(left_im.shape)) - np.array(list(left_im.shape)) % 16
-
+        
         disp = np.zeros(shape=left_im.shape, dtype=np.float32)
         disp[:sz[0],:sz[1]] = self.stereo_.process(lim, rim)
         return disp
