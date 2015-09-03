@@ -53,8 +53,9 @@ def get_calib_params(fx, fy, cx, cy, baseline=None, baseline_px=None):
                     [0, 0, 0, -fx], 
                     [0, 0, q43,0]])
 
+    D0, D1 = np.zeros(5), np.zeros(5)
     return AttrDict(R0=R0, R1=R1, P0=P0, P1=P1, Q=Q, T0=T0, T1=T1, 
-                    fx=fx, fy=fy, cx=cx, cy=cy, baseline=baseline)
+                    D0=D0, D1=D1, fx=fx, fy=fy, cx=cx, cy=cy, baseline=baseline)
 
 class CameraIntrinsic(object): 
     def __init__(self, K, D=np.zeros(4, dtype=np.float64), shape=None): 

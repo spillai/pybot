@@ -233,21 +233,21 @@ class CalibratedStereo(object):
         else: 
             self.set_calibration = lambda H,W: self.stereo_.set_calib(calib_params.P0[:3,:3], 
                                                                       calib_params.P1[:3,:3], # K0, K1
-                                                                      np.zeros(5), np.zeros(5),
-                                                                      # calib_params.D1, calib_params.D0, # D0, D1
-                                                                      np.eye(3), np.eye(3),
-                                                                      # calib_params.R0, calib_params.R1, 
+                                                                      calib_params.D1, calib_params.D0, 
+                                                                      calib_params.R0, calib_params.R1, 
                                                                       calib_params.P0, calib_params.P1, 
                                                                       calib_params.Q, calib_params.T1, 
                                                                       W, H # round to closest multiple of 16
                                                                   )
 
     def strip(self, left_im, right_im): 
+        sz0 = left_im.shape[:2]
         sz = np.array(list(left_im.shape)) - np.array(list(left_im.shape)) % 16
+        dsz = sz0 - sz
         if not self.calib_set_: 
             self.set_calibration(sz[0], sz[1])
             self.calib_set_ = True
-        return left_im[:sz[0],:sz[1]], right_im[:sz[0],:sz[1]]
+        return left_im[dsz[0]/2:sz[0]+dsz[0]/2, dsz[1]/2:sz[1]+dsz[1]/2], right_im[dsz[0]/2:sz[0]+dsz[0]/2, dsz[1]/2:sz[1]+dsz[1]/2]
 
     def process(self, left_im, right_im): 
         if self.rectify: 
