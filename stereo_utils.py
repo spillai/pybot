@@ -16,9 +16,9 @@ from bot_vision.camera_utils import get_calib_params
 from bot_vision.image_utils import im_resize, gaussian_blur
 from bot_vision.imshow_utils import imshow_cv
 
-def colorize_stereo_disparity(disp, im=None): 
+def colorize_stereo_disparity(disp, im=None, max_disparity=256): 
     # Display colored disparity
-    disp_color = color_utils.colormap(disp.astype(np.float32) / 256) 
+    disp_color = color_utils.colormap(disp.astype(np.float32) / max_disparity) 
     if im is None: 
         return disp_color 
     else: 
@@ -30,7 +30,7 @@ class StereoSGBM:
 
     default_params = dict( minDisparity = 0, # 16,
                     preFilterCap = 15, # 63, 
-                    numDisparities = 256, # 128,
+                    numDisparities = 128,
                     # SADWindowSize = sad_window_size, uniquenessRatio = 10, speckleWindowSize = 100,
                     SADWindowSize = sad_window_size, 
                     uniquenessRatio = 0, # 10, 
@@ -185,7 +185,6 @@ class OrderedStereoBM(object):
 class StereoReconstruction(object): 
     def __init__(self, calib=None):
         self.calib = calib
-        print 'INIT STEREO RECONSTRUCTION'
 
     def disparity_from_plane(self, rows, height): 
         Z = height * self.calib.fy  /  (np.arange(rows) - self.calib.cy + 1e-9)
