@@ -159,24 +159,19 @@ class ImageDatasetReader(DatasetReader):
 
     @staticmethod
     def imread_process_cb(scale=1.0):
-        if scale != 1.0: 
-            return lambda fn: im_resize(cv2.imread(fn, -1), scale=scale)
-        else: 
-            return lambda fn: cv2.imread(fn, -1)
-
+        return lambda fn: im_resize(cv2.imread(fn, -1), scale=scale)
+        
     def __init__(self, **kwargs): 
         if 'process_cb' in kwargs: 
             raise RuntimeError('ImageDatasetReader does not support defining a process_cb')
 
         if 'scale' in kwargs: 
             scale = kwargs.pop('scale', 1.0)
-            if scale < 1: 
-                DatasetReader.__init__(self, 
-                                       process_cb=ImageDatasetReader.imread_process_cb(scale), 
-                                       **kwargs)
-                return 
-
-        DatasetReader.__init__(self, process_cb=ImageDatasetReader.imread_process_cb(), **kwargs)
+            DatasetReader.__init__(self, 
+                                   process_cb=ImageDatasetReader.imread_process_cb(scale), 
+                                   **kwargs)
+        else: 
+            DatasetReader.__init__(self, process_cb=ImageDatasetReader.imread_process_cb(), **kwargs)
 
     @staticmethod
     def from_filenames(files, **kwargs): 
