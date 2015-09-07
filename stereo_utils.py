@@ -215,29 +215,35 @@ class CalibratedStereo(object):
         self.stereo_ = stereo
         self.calib_set_ = False
         self.rectify = rectify
-        
-        # Set fake calibration parameters if None
-        if calib_params is None: 
-            def calibration_lambda(H,W): 
-                new_calib_params = get_calib_params(1000, 1000, W/2-0.5, H/2-0.5, 0.120)
-                return self.stereo_.set_calib(new_calib_params.P0[:3,:3], 
-                                                          new_calib_params.P1[:3,:3], # K0, K1
-                                                          np.zeros(5), np.zeros(5),
-                                                          np.eye(3), np.eye(3),
-                                                          new_calib_params.P0, new_calib_params.P1, 
-                                                          new_calib_params.Q, new_calib_params.T1, 
-                                                          W, H # round to closest multiple of 16
-                )
-            self.set_calibration = lambda H,W: calibration_lambda(H,W)
+
+        # Only set calib if available
+        if hasattr(self.stereo_, 'set_calib'): 
+
+            # Set fake calibration parameters if None
+            if calib_params is None: 
+                def calibration_lambda(H,W): 
+                    new_calib_params = get_calib_params(1000, 1000, W/2-0.5, H/2-0.5, 0.120)
+                    return self.stereo_.set_calib(new_calib_params.P0[:3,:3], 
+                                                              new_calib_params.P1[:3,:3], # K0, K1
+                                                              np.zeros(5), np.zeros(5),
+                                                              np.eye(3), np.eye(3),
+                                                              new_calib_params.P0, new_calib_params.P1, 
+                                                              new_calib_params.Q, new_calib_params.T1, 
+                                                              W, H # round to closest multiple of 16
+                    )
+                self.set_calibration = lambda H,W: calibration_lambda(H,W)
+            else: 
+                self.set_calibration = lambda H,W: self.stereo_.set_calib(calib_params.P0[:3,:3], 
+                                                                          calib_params.P1[:3,:3], # K0, K1
+                                                                          calib_params.D1, calib_params.D0, 
+                                                                          calib_params.R0, calib_params.R1, 
+                                                                          calib_params.P0, calib_params.P1, 
+                                                                          calib_params.Q, calib_params.T1, 
+                                                                          W, H # round to closest multiple of 16
+                                                                      )
         else: 
-            self.set_calibration = lambda H,W: self.stereo_.set_calib(calib_params.P0[:3,:3], 
-                                                                      calib_params.P1[:3,:3], # K0, K1
-                                                                      calib_params.D1, calib_params.D0, 
-                                                                      calib_params.R0, calib_params.R1, 
-                                                                      calib_params.P0, calib_params.P1, 
-                                                                      calib_params.Q, calib_params.T1, 
-                                                                      W, H # round to closest multiple of 16
-                                                                  )
+            self.set_calibration = lambda *args: None
+
 
     def strip(self, left_im, right_im): 
         sz0 = left_im.shape[:2]
