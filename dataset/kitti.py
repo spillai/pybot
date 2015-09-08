@@ -5,7 +5,7 @@ import cv2
 from itertools import izip
 from bot_utils.db_utils import AttrDict
 from bot_utils.dataset_readers import natural_sort, \
-    StereoDatasetReader, VelodyneDatasetReader
+    ImageDatasetReader, StereoDatasetReader, VelodyneDatasetReader
 
 from .kitti_helpers import kitti_stereo_calib_params, kitti_load_poses
 
@@ -28,19 +28,19 @@ class KITTIDatasetReader(object):
         # Get calib
         self.calib = kitti_stereo_calib_params(scale=scale)
 
-        # Read poses
-        try: 
-            pose_fn = os.path.join(os.path.expanduser(directory), 'poses', ''.join([sequence, '.txt']))
-            self.poses = kitti_load_poses(fn=pose_fn)
-        except: 
-            pass
-
         # Read stereo images
         seq_directory = os.path.join(os.path.expanduser(directory), 'sequences', sequence)
         self.stereo = StereoDatasetReader(directory=seq_directory, 
                                           left_template=os.path.join(seq_directory,left_template), 
                                           right_template=os.path.join(seq_directory,right_template), 
                                           start_idx=start_idx, max_files=max_files, scale=scale)
+
+        # Read poses
+        try: 
+            pose_fn = os.path.join(os.path.expanduser(directory), 'poses', ''.join([sequence, '.txt']))
+            self.poses = kitti_load_poses(fn=pose_fn)
+        except: 
+            self.poses = [None] * self.stereo.length
 
         # Read velodyne
         self.velodyne = VelodyneDatasetReader(
@@ -76,6 +76,36 @@ class KITTIDatasetReader(object):
     def velodyne_frames(self): 
         return self.iter_velodyne_frames()
 
+    
+    @classmethod
+    def stereo_test_dataset(cls, directory, subdir, scale=1.0):
+        """
+        Ground truth dataset iterator
+        """
+
+        left_directory = os.path.join(os.path.expanduser(directory), '%s_0' % subdir)
+        right_directory = os.path.join(os.path.expanduser(directory), '%s_1' % subdir)
+        noc_directory = os.path.join(os.path.expanduser(directory), 'disp_noc')
+        occ_directory = os.path.join(os.path.expanduser(directory), 'disp_occ')
+
+        c = cls()
+        c.scale = scale
+        c.calib = kitti_stereo_calib_params(scale=scale)
+
+        c.stereo = StereoDatasetReader.from_directory(left_directory, right_directory)
+        c.noc = ImageDatasetReader.from_directory(noc_directory)
+        c.occ = ImageDatasetReader.from_directory(occ_directory)
+
+        c.poses = [None] * c.stereo.length
+
+        return c
+
+    def iter_gt_frames(self, *args, **kwargs): 
+        for (left, right), noc, occ, pose in izip(self.iter_stereo_frames(*args, **kwargs), 
+                                                  self.noc.iteritems(*args, **kwargs), 
+                                                  self.occ.iteritems(*args, **kwargs), 
+                                                  self.poses): 
+            yield AttrDict(left=left, right=right, velodyne=None, noc=noc, occ=occ, pose=pose)
 
 class OmnicamDatasetReader(object): 
     """

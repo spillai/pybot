@@ -99,11 +99,18 @@ class DatasetReader(object):
                           if os.path.exists(template % idx)]
         else: 
             self.files = files
-
+        
     @staticmethod
     def from_filenames(process_cb, files): 
         return DatasetReader(process_cb=process_cb, files=files)
-        
+
+    @staticmethod
+    def from_directory(process_cb, directory, pattern='*.png'):
+        files = read_dir(directory, pattern=pattern, flatten=True)
+        sorted_files = natural_sort(files)
+        # print files[:10], sorted_files[:10]
+        return DatasetReader.from_filenames(process_cb, sorted_files)
+
     def iteritems(self, every_k_frames=1, reverse=False):
         fnos = np.arange(0, len(self.files), every_k_frames).astype(int)
         if reverse: 
@@ -177,6 +184,11 @@ class ImageDatasetReader(DatasetReader):
     def from_filenames(files, **kwargs): 
         return DatasetReader(process_cb=ImageDatasetReader.imread_process_cb(), files=files, **kwargs)
 
+    @staticmethod
+    def from_directory(directory, pattern='*.png', **kwargs):
+        return DatasetReader.from_directory(process_cb=ImageDatasetReader.imread_process_cb(),
+                                          directory=directory, pattern=pattern)
+        
 class StereoDatasetReader(object): 
     """
     KITTIDatasetReader: ImageDatasetReader (left) + ImageDatasetReader (right)
@@ -197,6 +209,18 @@ class StereoDatasetReader(object):
         c.left = ImageDatasetReader.from_filenames(left_files, **kwargs)
         c.right = ImageDatasetReader.from_filenames(right_files, **kwargs)
         return c
+
+    @classmethod 
+    def from_directory(cls, left_directory, right_directory, **kwargs): 
+        c = cls()
+        c.left = ImageDatasetReader.from_directory(left_directory, **kwargs)
+        c.right = ImageDatasetReader.from_directory(right_directory, **kwargs)
+        return c
+
+    @property
+    def length(self): 
+        assert(self.left.length == self.right.length)
+        return self.left.length
 
     def iteritems(self, *args, **kwargs): 
         return izip(self.left.iteritems(*args, **kwargs), 

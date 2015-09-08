@@ -2,6 +2,20 @@
 from bot_vision.image_utils import to_color, to_gray
 from bot_utils.dataset.kitti import KITTIDatasetReader
 
+# def eval_kitti_dataset(color=False, **kwargs): 
+#     # if color: 
+#     #     return KITTIDatasetReader(directory='~/data/dataset/', sequence='08', 
+#     #                                     left_template='image_2/%06i.png', right_template='image_3/%06i.png', 
+#     #                                     start_idx=0, **kwargs)
+#     # else: 
+#         return KITTIDatasetReader(directory='~/HD1/data/KITTI/data_stereo_flow/', sequence='training', **kwargs)
+
+def test_kitti_dataset(color=False, **kwargs): 
+    if color: 
+        return KITTIDatasetReader.stereo_test_dataset(directory='~/HD1/data/KITTI/data_stereo_flow/training', subdir='colored', **kwargs)
+    else: 
+        return KITTIDatasetReader.stereo_test_dataset(directory='~/HD1/data/KITTI/data_stereo_flow/training', subdir='image', **kwargs)
+    
 def test_dataset(color=False, **kwargs): 
     if color: 
         return KITTIDatasetReader(directory='~/data/dataset/', sequence='08', 
