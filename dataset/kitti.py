@@ -92,20 +92,29 @@ class KITTIDatasetReader(object):
         c.scale = scale
         c.calib = kitti_stereo_calib_params(scale=scale)
 
-        c.stereo = StereoDatasetReader.from_directory(left_directory, right_directory)
+        # Stereo is only evaluated on the _10.png images
+        c.stereo = StereoDatasetReader.from_directory(left_directory, right_directory, pattern='*_10.png')
         c.noc = ImageDatasetReader.from_directory(noc_directory)
         c.occ = ImageDatasetReader.from_directory(occ_directory)
+        for l,r in zip(c.stereo.left.files, c.noc.files): 
+            print l, r
 
         c.poses = [None] * c.stereo.length
 
         return c
 
-    def iter_gt_frames(self, *args, **kwargs): 
+    def iter_gt_frames(self, *args, **kwargs):
+        """
+        Iterate over all the ground-truth data
+           - For noc, occ disparity conversion, see devkit_stereo_flow/matlab/disp_read.m
+        """
         for (left, right), noc, occ, pose in izip(self.iter_stereo_frames(*args, **kwargs), 
                                                   self.noc.iteritems(*args, **kwargs), 
                                                   self.occ.iteritems(*args, **kwargs), 
                                                   self.poses): 
-            yield AttrDict(left=left, right=right, velodyne=None, noc=noc, occ=occ, pose=pose)
+            yield AttrDict(left=left, right=right, velodyne=None, 
+                           noc=(noc/256).astype(np.float32), 
+                           occ=(occ/256).astype(np.float32), pose=pose)
 
 class OmnicamDatasetReader(object): 
     """
