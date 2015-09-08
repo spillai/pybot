@@ -254,14 +254,16 @@ class CalibratedStereo(object):
             self.calib_set_ = True
         return left_im[dsz[0]/2:sz[0]+dsz[0]/2, dsz[1]/2:sz[1]+dsz[1]/2], right_im[dsz[0]/2:sz[0]+dsz[0]/2, dsz[1]/2:sz[1]+dsz[1]/2]
 
-    def process(self, left_im, right_im): 
+    def process(self, left_im, right_im):
         if self.rectify: 
             left_im, right_im = self.calibration.rectify([left_im, right_im])
-
+        
         lim, rim = self.strip(left_im, right_im)
         sz = np.array(list(left_im.shape)) - np.array(list(left_im.shape)) % 16
-        
         disp = np.zeros(shape=left_im.shape, dtype=np.float32)
+        
+        print left_im.shape, lim.shape, disp.shape
+        
         disp[:sz[0],:sz[1]] = self.stereo_.process(lim, rim)
         return disp
 
