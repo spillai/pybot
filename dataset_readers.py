@@ -108,7 +108,6 @@ class DatasetReader(object):
     def from_directory(process_cb, directory, pattern='*.png'):
         files = read_dir(directory, pattern=pattern, flatten=True)
         sorted_files = natural_sort(files)
-        # print files[:10], sorted_files[:10]
         return DatasetReader.from_filenames(process_cb, sorted_files)
 
     def iteritems(self, every_k_frames=1, reverse=False):

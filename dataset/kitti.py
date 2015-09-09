@@ -96,9 +96,6 @@ class KITTIDatasetReader(object):
         c.stereo = StereoDatasetReader.from_directory(left_directory, right_directory, pattern='*_10.png')
         c.noc = ImageDatasetReader.from_directory(noc_directory)
         c.occ = ImageDatasetReader.from_directory(occ_directory)
-        for l,r in zip(c.stereo.left.files, c.noc.files): 
-            print l, r
-
         c.poses = [None] * c.stereo.length
 
         return c
