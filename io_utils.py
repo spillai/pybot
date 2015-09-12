@@ -24,6 +24,14 @@ def mkdir_p(path):
 def path_exists(path): 
     return os.path.exists(os.path.expanduser(path))
 
+def create_directory_if_not_exists(dir_path): 
+    """ Create directory path if it doesn't exist """
+    
+    if not path_exists(dir_path): 
+        mkdir_p(dir_path)
+        return True
+    return False
+
 def create_path_if_not_exists(filename): 
     """ Create directory path if it doesn't exist """
     
