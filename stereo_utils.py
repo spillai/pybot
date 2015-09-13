@@ -210,11 +210,11 @@ class StereoReconstruction(object):
                         np.copy(X[::sample,::sample]).reshape(-1,3)
         return im_pub, X_pub
 
-class CalibratedStereo(object): 
-    def __init__(self, stereo, calib_params, rectify=True): 
+class CalibratedFastStereo(object): 
+    def __init__(self, stereo, calib_params, rectify=None): 
         self.stereo_ = stereo
         self.calib_set_ = False
-        self.rectify = rectify
+        self.rectify_ = rectify
 
         # Only set calib if available
         if hasattr(self.stereo_, 'set_calib'): 
@@ -255,8 +255,8 @@ class CalibratedStereo(object):
         return left_im[dsz[0]/2:sz[0]+dsz[0]/2, dsz[1]/2:sz[1]+dsz[1]/2], right_im[dsz[0]/2:sz[0]+dsz[0]/2, dsz[1]/2:sz[1]+dsz[1]/2]
 
     def process(self, left_im, right_im):
-        if self.rectify: 
-            left_im, right_im = self.calibration.rectify([left_im, right_im])
+        if self.rectify_ is not None: 
+            left_im, right_im = self.rectify_(left_im, right_im)
         
         lim, rim = self.strip(left_im, right_im)
         disp = np.zeros(shape=left_im.shape, dtype=np.float32)
