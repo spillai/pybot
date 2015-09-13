@@ -7,6 +7,7 @@ import time
 import numpy as np
 
 import cv2
+from bot_vision.image_utils import to_gray
 from bot_vision.imshow_utils import imshow_cv
 
 from pybot_drivers import DC1394Device, ZEDDevice
@@ -97,7 +98,8 @@ class LiveStereoPair(object):
 
     def get_frames(self):
         """Get current frames from cameras."""
-        return self.capture.getImages()
+        l,r = self.capture.getImages()
+        return to_gray(l), to_gray(r)
 
     def show_frames(self, wait=0):
         """

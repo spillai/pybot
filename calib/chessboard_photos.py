@@ -20,7 +20,7 @@ import numpy as np
 from bot_vision.image_utils import to_color, im_resize, im_mosaic, im_pad
 from bot_vision.imshow_utils import imshow_cv
 
-class ChessboardFinder(webcams.BumblebeeStereoPair):
+class ChessboardFinder(webcams.LiveStereoPair):
     """A ``StereoPair`` that can find chessboards."""
 
     def get_chessboard(self, columns, rows, show=False):
@@ -45,7 +45,7 @@ class ChessboardFinder(webcams.BumblebeeStereoPair):
             vis = np.hstack(fvis)
             label = np.tile(np.uint8([[[0,255,0]]]), (20, vis.shape[1], 1)) \
                    if all(found_chessboard) else np.tile(np.uint8([[[0,0,255]]]), (20, vis.shape[1], 1))
-            imshow_cv('Checkerboard', im_resize(np.vstack([vis, label]), scale=0.75))
+            imshow_cv('Checkerboard', im_resize(np.vstack([vis, label]), scale=0.5))
         return frames
 
 PROGRAM_DESCRIPTION=(
@@ -91,7 +91,7 @@ def main():
     # Interval captures
     pstamp = 0
 
-    with ChessboardFinder() as pair:
+    with ChessboardFinder(name='zed') as pair:
 
         idx = 0
         while idx < args.num_pictures: 
