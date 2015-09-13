@@ -9,7 +9,7 @@ import numpy as np
 import cv2
 from bot_vision.imshow_utils import imshow_cv
 
-from pybot_vision import DC1394Device
+from pybot_drivers import DC1394Device, ZEDDevice
 
 class StereoPair(object):
     """
@@ -61,7 +61,8 @@ class StereoPair(object):
                 break
 
 
-class BumblebeeStereoPair(object):
+
+class LiveStereoPair(object):
     """
     A stereo pair of cameras.
 
@@ -69,15 +70,21 @@ class BumblebeeStereoPair(object):
     freed properly after use.
     """
 
-    def __init__(self):
+    def __init__(self, name='bb'):
         """
         Initialize cameras.
 
         ``devices`` is an iterable containing the device numbers.
         """
         #: Video captures associated with the ``StereoPair``
-        self.capture = DC1394Device()
-        self.capture.init()
+        if name == 'bb': 
+            self.capture = DC1394Device()
+            self.capture.init()
+        elif name == 'zed': 
+            self.capture = ZEDDevice('720')
+            self.capture.init()
+        else: 
+            raise RuntimeError('Unknown stereo camera name: %s' % name)
 
         #: Window names for showing captured frame from each camera
         self.windows = ["{} camera".format(side) for side in ("Left", "Right")]
@@ -129,7 +136,7 @@ def main():
                         help="Interval (s) to take pictures in.")
     args = parser.parse_args()
 
-    with BumblebeeStereoPair() as pair:
+    with LiveStereoPair(name='zed') as pair:
     # with StereoPair(args.devices) as pair:
         if not args.output_folder:
             pair.show_videos()

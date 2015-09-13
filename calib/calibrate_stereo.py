@@ -8,7 +8,7 @@ See stereo_match.tune_calib_pair in the OpenCV examples for some additional tips
 converting the generated 3D coordinates into a point cloud. I borrowed some
 numpy magic from there.
 
-python calibrate_stereo.py --rows 8 --columns 6 --square-size 9.3 --show-chessboards data/ calib_output 
+python calibrate_stereo.py --rows 8 --columns 6 --square-size 9.3 --show-chessboards bb/data bb/calib 
 """
 
 import argparse
