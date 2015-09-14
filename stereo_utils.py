@@ -26,7 +26,7 @@ def colorize_stereo_disparity(disp, im=None, max_disparity=256):
 
 class StereoSGBM: 
     # Parameters from KITTI dataset
-    sad_window_size = 3
+    sad_window_size = 5
 
     default_params = dict( minDisparity = 0, # 16,
                     preFilterCap = 15, # 63, 
