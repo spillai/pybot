@@ -5,6 +5,7 @@ from collections import OrderedDict
 
 from bot_utils.db_utils import AttrDict
 from bot_vision.camera_utils import construct_K, DepthCamera
+from bot_vision.image_utils import im_resize
 from bot_vision.imshow_utils import imshow_cv
 
 import bot_core.image_t as image_t
@@ -22,14 +23,15 @@ from pybot_pcl import compute_normals, fast_bilateral_filter, median_filter
 class ImageDecoder(object): 
     def __init__(self, channel='CAMERA', scale=1.): 
         self.channel = channel
+        self.scale = scale
 
     def decode(self, data): 
         msg = image_t.decode(data)
         if msg.pixelformat == image_t.PIXEL_FORMAT_GRAY: 
-            return np.asarray(bytearray(msg.data), dtype=np.uint8).reshape(msg.height, msg.width)
+            return im_resize(np.asarray(bytearray(msg.data), dtype=np.uint8).reshape(msg.height, msg.width), scale=self.scale)
         elif msg.pixelformat == image_t.PIXEL_FORMAT_MJPEG: 
             im = cv2.imdecode(np.asarray(bytearray(msg.data), dtype=np.uint8), -1)
-            return im
+            return im_resize(im, scale=self.scale)
         else: 
             raise RuntimeError('Unknown pixelformat for ImageDecoder')
 
