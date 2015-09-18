@@ -73,3 +73,11 @@ def box_blur(im, size=3):
 
 def median_blur(im, size=3): 
     return cv2.medianBlur(im, size)
+
+def blur_measure(im): 
+    cv2.imshow('im', im)
+    cv2.waitKey(0)
+    return cv2.Laplacian(im, cv2.CV_64F).var()
+
+def blur_detect(im, threshold=100): 
+    return blur_measure(im) > threshold
