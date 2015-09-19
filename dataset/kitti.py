@@ -57,6 +57,10 @@ class KITTIDatasetReader(object):
         return self.stereo.iteritems(*args, **kwargs)
 
     def iter_velodyne_frames(self, *args, **kwargs):         
+        """
+        for pc in dataset.iter_velodyne_frames(): 
+          X = pc[:,:3]
+        """
         return self.velodyne.iteritems(*args, **kwargs)
 
     def iter_stereo_velodyne_frames(self, *args, **kwargs):         
