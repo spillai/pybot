@@ -46,12 +46,17 @@ def find_files(folder):
     return files
 
 def get_stereo_calibration_params(input_folder=None): 
-    return dict(P0=np.load(os.path.join(input_folder, 'proj_mats_left.npy')),
+    P0 = np.load(os.path.join(input_folder, 'proj_mats_left.npy'))
+    Q = np.load(os.path.join(input_folder, 'disp_to_depth_mat.npy')) 
+    fx, fy, cx, cy = P0[0,0], P0[1,1], P0[0,3], P0[1,3]
+    baseline = -1/Q[3,2]
+    return dict(fx=fx, fy=fy, cx=cx, cy=cy, baseline=baseline,
+                P0=P0, 
                 P1=np.load(os.path.join(input_folder, 'proj_mats_right.npy')), 
                 D0=np.load(os.path.join(input_folder, 'dist_coefs_left.npy')), 
                 D1=np.load(os.path.join(input_folder, 'dist_coefs_right.npy')), 
                 R0=np.eye(3), R1=np.load(os.path.join(input_folder, 'rot_mat.npy')), 
-                Q=np.load(os.path.join(input_folder, 'disp_to_depth_mat.npy')), 
+                Q=Q,
                 T1=np.load(os.path.join(input_folder, 'trans_vec.npy')))
 
 class StereoCalibration(object):

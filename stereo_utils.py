@@ -11,7 +11,7 @@ import bot_vision.image_utils as image_utils
 
 from pybot_externals import StereoELAS # , OrderedCostVolumeStereo
 # from pybot_externals import fast_cost_volume_filtering, ordered_row_disparity
-
+from bot_utils.db_utils import AttrDict
 from bot_vision.camera_utils import get_calib_params
 from bot_vision.image_utils import im_resize, gaussian_blur
 from bot_vision.imshow_utils import imshow_cv
@@ -264,4 +264,63 @@ class CalibratedFastStereo(object):
         disp[:sz[0],:sz[1]] = res
         return disp
 
-        
+def setup_zed(scale=1.0): 
+    # Saved Calibration
+    # calib_path = '/home/spillai/perceptual-learning/software/python/bot_vision/calib/zed/calib'
+    # calibration = StereoCalibration(input_folder=calib_path)
+
+    # Setup one-time calibration
+    calib_params = get_calib_params(702.429138*scale, 702.429138*scale, 652.789368*scale, 360.765472*scale, 0.120)
+    calib_params.D0 = np.array([-0.16, 0, 0, 0, 0], np.float64)
+    calib_params.D1 = calib_params.D0
+    return calib_params
+
+def setup_bb(scale=1.0): 
+    # Setup one-time calibration
+    calib_path = '/home/spillai/perceptual-learning/software/python/bot_vision/calib/bb/calib'
+    calibration = StereoCalibration(input_folder=calib_path)
+    calib_params = AttrDict(get_stereo_calibration_params(input_folder=calib_path))
+    return calib_params
+
+def stereo_dataset(filename, channel='CAMERA', every_k_frames=1, scale=1): 
+    from bot_externals.lcm.log_utils import LCMLogReader, ImageDecoder
+    dataset = LCMLogReader(filename=filename, every_k_frames=every_k_frames, decoder=ImageDecoder(channel=channel,scale=scale))
+    
+    def iter_frames(*args, **kwargs): 
+        for im in dataset.iteritems(*args, **kwargs):
+            h,w = im.shape[:2]
+            l,r = np.split(im, 2, axis=0)
+            yield AttrDict(left=l, right=r)
+            
+    def iter_gt_frames(*args, **kwargs): 
+        gt = StereoSGBM()
+        for im in dataset.iteritems(*args, **kwargs): 
+            h,w = im.shape[:2]
+            l,r = np.split(im, 2, axis=0)
+            disp = gt.process(l,r)
+            yield AttrDict(left=l, right=r, noc=disp, occ=disp)
+            
+    dataset.iter_frames = iter_frames
+    dataset.iter_gt_frames = iter_gt_frames
+    return dataset
+
+def setup_zed_dataset(filename, every_k_frames=1, scale=1): 
+    from bot_utils.dataset.kitti_helpers import get_calib_params
+    dataset = stereo_dataset(filename=filename, 
+                             channel='CAMERA', every_k_frames=every_k_frames, scale=scale)
+
+    # Setup one-time calibration
+    calib_params = setup_zed(scale=scale)
+    dataset.calib = calib_params
+    return dataset
+ 
+def setup_bb_dataset(filename, every_k_frames=1, scale=1): 
+    from bot_utils.dataset.kitti_helpers import get_calib_params
+    
+    dataset = stereo_dataset(filename=filename, 
+                             channel='CAMERA', every_k_frames=every_k_frames, scale=scale)
+    
+    # Setup one-time calibration
+    calib_params = setup_bb(scale=scale)
+    dataset.calib = calib_params
+    return dataset

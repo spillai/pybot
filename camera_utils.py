@@ -314,7 +314,6 @@ def get_object_bbox(camera, pts, subsample=10, scale=1.0, min_height=10, min_wid
     else: 
         return [None] * 3
 
-
 # def plot_epipolar_line(im, F, x, epipole=None, show_epipole=True):
 #   """
 #   Plot the epipole and epipolar line F * x = 0.
