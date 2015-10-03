@@ -310,7 +310,7 @@ def setup_zed_dataset(filename, every_k_frames=1, scale=1):
                              channel='CAMERA', every_k_frames=every_k_frames, scale=scale)
 
     # Setup one-time calibration
-    calib_params = setup_zed(scale=scale)
+    calib_params = setup_zed(scale=0.5)
     dataset.calib = calib_params
     return dataset
  

@@ -10,6 +10,25 @@ global figures, trackbars
 figures = OrderedDict()
 trackbars = dict()
 
+class WindowManager(object): 
+    """
+    Basic window manager
+    """
+    def __init__(self): 
+        pass
+        self.trackbars_ = dict()
+        self.figures_ = OrderedDict()
+        self.has_moved_ = set()
+
+    def imshow(self, label, im): 
+        cv2.imshow(label, im)
+        if label not in self.has_moved_:
+            cv2.moveWindow(label, 1920, 0)
+            self.has_moved_.add(label)
+
+global window_manager
+window_manager = WindowManager()
+
 def imshow_plt(label, im, block=True):
     global figures
     if label not in figures: 
@@ -46,7 +65,7 @@ def print_status(vis, text=None):
 def imshow_cv(label, im, block=False, text=None): 
     vis = im.copy()
     print_status(vis, text=text)
-    cv2.imshow(label, vis)
+    window_manager.imshow(label, vis)
     ch = cv2.waitKey(0 if block else 1) & 0xFF
     if ch == ord(' '):
         cv2.waitKey(0)
@@ -76,6 +95,10 @@ def trackbar_value(key=None):
     if key not in trackbars: 
         raise KeyError('%s not in trackbars' % key)
     return trackbars[key]['value'] * trackbars[key]['scale']
+
+def mouse_event_create(win_name, cb): 
+    cv2.namedWindow(win_name)
+    cv2.setMouseCallback(win_name, cb)
 
 def annotate_bbox(vis, bbox, color=(0,200,0), title=''): 
     # Bounding Box and top header
