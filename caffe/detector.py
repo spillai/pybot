@@ -16,6 +16,8 @@ import numpy as np
 import os
 
 import caffe
+from fast_rcnn.test import _get_blobs, _bbox_pred, _clip_boxes
+from fast_rcnn.config import cfg
 
 class Detector(caffe.Net):
     """
@@ -95,7 +97,7 @@ class Detector(caffe.Net):
                 ix += 1
         return detections
 
-    def detect_bboxes(self, im, bboxes, name='fc7'):
+    def detect_bboxes(self, im, bboxes, layer='fc7'):
         """
         Take
         image: 
@@ -117,7 +119,7 @@ class Detector(caffe.Net):
         
         for ix, window_in in enumerate(window_inputs):
             caffe_in[ix] = self.transformer.preprocess(in_, window_in)
-        out = self.forward_all(**{in_: caffe_in, 'blobs': [name]})
+        out = self.forward_all(**{in_: caffe_in, 'blobs': [layer]})
 
         # predictions = out[self.outputs[0]].squeeze(axis=(2,3))
         return out[name]
@@ -213,3 +215,79 @@ class Detector(caffe.Net):
                 self.crop_mean = crop_mean
             else:
                 self.crop_mean = np.zeros(self.crop_dims, dtype=np.float32)
+
+def im_detect(net, im, boxes, layer='fc7'):
+    """Detect object classes in an image given object proposals.
+
+    Arguments:
+        net (caffe.Net): Fast R-CNN network to use
+        im (ndarray): color image to test (in BGR order)
+        boxes (ndarray): R x 4 array of object proposals
+
+    Returns:
+        scores (ndarray): R x K array of object class scores (K includes
+            background as object category 0)
+        boxes (ndarray): R x (4*K) array of predicted bounding boxes
+    """
+    blobs, unused_im_scale_factors = _get_blobs(im, boxes)
+
+    # When mapping from image ROIs to feature map ROIs, there's some aliasing
+    # (some distinct image ROIs get mapped to the same feature ROI).
+    # Here, we identify duplicate feature ROIs, so we only compute features
+    # on the unique subset.
+    if cfg.DEDUP_BOXES > 0:
+        v = np.array([1, 1e3, 1e6, 1e9, 1e12])
+        hashes = np.round(blobs['rois'] * cfg.DEDUP_BOXES).dot(v)
+        _, index, inv_index = np.unique(hashes, return_index=True,
+                                        return_inverse=True)
+        blobs['rois'] = blobs['rois'][index, :]
+        boxes = boxes[index, :]
+
+    # reshape network inputs
+    net.blobs['data'].reshape(*(blobs['data'].shape))
+    net.blobs['rois'].reshape(*(blobs['rois'].shape))
+    blobs_out = net.forward(data=blobs['data'].astype(np.float32, copy=False),
+                            rois=blobs['rois'].astype(np.float32, copy=False))
+
+    data = net.blobs[layer].data
+    return data[inv_index, :] 
+
+    # if cfg.TEST.SVM:
+    #     # use the raw scores before softmax under the assumption they
+    #     # were trained as linear SVMs
+    #     scores = net.blobs['cls_score'].data
+    # else:
+    #     # use softmax estimated probabilities
+    #     scores = blobs_out['cls_prob']
+
+    # if cfg.TEST.BBOX_REG:
+    #     # Apply bounding-box regression deltas
+    #     box_deltas = blobs_out['bbox_pred']
+    #     pred_boxes = _bbox_pred(boxes, box_deltas)
+    #     pred_boxes = _clip_boxes(pred_boxes, im.shape)
+    # else:
+    #     # Simply repeat the boxes, once for each class
+    #     pred_boxes = np.tile(boxes, (1, scores.shape[1]))
+
+    # if cfg.DEDUP_BOXES > 0:
+    #     # Map scores and predictions back to the original set of boxes
+    #     scores = scores[inv_index, :]
+    #     pred_boxes = pred_boxes[inv_index, :]
+
+    # return scores, pred_boxes
+
+class DetectorFastRCNN(caffe.Net):
+    """
+    Detector extends Net for windowed detection by a list of crops or
+    selective search proposals.
+    """
+    def __init__(self, model_file, pretrained_file):
+        """
+        FastRCNN
+        """
+        caffe.Net.__init__(self, model_file, pretrained_file, caffe.TEST)
+
+    def detect_bboxes(self, im, boxes, layer='fc7'): 
+        return im_detect(self, im, boxes, layer=layer)
+
+
