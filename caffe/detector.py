@@ -16,6 +16,8 @@ import numpy as np
 import os
 
 import caffe
+caffe.set_mode_gpu()
+
 from fast_rcnn.test import _get_blobs, _bbox_pred, _clip_boxes
 from fast_rcnn.config import cfg
 
