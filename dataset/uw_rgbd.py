@@ -304,7 +304,6 @@ class UWRGBDSceneDataset(UWRGBDDataset):
                 if version != 'v2': 
                     raise RuntimeError('Version v2 is only supported')
 
-                print '\n===> Un-optimized load_plylabel. Takes too long. FIX!! <===\n' 
                 ply_xyz, ply_rgb = UWRGBDSceneDataset._reader.load_ply(aligned_file.ply, version)
                 ply_label = UWRGBDSceneDataset._reader.load_plylabel(aligned_file.label, version)
 
