@@ -12,6 +12,9 @@ import pprint
 import datetime
 import pandas as pd
 
+import gop
+from pybot_vision import BINGObjectness
+
 from bot_vision.image_utils import im_resize, gaussian_blur, median_blur, box_blur
 from bot_vision.bow_utils import BoWVectorizer, bow_codebook, bow_project, flair_project
 from bot_vision.caffe.detector import Detector, DetectorFastRCNN
@@ -1261,7 +1264,7 @@ class HistogramClassifier(BOWClassifier):
                     target = np.ones(len(bboxes), dtype=np.int32) * frame.bbox_extract_target
                     
                     # Add all bboxes extracted via object proposals as bbox_extract_target
-                    im_desc = self.image_descriptor_.detect_and_describe(frame.img, bboxes)
+                    im_desc = self.image_descriptor_.describe(frame.img, bboxes)
                     add_item_to_hists_db(hists_db, im_desc, target, bboxes)
                 else: 
                     print 'Nothing to do, frame.bbox is empty'
@@ -1299,28 +1302,6 @@ class HistogramClassifier(BOWClassifier):
         # 4. Linear classification
         self._train(mode='train')
 
-    # def neg_train(self, bg_data_iterable, batch_size=10, viz_cb=lambda e: None): 
-
-    #     # 5. Hard-neg mining
-    #     for epoch in np.arange(self.params_.neg_epochs): 
-    #         self.epoch_no_ = epoch
-    #         print 'Processing epoch %i' % (epoch)
-
-    #         if epoch == 0:
-    #             # 1. Extract features
-    #             self._extract(bg_data_iterable, mode='neg', batch_size=batch_size)
-
-    #             # 2. Project
-    #             self._project(mode='neg', batch_size=batch_size)
-
-    #         # 3. Re-train
-    #         self._train(mode='neg')
-
-    #         viz_cb(epoch)
-    #         # training = self._hard_negative_mining(training, epoch)
-    #         # training.save(os.path.join(conf.results_dir, 'training-epoch-%i.h5' % (epoch)))
-
-
     def evaluate(self, data_iterable, batch_size=10): 
         # 1. Extract D-SIFT features 
         self._extract(data_iterable, mode='test', batch_size=batch_size)
@@ -1330,51 +1311,17 @@ class HistogramClassifier(BOWClassifier):
         # 4. Linear classification eval
         self._classify()
 
-    # def describe(self, img, bboxes): 
-    #     """ 
-    #     Describe img regions defined by the bboxes
-    #     FLAIR classification (one-time descriptor evaluation)
+    def describe(self, img, bboxes): 
+        """ 
+        Describe img regions defined by the bboxes
+        FLAIR classification (one-time descriptor evaluation)
 
-    #     Params: 
-    #          img:    np.uint8
-    #          bboxes: np.float32 [bbox['left'], bbox['top'], bbox['right'], bbox['bottom'], ...] 
+        Params: 
+             img:    np.uint8
+             bboxes: np.float32 [bbox['left'], bbox['top'], bbox['right'], bbox['bottom'], ...] 
 
-    #     """
-    #     if not hasattr(self, 'flair_'): 
-    #         raise RuntimeError('FLAIR not setup yet, run setup_flair() first!')
-
-    #     # Construct rectangle info
-    #     im_rect = np.vstack([[bbox['left'], bbox['top'], 
-    #                           bbox['right'], bbox['bottom']] \
-    #                          for bbox in bboxes]).astype(np.float32)
-        
-    #     try: 
-    #         # Extract image features
-    #         # if self.params_.profile: self.profiler[self.params_.descriptor.descriptor].start()
-    #         pts, desc = self.image_descriptor_.detect_and_describe(img=img, mask=None)
-    #         # if self.params_.profile: self.profiler[self.params_.descriptor.descriptor].stop()
-
-    #         # Reduce dimensionality
-    #         # if self.params_.profile: self.profiler['dim_red'].start()
-    #         if self.params_.do_pca: 
-    #             desc = self.pca_.transform(desc)
-    #         # if self.params_.profile: self.profiler['dim_red'].stop()
-
-    #         # Extract histogram
-    #         # pts: int32, desc: float32, im_rect: float32
-    #         # if self.params_.profile: self.profiler['FLAIR'].start()
-    #         hists = self.flair_.process(pts.astype(np.int32), desc.astype(np.float32), im_rect)
-    #         # if self.params_.profile: self.profiler['FLAIR'].stop()
-
-    #         # Transform histogram using kernel feature map
-    #         if self.params_.do_kernel_approximation: 
-    #             hists = self.kernel_tf_.transform(hists)
-    #     except Exception as e: 
-    #         # if self.params_.profile: self.profiler[self.params_.descriptor.descriptor].stop(force=True)
-    #         print 'Failed to extract FLAIR and process', e
-    #         return None
-
-    #     return hists
+        """
+        return self.image_descriptor_.describe(img, bboxes)
 
     def process(self, img, bboxes): 
         """ 
@@ -1428,3 +1375,53 @@ class HistogramClassifier(BOWClassifier):
     def load(cls, path): 
         db = AttrDict.load(path)
         return cls.from_dict(db)
+
+class ObjectProposer(object): 
+    """
+    Usage: 
+
+        prop = ObjectProposer.create('GOP', params)
+        bboxes = prop.process(im)
+        
+    """
+    def __init__(self): 
+        pass
+
+    @staticmethod
+    def create(method='GOP', params=None): 
+        if method == 'GOP': 
+            return GOPObjectProposer(**params)
+        elif method == 'BING': 
+            return BINGObjectProposer(**params)
+        else: 
+            raise RuntimeError('Unknown proposals method: %s' % method)
+
+class GOPObjectProposer(ObjectProposer): 
+    def __init__(self, num_proposals=1000): 
+        from bot_vision.recognition.gop_util import setupLearned as gop_setuplearned
+
+        gop_data_dir = """/home/spillai/perceptual-learning/software/externals/recognition-pod/proposals/gop/data/"""
+        self.prop_ = gop.proposals.Proposal( gop_setuplearned( 140, 4, 0.8, gop_data_dir=gop_data_dir ) )
+
+        self.num_proposals_ = num_proposals
+        self.segmenter_ = gop.contour.MultiScaleStructuredForest()
+        self.segmenter_.load( os.path.join(gop_data_dir, 'sf.dat'))
+
+    def process(self, im): 
+        im_ = gop.imgproc.npread(np.copy(im))
+        s = gop.segmentation.geodesicKMeans( im_, self.segmenter_, self.num_proposals_ )
+        b = self.prop_.propose( s )
+        return s.maskToBox( b )
+
+class BINGObjectProposer(ObjectProposer): 
+    def __init__(self, voc_dir, num_proposals=10): 
+        self.proposer_ = BINGObjectness()
+        self.num_proposals_ = num_proposals
+        try: 
+            self.proposer_.build(voc_dir)
+        except: 
+            raise RuntimeError('Error with selective search voc dir %s' % params.voc_dir)
+
+    def process(self, im): 
+        return self.proposer_.process(im, self.num_proposals_)
+            
