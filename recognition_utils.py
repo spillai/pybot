@@ -1453,8 +1453,9 @@ class BINGObjectProposer(ObjectProposer):
         self.num_proposals_ = num_proposals
         try: 
             self.proposer_.build(voc_dir)
+            print voc_dir
         except: 
-            raise RuntimeError('Error with selective search voc dir %s' % params.voc_dir)
+            raise RuntimeError('Error with selective search voc dir %s' % voc_dir)
 
     def process(self, im): 
         return self.proposer_.process(im, self.num_proposals_)
