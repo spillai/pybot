@@ -292,7 +292,7 @@ def root_sift(kpts, desc, eps=1e-7):
     kpts, desc = [kpts[ind] for ind in inds], desc[inds]
     return kpts, desc
 
-class CNNDescription(object): 
+class FastRCNNDescription(object): 
     def __init__(self): 
         
         NETS = {'vgg16': ('VGG16',
@@ -986,9 +986,7 @@ class BOWClassifier(object):
             self._train(mode='neg')
 
             viz_cb(epoch)
-            # training = self._hard_negative_mining(training, epoch)
-            # training.save(os.path.join(conf.results_dir, 'training-epoch-%i.h5' % (epoch)))
-
+            
 
     def evaluate(self, data_iterable, batch_size=10): 
         # 1. Extract D-SIFT features 
@@ -1175,7 +1173,7 @@ class HistogramClassifier(BOWClassifier):
         self.epoch_no_ = 0
 
         # 1. Image description using Dense SIFT/Descriptor
-        self.image_descriptor_ = CNNDescription(**self.params_.descriptor)
+        self.image_descriptor_ = FastRCNNDescription(**self.params_.descriptor)
 
         # 2. Setup dim. red
         self.pca_ = RandomizedPCA(**self.params_.pca) if self.params_.do_pca else None
@@ -1223,10 +1221,12 @@ class HistogramClassifier(BOWClassifier):
         if not (mode == 'train' or mode == 'test' or mode == 'neg'): 
             raise Exception('Unknown mode %s' % mode)
 
+        
         # Extract features, only if not already available
         hists_dir = getattr(self.params_.cache, '%s_hists_dir' % mode)
         hists_dir = hists_dir.replace('EPOCH', 'all')
         mode_prefix = lambda name: ''.join(['%s_' % mode, name])
+        print 'HISTS', hists_dir
         if not os.path.isdir(hists_dir): 
             print '====> [COMPUTE] %s: Feature Extraction ' % mode.upper()
             st = time.time()
@@ -1248,7 +1248,7 @@ class HistogramClassifier(BOWClassifier):
                     target = np.array([bbox['target'] for bbox in frame.bbox], dtype=np.int32)
                     bboxes = np.vstack([[bbox['left'], bbox['top'], bbox['right'], bbox['bottom']] for bbox in frame.bbox])
 
-                    im_desc = self.image_descriptor_.describe(**self.process_cb_(frame))
+                    im_desc = self.image_descriptor_.describe(frame.img, bboxes)
                     add_item_to_hists_db(hists_db, im_desc, target, bboxes)
 
                 elif hasattr(frame, 'target'): 
@@ -1258,10 +1258,8 @@ class HistogramClassifier(BOWClassifier):
                     im_desc = self.image_descriptor_.describe(frame.img, bboxes)
                     add_item_to_hists_db(hists_db, im_desc, frame.target, bboxes)
 
-                elif mode == 'neg' and hasattr(frame, 'bbox_extract') and hasattr(frame, 'bbox_extract_target'): 
-                    assert mode == 'neg', "Mode should be neg to continue, not %s" % mode
-                    bboxes = frame.bbox_extract(frame)
-                    target = np.ones(len(bboxes), dtype=np.int32) * frame.bbox_extract_target
+                elif mode == 'neg': 
+                    target, bboxes = self.process_cb_(frame)
                     
                     # Add all bboxes extracted via object proposals as bbox_extract_target
                     im_desc = self.image_descriptor_.describe(frame.img, bboxes)
@@ -1302,11 +1300,25 @@ class HistogramClassifier(BOWClassifier):
         # 4. Linear classification
         self._train(mode='train')
 
+    def neg_train(self, bg_data_iterable, batch_size=10, viz_cb=lambda e: None): 
+
+        # 5. Hard-neg mining
+        for epoch in np.arange(self.params_.neg_epochs): 
+            self.epoch_no_ = epoch
+            print 'Processing epoch %i' % (epoch)
+
+            if epoch == 0:
+                # 1. Extract features
+                self._extract(bg_data_iterable, mode='neg', batch_size=batch_size)
+
+            # 2. Re-train
+            self._train(mode='neg')
+
+            # viz_cb(epoch)
+
     def evaluate(self, data_iterable, batch_size=10): 
         # 1. Extract D-SIFT features 
         self._extract(data_iterable, mode='test', batch_size=batch_size)
-        
-        print 'data_iterable', data_iterable
 
         # 4. Linear classification eval
         self._classify()
@@ -1348,8 +1360,8 @@ class HistogramClassifier(BOWClassifier):
     def _setup_from_dict(self, db): 
         try: 
             self.params_ = db.params
-            self.image_descriptor_ = CNNDescription(**db.params.descriptor)
-            # self.bow_ = BoWVectorizer.from_dict(db.bow)
+            self.image_descriptor_ = FastRCNNDescription(**db.params.descriptor)
+            self.process_cb_ = None
             self.pca_ = db.pca
             self.kernel_tf_ = db.kernel_tf
             self.clf_base_, self.clf_, self.clf_hyparams_ = db.clf_base, db.clf, db.clf_hyparams
@@ -1359,7 +1371,6 @@ class HistogramClassifier(BOWClassifier):
         
     def save(self, path): 
         db = AttrDict(params=self.params_, 
-                      # bow=self.bow_.to_dict(), 
                       pca=self.pca_, kernel_tf=self.kernel_tf_, 
                       clf=self.clf_, clf_base=self.clf_base_, clf_hyparams=self.clf_hyparams_, 
                       clf_prob=self.clf_prob_, target_map=self.target_map_)
@@ -1376,25 +1387,47 @@ class HistogramClassifier(BOWClassifier):
         db = AttrDict.load(path)
         return cls.from_dict(db)
 
+
+class ObjectClassifier(object): 
+    """
+    Usage: 
+
+        prop = ObjectClassifier.create('fast-rcnn', params)
+        probs, targets = prop.process(im, bboxes)
+    """
+    @staticmethod
+    def create(method='fast-rcnn', params=None): 
+        if method == 'bow': 
+            return BOWClassifier(**params)
+        elif method == 'fast-rcnn': 
+            return HistogramClassifier(**params)
+        else: 
+            raise RuntimeError('Unknown classifier method: %s' % method)
+
 class ObjectProposer(object): 
     """
     Usage: 
 
         prop = ObjectProposer.create('GOP', params)
         bboxes = prop.process(im)
-        
     """
-    def __init__(self): 
-        pass
-
     @staticmethod
-    def create(method='GOP', params=None): 
+    def create(method='GOP', scale=1, params=None): 
         if method == 'GOP': 
-            return GOPObjectProposer(**params)
+            return ScaledObjectProposer(GOPObjectProposer(**params), scale=scale)
         elif method == 'BING': 
-            return BINGObjectProposer(**params)
+            return ScaledObjectProposer(BINGObjectProposer(**params), scale=scale)
         else: 
             raise RuntimeError('Unknown proposals method: %s' % method)
+
+class ScaledObjectProposer(ObjectProposer): 
+    def __init__(self, proposer, scale=1): 
+        self.proposer_ = proposer
+        self.scale_ = scale
+
+    def process(self, im): 
+        boxes = self.proposer_.process(im_resize(im, scale=self.scale_))
+        return (boxes * 1 / self.scale_).astype(np.int32)
 
 class GOPObjectProposer(ObjectProposer): 
     def __init__(self, num_proposals=1000): 
@@ -1409,6 +1442,7 @@ class GOPObjectProposer(ObjectProposer):
 
     def process(self, im): 
         im_ = gop.imgproc.npread(np.copy(im))
+        st = time.time()
         s = gop.segmentation.geodesicKMeans( im_, self.segmenter_, self.num_proposals_ )
         b = self.prop_.propose( s )
         return s.maskToBox( b )
