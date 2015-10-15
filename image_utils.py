@@ -20,6 +20,34 @@ def im_pad(im, pad=3, value=0):
 def im_sample(im, sample=2): 
     return im[::2,::2]
 
+def im_mosaic_list(items, scale=1.0, shape=None, pad=0): 
+    N = len(items)
+
+    # print 'Items: ', N, items
+    assert N>0, 'No items to mosaic!'
+
+    sz = np.ceil(np.sqrt(N)).astype(int)
+    for j in range(sz * sz): 
+        if j < N: 
+            if shape is not None: 
+                items[j] = to_color(im_resize(items[j], shape=shape))
+            else: 
+                items[j] = to_color(im_resize(items[j], scale=scale))
+
+        else: 
+            items.append(np.zeros_like(items[-1]))
+
+    chunks = lambda l, n: [l[x: x+n] for x in xrange(0, len(l), n)]
+    # print len(items)
+    # print [len(chunk) for chunk in chunks(items, sz)]
+    # print [map(lambda ch: ch.shape, chunk) for chunk in chunks(items, sz)]
+    # print [(np.hstack(chunk)).shape for chunk in chunks(items, sz)]
+        
+    mosaic = im_pad(np.vstack([np.hstack(chunk) for chunk in chunks(items, sz)]), pad=3)
+    
+    return im_resize(mosaic, scale=scale)
+
+
 def im_mosaic(*args, **kwargs): 
     scale = kwargs.get('scale', 1.0)
     shape = kwargs.get('shape', None)

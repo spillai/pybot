@@ -17,7 +17,7 @@ from pybot_vision import BINGObjectness
 
 from bot_vision.image_utils import im_resize, gaussian_blur, median_blur, box_blur
 from bot_vision.bow_utils import BoWVectorizer, bow_codebook, bow_project, flair_project
-from bot_vision.caffe.detector import Detector, DetectorFastRCNN
+from bot_vision.caffe.detector import Detector, DetectorFastRCNN, nms
 from pybot_vision import FLAIR_code
 from fast_rcnn.config import cfg
 
@@ -1245,8 +1245,9 @@ class HistogramClassifier(BOWClassifier):
             def add_bbox(hists_db, frame, mode): 
                 if hasattr(frame, 'bbox') and len(frame.bbox): 
                     # Single image, multiple ROIs/targets
-                    target = np.array([bbox['target'] for bbox in frame.bbox], dtype=np.int32)
-                    bboxes = np.vstack([[bbox['left'], bbox['top'], bbox['right'], bbox['bottom']] for bbox in frame.bbox])
+                    # target = np.array([bbox['target'] for bbox in frame.bbox], dtype=np.int32)
+                    # bboxes = np.vstack([[bbox['left'], bbox['top'], bbox['right'], bbox['bottom']] for bbox in frame.bbox])
+                    target, bboxes = self.process_cb_(frame)
 
                     im_desc = self.image_descriptor_.describe(frame.img, bboxes)
                     add_item_to_hists_db(hists_db, im_desc, target, bboxes)

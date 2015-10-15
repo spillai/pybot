@@ -18,7 +18,7 @@ import os
 import caffe
 caffe.set_mode_gpu()
 
-from fast_rcnn.test import _get_blobs, _bbox_pred, _clip_boxes
+from fast_rcnn.test import _get_blobs, _bbox_pred, _clip_boxes, nms
 from fast_rcnn.config import cfg
 
 class Detector(caffe.Net):
@@ -291,5 +291,4 @@ class DetectorFastRCNN(caffe.Net):
 
     def detect_bboxes(self, im, boxes, layer='fc7'): 
         return im_detect(self, im, boxes, layer=layer)
-
 
