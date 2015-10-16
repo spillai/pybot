@@ -9,6 +9,7 @@ from bot_vision.image_utils import im_resize
 from bot_vision.imshow_utils import imshow_cv
 
 import bot_core.image_t as image_t
+import bot_core.pose_t as pose_t
 
 from kinect.frame_msg_t import frame_msg_t
 from kinect.image_msg_t import image_msg_t
@@ -20,9 +21,24 @@ from kinect.depth_msg_t import depth_msg_t
 
 from pybot_pcl import compute_normals, fast_bilateral_filter, median_filter
 
-class ImageDecoder(object): 
-    def __init__(self, channel='CAMERA', scale=1.): 
+class Decoder(object): 
+    def __init__(self, channel=''): 
         self.channel = channel
+
+    def decode(self, data): 
+        return None
+
+class PoseDecoder(Decoder): 
+    def __init__(self, channel='CAMERA', scale=1.): 
+        Decoder.__init__(self, channel=channel)
+        
+    def decode(self, data):
+        msg = pose_t.decode(data)
+        return msg
+
+class ImageDecoder(Decoder): 
+    def __init__(self, channel='CAMERA', scale=1.): 
+        Decoder.__init__(self, channel=channel)
         self.scale = scale
 
     def decode(self, data): 
@@ -50,11 +66,11 @@ class KinectFrame:
     def N(self): 
         return compute_normals(self.Xest, depth_change_factor=0.5, smoothing_size=10.0)
 
-class KinectDecoder(object): 
+class KinectDecoder(Decoder): 
     kinect_params = AttrDict(fx=576.09757860, fy=576.09757860, cx=319.50, cy=239.50)
     def __init__(self, channel='KINECT_FRAME', scale=1., 
                  extract_rgb=True, extract_depth=True, extract_X=True, bgr=True):
-        self.channel = channel
+        Decoder.__init__(self, channel=channel)
         self.skip = int(1.0 / scale);
         
         assert (self.skip >= 1)
@@ -141,14 +157,39 @@ class LCMLogReader(object):
         self._log.c_eventlog.seek_to_timestamp(t)
         while True: 
             ev = self._log.next()
-            if ev.channel == self.decoder.channel: 
-                break
-        return self.decoder.decode(ev.data)
+            res, msg = self.decode_msgs(ev)
+            if res: return msg
+
+            # if ev.channel == self.decoder.channel: 
+            #     break
+
+        #         if res: yield msg
+
+        # return self.decoder.decode(ev.data)
 
     def get_frame_with_index(self, idx): 
         assert(idx >= 0 and idx < len(self.index))
         return self.get_frame_with_timestamp(self.index[idx])
 
+    def decode_msg(self, ev, dec):
+        if ev.channel == dec.channel: 
+            self.idx += 1
+            if self.idx % self.every_k_frames == 0: 
+                return True, (ev.channel, dec.decode(ev.data))
+        return False, None
+
+    def decode_msgs(self, ev): 
+        if isinstance(self.decoder, list):
+            res, msg = False, None
+            for dec in self.decoder: 
+                res, msg = self.decode_msg(ev, dec)
+                if res: break
+            return res, msg
+        else: 
+            # when accessing only single decoding, 
+            # return value as is
+            return self.decode_msg(ev, self.decoder)[1]
+            
     def iteritems(self, reverse=False): 
         if self.index is not None: 
             if reverse: 
@@ -163,12 +204,15 @@ class LCMLogReader(object):
             if reverse: 
                 raise RuntimeError('Cannot provide items in reverse when file is not indexed')
 
-            idx = 0
+            self.idx = 0
             for ev in self._log: 
-                if ev.channel == self.decoder.channel: 
-                    idx += 1
-                    if idx % self.every_k_frames == 0: 
-                        yield self.decoder.decode(ev.data)
+                res, msg = self.decode_msgs(ev)
+                if res: yield msg
+
+                # if ev.channel == self.decoder.channel: 
+                #     self.idx += 1
+                #     if idx % self.every_k_frames == 0: 
+                #         yield self.decoder.decode(ev.data)
 
     def iter_frames(self):
         return self.iteritems()
