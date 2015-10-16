@@ -1431,15 +1431,21 @@ class ScaledObjectProposer(ObjectProposer):
         return (boxes * 1 / self.scale_).astype(np.int32)
 
 class GOPObjectProposer(ObjectProposer): 
-    def __init__(self, num_proposals=1000): 
+    def __init__(self, detector='sf', num_proposals=1000): 
         from bot_vision.recognition.gop_util import setupLearned as gop_setuplearned
 
         gop_data_dir = """/home/spillai/perceptual-learning/software/externals/recognition-pod/proposals/gop/data/"""
         self.prop_ = gop.proposals.Proposal( gop_setuplearned( 140, 4, 0.8, gop_data_dir=gop_data_dir ) )
 
+        if detector == 'sf': 
+            self.segmenter_ = gop.contour.MultiScaleStructuredForest()
+            self.segmenter_.load( os.path.join(gop_data_dir, 'sf.dat'))
+        elif detector == 'sobel': 
+            self.segmenter_ = gop.contour.DirectedSobel()
+        else: 
+            raise RuntimeError('Unknown detector %s' % detector)
+
         self.num_proposals_ = num_proposals
-        self.segmenter_ = gop.contour.MultiScaleStructuredForest()
-        self.segmenter_.load( os.path.join(gop_data_dir, 'sf.dat'))
 
     def process(self, im): 
         im_ = gop.imgproc.npread(np.copy(im))
