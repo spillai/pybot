@@ -176,7 +176,7 @@ class LCMLogReader(object):
             self.idx += 1
             if self.idx % self.every_k_frames == 0: 
                 return True, (ev.channel, dec.decode(ev.data))
-        return False, None
+        return False, (None, None)
 
     def decode_msgs(self, ev): 
         if isinstance(self.decoder, list):
@@ -188,7 +188,8 @@ class LCMLogReader(object):
         else: 
             # when accessing only single decoding, 
             # return value as is
-            return self.decode_msg(ev, self.decoder)[1]
+            res, msg = self.decode_msg(ev, self.decoder)
+            return res, msg[1]
             
     def iteritems(self, reverse=False): 
         if self.index is not None: 
