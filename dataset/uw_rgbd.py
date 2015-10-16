@@ -53,12 +53,12 @@ class UWRGBDDataset(object):
     # train_names = ["bowl", "cap", "cereal_box", "background"]
     # train_names = ["cap", "cereal_box", "coffee_mug", "soda_can", "background"]
     # train_names = ["bowl", "cap", "cereal_box", "soda_can", "background"]
-    train_names = ["bowl", "cap", "cereal_box", "coffee_mug", "soda_can", "background"]
+    # train_names = ["bowl", "cap", "cereal_box", "coffee_mug", "soda_can", "background"]
     # train_names = ["bowl", "cap", "cereal_box", "coffee_mug", "soda_can"]
     # train_names = ["bowl", "cap", "cereal_box", "coffee_mug", "flashlight", 
     #                "keyboard", "kleenex", "scissors",  "soda_can", 
     #                "stapler", "background"]
-    # train_names = class_names
+    train_names = class_names
 
     train_ids = [target_hash[name] for name in train_names]
     train_names_set, train_ids_set = set(train_names), set(train_ids)
@@ -604,10 +604,9 @@ class UWRGBDSceneDataset(UWRGBDDataset):
         for key, scene in self.iterscenes(verbose=verbose, with_ground_truth=with_ground_truth): 
             if verbose: 
                 pbar.increment()
-                # print 'Processing: %s' % key
-
             for frame in scene.iteritems(every_k_frames=every_k_frames): 
                 yield frame
+            
         if verbose: pbar.finish()
 
     def scene(self, key, with_ground_truth=False): 
