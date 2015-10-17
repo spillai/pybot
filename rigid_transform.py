@@ -113,11 +113,14 @@ class RigidTransform(object):
         raise NotImplementedError('Right multiply not implemented yet!')                    
 
     def oplus(self, other): 
-        if not isinstance(other, RigidTransform): 
+        if isinstance(other, RigidTransform): 
+            t = self.quat.rotate(other.tvec) + self.tvec
+            r = self.quat * other.quat
+            return RigidTransform(r, t)
+        elif isinstance(other, list): 
+            return map(lambda o: self.oplus(o), other)
+        else: 
             raise TypeError("Type inconsistent", type(other), other.__class__)
-        t = self.quat.rotate(other.tvec) + self.tvec
-        r = self.quat * other.quat
-        return RigidTransform(r, t)
 
     def to_roll_pitch_yaw_x_y_z(self, axes='rxyz'):
         r, p, y = self.quat.to_roll_pitch_yaw(axes=axes)
