@@ -304,7 +304,7 @@ def publish_cloud(pub_channel, arr, c='r', flip_rb=False, frame_id='KINECT', ele
     _publish_point_type(pub_channel, deepcopy(arr), c=deepcopy(c), point_type='POINT', 
                         flip_rb=flip_rb, frame_id=frame_id, element_id=element_id, reset=reset)
 
-def _publish_pose_list(pub_channel, _poses, texts=[], frame_id='KINECT', reset=True):
+def _publish_pose_list(pub_channel, _poses, texts=[], frame_id='KINECT', reset=True, object_type='AXIS3D'):
     """
     Publish Pose List on:
     pub_channel: Channel on which the cloud will be published
@@ -318,7 +318,7 @@ def _publish_pose_list(pub_channel, _poses, texts=[], frame_id='KINECT', reset=T
     pose_list_msg = vs.obj_collection_t()
     pose_list_msg.id = g_viz_pub.channel_uid(pub_channel)
     pose_list_msg.name = pub_channel
-    pose_list_msg.type = getattr(vs.obj_collection_t, 'AXIS3D')
+    pose_list_msg.type = getattr(vs.obj_collection_t, object_type)
     pose_list_msg.reset = reset
     
     nposes = len(poses)
@@ -382,8 +382,8 @@ def publish_text_list(pub_channel, poses, texts=[], frame_id='KINECT'):
 
 
 # @run_async
-def publish_pose_list(pub_channel, poses, texts=[], frame_id='KINECT', reset=True):
-    _publish_pose_list(pub_channel, deepcopy(poses), texts=texts, frame_id=frame_id, reset=True)
+def publish_pose_list(pub_channel, poses, texts=[], frame_id='KINECT', reset=True, object_type='AXIS3D'):
+    _publish_pose_list(pub_channel, deepcopy(poses), texts=texts, frame_id=frame_id, reset=True, object_type=object_type)
 
 # ===== Tangents drawing ====
 def _publish_line_segments(pub_channel, _arr1, _arr2, c='r', flip_rb=False, frame_id='KINECT'):
