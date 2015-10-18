@@ -10,6 +10,7 @@ from bot_vision.imshow_utils import imshow_cv
 
 import bot_core.image_t as image_t
 import bot_core.pose_t as pose_t
+import bot_param.update_t as update_t
 
 from kinect.frame_msg_t import frame_msg_t
 from kinect.image_msg_t import image_msg_t
@@ -28,8 +29,17 @@ class Decoder(object):
     def decode(self, data): 
         return None
 
+
+class BotParamDecoder(Decoder): 
+    def __init__(self, channel='PARAM_UPDATE'): 
+        Decoder.__init__(self, channel=channel)
+        
+    def decode(self, data):
+        msg = update_t.decode(data)
+        return msg
+
 class PoseDecoder(Decoder): 
-    def __init__(self, channel='CAMERA', scale=1.): 
+    def __init__(self, channel='CAMERA'): 
         Decoder.__init__(self, channel=channel)
         
     def decode(self, data):
