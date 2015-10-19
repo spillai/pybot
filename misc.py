@@ -31,6 +31,11 @@ class Accumulator(object):
     @property
     def items(self): 
         return self.items_
+        
+    @property
+    def length(self): 
+        return len(self.items_)
+
 
 class Counter(object): 
     def __init__(self): 
@@ -46,6 +51,15 @@ class Counter(object):
         return self.idx_ % every_k == 0 #  and self.idx_ > 0 
         
 class CounterWithPeriodicCallback(Counter): 
+    """
+    robot_poses = PoseAccumulator(maxlen=1000, relative=True)
+    robot_poses_counter = CounterWithPeriodicCallback(
+        every_k=10, 
+        process_cb=lambda: draw_utils.publish_pose_list('ROBOT_POSES', robot_poses.items, 
+                                                        frame_id=ref_frame_id, reset=reset_required())   
+    )
+    robot_poses_counter.register_callback(robot_poses, 'accumulate')
+    """
     def __init__(self, every_k, process_cb): 
         Counter.__init__(self)
         self.every_k_ = every_k
