@@ -381,94 +381,98 @@ def publish_text_list(pub_channel, poses, texts=[], frame_id='KINECT'):
     # g_log.debug('Published %i poses' % (nposes))
 
 
+def publish_line_segments(pub_channel, _arr1, _arr2, c='r', flip_rb=False, frame_id='KINECT', element_id=0, reset=True):
+    publish_point_type(pub_channel, np.hstack([_arr1, _arr2]), c=c, point_type='LINES', 
+                       flip_rb=flip_rb, frame_id=frame_id, element_id=element_id, reset=reset)
+
 # @run_async
 def publish_pose_list(pub_channel, poses, texts=[], frame_id='KINECT', reset=True, object_type='AXIS3D'):
     _publish_pose_list(pub_channel, deepcopy(poses), texts=texts, frame_id=frame_id, reset=True, object_type=object_type)
 
-# ===== Tangents drawing ====
-def _publish_line_segments(pub_channel, _arr1, _arr2, c='r', flip_rb=False, frame_id='KINECT'):
-    """ 
-    Publish point cloud tangents:
-    note: draw line from p1 to p2
-    pub_channel: Channel on which the cloud will be published
-    arr1: numpy array (N x 3) for point cloud data (p1)
-    arr2: numpy array (N x 3) for point cloud data (p2) aligned 
-    c: Option 1: 'c', 'b', 'r' etc colors accepted by matplotlibs color
-       Option 2: float ranging from 0 to 1 via matplotlib's jet colormap
-       Option 3: numpy array (N x 3) with r,g,b vals ranging from 0 to 1
-    s: size of tangent vector (assuming normalized tangent vector)
-    alpha: supported only by matplotlib plotting
-    """
-    global g_viz_pub
-    arr1, carr = copy_pointcloud_data(_arr1, c, flip_rb=flip_rb)
-    arr2 = _arr2.reshape(-1,3)
-    if not arr1.shape == arr2.shape: raise AssertionError    
+# # ===== Tangents drawing ====
+# def _publish_line_segments(pub_channel, _arr1, _arr2, c='r', flip_rb=False, frame_id='KINECT', element_id=0):
+#     """ 
+#     Publish point cloud tangents:
+#     note: draw line from p1 to p2
+#     pub_channel: Channel on which the cloud will be published
+#     arr1: numpy array (N x 3) for point cloud data (p1)
+#     arr2: numpy array (N x 3) for point cloud data (p2) aligned 
+#     c: Option 1: 'c', 'b', 'r' etc colors accepted by matplotlibs color
+#        Option 2: float ranging from 0 to 1 via matplotlib's jet colormap
+#        Option 3: numpy array (N x 3) with r,g,b vals ranging from 0 to 1
+#     s: size of tangent vector (assuming normalized tangent vector)
+#     alpha: supported only by matplotlib plotting
+#     """
+#     global g_viz_pub
+#     arr1, carr = copy_pointcloud_data(_arr1, c, flip_rb=flip_rb)
+#     arr2 = _arr2.reshape(-1,3)
+#     if not arr1.shape == arr2.shape: raise AssertionError    
 
-    frame_pose = g_viz_pub.get_sensor_pose(frame_id)
+#     frame_pose = g_viz_pub.get_sensor_pose(frame_id)
 
-    # point3d list collection msg
-    pc_list_msg = vs.point3d_list_collection_t()
-    pc_list_msg.id = g_viz_pub.channel_uid(pub_channel)
-    pc_list_msg.name = pub_channel
-    pc_list_msg.type = vs.point3d_list_collection_t.LINES
-    pc_list_msg.reset = True
-    pc_list_msg.point_lists = []
+#     # point3d list collection msg
+#     pc_list_msg = vs.point3d_list_collection_t()
+#     pc_list_msg.id = g_viz_pub.channel_uid(pub_channel)
+#     pc_list_msg.name = pub_channel
+#     pc_list_msg.type = vs.point3d_list_collection_t.LINES
+#     pc_list_msg.reset = True
+#     pc_list_msg.point_lists = []
 
-    arr1s, arr2s, carrs = [arr1], [arr2], [carr]
-    # # Handle 3D data: [ndarray or list of ndarrays]
-    # arr1s, arr2s, carrs = [], [], []
-    # if isinstance(arr1, np.ndarray) and isinstance(arr2, np.ndarray): 
-    #     # ensure arr is in (N x 3) format
-    #     # carr in (N x 3) format
-    #     arr1, arr2 = reshape_arr(arr1), reshape_arr(arr2)
-    #     arr1s.append(arr1)
-    #     arr2s.append(arr2)
-    # elif isinstance(arr1, list) and isinstance(arr2, list): 
-    #     arr1s, arr2s = arr1, arr2
-    # else: 
-    #     raise TypeError("publish_line_segments: Unknown pts3d array type")
+#     arr1s, arr2s, carrs = [arr1], [arr2], [carr]
+#     # # Handle 3D data: [ndarray or list of ndarrays]
+#     # arr1s, arr2s, carrs = [], [], []
+#     # if isinstance(arr1, np.ndarray) and isinstance(arr2, np.ndarray): 
+#     #     # ensure arr is in (N x 3) format
+#     #     # carr in (N x 3) format
+#     #     arr1, arr2 = reshape_arr(arr1), reshape_arr(arr2)
+#     #     arr1s.append(arr1)
+#     #     arr2s.append(arr2)
+#     # elif isinstance(arr1, list) and isinstance(arr2, list): 
+#     #     arr1s, arr2s = arr1, arr2
+#     # else: 
+#     #     raise TypeError("publish_line_segments: Unknown pts3d array type")
 
-    # # Handle color: [string or ndarray]
-    # if isinstance(c,str):
-    #     carrs = [c] * len(arr1s)
-    # elif isinstance(c, np.ndarray): 
-    #     carrs.append(c)
-    # else: 
-    #     raise TypeError("publish_line_segments: Unknown color array type")
-    #     carrs = c
+#     # # Handle color: [string or ndarray]
+#     # if isinstance(c,str):
+#     #     carrs = [c] * len(arr1s)
+#     # elif isinstance(c, np.ndarray): 
+#     #     carrs.append(c)
+#     # else: 
+#     #     raise TypeError("publish_line_segments: Unknown color array type")
+#     #     carrs = c
 
-    tpoints = 0
-    for arr1,arr2,c in zip(arr1s,arr2s,carrs): 
-        # fill out points
-        npoints = len(arr1)
-        tpoints += npoints
+#     tpoints = 0
+#     for arr1,arr2,c in zip(arr1s,arr2s,carrs): 
+#         # fill out points
+#         npoints = len(arr1)
+#         tpoints += npoints
     
-        # Get the colors
-        carr = get_color_arr(c, npoints)
-        ch, cw = carr.shape
-        carr = np.hstack([carr, carr]).reshape((-1,cw))
+#         # Get the colors
+#         carr = get_color_arr(c, npoints)
+#         ch, cw = carr.shape
+#         carr = np.hstack([carr, carr]).reshape((-1,cw))
 
-        # Interleaved arr1, and arr2
-        arr = np.hstack([arr1, arr2]).reshape((-1,3))
+#         # Interleaved arr1, and arr2
+#         arr = np.hstack([arr1, arr2]).reshape((-1,3))
         
-        # Create the point cloud msg
-        pc_msg = arr_msg(arr, carr=carr, frame_uid=g_viz_pub.channel_uid(frame_id))
+#         # Create the point cloud msg
+#         pc_msg = arr_msg(arr, carr=carr, frame_uid=g_viz_pub.channel_uid(frame_id), element_id=element_id)
 
-        pc_list_msg.point_lists.append(pc_msg)
+#         pc_list_msg.point_lists.append(pc_msg)
 
-    # pc_msg.normals = [vs.point3d_t() for j in range(0,npoints)]   
-    # pc_msg.nnormals = len(pc_msg.normals)
-    # for j in range(0,npoints):
-    #     pc_msg.normals[j].x, pc_msg.normals[j].y, pc_msg.normals[j].z = tarr[j,0], tarr[j,1], tarr[j,2]
+#     # pc_msg.normals = [vs.point3d_t() for j in range(0,npoints)]   
+#     # pc_msg.nnormals = len(pc_msg.normals)
+#     # for j in range(0,npoints):
+#     #     pc_msg.normals[j].x, pc_msg.normals[j].y, pc_msg.normals[j].z = tarr[j,0], tarr[j,1], tarr[j,2]
 
-    # add to point cloud list    
-    pc_list_msg.nlists = len(pc_list_msg.point_lists)
-    g_viz_pub.lc.publish("POINTS_COLLECTION", pc_list_msg.encode())
-    # g_log.debug('Published %i normals' % (tpoints))
+#     # add to point cloud list    
+#     pc_list_msg.nlists = len(pc_list_msg.point_lists)
+#     g_viz_pub.lc.publish("POINTS_COLLECTION", pc_list_msg.encode())
+#     print('Published %i lines' % (tpoints))
 
-@run_async
-def publish_line_segments(pub_channel, arr1, arr2, c='r', flip_rb=False, frame_id='KINECT'):
-    _publish_line_segments(pub_channel, deepcopy(arr1), deepcopy(arr2), c=deepcopy(c), flip_rb=flip_rb, frame_id=frame_id)
+# # @run_async
+# def publish_line_segments(pub_channel, arr1, arr2, c='r', flip_rb=False, frame_id='KINECT'):
+#     _publish_line_segments(pub_channel, deepcopy(arr1), deepcopy(arr2), c=deepcopy(c), flip_rb=flip_rb, frame_id=frame_id)
 
 
 # # # ===== Pose drawing (viz) ====
