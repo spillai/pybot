@@ -92,7 +92,14 @@ class CameraIntrinsic(object):
 
     def undistort(self, im): 
         return undistort_image(im, self.K, self.D)
-
+        
+    def undistort_debug(self, im=None): 
+        if im is None: 
+            im = np.zeros(shape=self.shape, dtype=np.uint8)
+        im[::20, :] = 128
+        im[:, ::20] = 128
+        return self.undistort(im)
+        
 class CameraExtrinsic(RigidTransform): 
     def __init__(self, R=npm.eye(3), t=npm.zeros(3)):
         """
@@ -143,6 +150,14 @@ class Camera(CameraIntrinsic, CameraExtrinsic):
     @classmethod
     def from_intrinsics_extrinsics(cls, intrinsic, extrinsic): 
         return cls(intrinsic.K, extrinsic.R, extrinsic.t, D=intrinsic.D, shape=intrinsic.shape)
+
+    @classmethod
+    def from_intrinsics(cls, intrinsic): 
+        return cls.from_intrinsics_extrinsics(intrinsic, CameraExtrinsic.identity())
+
+    @classmethod
+    def from_KD(cls, K, D, shape=None): 
+        return cls.from_intrinsics(CameraIntrinsic(K, D=D, shape=shape))
 
     def project(self, X):
         """
