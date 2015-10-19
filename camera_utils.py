@@ -28,6 +28,10 @@ def construct_K(fx=500.0, fy=500.0, cx=319.5, cy=239.5):
     K[0,2], K[1,2] = cx, cy
     return K
 
+def undistort_image(im, K, D): 
+    # newcamera, roi = cv2.getOptimalNewCameraMatrix(self.K, self.D, (W,H), 0) 
+    return cv2.undistort(im, K, D, None, K)
+
 def get_calib_params(fx, fy, cx, cy, baseline=None, baseline_px=None): 
     assert(baseline is not None or baseline_px is not None)
     if baseline is not None: 
@@ -58,7 +62,7 @@ def get_calib_params(fx, fy, cx, cy, baseline=None, baseline_px=None):
                     D0=D0, D1=D1, fx=fx, fy=fy, cx=cx, cy=cy, baseline=baseline)
 
 class CameraIntrinsic(object): 
-    def __init__(self, K, D=np.zeros(4, dtype=np.float64), shape=None): 
+    def __init__(self, K, D=np.zeros(5, dtype=np.float64), shape=None): 
         """
         Default init
         """
@@ -86,6 +90,8 @@ class CameraIntrinsic(object):
         """
         return np.array([np.arctan(self.cx / self.fx), np.arctan(self.cy / self.fy)]) * 2
 
+    def undistort(self, im): 
+        return undistort_image(im, self.K, self.D)
 
 class CameraExtrinsic(RigidTransform): 
     def __init__(self, R=npm.eye(3), t=npm.zeros(3)):
