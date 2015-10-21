@@ -34,7 +34,7 @@ class VisualizationMsgsPub:
         self.log = logging.getLogger(__name__)
 
         kinect_pose = RigidTransform.from_roll_pitch_yaw_x_y_z(-np.pi/2, 0, -np.pi/2, 
-                                                               0.15, 0.2, 1.48, axes='sxyz')
+                                                               0, 0, 1, axes='sxyz')
         # kinect_pose = RigidTransform.from_roll_pitch_yaw_x_y_z(-np.pi/2 - np.pi * 20/180, 0, -np.pi/2, 
         #                                                        0.15, 0.2, 0.5, axes='sxyz')
 
@@ -336,14 +336,14 @@ def _publish_pose_list(pub_channel, _poses, texts=[], frame_id='KINECT', reset=T
         arr[j,2] = pose.tvec[2]
 
         # Pose compounding
-        p = frame_pose.oplus(pose) # RigidTransform(pose.quat, pose.tvec))
+        p = frame_pose.oplus(pose) 
         roll, pitch, yaw, x, y, z = p.to_roll_pitch_yaw_x_y_z(axes='sxyz')
 
         # Optionally get the id of the pose, 
         # for plotting clouds with corresponding pose
         # Note: defaults to index of pose
         pose_list_msg.objs[j].id = getattr(pose, 'id', j) 
-
+        
         pose_list_msg.objs[j].x = x
         pose_list_msg.objs[j].y = y
         pose_list_msg.objs[j].z = z
@@ -387,7 +387,7 @@ def publish_line_segments(pub_channel, _arr1, _arr2, c='r', flip_rb=False, frame
 
 # @run_async
 def publish_pose_list(pub_channel, poses, texts=[], frame_id='KINECT', reset=True, object_type='AXIS3D'):
-    _publish_pose_list(pub_channel, deepcopy(poses), texts=texts, frame_id=frame_id, reset=True, object_type=object_type)
+    _publish_pose_list(pub_channel, deepcopy(poses), texts=texts, frame_id=frame_id, reset=reset, object_type=object_type)
 
 # # ===== Tangents drawing ====
 # def _publish_line_segments(pub_channel, _arr1, _arr2, c='r', flip_rb=False, frame_id='KINECT', element_id=0):
