@@ -206,6 +206,10 @@ class Pose(RigidTransform):
         RigidTransform.__init__(self, xyzw=xyzw, tvec=tvec)
         self.id = pid
 
+    @classmethod
+    def from_rigid_transform(cls, pid, pose):
+        return cls(pid, pose.quat, pose.tvec)
+    
     def __repr__(self): 
         return 'Pose ID: %i, quat: %s, rpy: %s tvec: %s' % \
             (self.id, self.quat, self.quat.to_roll_pitch_yaw(), self.tvec)
