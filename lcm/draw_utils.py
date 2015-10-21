@@ -35,9 +35,6 @@ class VisualizationMsgsPub:
 
         kinect_pose = RigidTransform.from_roll_pitch_yaw_x_y_z(-np.pi/2, 0, -np.pi/2, 
                                                                0, 0, 1, axes='sxyz')
-        # kinect_pose = RigidTransform.from_roll_pitch_yaw_x_y_z(-np.pi/2 - np.pi * 20/180, 0, -np.pi/2, 
-        #                                                        0.15, 0.2, 0.5, axes='sxyz')
-
         self.publish_sensor_frame('KINECT', pose=kinect_pose)
 
     def channel_uid(self, channel): 
@@ -270,7 +267,7 @@ def _publish_point_type(pub_channel, _arr, c='r', point_type='POINT', flip_rb=Fa
     pc_list_msg.type = getattr(vs.point3d_list_collection_t, point_type);
     pc_list_msg.reset = reset
     pc_list_msg.point_lists = []
-
+    
     # Create the point cloud msg
     if isinstance(_arr, list) or isinstance(_arr, deque): 
         element_ids = element_id if isinstance(element_id, list) else [0] * len(_arr) 
@@ -288,7 +285,7 @@ def _publish_point_type(pub_channel, _arr, c='r', point_type='POINT', flip_rb=Fa
         pc_list_msg.point_lists.append(pc_msg)
 
     # add to point cloud list                
-    # print 'published %i lists' % len(_arr)
+    # print 'published %i lists %s' % (len(_arr), reset)
     pc_list_msg.nlists = len(pc_list_msg.point_lists)
     g_viz_pub.lc.publish("POINTS_COLLECTION", pc_list_msg.encode())
     # g_log.debug('Published %i points' % (tpoints))
