@@ -125,7 +125,27 @@ def publish_image_t(pub_channel, im, jpeg=False, flip_rb=True):
     # Pub
     g_viz_pub.lc.publish(pub_channel, out.encode())
 
+def draw_tag(pose=None, size=0.1): 
+    corners = np.float32([[size, size, 0], [-size, size, 0], 
+                          [-size, -size, 0], [size, -size, 0], 
+                          [size, size, 0], [-size, -size, 0], 
+                          [-size, size, 0], [size, -size, 0]])
+    return pose * corners if pose is not None else corners
 
+def draw_tag_edges(pose=None, size=0.1):
+    return corners_to_edges(draw_tag(pose=pose, size=size))
+    
+def draw_tags_edges(poses, size=0.1): 
+    return np.vstack([draw_tag_edges(p) for p in poses])
+
+def corners_to_edges(corners):
+    """ Edges are represented in N x 6 form """
+    return np.hstack([corners, np.roll(corners, 1, axis=0)])
+
+def polygons_to_edges(polygons):
+    """ Edges are represented in N x 6 form """
+    return np.vstack([ corners_to_edges(corners) for corners in polygons])
+    
 # @run_async
 # def publish_cloud(pub_ns, _arr, _carr, stamp=None, flip_rb=False, frame_id='map', seq=None): 
 #     """
@@ -702,5 +722,6 @@ def publish_cameras(pub_channel, poses, c='y', texts=[], frame_id='KINECT', draw
     #     assert(len(poses) == len(texts))
     #     arr = np.vstack([pose.tvec for pose in poses])
     #     publish_text_lcmgl(pub_channel+'-text', arr, texts=texts, sensor_tf=sensor_tf)
+
 
 
