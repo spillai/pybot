@@ -206,15 +206,21 @@ class VideoCapture(object):
         self.cap = cv2.VideoCapture(filename)
 
         if isinstance(filename, int): 
-            if size: 
+            if size is not None: 
                 self.cap.set(cv2.cv.CV_CAP_PROP_FRAME_WIDTH, size[0])
                 self.cap.set(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT, size[1])
-            if fps: 
+            if fps is not None: 
                 self.cap.set(cv2.cv.CV_CAP_PROP_FPS, fps)
 
-                self.cap.set(cv2.cv.CV_CAP_PROP_MODE, 70) # MODE_640x480_MONO16
+            # self.cap.set(cv2.cv.CV_CAP_PROP_MODE, 70) # MODE_640x480_MONO16
 
         self.process_cb = process_cb
+
+    def get(self): 
+        ret, im = self.cap.read()
+        if not ret: 
+            raise RuntimeError('Failed to read image from capture device')
+        return im
 
     def iteritems(self): 
         while True: 
