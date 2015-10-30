@@ -109,3 +109,36 @@ def blur_measure(im):
 
 def blur_detect(im, threshold=100): 
     return blur_measure(im) > threshold
+
+
+class MosaicBuilder(object): 
+    def __init__(self, filename_template, maxlen=100, shape=(1600,900), glyph_shape=(50,50)): 
+        self.idx_ = 0
+        self.filename_template_ = filename_template
+
+        if '%i' not in self.filename_template_: 
+            raise RuntimeError('Failed to parse filename template, missing %%i')
+
+        self.maxlen_ = maxlen
+        self.ims_ = []
+        self.resize_cb_ = lambda im: im_resize(im, shape=glyph_shape)
+        self.mosaic_cb_ = lambda ims: im_mosaic_list(ims, shape=None)
+
+    def add(self, im): 
+        self.ims_.append(self.resize_cb_(im))
+        if len(self.ims_) % self.maxlen_ == 0: 
+            self._save()
+
+    def _save(self): 
+        if not len(self.ims_): 
+            return
+
+        fn = self.filename_template_ % self.idx_
+        cv2.imwrite(fn, self.mosaic_cb_(self.ims_))
+        print('Saving mosaic: %s' % fn)
+
+        self.idx_ += 1
+        self.ims_ = []
+
+    def finalize(self): 
+        self._save()
