@@ -202,7 +202,7 @@ class VideoSink(object) :
             self.p.stdin.close()            
 
 class VideoCapture(object): 
-    def __init__(self, filename=-1, fps=30, size=(640,480), process_cb=None): 
+    def __init__(self, filename=-1, fps=None, size=None, process_cb=None): 
         self.cap = cv2.VideoCapture(filename)
 
         if isinstance(filename, int): 
@@ -215,7 +215,7 @@ class VideoCapture(object):
             # self.cap.set(cv2.cv.CV_CAP_PROP_MODE, 70) # MODE_640x480_MONO16
 
         self.process_cb = process_cb
-
+    
     def get(self): 
         ret, im = self.cap.read()
         if not ret: 
