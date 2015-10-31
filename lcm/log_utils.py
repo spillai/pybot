@@ -61,6 +61,19 @@ class ImageDecoder(Decoder):
         else: 
             raise RuntimeError('Unknown pixelformat for ImageDecoder')
 
+class StereoImageDecoder(ImageDecoder): 
+    def __init__(self, split='vertical', channel='CAMERA', scale=1.): 
+        ImageDecoder.__init__(self, channel=channel, scale=scale)
+        if split == 'vertical' or split == 0: 
+            self.split = 0
+        elif split == 'horizontal' or split == 1: 
+            self.split = 1
+        else: 
+            raise RuntimeError('Unknown image split type')
+
+    def decode(self, data):
+        return np.split(super(StereoImageDecoder, self).decode(data), 2, axis=self.split)
+
 class KinectFrame: 
     def __init__(self, timestamp=None, img=None, depth=None, X=None): 
         self.timestamp = timestamp

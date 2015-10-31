@@ -35,7 +35,7 @@ class VisualizationMsgsPub:
 
         kinect_pose = RigidTransform.from_roll_pitch_yaw_x_y_z(-np.pi/2, 0, -np.pi/2, 
                                                                0, 0, 1, axes='sxyz')
-        self.publish_sensor_frame('KINECT', pose=kinect_pose)
+        self.publish_sensor_frame('camera', pose=kinect_pose)
 
     def channel_uid(self, channel): 
         uid = self._channel_uid.setdefault(channel, len(self._channel_uid))
