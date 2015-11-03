@@ -209,7 +209,11 @@ class StereoReconstruction(object):
                         np.copy(X[::sample,::sample]).reshape(-1,3)
         return im_pub, X_pub
 
+
 class CalibratedFastStereo(object): 
+    """
+    This class has been deprecated
+    """
     def __init__(self, stereo, calib_params, rectify=None): 
         self.stereo_ = stereo
         self.calib_set_ = False
