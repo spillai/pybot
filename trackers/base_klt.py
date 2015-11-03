@@ -1,7 +1,7 @@
 '''
 Lucas-Kanade tracker
 
-@author: Sudeep Pillai 
+Author: Sudeep Pillai 
   (First implementation: 07 May 2014)
   (Modified: 17 Oct 2014)
 ====================
