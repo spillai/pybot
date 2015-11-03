@@ -243,26 +243,17 @@ class CalibratedFastStereo(object):
         else: 
             self.set_calibration = lambda *args: None
 
-
-    def strip(self, left_im, right_im): 
-        sz0 = left_im.shape[:2]
-        sz = np.array(list(left_im.shape)) - np.array(list(left_im.shape)) % 16
-        dsz = sz0 - sz
-        if not self.calib_set_: 
-            self.set_calibration(sz[0], sz[1])
-            self.calib_set_ = True
-        return left_im[dsz[0]/2:sz[0]+dsz[0]/2, dsz[1]/2:sz[1]+dsz[1]/2], right_im[dsz[0]/2:sz[0]+dsz[0]/2, dsz[1]/2:sz[1]+dsz[1]/2]
-
     def process(self, left_im, right_im):
         if self.rectify_ is not None: 
             left_im, right_im = self.rectify_(left_im, right_im)
-        
-        lim, rim = self.strip(left_im, right_im)
-        disp = np.zeros(shape=left_im.shape, dtype=np.float32)
-        res = self.stereo_.process(lim, rim)
-        sz = res.shape
-        disp[:sz[0],:sz[1]] = res
-        return disp
+
+        # Set one time calibration 
+        if not self.calib_set_: 
+            sz = left_im.shape[:2]
+            self.set_calibration(sz[0], sz[1])
+            self.calib_set_ = True
+
+        return self.stereo_.process(left_im, right_im)
 
 def setup_zed(scale=1.0): 
     # Saved Calibration
