@@ -13,7 +13,6 @@ def kitti_stereo_calib_params(scale=1.0):
     f = 718.856*scale
     cx, cy = 607.192*scale, 185.2157*scale
     baseline_px = 386.1448 * scale
-
     return get_calib_params(f, f, cx, cy, baseline_px=baseline_px)
 
 def kitti_load_poses(fn): 
