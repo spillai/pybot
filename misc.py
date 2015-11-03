@@ -108,7 +108,7 @@ class PoseAccumulator(Accumulator):
     def relative_to_init(self, pose_wt): 
         """ pose of [t] wrt [0]:  p_0t = p_w0.inverse() * p_wt """  
         return (self.init_.inverse()).oplus(pose_wt)
-
+        
 class SkippedCounter(Counter): 
     def __init__(self, skip=10, **kwargs): 
         Counter.__init__(self)
