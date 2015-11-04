@@ -160,6 +160,7 @@ class LCMLogReader(object):
         self._log = lcm.EventLog(self.filename, "r")
 
         # Build index
+        self.idx = 0
         if index: 
             self._index()
         else: 
@@ -228,7 +229,6 @@ class LCMLogReader(object):
             if reverse: 
                 raise RuntimeError('Cannot provide items in reverse when file is not indexed')
 
-            self.idx = 0
             for ev in self._log: 
                 res, msg = self.decode_msgs(ev)
                 if res: yield msg
