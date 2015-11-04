@@ -66,6 +66,94 @@ from bot_vision.imshow_utils import imshow_cv
 from pybot_externals import StereoELAS
 from bot_vision.color_utils import colormap
 
+class BotSource(object): 
+    def __init__(self): 
+        pass
+
+    # def run(self): 
+    #     pass
+
+    def set_source(self, source): 
+        self.source_ = source
+
+    def iteritems(self, *args, **kwargs): 
+        return self.source_.iteritems(*args, **kwargs)
+
+
+from bot_utils.io_utils import VideoCapture
+from bot_externals.lcm.log_utils import KinectLCMLogReader, KinectDecoder
+                        
+class MonoSource(BotSource): 
+    """
+    Formats:
+
+      'cam://0'
+      'file:///home/spillai/data/test.avi'
+      'lcm:///home/spillai/data/lcmlog-2015-07-07.00?=KINECT_DATA'
+    
+    """
+    def __init__(self, source_file, source_params):
+        BotSource.__init__(self)
+        source_type, source_name = source_file.split('://')
+        if source_type == 'cam': 
+            source = VideoCapture(filename=int(source_name), size=(640,480), fps=60) # replace with source_params
+        elif source_type == 'file': 
+            source = VideoCapture(filename=source_name) # replace with source_params
+        elif source_type == 'lcm': 
+            splits = source_name.split('?=')
+            filename, channel = splits if len(splits) == 2 else (splits[0], 'KINECT_DATA') 
+            source = KinectLCMLogReader(filename=source_name, 
+                                         channel=channel, extract_depth=True)
+        else: 
+            raise RuntimeError("Unknown Source type %s" % source_type)
+
+        self.set_source(source)
+
+class StereoSource(BotSource): 
+    def __init__(self, source_file, source_params):
+        BotSource.__init__(self)
+        source_type, source_name = source_file.split('://')
+        # if source_type == 'cam': 
+        #     try: 
+        #         idx0, idx1 = source_name.split(',')
+        #     except ValueError as e:  
+        #         print(e.args)
+        #     source = MonoSource(
+        #         VideoCapture(filename=int(source_name), size=(640,480), fps=60) # replace with source_params
+        
+        if source_type == 'firewire': 
+            from pybot_vision import DC1394Device
+            from bot_utils.db_utils import AttrDict
+
+            dataset = DC1394Device()
+            dataset.init()
+        elif source_type == 'dir':
+            StereoImageDatasetReader(directory=directory)
+        else: 
+            raise RuntimeError("Unknown Source type %s" % source_type)
+
+    
+    # def run(self): 
+    #     pass
+
+# def app_factory(source_type='mono', source_file='cam://0'):
+    
+#     if source_type == 'mono':
+#         source = MonoSource
+#     elif source_type == 'stereo': 
+#         source = StereoSource
+#     elif source_type == 'rgbd': 
+#         source = RGBDSource
+#     else: 
+#         raise RuntimeError('Unknown source_type: %s for factory production' % source_type)
+
+#     class SourcedApp(source): 
+#         def __init__(self): 
+#             source.__init__(self, source_file)
+
+#     return SourcedApp
+
+
 class TestDatasetIterator(BotFilter): 
     def __init__(self, *args, **kwargs):
         # BotFilter.__init__(self)
@@ -96,7 +184,10 @@ class TestFilter(BotFilter):
     #     return None
 
 if __name__ == "__main__": 
-    pipeline = BotPipeline([dict(name='dataset', process=TestDatasetIterator(scale=1)), 
-                            dict(name='tfilter', process=TestFilter()), 
-                        ])
-    pipeline.run()
+    # pipeline = BotPipeline([dict(name='dataset', process=TestDatasetIterator(scale=1)), 
+    #                         dict(name='tfilter', process=TestFilter()), 
+    #                     ])
+    # pipeline.run()
+
+    # StereoSource()
+    
