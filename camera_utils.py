@@ -103,11 +103,16 @@ class CameraIntrinsic(object):
 class CameraExtrinsic(RigidTransform): 
     def __init__(self, R=npm.eye(3), t=npm.zeros(3)):
         """
-        Default init
+        Pose is defined as p_cw (pose of the world wrt camera)
         """
         p = RigidTransform.from_Rt(R, t)
         RigidTransform.__init__(self, xyzw=p.quat.to_xyzw(), tvec=p.tvec)
 
+    @classmethod
+    def from_rigid_transform(cls, p): 
+        R, t = p.to_Rt()
+        return cls(R, t)
+    
     @property
     def R(self): 
         return self.quat.to_homogeneous_matrix()[:3,:3]
