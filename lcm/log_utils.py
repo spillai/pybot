@@ -144,7 +144,7 @@ class KinectDecoder(Decoder):
         return depth
 
 class LCMLogReader(object): 
-    def __init__(self, filename=None, decoder=None, every_k_frames=1, index=True):
+    def __init__(self, filename=None, decoder=None, start_idx=0, every_k_frames=1, index=True):
         filename = os.path.expanduser(filename)
         if filename is None or not os.path.exists(os.path.expanduser(filename)):
             raise Exception('Invalid Filename: %s' % filename)
@@ -154,6 +154,7 @@ class LCMLogReader(object):
         self.filename = filename
         self.decoder = decoder
         self.every_k_frames = every_k_frames
+        self.start_idx = start_idx
 
         # Log specific
         self._lc = lcm.LCM()
@@ -171,7 +172,10 @@ class LCMLogReader(object):
         inds = np.array([idx
                          for idx, ev in enumerate(self._log) 
                          if ev.channel == self.decoder.channel], dtype=np.int64)
-        self.index = utimes[np.maximum(0, inds-1)][::self.every_k_frames]
+        try: 
+            self.index = utimes[np.maximum(self.start_idx, inds-1)][::self.every_k_frames]
+        except: 
+            raise RuntimeError('Probably failed to establish start_idx')
 
     @property
     def length(self): 
@@ -198,7 +202,7 @@ class LCMLogReader(object):
     def decode_msg(self, ev, dec):
         if ev.channel == dec.channel: 
             self.idx += 1
-            if self.idx % self.every_k_frames == 0: 
+            if self.idx >= self.start_idx and self.idx % self.every_k_frames == 0: 
                 return True, (ev.channel, dec.decode(ev.data))
         return False, (None, None)
 
@@ -219,6 +223,8 @@ class LCMLogReader(object):
         if self.index is not None: 
             if reverse: 
                 for t in self.index[::-1]: 
+                    if self.start_idx != 0: 
+                        raise RuntimeWarning('No support for start_idx != 0')
                     frame = self.get_frame_with_timestamp(t)
                     yield frame
             else: 
