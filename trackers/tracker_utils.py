@@ -158,6 +158,8 @@ class OpticalFlowTracker(object):
             self.track = self.dense_track
         else: 
             raise RuntimeError('Unknown tracking type: %s! Use lk or dense' % self.params.type)
+        from bot_utils.timer import SimpleTimer
+        self.timer = SimpleTimer(name='optical-flow', iterations=100)
 
     def dense_track(self, im0, im1, p0): 
         if p0 is None or not len(p0): 
@@ -211,6 +213,7 @@ class OpticalFlowTracker(object):
         """
         Main tracking method using either sparse/dense optical flow
         """
+        self.timer.start()
         if p0 is None or not len(p0): 
             return np.array([])
 
@@ -227,5 +230,6 @@ class OpticalFlowTracker(object):
             fb_good = (np.fabs(p0r-p0) < 2).all(axis=1)
             p1[~fb_good] = np.nan
 
+        self.timer.stop()
         return p1
 

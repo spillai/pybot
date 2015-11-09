@@ -40,7 +40,7 @@ class BaseKLT(object):
     """
 
     default_params = AttrDict(
-        detector=FeatureDetector.fast_detector_params, 
+        detector=FeatureDetector.gftt_detector_params, 
         tracker=OpticalFlowTracker.klt_flow_params
     )
     def __init__(self, params=default_params): 
@@ -73,7 +73,7 @@ class BaseKLT(object):
         valid = finite_and_within_bounds(self.tm.pts, out.shape)
         colors = colormap(np.float32(self.tm.ids % 20) / 20)
         for col, pt in zip(colors, self.tm.pts[valid]): 
-            cv2.circle(out, tuple(map(int, pt)), 3, col, -1, lineType=cv2.CV_AA)
+            cv2.circle(out, tuple(map(int, pt)), 2, col, -1, lineType=cv2.CV_AA)
 
 
 
