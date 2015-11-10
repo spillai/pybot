@@ -21,12 +21,34 @@ from kinect.depth_msg_t import depth_msg_t
 # from openni.depth_msg_t import depth_msg_t
 
 
+# class Decoder2(object): 
+#     def __init__(self): 
+#         pass
+
+#     def decode(self, data): 
+#         return None
+
+# class Channel(object): 
+#     def __init__(self, channel=''): 
+#         self.channel = channel
+
+#     def check(self, ch): 
+#         return self.channel == ch
+
+# class MicrostrainChannelDecoder(Channel, MicrostrainDecoder): 
+#     def __init__(self, channel=''): 
+#         Channel.__init__(self, channel=channel)
+#         MicrostrainDecoder.__init__(self)
+
 class Decoder(object): 
     def __init__(self, channel=''): 
         self.channel = channel
-
+    
     def decode(self, data): 
         return None
+
+    def can_decode(self, channel): 
+        return self.channel == channel
 
 class BotParamDecoder(Decoder): 
     def __init__(self, channel='PARAM_UPDATE'): 
@@ -37,7 +59,7 @@ class BotParamDecoder(Decoder):
         return msg
 
 class MicrostrainDecoder(Decoder): 
-    def __init__(self, channel=''): 
+    def __init__(self, channel='MICROSTRAIN_INS'): 
         Decoder.__init__(self, channel=channel)
         from microstrain import ins_t 
         self.ins_t_decode_ = lambda data : ins_t.decode(data)
