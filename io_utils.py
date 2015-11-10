@@ -1,3 +1,9 @@
+"""
+General purpose IO utils for pybot
+"""
+# Author: Sudeep Pillai <spillai@csail.mit.edu>
+# License: MIT
+
 import cv2
 import sys
 import argparse
