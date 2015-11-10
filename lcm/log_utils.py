@@ -20,7 +20,6 @@ from kinect.depth_msg_t import depth_msg_t
 # from openni.image_msg_t import image_msg_t
 # from openni.depth_msg_t import depth_msg_t
 
-from pybot_pcl import compute_normals, fast_bilateral_filter, median_filter
 
 class Decoder(object): 
     def __init__(self, channel=''): 
@@ -29,13 +28,22 @@ class Decoder(object):
     def decode(self, data): 
         return None
 
-
 class BotParamDecoder(Decoder): 
     def __init__(self, channel='PARAM_UPDATE'): 
         Decoder.__init__(self, channel=channel)
         
     def decode(self, data):
         msg = update_t.decode(data)
+        return msg
+
+class MicrostrainDecoder(Decoder): 
+    def __init__(self, channel=''): 
+        Decoder.__init__(self, channel=channel)
+        from microstrain import ins_t 
+        self.ins_t_decode_ = lambda data : ins_t.decode(data)
+
+    def decode(self, data):
+        msg = self.ins_t_decode_(data)
         return msg
 
 class PoseDecoder(Decoder): 
@@ -81,13 +89,18 @@ class KinectFrame:
         self.depth = depth
         self.X = X
 
+        from pybot_pcl import compute_normals, fast_bilateral_filter, median_filter
+        self.compute_normals_ = compute_normals
+        self.fast_bilateral_filter_ = fast_bilateral_filter
+        self.median_filter_ = median_filter
+
     @property
     def Xest(self): 
-        return fast_bilateral_filter(self.X, sigmaS=20.0, sigmaR=0.05)
+        return self.fast_bilateral_filter_(self.X, sigmaS=20.0, sigmaR=0.05)
 
     @property
     def N(self): 
-        return compute_normals(self.Xest, depth_change_factor=0.5, smoothing_size=10.0)
+        return self.compute_normals(self.Xest, depth_change_factor=0.5, smoothing_size=10.0)
 
 class KinectDecoder(Decoder): 
     kinect_params = AttrDict(fx=576.09757860, fy=576.09757860, cx=319.50, cy=239.50)
