@@ -49,6 +49,8 @@ def get_calib_params(fx, fy, cx, cy, baseline=None, baseline_px=None):
                      0.0, fy, cy, 0.0, 
                      0.0, 0.0, 1.0, 0.0]).reshape((3,4))
 
+    K0, K1 = P0[:3,:3], P1[:3,:3]
+
     R0, R1 = np.eye(3), np.eye(3)
     T0, T1 = np.zeros(3), np.float32([-baseline_px, 0, 0])
 
@@ -58,7 +60,7 @@ def get_calib_params(fx, fy, cx, cy, baseline=None, baseline_px=None):
                     [0, 0, q43,0]])
 
     D0, D1 = np.zeros(5), np.zeros(5)
-    return AttrDict(R0=R0, R1=R1, P0=P0, P1=P1, Q=Q, T0=T0, T1=T1, 
+    return AttrDict(R0=R0, R1=R1, K0=K0, K1=K1, P0=P0, P1=P1, Q=Q, T0=T0, T1=T1, 
                     D0=D0, D1=D1, fx=fx, fy=fy, cx=cx, cy=cy, baseline=baseline)
 
 class CameraIntrinsic(object): 

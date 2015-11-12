@@ -300,7 +300,6 @@ def stereo_dataset(filename, channel='CAMERA', every_k_frames=1, scale=1):
     return dataset
 
 def setup_zed_dataset(filename, every_k_frames=1, scale=1): 
-    from bot_utils.dataset.kitti_helpers import get_calib_params
     dataset = stereo_dataset(filename=filename, 
                              channel='CAMERA', every_k_frames=every_k_frames, scale=scale)
 
@@ -310,8 +309,6 @@ def setup_zed_dataset(filename, every_k_frames=1, scale=1):
     return dataset
  
 def setup_bb_dataset(filename, every_k_frames=1, scale=1): 
-    from bot_utils.dataset.kitti_helpers import get_calib_params
-    
     dataset = stereo_dataset(filename=filename, 
                              channel='CAMERA', every_k_frames=every_k_frames, scale=scale)
     
