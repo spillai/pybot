@@ -54,10 +54,14 @@ class TsukubaStereo2012Reader(object):
                                           right_template=right_template, 
                                           start_idx=start_idx, max_files=max_files, scale=scale)
         print 'Initialized stereo dataset reader with %f scale' % scale
-    
+        self.gt = ImageDatasetReader(template=
+                                     os.path.join(os.path.expanduser(directory), 
+                                                  'groundtruth/disparity_maps/left/tsukuba_disparity_L_%05i.png'), 
+                                     start_idx=start_idx, max_files=max_files, scale=scale)
+        
     def iter_frames(self, *args, **kwargs): 
-        for (left, right), pose in izip(self.iter_stereo_frames(*args, **kwargs), self.poses): 
-            yield AttrDict(left=left, right=right, velodyne=None, pose=pose)
+        for (left, right), pose, depth in izip(self.iter_stereo_frames(*args, **kwargs), self.poses, self.gt.iteritems(*args, **kwargs)): 
+            yield AttrDict(left=left, right=right, velodyne=None, pose=pose, depth=depth)
 
     def iter_stereo_frames(self, *args, **kwargs): 
         return self.stereo.iteritems(*args, **kwargs)
@@ -71,9 +75,8 @@ if __name__ == "__main__":
     from bot_vision.image_utils import to_gray
 
     dataset = TsukubaStereo2012Reader(directory='~/data/NewTsukubaStereoDataset/')
-    # for f in dataset.iter_frames():
-    for l,r in dataset.iter_stereo_frames():
-        lim, rim = to_gray(l), to_gray(r)
+    for f in dataset.iter_frames():
+        lim, rim = to_gray(f.left), to_gray(f.right)
         out = np.dstack([np.zeros_like(lim), lim, rim])
         imshow_cv('left/right', out)
-        
+        imshow_cv('disp', f.depth)
