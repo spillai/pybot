@@ -99,7 +99,7 @@ class DatasetReader(object):
                           if os.path.exists(template % idx)]
         else: 
             self.files = files
-        
+
     @staticmethod
     def from_filenames(process_cb, files): 
         return DatasetReader(process_cb=process_cb, files=files)

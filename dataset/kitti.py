@@ -9,6 +9,9 @@ from bot_utils.dataset_readers import natural_sort, \
 
 from .kitti_helpers import kitti_stereo_calib_params, kitti_load_poses
 
+# class StereoDatasetMixin(): 
+# TODO
+
 class KITTIDatasetReader(object): 
     """
     KITTIDatasetReader: ImageDatasetReader + VelodyneDatasetReader + Calib
