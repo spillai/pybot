@@ -2,11 +2,9 @@ import os
 import numpy as np
 from itertools import izip
 
-from bot_utils.io_utils import path_exists
 from bot_vision.camera_utils import get_calib_params
 from bot_geometry.rigid_transform import Quaternion, RigidTransform
-from bot_utils.dataset_readers import natural_sort, \
-    read_dir, DatasetReader, ImageDatasetReader, StereoDatasetReader, VelodyneDatasetReader
+from bot_utils.dataset_readers import ImageDatasetReader, StereoDatasetReader
 from bot_utils.db_utils import AttrDict
 import bot_externals.lcm.draw_utils as draw_utils
 
