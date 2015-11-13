@@ -199,6 +199,16 @@ class StereoReconstruction(object):
         X = cv2.reprojectImageTo3D(disp, self.calib.Q)
         return X
 
+    def reconstruct_sparse(self, xyd): 
+        """
+        Reproject to 3D with calib params
+        """
+        N, _ = xyd.shape[:2]
+        xyd1 = np.hstack([xyd, np.ones(shape=(N,1))])
+        XYZW = np.dot(self.calib.Q, xyd1.T).T
+        W = (XYZW[:,3]).reshape(-1,1)
+        return (XYZW / W)[:,:3]
+                          
     def reconstruct_with_texture(self, disp, im, sample=1): 
         """
         Reproject to 3D with calib params and texture mapped
