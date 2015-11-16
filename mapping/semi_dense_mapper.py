@@ -59,16 +59,11 @@ class Mapper(object):
            Colors corresponding to each point reconstructed
 
     """
-    # default_params = AttrDict(
-    #     K = np.array([[528.49404721, 0, 319.5], 
-    #                   [0, 528.49404721, 239.5],
-    #                   [0, 0, 1]]), 
-    #     W = 640, H = 480
-    # )
-
-    def __init__(self, poses=None, keyframes=None): 
+    def __init__(self, poses=None, keyframes=None, update_every=20, update_cb=lambda: None): 
         self.poses = poses
         self.keyframes = keyframes
+        self.update_every = update_every
+        self.update_cb = update_cb
 
         if keyframes is None: 
             return
@@ -90,6 +85,17 @@ class Mapper(object):
             self.keyframes[k_id].points = points[inds]
             self.keyframes[k_id].colors = colors[inds]
 
+    def add(self, pose): 
+        self.poses.append(pose)
+
+        # Update keyframes 
+        if len(self.poses) % self.update_every == 0: 
+            try: 
+                self.update_cb()
+                self.publish()
+            except: 
+                raise RuntimeError('Failed to update, check if update_cb is prepared')
+            
     def fetch_keyframe(self, frame_id): 
         return self.keyframes[self.kf_idx[frame_id]]
 
@@ -99,38 +105,47 @@ class Mapper(object):
         keyframes = OrderedDict({kf.id:kf for kf in db.keyframes})
         return cls(db.poses, keyframes)
 
-    # Not return class specific dictionary: 
-    # Only saving map, and relevant poses, keyframes, colors etc
     def save(self, path): 
+        """
+        Save map, and relevant poses, keyframes, colors etc
+        Not return class specific dictionary: 
+        """
         print 'Saving keyframe ids: ', self.keyframes.keys()
         db = AttrDict(poses=self.poses, 
                       keyframes=self.keyframes.values())
         db.save(path)
-
-    # def iter_keyframes(self, every_k_frames=1): 
-    #     fnos = np.arange(0, len(self.keyframes), every_k_frames).astype(int)
-    #     for fno in fnos:
-    #         yield self.keyframes[fno]
-
-    @staticmethod
-    def publish_map_components(poses, keyframes, points, colors): 
-        draw_utils.publish_pose_list('slam_poses', poses, frame_id='KINECT')
-        draw_utils.publish_cameras('slam_keyframes', keyframes, frame_id='KINECT', draw_faces=False)
-        draw_utils.publish_cloud('slam_keyframe_cloud', points, c=colors, frame_id='KINECT')
-
+        
     def publish(self): 
-        try: 
-            Mapper.publish_map_components(self.poses, self.all_keyframes, self.all_points, self.all_colors)
-        except Exception as e: 
-            print e
+        """
 
+        Publish map components: 
+           poses: Intermediate poses, i.e. tracked poses (usually unoptimized)
+           keyframes: Optimized keyframes (this will be updated every so often)
+           points: Landmark features that are also optimized along with keyframes
+
+        """
+        draw_utils.publish_pose_list('slam_poses', self.poses, frame_id='camera')
+
+        kf_ids = self.all_keyframe_ids
+        kf_pts = self.all_points
+        kf_cols = self.all_colors
+        kf_poses = self.all_keyframes
+
+        draw_utils.publish_cameras('slam_keyframes', kf_poses, frame_id='camera', draw_faces=False)
+        draw_utils.publish_cloud('slam_keyframes_cloud', kf_pts, c=kf_cols, frame_id='camera')
+        # draw_utils.publish_cloud('slam_keyframes_cloud', kf_pts, c=kf_cols, element_id=kf_ids, frame_id='slam_keyframes')
+        
     @property
     def all_points(self): 
-        return np.vstack([kf.pose * kf.points for kf in self.keyframes.itervalues() if kf.points is not None])
+        return [kf.points for kf in self.keyframes.itervalues() if kf.points is not None]
 
     @property
     def all_colors(self): 
-        return np.vstack([kf.colors for kf in self.keyframes.itervalues() if kf.colors is not None ])
+        return [kf.colors for kf in self.keyframes.itervalues() if kf.colors is not None ]
+
+    @property
+    def all_keyframe_ids(self): 
+        return [kf.id for kf in self.keyframes.itervalues()]
 
     @property
     def all_keyframes(self): 
@@ -144,7 +159,8 @@ class LSDMapper(Mapper):
         in_width=640, in_height=480,
     )
     def __init__(self, params=default_params): 
-        Mapper.__init__(self, poses=None, keyframes=OrderedDict())
+        Mapper.__init__(self, poses=[], keyframes=OrderedDict(), update_cb=self._update_keyframes)
+        
         from pybot_externals import LSDSLAM
         self.slam = LSDSLAM(**params)
         self.poses = []
@@ -172,14 +188,9 @@ class LSDMapper(Mapper):
 
         # Retain intermediate poses
         T = self.slam.getCurrentPoseEstimate()
-        self.poses.append(Sim3.from_homogenous_matrix(T))
+        self.add(Sim3.from_homogenous_matrix(T))
+
         # self.poses.append(RigidTransform.from_homogenous_matrix(T))
-
-        # Update keyframes 
-        self._update_keyframes()
-
-        if len(self.poses) % 20 == 0: 
-            self.publish()
 
         # # Show debug output
         # if len(self.keyframes): 
@@ -202,12 +213,12 @@ class ORBMapper(Mapper):
         W = 640, H = 480
     )
     def __init__(self, params=default_params): 
-        Mapper.__init__(self, poses=[], keyframes=OrderedDict())
-
+        Mapper.__init__(self, poses=[], keyframes=OrderedDict(), update_cb=self._update_keyframes)
         from pybot_externals import ORBSLAM
 
         path = '/home/spillai/perceptual-learning/software/python/apps/config/orb_slam/'
         self.slam = ORBSLAM(settings=path + 'Settings_udub.yaml', vocab=path + 'ORBvoc.yml')
+
 
     def _update_keyframes(self): 
         # Keyframe graph for updates
@@ -220,12 +231,15 @@ class ORBMapper(Mapper):
             pose_cw = RigidTransform.from_homogenous_matrix(kf.getPose())
             pose_wc = pose_cw.inverse()
             cloud_w = kf.getPoints()
-            cloud_c = pose_cw * cloud_w
-            colors = (np.tile([0,0,1.0], [len(cloud_c),1])).astype(np.float32)
+            # cloud_c = pose_cw * cloud_w
+            colors = (np.tile([0,0,1.0], [len(cloud_w),1])).astype(np.float32)
 
+            # print k_id, len(cloud_w), len(cloud_c)
+
+            # For now, add Pose with ID to pose, not necessary later on
             self.keyframes[k_id] = AttrDict(id=k_id, frame_id=f_id, 
-                                            pose=pose_wc, 
-                                            points=cloud_c, colors=colors, img=kf.getImage())
+                                            pose=Pose.from_rigid_transform(k_id, pose_wc), 
+                                            points=cloud_w, colors=colors, img=kf.getImage())
 
         print 'Keyframes: ', len(self.keyframes), 'Poses: ', len(self.poses)
 
@@ -241,13 +255,9 @@ class ORBMapper(Mapper):
             pose_wc = pose_cw.inverse()
         except: 
             return
-        self.poses.append(pose_wc)
 
-        # Update keyframes 
-        self._update_keyframes()
-
-        if len(self.poses) % 20 == 0: 
-            self.publish()
+        # Add pose to map
+        self.add(pose_wc)
 
         imshow_cv('orb-slam', im)
     
@@ -295,7 +305,7 @@ class MultiViewMapper(Mapper):
             cloud = self.depth_filter.getPoints()
             colors = (self.depth_filter.getColors() * 1.0 / 255).astype(np.float32)
             # colors = (np.tile([1.0,0,0], [len(cloud),1])).astype(np.float32)
-            draw_utils.publish_cloud('depth_keyframe_cloud', cloud, c=colors, frame_id='KINECT')
+            draw_utils.publish_cloud('depth_keyframe_cloud', cloud, c=colors, frame_id='camera')
         except Exception as e: 
             print e
 
@@ -312,7 +322,7 @@ class MultiViewMapper(Mapper):
             if kf_id < 20: 
                 continue
             self.process_img(self.keyframes[kf_id].img, self.keyframes[kf_id].pose)
-            draw_utils.publish_cameras('current_keyframe', [self.keyframes[kf_id].pose], frame_id='KINECT', size=2)
+            draw_utils.publish_cameras('current_keyframe', [self.keyframes[kf_id].pose], frame_id='camera', size=2)
 
         # HACK: save to first keyframe
         self.keyframes[0].points = self.depth_filter.getPoints()
@@ -326,16 +336,6 @@ class SemiDenseMapper(object):
     )
     def __init__(self, params=default_params): 
         self.params = params
-
-    # def run(self): 
-    #     for key, scene in dataset.iterscenes(targets=self.params.targets, verbose=True): 
-    #         print 'Processing scene %s' % key
-    #         if self.params.mapper == 'orb': 
-    #             self._run_scene_orb(key, scene)
-    #         elif self.params.mapper == 'lsd': 
-    #             self._run_scene_lsd(key, scene)
-    #         else: 
-    #             raise RuntimeError('Mapper not available: %s' % self.params.mapper)
 
     def run(self, key, scene, remap_sparse=True): 
         print 'Processing scene %s' % key
