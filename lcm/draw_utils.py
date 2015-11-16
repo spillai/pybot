@@ -80,6 +80,10 @@ class VisualizationMsgsPub:
 global g_viz_pub
 g_viz_pub = VisualizationMsgsPub()
 
+def get_sensor_pose(frame_id='camera'): 
+    global g_viz_pub
+    return g_viz_pub.get_sensor_pose(frame_id)
+
 def publish_sensor_frame(frame_id, pose): 
     global g_viz_pub
     g_viz_pub.publish_sensor_frame(frame_id, pose)
@@ -304,10 +308,9 @@ def _publish_point_type(pub_channel, _arr, c='r', point_type='POINT', flip_rb=Fa
         pc_list_msg.point_lists.append(pc_msg)
 
     # add to point cloud list                
-    # print 'published %i lists %s' % (len(_arr), reset)
+    # print('published %i lists %s' % (len(_arr), reset))
     pc_list_msg.nlists = len(pc_list_msg.point_lists)
     g_viz_pub.lc.publish("POINTS_COLLECTION", pc_list_msg.encode())
-    # g_log.debug('Published %i points' % (tpoints))
 
 # @run_async
 def publish_point_type(pub_channel, arr, c='r', point_type='POINT', 
@@ -560,7 +563,7 @@ def publish_pose_list(pub_channel, poses, texts=[], frame_id='camera', reset=Tru
 
 # # ===== Pose drawing (viz) ====
 # def publish_text_list(pub_channel, ref_channel, texts, 
-#                       sensor_tf='KINECT'):
+#                       sensor_tf='camera'):
 #     """
 #     Publish Text List on:
 #     pub_channel: Channel on which the cloud will be published
@@ -644,7 +647,7 @@ def publish_pose_list(pub_channel, poses, texts=[], frame_id='camera', reset=Tru
 #     g.glEnd()
 #     g.switch_buffer()
 
-# def publish_text_lcmgl(pub_channel, arr, texts, alpha=0.9, sensor_tf='KINECT'): 
+# def publish_text_lcmgl(pub_channel, arr, texts, alpha=0.9, sensor_tf='camera'): 
 #     """ 
 #     Publish text with point cloud array in lcmgl
 #     """
@@ -696,7 +699,7 @@ def draw_camera(pose, depth=0.1, fov=np.deg2rad(60)):
     
     return (faces, np.hstack([pts[:-1], pts[1:]]).reshape((-1,3)))
 
-def publish_cameras(pub_channel, poses, c='y', texts=[], frame_id='KINECT', draw_faces=True, draw_edges=True, size=1):
+def publish_cameras(pub_channel, poses, c='y', texts=[], frame_id='camera', draw_faces=True, draw_edges=True, size=1):
     cam_feats = [draw_camera(pose, depth=0.05 * size) for pose in poses]
     cam_faces = map(lambda x: x[0], cam_feats)
     cam_edges = map(lambda x: x[1], cam_feats)
