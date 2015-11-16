@@ -219,6 +219,24 @@ class StereoReconstruction(object):
                         np.copy(X[::sample,::sample]).reshape(-1,3)
         return im_pub, X_pub
 
+class CalibratedStereo(object): 
+    def __init__(self, left, right):
+        self.cams = [left, right]
+        self.undistortion_map = {}
+        self.rectification_map = {}
+        
+        for cidx, cam in enumerate(self.cams):
+            (self.undistortion_map[cidx], self.rectification_map[cidx]) = cv2.initUndistortRectifyMap(
+                cam.K, cam.D, cam.R, cam.P, cam.shape[:2], cv2.CV_32FC1)
+
+    def rectify(self, l, r): 
+        """
+        Rectify frames passed as (left, right) 
+        Remapping is done with nearest neighbor for speed.
+        """
+        return [cv2.remap(l, self.undistortion_map[cidx], self.rectification_map[cidx], cv2.INTER_NEAREST)
+                for cidx in range(len(self.cams))]
+        
 
 class CalibratedFastStereo(object): 
     """
@@ -276,7 +294,8 @@ def setup_zed(scale=1.0):
 
     # Setup one-time calibration
     calib_params = get_calib_params(702.429138*scale, 702.429138*scale, 652.789368*scale, 360.765472*scale, 0.120)
-    calib_params.D0 = np.array([-0.16, 0, 0, 0, 0], np.float64)
+    calib_params.D0 = np.array([0, 0, 0, 0, 0], np.float64)
+    # calib_params.D0 = np.array([-0.16, 0, 0, 0, 0], np.float64)
     calib_params.D1 = calib_params.D0
     return calib_params
 
@@ -316,6 +335,7 @@ def setup_zed_dataset(filename, every_k_frames=1, scale=1):
     # Setup one-time calibration
     calib_params = setup_zed(scale=0.5)
     dataset.calib = calib_params
+    dataset.scale = scale
     return dataset
  
 def setup_bb_dataset(filename, every_k_frames=1, scale=1): 
