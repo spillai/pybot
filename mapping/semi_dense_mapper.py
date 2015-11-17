@@ -381,4 +381,4 @@ class SemiDenseMapper(object):
         mv_mapper.load(map_file)
         mv_mapper.process()
         
-        mv_mapper.save(os.path.join(self.params.cache.map_dir, '%s.h5' % key))
+        mv_mapper.save(os.path.join(self.params.cache.map_dir, '%s_dense.h5' % key))
