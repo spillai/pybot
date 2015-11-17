@@ -191,11 +191,13 @@ class UWRGBDObjectDataset(UWRGBDDataset):
 
                 # Only a single bbox per image
                 yield AttrDict(img=rgb, depth=depth, mask=mask, 
-                               bbox=[{'left':loc[0], 'right':loc[0]+mask_im.shape[1], 
-                                      'top':loc[1], 'bottom':loc[1]+mask_im.shape[0], 
-                                      'target':self.target, 
-                                      'category':UWRGBDDataset.get_category_name(self.target), 
-                                      'instance':self.instance}])
+                               bbox=AttrDict(
+                                   coords=np.float32([loc[0], loc[1], 
+                                                      loc[0]+mask_im.shape[1], 
+                                                      loc[1]+mask_im.shape[0]]), 
+                                   target=self.target, 
+                                   category=UWRGBDDataset.get_category_name(self.target), 
+                                   instance=self.instance))
 
     def __init__(self, directory='', targets=UWRGBDDataset.train_names, blacklist=['']):         
         get_category = lambda name: '_'.join(name.split('_')[:-1])
@@ -340,8 +342,8 @@ class UWRGBDSceneDataset(UWRGBDDataset):
             from pybot_pcl import euclidean_clustering            
 
             object_info = []
-
             unique_labels = np.unique(ply_label)
+
             for l in unique_labels: 
 
                 # Only add clusters that are in target/train and not background
@@ -355,9 +357,12 @@ class UWRGBDSceneDataset(UWRGBDDataset):
                 linds = euclidean_clustering(l_xyz.astype(np.float32), tolerance=0.1, scale=1.0, min_cluster_size=10)
                 unique_linds = np.unique(linds)
                 # print 'Output ', unique_linds
-                object_info.extend([ AttrDict(label=l, 
-                                              points=l_xyz[linds == lind], colors=l_rgb[linds == lind], 
-                                              center=np.mean(l_xyz[linds == lind], axis=0)) for lind in unique_linds ])                  
+                for lind in unique_linds: 
+                    object_info.append(AttrDict(label=l, uid=len(object_info),  
+                                                points=l_xyz[linds == lind], 
+                                                colors=l_rgb[linds == lind], 
+                                                center=np.mean(l_xyz[linds == lind], axis=0)))
+
             print 'Total unique objects in dataset: ', len(object_info)
 
             return object_info
@@ -519,10 +524,16 @@ class UWRGBDSceneDataset(UWRGBDDataset):
             object_candidates = []
             for ind in visible_inds:
                 obj = self.map_info.objects[ind]
-                pts2d, bbox, depth = get_object_bbox(self.map_info.camera, obj.points, subsample=3, scale=1.2)
-                if bbox is not None: 
-                    bbox['target'], bbox['category'], bbox['depth'] = obj.label, UWRGBDDataset.target_unhash[obj.label], depth
-                    object_candidates.append(bbox)
+                label = obj.label
+                pts2d, coords, depth = get_object_bbox(self.map_info.camera, obj.points, subsample=3, scale=1.2)
+                if coords is not None: 
+                    object_candidates.append(
+                        AttrDict(
+                            target=obj.label, 
+                            category=UWRGBDDataset.target_unhash[obj.label], 
+                            coords=coords, 
+                            depth=depth, 
+                            uid=obj.uid))
 
             return object_candidates
 
@@ -530,14 +541,15 @@ class UWRGBDSceneDataset(UWRGBDDataset):
             # print 'Processing pose', pose, bbox
 
             def _process_bbox(bbox): 
-                return dict(category=bbox['category'], target=UWRGBDDataset.target_hash[str(bbox['category'])], 
-                            left=bbox['left'], right=bbox['right'], top=bbox['top'], bottom=bbox['bottom'])
+                return AttrDict(category=bbox.category, 
+                                target=UWRGBDDataset.target_hash[str(bbox.category)], 
+                                coords=bbox.coords)
 
             # Compute bbox from pose and map (v2 support)
             if self.version == 'v1': 
                 if bbox is not None: 
                     bbox = [_process_bbox(bb) for bb in bbox]
-                    bbox = filter(lambda bb: bb['target'] in UWRGBDDataset.train_ids_set, bbox)
+                    bbox = filter(lambda bb: bb.target in UWRGBDDataset.train_ids_set, bbox)
 
             if self.version == 'v2': 
                 if bbox is None and hasattr(self, 'map_info'): 
@@ -640,12 +652,12 @@ class UWRGBDSceneDataset(UWRGBDDataset):
     def annotate_bboxes(vis, bboxes, target_names): # , box_color=lambda target: (0, 200, 0) if UWRGBDDataset.get_category_name(target) != 'background' else (100, 100, 100)): 
         for bbox,target_name in izip(bboxes, target_names): 
             box_color = (0, 200, 0) # if UWRGBDDataset.get_category_name(target) != 'background' else (100, 100, 100)
-            annotate_bbox(vis, bbox, color=box_color, title=target_name.title().replace('_', ' '))
+            annotate_bbox(vis, bbox.coords, color=box_color, title=target_name.title().replace('_', ' '))
 
-            # cv2.rectangle(vis, (bbox['left'], bbox['top']), (bbox['right'], bbox['bottom']), box_color, 2) 
-            # cv2.rectangle(vis, (bbox['left']-1, bbox['top']-15), (bbox['right']+1, bbox['top']), box_color, -1)
+            # cv2.rectangle(vis, (bbox.coords[0], bbox.coords[1]), (bbox.coords[2], bbox.coords[3]), box_color, 2) 
+            # cv2.rectangle(vis, (bbox.coords[0]-1, bbox.coords[1]-15), (bbox.coords[2]+1, bbox.coords[1]), box_color, -1)
             # cv2.putText(vis, '%s' % (), 
-            #             (bbox['left'], bbox['top']-5), 
+            #             (bbox[0], bbox[1]-5), 
             #             cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), thickness=1, lineType=cv2.CV_AA)
         return vis
 
@@ -654,12 +666,12 @@ class UWRGBDSceneDataset(UWRGBDDataset):
         # TODO: Standardize
         vis = f.img.copy()
         for bbox in f.bbox: 
-            cv2.rectangle(vis, (bbox['left'], bbox['top']), (bbox['right'], bbox['bottom']), 
+            cv2.rectangle(vis, (bbox.coords[0], bbox.coords[1]), (bbox.coords[2], bbox.coords[3]), 
                           (50, 50, 50), 2)
-            category_name = str(bbox['category'])
+            category_name = str(bbox.category)
             cv2.putText(vis, '[Category: [%i] %s]' % 
                         (UWRGBDDataset.get_category_id(category_name), category_name), 
-                        (bbox['left'], bbox['top']-5), 
+                        (bbox.coords[0], bbox.coords[1]-5), 
                         cv2.FONT_HERSHEY_SIMPLEX, 0.4, (240, 240, 240), thickness = 1)
         return vis
 

@@ -53,7 +53,7 @@ class NYURGBDDataset(object):
 
         # def _process_bbox(bbox): 
         #     return dict(category=bbox['category'], target=UWRGBDDataset.target_hash[str(bbox['category'])], 
-        #                 left=bbox['left'], right=bbox['right'], top=bbox['top'], bottom=bbox['bottom'])
+        #                 left=bbox.coords['left'], right=bbox['right'], top=bbox['top'], bottom=bbox['bottom'])
 
         # # Compute bbox from pose and map (v2 support)
         # if self.version == 'v1': 
