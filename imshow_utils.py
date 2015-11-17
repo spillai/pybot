@@ -66,7 +66,7 @@ def imshow_cv(label, im, block=False, text=None):
     vis = im.copy()
     print_status(vis, text=text)
     window_manager.imshow(label, vis)
-    ch = cv2.waitKey(0 if block else 1) & 0xFF
+    ch = cv2.waitKey(0 if block else 10) & 0xFF
     if ch == ord(' '):
         cv2.waitKey(0)
     if ch == ord('s'):
@@ -100,11 +100,12 @@ def mouse_event_create(win_name, cb):
     cv2.namedWindow(win_name)
     cv2.setMouseCallback(win_name, cb)
 
-def annotate_bbox(vis, bbox, color=(0,200,0), title=''): 
+def annotate_bbox(vis, coords, color=(0,200,0), title=''): 
     # Bounding Box and top header
-    cv2.rectangle(vis, (bbox['left'], bbox['top']), (bbox['right'], bbox['bottom']), color, 2)
-    cv2.rectangle(vis, (bbox['left']-1, bbox['top']-15), (bbox['right']+1, bbox['top']), color, -1)
+    icoords = coords.astype(np.int32)
+    cv2.rectangle(vis, (icoords[0], icoords[1]), (icoords[2], icoords[3]), color, 2)
+    cv2.rectangle(vis, (icoords[0]-1, icoords[1]-15), (icoords[2]+1, icoords[1]), color, -1)
 
-    cv2.putText(vis, '%s' % title, (bbox['left'], bbox['top']-5), 
+    cv2.putText(vis, '%s' % title, (icoords[0], icoords[1]-5), 
                 cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), thickness=1, lineType=cv2.CV_AA)
 

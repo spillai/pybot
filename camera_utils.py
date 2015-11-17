@@ -316,6 +316,15 @@ def get_discretized_projection(camera, pts, subsample=10, discretize=4):
     return vis, depth
 
 def get_object_bbox(camera, pts, subsample=10, scale=1.0, min_height=10, min_width=10): 
+    """
+
+    Returns: 
+       pts2d: Projected points onto camera
+       bbox: Bounding box of the projected points [l, t, r, b]
+       depth: Median depth of the projected points
+
+    """
+
     pts2d, valid = get_bounded_projection(camera, pts, subsample=subsample)
 
     if not len(pts2d): 
@@ -338,7 +347,7 @@ def get_object_bbox(camera, pts, subsample=10, scale=1.0, min_height=10, min_wid
             w2, h2 = (scale-1.0) * (x1-x0) / 2, (scale-1.0) * (y1-y0) / 2
             x0, x1 = int(max(0, x0 - w2)), int(min(x1 + w2, camera.shape[1]-1))
             y0, y1 = int(max(0, y0 - h2)), int(min(y1 + h2, camera.shape[0]-1))
-        return pts2d.astype(np.int32), {'left':x0, 'right':x1, 'top':y0, 'bottom':y1}, depth
+        return pts2d.astype(np.int32), np.float32([x0, y0, x1, y1]), depth
     else: 
         return [None] * 3
 

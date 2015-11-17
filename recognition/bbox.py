@@ -18,26 +18,45 @@ def intersection_over_union(A,B):
     I, U = intersection_union(A, B)
     return I * 1.0 / U
 
-def brute_force_match(bboxes_truth, bboxes_test, match_func=intersection_over_union): 
-    A = np.zeros(shape=(len(bboxes_truth), len(bboxes_test)), dtype=np.float32)
+def brute_force_match(bboxes_truth, bboxes_test, 
+                      match_func=lambda (x,y): None, dtype=np.float32):
+    A = np.zeros(shape=(len(bboxes_truth), len(bboxes_test)), dtype=dtype)
     for i, bbox_truth in enumerate(bboxes_truth): 
         for j, bbox_test in enumerate(bboxes_test): 
             A[i,j] = match_func(bbox_truth, bbox_test)
     return A
 
+# def brute_force_match_coords(bboxes_truth, bboxes_test, 
+#                              match_func=lambda (x,y): intersection_over_union(x.coords, y.coords)): 
+#     A = np.zeros(shape=(len(bboxes_truth), len(bboxes_test)), dtype=np.float32)
+#     for i, bbox_truth in enumerate(bboxes_truth): 
+#         for j, bbox_test in enumerate(bboxes_test): 
+#             A[i,j] = match_func(bbox_truth, bbox_test)
+#     return A
+
+# def brute_force_match_target(bboxes_truth, bboxes_test): 
+#     A = np.zeros(shape=(len(bboxes_truth), len(bboxes_test)), dtype=bool)
+#     for i, bbox_truth in enumerate(bboxes_truth): 
+#         for j, bbox_test in enumerate(bboxes_test): 
+#             A[i,j] = (bbox_truth['target'] == bbox_test['target'])
+#     return A
+
+def brute_force_match_coords(bboxes_truth, bboxes_test): 
+    return brute_force_match(bboxes_truth, bboxes_test, 
+                             match_func=lambda x,y: intersection_over_union(x.coords, y.coords),
+                             dtype=np.float32)
+
 def brute_force_match_target(bboxes_truth, bboxes_test): 
-    A = np.zeros(shape=(len(bboxes_truth), len(bboxes_test)), dtype=bool)
-    for i, bbox_truth in enumerate(bboxes_truth): 
-        for j, bbox_test in enumerate(bboxes_test): 
-            A[i,j] = (bbox_truth['target'] == bbox_test['target'])
-    return A
+    return brute_force_match(bboxes_truth, bboxes_test, 
+                             match_func=lambda x,y: x['target'] == y['target'], 
+                             dtype=np.bool)
 
 def match_targets(bboxes_truth, bboxes_test, intersection_th=0.5): 
-    A = brute_force_match(bboxes_truth, bboxes_test, match_func=intersection_over_union)
+    A = brute_force_match_coords(bboxes_truth, bboxes_test)
     B = brute_force_match_target(bboxes_truth, bboxes_test)
     pos = np.bitwise_and(A > intersection_th, B)
     return pos
 
 def match_bboxes(bboxes_truth, bboxes_test, intersection_th=0.5): 
-    A = brute_force_match(bboxes_truth, bboxes_test, match_func=intersection_over_union)
+    A = brute_force_match_coords(bboxes_truth, bboxes_test)
     return A > intersection_th
