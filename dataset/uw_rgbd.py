@@ -592,7 +592,6 @@ class UWRGBDSceneDataset(UWRGBDDataset):
                 yield self._process_items(index, rgb_im, depth_im, bbox, pose)
 
         def iterinds(self, inds): 
-            print len(inds), inds, len(self.bboxes)
             for index, rgb_im, depth_im, bbox, pose in izip(inds, 
                                                             self.rgb.iterinds(inds), 
                                                             self.depth.iterinds(inds), 
