@@ -54,8 +54,7 @@ def multilabel_precision_recall(y_score, y_test, target_map):
 
     target_ids = target_map.keys()
     target_names = target_map.values()
-    print target_names
-
+    
     y_test_multi = label_binarize(y_test, classes=target_ids)
     N, n_classes = y_score.shape[:2]
     for i,name in enumerate(target_names):
@@ -1114,6 +1113,7 @@ class BOWClassifier(object):
             self.kernel_tf_ = db.kernel_tf
             self.clf_base_, self.clf_, self.clf_hyparams_ = db.clf_base, db.clf, db.clf_hyparams
             self.clf_prob_ = db.clf_prob
+            self.target_map_ = db.target_map
         except KeyError: 
             raise RuntimeError('DB not setup correctly, try re-training!')
         
