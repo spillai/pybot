@@ -262,6 +262,7 @@ def compute_essential(F, K):
 def check_visibility(camera, pts_w): 
     """
     Check if points are visible given fov of camera
+    
     camera: type Camera
     """
     # Transform points in to camera's reference

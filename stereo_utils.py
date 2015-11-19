@@ -306,21 +306,22 @@ def setup_bb(scale=1.0):
     calib_params = AttrDict(get_stereo_calibration_params(input_folder=calib_path))
     return calib_params
 
-def stereo_dataset(filename, channel='CAMERA', every_k_frames=1, scale=1): 
-    from bot_externals.lcm.log_utils import LCMLogReader, ImageDecoder
-    dataset = LCMLogReader(filename=filename, every_k_frames=every_k_frames, decoder=ImageDecoder(channel=channel,scale=scale))
+def stereo_dataset(filename, channel='CAMERA', start_idx=0, every_k_frames=1, scale=1): 
+    from bot_externals.lcm.log_utils import LCMLogReader, ImageDecoder, StereoImageDecoder
+    dataset = LCMLogReader(filename=filename, start_idx=start_idx, every_k_frames=every_k_frames, 
+                           decoder=StereoImageDecoder(channel=channel,scale=scale), index=False)
     
     def iter_frames(*args, **kwargs): 
-        for im in dataset.iteritems(*args, **kwargs):
-            h,w = im.shape[:2]
-            l,r = np.split(im, 2, axis=0)
+        for (l,r) in dataset.iteritems(*args, **kwargs):
+            # h,w = im.shape[:2]
+            # l,r = np.split(im, 2, axis=0)
             yield AttrDict(left=l, right=r)
             
     def iter_gt_frames(*args, **kwargs): 
         gt = StereoSGBM()
-        for im in dataset.iteritems(*args, **kwargs): 
-            h,w = im.shape[:2]
-            l,r = np.split(im, 2, axis=0)
+        for (l,r) in dataset.iteritems(*args, **kwargs): 
+            # h,w = im.shape[:2]
+            # l,r = np.split(im, 2, axis=0)
             disp = gt.process(l,r)
             yield AttrDict(left=l, right=r, noc=disp, occ=disp)
             
@@ -328,9 +329,10 @@ def stereo_dataset(filename, channel='CAMERA', every_k_frames=1, scale=1):
     dataset.iter_gt_frames = iter_gt_frames
     return dataset
 
-def setup_zed_dataset(filename, every_k_frames=1, scale=1): 
+def setup_zed_dataset(filename, start_idx=0, every_k_frames=1, scale=1): 
     dataset = stereo_dataset(filename=filename, 
-                             channel='CAMERA', every_k_frames=every_k_frames, scale=scale)
+                             channel='CAMERA', start_idx=start_idx, 
+                             every_k_frames=every_k_frames, scale=scale)
 
     # Setup one-time calibration
     calib_params = setup_zed(scale=0.5)
@@ -338,8 +340,8 @@ def setup_zed_dataset(filename, every_k_frames=1, scale=1):
     dataset.scale = scale
     return dataset
  
-def setup_bb_dataset(filename, every_k_frames=1, scale=1): 
-    dataset = stereo_dataset(filename=filename, 
+def setup_bb_dataset(filename, start_idx=0, every_k_frames=1, scale=1): 
+    dataset = stereo_dataset(filename=filename, start_idx=start_idx,
                              channel='CAMERA', every_k_frames=every_k_frames, scale=scale)
     
     # Setup one-time calibration

@@ -206,19 +206,19 @@ class LSDMapper(Mapper):
 
 class ORBMapper(Mapper): 
     """ ORB-SLAM interface """
-    default_params = AttrDict(
-        K = np.array([[528.49404721, 0, 319.5], 
-                      [0, 528.49404721, 239.5],
-                      [0, 0, 1]], dtype=np.float64), 
-        W = 640, H = 480
-    )
-    def __init__(self, params=default_params): 
+    # default_params = AttrDict(
+    #     K = np.array([[528.49404721, 0, 319.5], 
+    #                   [0, 528.49404721, 239.5],
+    #                   [0, 0, 1]], dtype=np.float64), 
+    #     W = 640, H = 480
+    # )
+    def __init__(self, settings='Settings_udub.yaml'): 
         Mapper.__init__(self, poses=[], keyframes=OrderedDict(), update_cb=self._update_keyframes)
         from pybot_externals import ORBSLAM
 
         path = '/home/spillai/perceptual-learning/software/python/apps/config/orb_slam/'
-        self.slam = ORBSLAM(settings=path + 'Settings_udub.yaml', vocab=path + 'ORBvoc.yml')
-
+        self.slam = ORBSLAM(settings=path + settings, vocab=path + 'ORBvoc.yml')
+        print('ORBSLAM: Settings File %s' % (path + settings))
 
     def _update_keyframes(self): 
         # Keyframe graph for updates
