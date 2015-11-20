@@ -1,9 +1,11 @@
 import cv2
 
 import numpy as np
+from numpy.linalg import det, norm
 import numpy.matlib as npm
 from scipy import linalg
 
+from bot_vision.image_utils import to_color
 from bot_utils.db_utils import AttrDict
 from bot_geometry.rigid_transform import Quaternion, RigidTransform
 
@@ -75,7 +77,7 @@ class CameraIntrinsic(object):
         self.shape = shape                 # Image size (H,W,C): (480,640,3)
 
     @classmethod
-    def simluate(cls): 
+    def simulate(cls): 
         """
         Simulate a 640x480 camera with 500 focal length
         """
@@ -196,6 +198,29 @@ class Camera(CameraIntrinsic, CameraExtrinsic):
         """
         self.quat = pose.quat
         self.tvec = pose.tvec
+
+    def F(self, other): 
+        """
+        Compute the fundamental matrix with respect to other camera 
+        http://www.robots.ox.ac.uk/~vgg/hzbook/code/vgg_multiview/vgg_F_from_P.m
+        
+        Use as: 
+           F_10 = poses[1].F(poses[0])
+           l_1 = F_10 * x_0
+
+        """
+        X1 = self.P[[1,2],:]
+        X2 = self.P[[2,0],:]
+        X3 = self.P[[0,1],:]
+        Y1 = other.P[[1,2],:]
+        Y2 = other.P[[2,0],:]
+        Y3 = other.P[[0,1],:]
+        
+        return np.float64([[det(np.vstack([X1, Y1])), det(np.vstack([X2, Y1])), det(np.vstack([X3, Y1]))],
+                        [det(np.vstack([X1, Y2])), det(np.vstack([X2, Y2])), det(np.vstack([X3, Y2]))],
+                        [det(np.vstack([X1, Y3])), det(np.vstack([X2, Y3])), det(np.vstack([X3, Y3]))]])
+
+
 
 def KinectCamera(R=npm.eye(3), t=npm.zeros(3)): 
     return Camera(kinect_v1_params.K_depth, R, t)
@@ -352,11 +377,40 @@ def get_object_bbox(camera, pts, subsample=10, scale=1.0, min_height=10, min_wid
     else: 
         return [None] * 3
 
-# def plot_epipolar_line(im, F, x, epipole=None, show_epipole=True):
-#   """
-#   Plot the epipole and epipolar line F * x = 0.
-#   """
-#   import pylab
+def epipolar_line(F_10, x_1): 
+    """
+    l_1 = F_10 * x_1
+    line = F.dot(np.hstack([x, np.ones(shape=(len(x),1))]).T)
+    """
+    return cv2.computeCorrespondEpilines(x_1.reshape(-1,1,2), 1, F_10).reshape(-1,3)
+
+def plot_epipolar_line(im_1, F_10, x_0, im_0=None): 
+    """
+    Plot the epipole and epipolar line F * x = 0.
+    """
+    
+    H,W = im_1.shape[:2]
+    lines_1 = epipolar_line(F_10, x_0)
+
+    vis_1 = to_color(im_1)
+    vis_0 = to_color(im_0) if im_0 is not None else None
+    
+    col = (0,255,0)
+    for l1 in lines_1:
+        try: 
+            x0, y0 = map(int, [0, -l1[2] / l1[1] ])
+            x1, y1 = map(int, [W, -(l1[2] + l1[0] * W) / l1[1] ])
+            cv2.line(vis_1, (x0,y0), (x1,y1), col, 1)
+        except: 
+            pass
+            # raise RuntimeWarning('Failed to estimate epipolar line {:s}'.format(l1))
+
+    if vis_0 is not None: 
+        for x in x_0: 
+            cv2.circle(vis_0, tuple(x), 5, col, -1)
+        return np.hstack([vis_0, vis_1])
+    
+    return vis_1
 
 #   m, n = im.shape[:2]
 #   line = numpy.dot(F, x)
