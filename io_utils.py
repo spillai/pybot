@@ -47,8 +47,14 @@ def create_path_if_not_exists(filename):
         return True
     return False
 
+def find_files(directory, contains=''): 
+    return [os.path.join(root, file) 
+            for root, dirs, files in os.walk(os.path.expanduser(directory)) for file in files if contains in file]
+               
 def number_of_files(directory, ext=''): 
-    return len(filter(lambda x: ext in x, [item for item in os.listdir(directory) if os.path.isfile(os.path.join(directory, item))]))
+    return len(filter(lambda x: ext in x, 
+                      [item for item in os.listdir(directory) 
+                       if os.path.isfile(os.path.join(directory, item))]))
 
 def read_config(conf_path, section): 
     """
