@@ -12,14 +12,6 @@ import bot_core.image_t as image_t
 import bot_core.pose_t as pose_t
 import bot_param.update_t as update_t
 
-from kinect.frame_msg_t import frame_msg_t
-from kinect.image_msg_t import image_msg_t
-from kinect.depth_msg_t import depth_msg_t
-
-# from openni.frame_msg_t import frame_msg_t
-# from openni.image_msg_t import image_msg_t
-# from openni.depth_msg_t import depth_msg_t
-
 
 # class Decoder2(object): 
 #     def __init__(self): 
@@ -137,13 +129,25 @@ class KinectDecoder(Decoder):
         self.extract_X = extract_X
         self.bgr = bgr
 
+        from kinect.frame_msg_t import frame_msg_t 
+        from kinect.image_msg_t import image_msg_t
+        from kinect.depth_msg_t import depth_msg_t
+        
+        self.frame_msg_t_ = frame_msg_t
+        self.image_msg_t_ = image_msg_t
+        self.depth_msg_t_ = depth_msg_t
+        
+        # from openni.frame_msg_t import frame_msg_t as self.frame_msg_t_
+        # from openni.image_msg_t import image_msg_t as self.image_msg_t_
+        # from openni.depth_msg_t import depth_msg_t as self.depth_msg_t_
+                
         if self.extract_X: 
             K = construct_K(**KinectDecoder.kinect_params)
             self.camera = DepthCamera(K=K, shape=(480,640), skip=self.skip)
 
     def decode(self, data):
         img, depth, X = [None] * 3
-        frame_msg = frame_msg_t.decode(data)
+        frame_msg = self.frame_msg_t_.decode(data)
         if self.extract_rgb: 
             img = self.decode_rgb(frame_msg)
         if self.extract_depth: 
@@ -155,7 +159,7 @@ class KinectDecoder(Decoder):
 
     def decode_rgb(self, data): 
         w, h = data.image.width, data.image.height;
-        if data.image.image_data_format == image_msg_t.VIDEO_RGB_JPEG: 
+        if data.image.image_data_format == self.image_msg_t_.VIDEO_RGB_JPEG: 
             img = cv2.imdecode(np.asarray(bytearray(data.image.image_data), dtype=np.uint8), -1)
             bgr = img.reshape((h,w,3))[::self.skip, ::self.skip, :]             
         else: 
@@ -170,7 +174,7 @@ class KinectDecoder(Decoder):
     def decode_depth(self, data):
         # Extract depth image
         w, h = data.image.width, data.image.height;
-        if data.depth.compression != depth_msg_t.COMPRESSION_NONE: 
+        if data.depth.compression != self.depth_msg_t_.COMPRESSION_NONE: 
             depth = np.fromstring(zlib.decompress(data.depth.depth_data), dtype=np.uint16)
         else: 
             depth = np.fromstring(data.depth.depth_data, dtype=np.uint16)
