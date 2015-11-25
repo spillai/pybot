@@ -95,6 +95,10 @@ class BotDB(object):
 
     def setup(self, cmds): 
         for cmd in cmds.split(';'): 
+            if not len(cmd): 
+                continue
+            print('Setting up: %s %i' % (cmd,len(cmd)))
+            
             self.db_.execute(cmd) 
         self.tables_ = { table_name: BotDBTable(self.db_, table_name) 
                          for table_name in self.tables }
@@ -110,9 +114,6 @@ class BotDB(object):
     def __getitem__(self, tname): 
         return self.tables_[tname]
 
-    def __getattr__(self, tname): 
-        return self.__getitem__(self, tname)
-
     def execute(self, req): 
         pass
 
@@ -122,10 +123,10 @@ class BotDB(object):
 
 class BotDBTable(object):
     as_is = lambda item: item
-    decoders = {'text': as_is, 
-                          'double': as_is
-                          'blob': lambda item: sql.Binary(cPickle.dumps(item, -1))} 
-    encoders = {}
+    decoders = {'text': as_is, 'double': as_is, 'integer': as_is,
+                'blob': lambda item: loads(bytes(item))} 
+    encoders = {'text': as_is, 'double': as_is, 'integer': as_is,
+                'blob': lambda item: sql.Binary(dumps(item, -1))}
 
     def __init__(self, db, name):
         self.db_ = db
@@ -141,16 +142,19 @@ class BotDBTable(object):
                 raise RuntimeError("Cannot decode type: %s" % dtype)
                 
 
-    def retrieve(self, req): 
-        items = db.execute(req.replace('__TABLE__', self.name_))
-        return imap(lambda (dtype,item): 
-             self.decode(dtype, item), izip(self.dtypes_, items)) 
+    def retrieve(self, req, dtypes=[]): 
+        req_ = req.replace('__TABLE__', self.name_)
+        iterable = self.db_.execute(req_)
+        return imap(lambda items: 
+                    imap(lambda (dtype,item): self.decode(dtype, item), izip(dtypes, items)), 
+                    iterable) 
 
-    def update(self, req, iterable): 
-        for items in iterable: 
-            self.db_.executemany(req.replace('__TABLE__', self.name_), 
-                                 imap(lambda (dtype,item): 
-                                      self.encode(dtype, item), izip(self.dtypes_, items))) 
+    def update(self, req, items, dtypes=[]): 
+        req_ = req.replace('__TABLE__', self.name_)
+        values = izip(* imap(lambda (dtype,iterable): 
+             imap(lambda item: self.encode(dtype, item), iterable), 
+             izip(dtypes, items)))
+        self.db_.executemany(req_, values)
         self.db_.commit()
 
     def encode(self, dtype, item): 
@@ -167,21 +171,32 @@ class BotDBTable(object):
 
 
 if __name__ == "__main__": 
+
+    import numpy as np    
+    db = BotDB(filename=':memory:', flag='w')
+    db.setup(
+        '''CREATE TABLE IF NOT EXISTS channels (name text, id integer, length integer);'''
+        '''CREATE TABLE IF NOT EXISTS sensor_1 (timestamp double, data blob);'''
+        '''CREATE TABLE IF NOT EXISTS sensor_2 (timestamp double, data blob);'''
+    )
     
-    db = BotDB(filename='test.db', flag='w')
-    db.setup('''
-    CREATE TABLE IF NOT EXISTS channels (name text, id integer, length integer);
-    CREATE TABLE IF NOT EXISTS sensor_1 (timestamp double, data blob);
-    CREATE TABLE IF NOT EXISTS sensor_2 (timestamp double, data blob); 
-    ''')
+    # sql.Binary(dumps(item, -1)) 
+    values = (np.arange(1000), [item for item in np.random.randn(1000,200)])
 
-    values = izip( np.arange(1000), [sql.Binary(cPickle.dumps(item, -1)) 
-                                     for item in np.random.randn(1000,200)] )
+    # values = (np.arange(1000), [item for item in np.random.randn(1000,200)])
+    db['sensor_1'].update('''INSERT INTO __TABLE__ (timestamp, data) VALUES (?,?)''', values, dtypes=['double','blob'])
 
-    db['sensor_1'].update('''INSERT INTO __TABLE__ (timestamp, data) VALUES (?,?)''', values)
+    # values = izip( np.arange(1000), [sql.Binary(dumps(item, -1)) 
+    #                                  for item in np.random.randn(1000,200)] )
+    # db.db_.executemany('''INSERT INTO sensor_1 (timestamp, data) VALUES (?,?)''', values)
+    # db.db_.commit()
+
+    res = db['sensor_1'].retrieve('SELECT timestamp, data FROM __TABLE__ WHERE timestamp > 10 AND timestamp < 15', dtypes=['double','blob'])
+    for r in res: 
+        t,d = r 
+        print t,d.shape
     db.close()
 
-    # res = db.execute('SELECT (data) FROM sensor_1 WHERE timestamp > 10 AND timestamp < 100')
     # for r, in res: 
     #     print cPickle.loads(bytes(r)).shape
     #     break
