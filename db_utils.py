@@ -1,4 +1,3 @@
-#!/usr/bin/python
 import tables as tb
 import numpy as np
 import pickle

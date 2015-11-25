@@ -10,6 +10,7 @@ License: MIT
 # -*- coding: utf_8 -*-
 
 import os
+import re
 import sqlite3 as sql
 from itertools import izip, imap
 
@@ -33,7 +34,7 @@ except ImportError:
 #     return loads(bytes(obj))
 
 def get_scalar(iterable, pos=0): 
-    return imap(lambda item: item[pos], iterable)
+    return map(lambda items: items[pos], iterable)
 
 class BotDB(object):
     VALID_FLAGS = ['c', 'r', 'w', 'n']
@@ -132,8 +133,11 @@ class BotDBTable(object):
         self.db_ = db
         self.name_ = name
         table_info = list(self.db_.execute("PRAGMA table_info('%s')" % self.name_))
+
         self.fields_ = get_scalar(table_info, pos=1)
         self.dtypes_ = get_scalar(table_info, pos=2)
+        self.f2d_ = dict(zip(self.fields_, self.dtypes_))
+        print 'F2D: ', self.f2d_
 
         for dtype in self.dtypes_: 
             if dtype not in BotDBTable.encoders: 
@@ -141,21 +145,71 @@ class BotDBTable(object):
             if dtype not in BotDBTable.decoders: 
                 raise RuntimeError("Cannot decode type: %s" % dtype)
                 
+    def get_dtypes(self, req): 
+        """
 
-    def retrieve(self, req, dtypes=[]): 
+        Determine dtypes for each input map request, and 
+        replace mapped inputs with inputs in the request
+        
+        Remaps: SELECT from {data} => SELECT from data
+        dtypes: {'data': 'blob'} encode/decode type is blob
+
+        """
+        
+        # Establish inputs and mapped inputs
+        inputs = re.findall('\{.*?\}',req)
+        mapped_inputs = map(lambda item: item[1:-1], inputs)
+        
+        try: 
+            dtypes = map(lambda item: self.f2d_[item], mapped_inputs)
+        except: 
+            raise RuntimeError('Unknown decoder for %s, has to be one of %s'
+                               % (inputs, self.f2d_))
+        
+        # Replace mapped inputs with inputs in the request
+        req_ = req
+        for item,mitem in izip(inputs, mapped_inputs): 
+            req_ = req_.replace(item, mitem)
+        return req_, dtypes
+        
+    def retrieve(self, req): 
+        req, dtypes = self.get_dtypes(req)
+
         req_ = req.replace('__TABLE__', self.name_)
+
         iterable = self.db_.execute(req_)
         return imap(lambda items: 
                     imap(lambda (dtype,item): self.decode(dtype, item), izip(dtypes, items)), 
                     iterable) 
 
-    def update(self, req, items, dtypes=[]): 
+    def update(self, req, iterable): 
+        req, dtypes = self.get_dtypes(req)
+        print req
+
+        req_ = req.replace('__TABLE__', self.name_)
+        
+        values = imap(lambda items: 
+                      map(lambda (dtype,item): self.encode(dtype, item), 
+                          izip(dtypes, items)), 
+                      iterable)
+
+        self.db_.executemany(req_, values)
+        self.db_.commit()
+
+    def update_inmemory(self, req, iterables, dtype=[]): 
+        """
+        Data is in the form of tuples fully allocated: 
+        values = (np.arange(1000), 
+                  [item for item in np.random.randn(1000,200)])
+        """
         req_ = req.replace('__TABLE__', self.name_)
         values = izip(* imap(lambda (dtype,iterable): 
              imap(lambda item: self.encode(dtype, item), iterable), 
              izip(dtypes, items)))
+
         self.db_.executemany(req_, values)
         self.db_.commit()
+
 
     def encode(self, dtype, item): 
         if dtype not in BotDBTable.encoders:
@@ -171,32 +225,39 @@ class BotDBTable(object):
 
 
 if __name__ == "__main__": 
-
+    import time
     import numpy as np    
-    db = BotDB(filename=':memory:', flag='w')
+    from bot_utils.itertools_recipes import chunks
+
+
+    db = BotDB(filename='test.db', flag='w')
     db.setup(
         '''CREATE TABLE IF NOT EXISTS channels (name text, id integer, length integer);'''
         '''CREATE TABLE IF NOT EXISTS sensor_1 (timestamp double, data blob);'''
         '''CREATE TABLE IF NOT EXISTS sensor_2 (timestamp double, data blob);'''
     )
     
-    # sql.Binary(dumps(item, -1)) 
-    values = (np.arange(1000), [item for item in np.random.randn(1000,200)])
+    # Insert large number of values
+    # values = izip(np.arange(1000), [item for item in np.random.randn(1000,200)])    
+    def random_data_generator(): 
+        for j in range(1000000): 
+            yield (j, np.random.randn(10000))
+    values = random_data_generator()
 
-    # values = (np.arange(1000), [item for item in np.random.randn(1000,200)])
-    db['sensor_1'].update('''INSERT INTO __TABLE__ (timestamp, data) VALUES (?,?)''', values, dtypes=['double','blob'])
+    st = time.time()
+    for idx, chunk_values in enumerate(chunks(values, 1000)): 
+        print('{:03}'.format(idx))
+        db['sensor_1'].update('''INSERT INTO __TABLE__ '''
+                              '''({timestamp}, {data}) VALUES (?,?)''', chunk_values)
 
-    # values = izip( np.arange(1000), [sql.Binary(dumps(item, -1)) 
-    #                                  for item in np.random.randn(1000,200)] )
-    # db.db_.executemany('''INSERT INTO sensor_1 (timestamp, data) VALUES (?,?)''', values)
-    # db.db_.commit()
+    print('Time taken: {:4.3f} s'.format(time.time() - st))
 
-    res = db['sensor_1'].retrieve('SELECT timestamp, data FROM __TABLE__ WHERE timestamp > 10 AND timestamp < 15', dtypes=['double','blob'])
+    res = db['sensor_1'].retrieve(
+        '''SELECT {timestamp}, {data} FROM __TABLE__ '''
+        '''WHERE timestamp > 10 AND timestamp < 15'''
+    )
     for r in res: 
         t,d = r 
         print t,d.shape
     db.close()
 
-    # for r, in res: 
-    #     print cPickle.loads(bytes(r)).shape
-    #     break
