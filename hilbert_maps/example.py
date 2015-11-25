@@ -14,7 +14,7 @@ import sys
 
 import hilbert_map as hm
 import util
-
+import time
 
 def train_sparse_hm(data, components, gamma, distance_cutoff):
     """Trains a hilbert map model using the sparse feature.
@@ -68,16 +68,50 @@ def train_incremental_hm(data, components, gamma, feature):
     training_data = []
     for data, label in util.data_generator(poses, scans):
         training_data.extend(data)
+
     model.fit(np.array(training_data))
 
     # Train the model
     count = 0
+    time_count = 0
+
+    all_data, all_labels = [], []
+
+    def add_data(all_data, all_labels, fraction=1.0): 
+        if not len(all_labels): 
+            return
+
+        full_data, full_labels = np.vstack(all_data), np.hstack(all_labels)
+        neg_inds, = np.where(full_labels == 0)
+        pos_inds, = np.where(full_labels == 1)
+
+        ninds = np.random.choice(np.arange(len(neg_inds)), 
+                                 size=int(fraction * len(neg_inds)), replace=False)
+        neg_inds = neg_inds[ninds]
+        inds = np.hstack([pos_inds, neg_inds])
+        model.add(full_data[inds], full_labels[inds])
+        
+
     for data, label in util.data_generator(poses, scans):
-        model.add(data, label)
+        # model.add(data, label)
+        
+        all_data.append(data)
+        all_labels.append(label)
 
         sys.stdout.write("\rTraining model: {: 6.2f}%".format(count / float(len(poses)) * 100))
         sys.stdout.flush()
+
         count += 1
+
+        st = time.time()
+        N = len(all_data)
+        if N % 200 == 0 and N > 0: 
+            add_data(all_data, all_labels, fraction=0.1)
+            all_data, all_labels = [], []
+        time_count += time.time() - st
+    add_data(all_data, all_labels)
+    
+    print('Total training time {:4.3f} s'.format(time_count))
     print("")
 
     return model
@@ -103,7 +137,7 @@ def generate_map(model, resolution, limits, fname, verbose=True):
     # Obtain predictions in a batch fashion
     predictions = []
     offset = 0
-    batch_size = 100
+    batch_size = 10000
     old_intercept = copy.deepcopy(model.classifier.intercept_)
     model.classifier.intercept_ = 0.1 * model.classifier.intercept_
     while offset < len(sample_coords):

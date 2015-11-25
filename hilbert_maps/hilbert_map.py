@@ -66,7 +66,7 @@ class IncrementalHilbertMap(object):
         self.classifier = SGDClassifier(
                 loss="log",
                 penalty="elasticnet",
-                alpha=0.0001
+                alpha=0.0001, n_jobs=8, verbose=5
         )
 
     def fit(self, data):
@@ -138,7 +138,7 @@ class SparseHilbertMap(object):
         self.gamma = gamma
         self.cutoff = cutoff
         self.use_rkhs = use_rkhs
-        self.batch_size = 10000
+        self.batch_size = 1000
         self.classifier = SGDClassifier(
             loss="log",
             penalty="elasticnet",
