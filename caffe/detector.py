@@ -12,8 +12,9 @@ This implementation follows ideas in
 spillai: added detect_bboxes, with fc7 output
 
 """
-import numpy as np
+
 import os
+import numpy as np
 
 import caffe
 caffe.set_mode_gpu()
@@ -69,6 +70,7 @@ class Detector(caffe.Net):
         detections: list of {filename: image filename, window: crop coordinates,
             predictions: prediction vector} dicts.
         """
+
         # Extract windows.
         window_inputs = []
         for image_fname, windows in images_windows:
