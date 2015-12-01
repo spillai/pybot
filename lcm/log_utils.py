@@ -183,11 +183,11 @@ class KinectDecoder(Decoder):
         return depth
 
 class LCMLogReader(object): 
-    def __init__(self, filename=None, decoder=None, start_idx=0, every_k_frames=1, index=True):
+    def __init__(self, filename=None, decoder=None, start_idx=0, every_k_frames=1, index=False):
         filename = os.path.expanduser(filename)
         if filename is None or not os.path.exists(os.path.expanduser(filename)):
             raise Exception('Invalid Filename: %s' % filename)
-        print 'Kinect Reader: Opening file', filename        
+        print 'LCMLogReader: Opening file', filename        
 
         # Store attributes
         self.filename = filename
