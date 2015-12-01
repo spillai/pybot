@@ -1,0 +1,112 @@
+import numpy as np
+import cv2, os.path, lcm, zlib
+
+import roslib
+# roslib.load_manifest(PKG)
+
+import rosbag
+import rospy
+
+from sensor_msgs.msg import Image
+from cv_bridge import CvBridge, CvBridgeError
+
+from bot_vision.image_utils import im_resize
+from bot_vision.imshow_utils import imshow_cv
+
+class Decoder(object): 
+    def __init__(self, channel=''): 
+        self.channel = channel
+        
+	def decode(self, data): 
+            return None
+		
+        def can_decode(self, channel): 
+            return self.channel == channel
+
+class ImageDecoder(Decoder): 
+    def __init__(self, channel='/camera/rgb/image_raw', scale=1.): 
+        Decoder.__init__(self, channel=channel)
+        self.scale = scale
+        self.bridge = CvBridge()
+
+    def decode(self, msg): 
+        try:
+            im = self.bridge.imgmsg_to_cv2(msg,'bgr8')
+            return im_resize(im, scale=self.scale)
+        except CvBridgeError, e:
+            print e
+            # timestr = "%.6f" % msg.header.stamp.to_sec()
+        
+class ROSBagReader(object): 
+    def __init__(self, filename, decoder=None, start_idx=0, every_k_frames=1, index=False):
+        filename = os.path.expanduser(filename)
+		
+        if filename is None or not os.path.exists(os.path.expanduser(filename)):
+            raise Exception('Invalid Filename: %s' % filename)
+			
+        # print('ROSBagReader: Opening file %s' % filename)        
+            
+        # Store attributes
+        self.filename = filename
+        self.decoder = decoder
+        self.every_k_frames = every_k_frames
+        self.start_idx = start_idx
+        
+        # Log specific
+        self._log = rosbag.Bag(filename, 'r')
+		
+        # Build index
+        self.idx = 0
+        if index: 
+            self._index()
+        else: 
+            self.index = None
+
+    def iteritems(self, reverse=False): 
+        if self.index is not None: 
+            raise RuntimeError('Cannot provide items indexed')
+            # if reverse: 
+            #     for t in self.index[::-1]: 
+            #         if self.start_idx != 0: 
+            #             raise RuntimeWarning('No support for start_idx != 0')
+            #         frame = self.get_frame_with_timestamp(t)
+            #         yield frame
+            # else: 
+            #     for t in self.index: 
+            #         frame = self.get_frame_with_timestamp(t)
+            #         yield frame
+        else: 
+            if reverse: 
+                raise RuntimeError('Cannot provide items in reverse when file is not indexed')
+
+            for channel, msg, t in self._log.read_messages():
+                res, msg = self.decode_msgs(channel, msg, t)
+                if res: yield msg
+
+                # if ev.channel == self.decoder.channel: 
+                #     self.idx += 1
+                #     if idx % self.every_k_frames == 0: 
+                #         yield self.decoder.decode(ev.data)
+
+    def decode_msg(self, channel, data, t, dec):
+        if channel == dec.channel: 
+            self.idx += 1
+            if self.idx >= self.start_idx and self.idx % self.every_k_frames == 0: 
+                return True, (channel, dec.decode(data))
+        return False, (None, None)
+
+    def decode_msgs(self, channel, data, t): 
+        if isinstance(self.decoder, list):
+            res, msg = False, None
+            for dec in self.decoder: 
+                res, msg = self.decode_msg(channel, data, t, dec)
+                if res: break
+            return res, msg
+        else: 
+            # when accessing only single decoding, 
+            # return value as is
+            res, msg = self.decode_msg(channel, msg, t, self.decoder)
+            return res, msg[1]
+
+    def iter_frames(self):
+        return self.iteritems()
