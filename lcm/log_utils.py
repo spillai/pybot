@@ -182,29 +182,13 @@ class KinectDecoder(Decoder):
         depth = depth[::self.skip, ::self.skip] # skip pixels
         return depth
 
-class LCMLogReader(object): 
-    def __init__(self, filename=None, decoder=None, start_idx=0, every_k_frames=1, index=False):
-        filename = os.path.expanduser(filename)
-        if filename is None or not os.path.exists(os.path.expanduser(filename)):
-            raise Exception('Invalid Filename: %s' % filename)
-        print 'LCMLogReader: Opening file', filename        
-
-        # Store attributes
-        self.filename = filename
-        self.decoder = decoder
-        self.every_k_frames = every_k_frames
-        self.start_idx = start_idx
-
-        # Log specific
+class LCMLogReader(LogReader): 
+    def __init__(self, *args, **kwargs): 
+        super(LCMLogReader, self).__init__(*args, **kwargs)
         self._lc = lcm.LCM()
-        self._log = lcm.EventLog(self.filename, "r")
 
-        # Build index
-        self.idx = 0
-        if index: 
-            self._index()
-        else: 
-            self.index = None
+    def load_log(self, filename): 
+        return lcm.EventLog(self.filename, 'r')
 
     def _index(self): 
         utimes = np.array([ev.timestamp for ev in self._log], dtype=np.int64)
