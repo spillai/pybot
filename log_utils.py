@@ -9,7 +9,10 @@ class LogReader(object):
 
         # Store attributes
         self.filename = filename
-        self.decoder = decoder
+        if isinstance(decoder, list): 
+            self.decoder = { dec.channel: dec for dec in decoder } 
+        else: 
+            self.decoder = { decoder.channel: decoder }
         self.every_k_frames = every_k_frames
         self.start_idx = start_idx
         
