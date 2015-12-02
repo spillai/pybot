@@ -7,6 +7,7 @@ from bot_utils.db_utils import AttrDict
 from bot_vision.camera_utils import construct_K, DepthCamera
 from bot_vision.image_utils import im_resize
 from bot_vision.imshow_utils import imshow_cv
+from bot_externals.log_utils import LogReader
 
 import bot_core.image_t as image_t
 import bot_core.pose_t as pose_t
