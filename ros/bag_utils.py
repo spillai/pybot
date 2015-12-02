@@ -12,16 +12,21 @@ from cv_bridge import CvBridge, CvBridgeError
 
 from bot_vision.image_utils import im_resize
 from bot_vision.imshow_utils import imshow_cv
+from bot_geometry.rigid_transform import RigidTransform
 
 class Decoder(object): 
-    def __init__(self, channel=''): 
+    def __init__(self, channel='', decode_cb=lambda data: None): 
         self.channel = channel
-        
-	def decode(self, data): 
-            return None
-		
-        def can_decode(self, channel): 
-            return self.channel == channel
+        self.decode_cb = decode_cb
+
+    def decode(self, data): 
+        try: 
+            return self.decode_cb(data)
+        except: 
+            raise RuntimeError('Error decoding channel: %s' % self.channel)
+
+    def can_decode(self, channel): 
+        return self.channel == channel
 
 class ImageDecoder(Decoder): 
     def __init__(self, channel='/camera/rgb/image_raw', scale=1.): 
@@ -32,11 +37,22 @@ class ImageDecoder(Decoder):
     def decode(self, msg): 
         try:
             im = self.bridge.imgmsg_to_cv2(msg,'bgr8')
+            # print("%.6f" % msg.header.stamp.to_sec())
             return im_resize(im, scale=self.scale)
         except CvBridgeError, e:
             print e
-            # timestr = "%.6f" % msg.header.stamp.to_sec()
-        
+
+def NavMsgDecoder(channel): 
+    def odom_decode(data): 
+        tvec, ori = data.pose.pose.position, data.pose.pose.orientation
+        return RigidTransform(xyzw=[ori.x,ori.y,ori.z,ori.w], tvec=[tvec.x,tvec.y,tvec.z])
+    return Decoder(channel=channel, decode_cb=lambda data: odom_decode(data))
+
+def TfDecoder(channel): 
+    def tf_decode(data): 
+        return None
+    return Decoder(channel=channel, decode_cb=lambda data: tf_decode(data))
+
 class ROSBagReader(object): 
     def __init__(self, filename, decoder=None, start_idx=0, every_k_frames=1, index=False):
         filename = os.path.expanduser(filename)
