@@ -91,7 +91,7 @@ class FeatureDetector(object):
     fast_detector_params = AttrDict(default_detector_params, 
                                     type='fast', params=AttrDict( threshold=10, nonmaxSuppression=True ))
     gftt_detector_params = AttrDict(default_detector_params, 
-                                    type='gftt', params=AttrDict( maxCorners = 1000, qualityLevel = 0.04, 
+                                    type='gftt', params=AttrDict( maxCorners = 800, qualityLevel = 0.04, 
                                                                   minDistance = 5, blockSize = 5 ))
     def __init__(self, params=default_detector_params): 
         # FeatureDetector params

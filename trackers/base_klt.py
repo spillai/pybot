@@ -40,7 +40,7 @@ class BaseKLT(object):
     """
 
     default_params = AttrDict(
-        detector=FeatureDetector.gftt_detector_params, 
+        detector=FeatureDetector.fast_detector_params, 
         tracker=OpticalFlowTracker.klt_flow_params
     )
     def __init__(self, params=default_params): 
@@ -59,11 +59,11 @@ class BaseKLT(object):
         # Track Manager
         self.tm = TrackManager(maxlen=10)
 
-    def draw_tracks(self, im): 
+    def draw_tracks(self, im, colored=False): 
         for tid, pts in self.tm.tracks.iteritems(): 
             cv2.polylines(im,[np.vstack(pts).astype(np.int32)], False, 
-                              tuple(map(int, colormap(tid % 20 / 20.0).ravel())), 
-                              thickness=1, lineType=cv2.CV_AA)
+                              tuple(map(int, colormap(tid % 20 / 20.0).ravel())) if colored else (0,240,0), 
+                          thickness=1, lineType=cv2.CV_AA)
 
 
     def viz(self, out): 
