@@ -82,7 +82,7 @@ class BaseKLT(object):
 class OpenCVKLT(BaseKLT): 
     """
     KLT Tracker as implemented in OpenCV 2.4.9
-\    Stripped from opencv/samples/python2/lk_track.py
+    Stripped from opencv/samples/python2/lk_track.py
     """
     def __init__(self, *args, **kwargs):
         BaseKLT.__init__(self, *args, **kwargs)
@@ -125,4 +125,3 @@ class OpenCVKLT(BaseKLT):
             pts = self.detector.process(self.ims[-1], mask=mask)
             self.tm.add(pts, ids=None, prune=False)
             self.add_features = True
-

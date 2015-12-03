@@ -67,11 +67,6 @@ class TrackManager(object):
     @property
     def pts(self): 
         return self._pts
-
-    @property
-    def pts3d(self): 
-        return self._pts3d
-
         
     @property
     def ids(self): 
