@@ -8,13 +8,31 @@ def setup_pbar(maxval):
     pbar.increment = lambda : pbar.update(pbar.currval + 1)
     return pbar
 
-class Accumulator(object): 
-    def __init__(self, maxlen=100): 
-        self.items_ = deque(maxlen=maxlen)
+class Counter(object): 
+    def __init__(self): 
         self.idx_ = 0
+
+    def count(self): 
+        self.idx_ += 1
+
+    def reset(self): 
+        self.idx_ = 0
+
+    def check_divisibility(self, every_k): 
+        return self.idx_ % every_k == 0 #  and self.idx_ > 0 
+
+    @property
+    def index(self): 
+        return self.idx_
+
+class Accumulator(Counter): 
+    def __init__(self, maxlen=100): 
+        Counter.__init__(self)
+        self.items_ = deque(maxlen=maxlen)
 
     def accumulate(self, item): 
         self.items_.append(item)
+        self.count()
 
     def accumulate_list(self, items): 
         for item in items: 
@@ -37,18 +55,28 @@ class Accumulator(object):
         return len(self.items_)
 
 
-class Counter(object): 
-    def __init__(self): 
-        self.idx_ = 0
+class PoseAccumulator(Accumulator): 
+    def __init__(self, maxlen=100, relative=False): 
+        Accumulator.__init__(self, maxlen=maxlen)
 
-    def count(self): 
-        self.idx_ += 1
+        self.relative_ = relative
+        self.init_ = None
 
-    def reset(self): 
-        self.idx_ = 0
+    def accumulate(self, pose):
+        if self.relative_: 
+            if self.init_ is None: 
+                self.init_ = pose
+            p = self.relative_to_init(pose)
+        else: 
+            p = pose
 
-    def check_divisibility(self, every_k): 
-        return self.idx_ % every_k == 0 #  and self.idx_ > 0 
+        # Call accumulate on base class
+        super(PoseAccumulator, self).accumulate(p)
+        
+    def relative_to_init(self, pose_wt): 
+        """ pose of [t] wrt [0]:  p_0t = p_w0.inverse() * p_wt """  
+        return (self.init_.inverse()).oplus(pose_wt)
+
         
 class CounterWithPeriodicCallback(Counter): 
     """
@@ -87,27 +115,6 @@ class CounterWithPeriodicCallback(Counter):
             raise AttributeError('function %s has not been defined in instance' % function_name)
         
         print('Setting new polled callback for %s.%s' % (type(cls_instance).__name__, function_name))
-
-class PoseAccumulator(Accumulator): 
-    def __init__(self, maxlen=100, relative=False): 
-        Accumulator.__init__(self, maxlen=maxlen)
-
-        self.relative_ = relative
-        self.init_ = None
-
-    def accumulate(self, pose):
-        if self.relative_: 
-            if self.init_ is None: 
-                self.init_ = pose
-            p = self.relative_to_init(pose)
-        else: 
-            p = pose
-
-        self.items_.append(p)
-
-    def relative_to_init(self, pose_wt): 
-        """ pose of [t] wrt [0]:  p_0t = p_w0.inverse() * p_wt """  
-        return (self.init_.inverse()).oplus(pose_wt)
         
 class SkippedCounter(Counter): 
     def __init__(self, skip=10, **kwargs): 
@@ -127,7 +134,7 @@ class SkippedCounter(Counter):
         self.count()
         return self.skipped_
 
-class SkippedPoseAccumulator(Counter, PoseAccumulator): 
+class SkippedPoseAccumulator(PoseAccumulator): 
     def __init__(self, skip=10, **kwargs): 
         Counter.__init__(self)
         PoseAccumulator.__init__(self, **kwargs)
