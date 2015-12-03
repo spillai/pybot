@@ -25,8 +25,9 @@ class Decoder(object):
     def decode(self, data): 
         try: 
             return self.decode_cb(data)
-        except: 
-            raise RuntimeError('Error decoding channel: %s' % self.channel)
+        except Exception as e:
+            print e
+            raise RuntimeError('Error decoding channel: %s by %s' % (self.channel, self))
 
     def can_decode(self, channel): 
         return self.channel == channel
@@ -54,6 +55,47 @@ class ImageDecoder(Decoder):
         except CvBridgeError, e:
             print e
 
+class LaserScanDecoder(Decoder): 
+    """
+    Mostly stripped from 
+    https://github.com/ros-perception/laser_geometry/blob/indigo-devel/src/laser_geometry/laser_geometry.py
+    """
+    def __init__(self, channel='/scan', every_k_frames=1):
+        Decoder.__init__(self, channel=channel, every_k_frames=every_k_frames)
+
+        self.__angle_min = 0.0
+        self.__angle_max = 0.0
+        self.__cos_sin_map = np.array([[]])
+                
+    def decode(self, msg): 
+        try:
+
+            N = len(msg.ranges)
+
+            zeros = np.zeros(shape=(N,1))
+            ranges = np.array(msg.ranges)
+            ranges = np.array([ranges, ranges])
+
+            if (self.__cos_sin_map.shape[1] != N or
+               self.__angle_min != msg.angle_min or
+                self.__angle_max != msg.angle_max):
+                print("No precomputed map given. Computing one.")
+
+                self.__angle_min = msg.angle_min
+                self.__angle_max = msg.angle_max
+
+                cos_map = [np.cos(msg.angle_min + i * msg.angle_increment)
+                       for i in range(N)]
+                sin_map = [np.sin(msg.angle_min + i * msg.angle_increment)
+                        for i in range(N)]
+
+                self.__cos_sin_map = np.array([cos_map, sin_map])
+
+            return np.hstack([(ranges * self.__cos_sin_map).T, zeros])
+        except Exception as e:
+            print e
+
+
 def NavMsgDecoder(channel, every_k_frames=1): 
     def odom_decode(data): 
         tvec, ori = data.pose.pose.position, data.pose.pose.orientation
@@ -64,7 +106,7 @@ def TfDecoder(channel, every_k_frames=1):
     def tf_decode(data): 
         return None
     return Decoder(channel=channel, every_k_frames=every_k_frames, decode_cb=lambda data: tf_decode(data))
-        
+
 class ROSBagReader(LogReader): 
     def __init__(self, *args, **kwargs): 
         super(ROSBagReader, self).__init__(*args, **kwargs)
@@ -107,7 +149,7 @@ class ROSBagReader(LogReader):
                 return True, (channel, dec.decode(data))
         except Exception as e:
             print e
-            raise RuntimeError('Failed to decode data from channel: %s, mis-specified decoder?' % channel)
+            # raise RuntimeError('Failed to decode data from channel: %s, mis-specified decoder?' % channel)
         
         return False, (None, None)
 
