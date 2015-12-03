@@ -88,7 +88,7 @@ class CounterWithPeriodicCallback(Counter):
     )
     robot_poses_counter.register_callback(robot_poses, 'accumulate')
     """
-    def __init__(self, every_k, process_cb): 
+    def __init__(self, every_k=2, process_cb=lambda: None): 
         Counter.__init__(self)
         self.every_k_ = every_k
         self.process_cb_ = process_cb
