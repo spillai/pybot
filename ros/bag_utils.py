@@ -9,6 +9,7 @@ import rospy
 
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge, CvBridgeError
+from tf2_msgs.msg import TFMessage
 
 from bot_externals.log_utils import LogReader
 from bot_vision.image_utils import im_resize
@@ -96,20 +97,33 @@ class LaserScanDecoder(Decoder):
             print e
 
 
+class TfDecoderAndPublisher(Decoder): 
+    """
+    """
+    def __init__(self, channel='/tf', every_k_frames=1):
+        Decoder.__init__(self, channel=channel, every_k_frames=every_k_frames)
+        self.pub_ = None
+
+    def decode(self, msg): 
+        if self.pub_ is None: 
+            self.pub_ = rospy.Publisher('/tf', TFMessage, latch=False)
+        self.pub_.publish(msg)
+        return None
+
 def NavMsgDecoder(channel, every_k_frames=1): 
     def odom_decode(data): 
         tvec, ori = data.pose.pose.position, data.pose.pose.orientation
         return RigidTransform(xyzw=[ori.x,ori.y,ori.z,ori.w], tvec=[tvec.x,tvec.y,tvec.z])
     return Decoder(channel=channel, every_k_frames=every_k_frames, decode_cb=lambda data: odom_decode(data))
 
-def TfDecoder(channel, every_k_frames=1): 
-    def tf_decode(data): 
-        return None
-    return Decoder(channel=channel, every_k_frames=every_k_frames, decode_cb=lambda data: tf_decode(data))
-
 class ROSBagReader(LogReader): 
     def __init__(self, *args, **kwargs): 
         super(ROSBagReader, self).__init__(*args, **kwargs)
+
+        # # Topic datatypes
+        # self.topic_datatypes_ = dict([(con.topic, roslib.message.get_message_class(con.datatype))
+        #                               for con in self.log_._get_connections()])
+        # print 'Connections:', self.topic_datatypes_
 
     def load_log(self, filename): 
         return rosbag.Bag(filename, 'r')
@@ -146,7 +160,7 @@ class ROSBagReader(LogReader):
             # and only then check if decode necessary  
             dec = self.decoder[channel]
             if self.should_decode() and dec.should_decode(): 
-                return True, (channel, dec.decode(data))
+                return True, (t, channel, dec.decode(data))
         except Exception as e:
             print e
             # raise RuntimeError('Failed to decode data from channel: %s, mis-specified decoder?' % channel)
