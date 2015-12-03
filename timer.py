@@ -12,7 +12,7 @@ class SimpleTimer:
         if self._counter == self.iterations: 
             self._counter = 0
             now = time.time()
-            print '%s: %4.3f ms' % (self._name, ((now - self._last) * 1e3 / self.iterations))
+            print '%s: %4.3f ms (avg over %i iterations)' % (self._name, ((now - self._last) * 1e3 / self.iterations), self.iterations)
             self._last = now
 
     def start(self): 
