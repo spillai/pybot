@@ -120,11 +120,6 @@ class ROSBagReader(LogReader):
     def __init__(self, *args, **kwargs): 
         super(ROSBagReader, self).__init__(*args, **kwargs)
 
-        # # Topic datatypes
-        # self.topic_datatypes_ = dict([(con.topic, roslib.message.get_message_class(con.datatype))
-        #                               for con in self.log_._get_connections()])
-        # print 'Connections:', self.topic_datatypes_
-
     def load_log(self, filename): 
         return rosbag.Bag(filename, 'r')
 
