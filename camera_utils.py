@@ -252,6 +252,11 @@ class DepthCamera(CameraIntrinsic):
         assert(depth.shape == self.xs.shape)
         return np.dstack([self.xs * depth, self.ys * depth, depth])
 
+    def reconstruct_points(self, pts, depth): 
+        return np.vstack([self.xs[pts[:,1], pts[:,0]] * depth,
+                          self.ys[pts[:,1], pts[:,0]] * depth,
+                          depth]).T
+
 def KinectDepthCamera(K=kinect_v1_params.K_depth, shape=(480,640)): 
     return DepthCamera(K=K, shape=shape)
 

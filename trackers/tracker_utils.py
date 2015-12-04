@@ -220,7 +220,7 @@ class OpticalFlowTracker(object):
             # Backward flow
             p0r, st0, err0 = cv2.calcOpticalFlowPyrLK(im1, im0, p1, None, **self.params.params)
             p0r[st0 == 0] = np.nan
-
+            
             # Set only good
             fb_good = (np.fabs(p0r-p0) < 2).all(axis=1)
             p1[~fb_good] = np.nan
