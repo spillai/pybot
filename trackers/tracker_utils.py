@@ -5,6 +5,8 @@ from collections import defaultdict, deque
 from bot_vision.color_utils import colormap
 from bot_utils.db_utils import AttrDict
 
+from pybot_apriltags import AprilTag, AprilTagsWrapper
+
 def finite_and_within_bounds(xys, shape): 
     H, W = shape[:2]
     if not len(xys): 
@@ -73,6 +75,29 @@ class TrackManager(object):
         return self._ids
 
 
+# class BaseFeatureDetector(object): 
+#     def __init__(self): 
+#         pass
+
+#     def detect(self, im, mask=None): 
+#         raise NotImplementedError()
+
+class AprilTagFeatureDetector(object): 
+    """
+    AprilTag Feature Detector (only detect 4 corner points)
+    """
+    default_detector_params = AttrDict(tag_size=0.1, fx=576.09, fy=576.09, cx=319.5, cy=239.5)
+    def __init__(self, tag_size=0.1, fx=576.09, fy=576.09, cx=319.5, cy=239.5): 
+        self.detector = AprilTagsWrapper()
+        self.detector.set_calib(tag_size=tag_size, fx=fx, fy=fy, cx=cx, cy=cy)
+    
+    def detect(self, im, mask=None): 
+        tags = self.detector.process(im, return_poses=False)
+        kpts = []
+        for tag in tags: 
+            kpts.extend([cv2.KeyPoint(pt[0], pt[1], 1) for pt in tag.getFeatures()])
+        return kpts
+
 class FeatureDetector(object): 
     """
     Feature Detector class that allows for fast switching between
@@ -83,11 +108,13 @@ class FeatureDetector(object):
     """
 
     default_detector_params = AttrDict(levels=4, subpixel=False)
-    fast_detector_params = AttrDict(default_detector_params, 
-                                    type='fast', params=AttrDict( threshold=10, nonmaxSuppression=True ))
-    gftt_detector_params = AttrDict(default_detector_params, 
-                                    type='gftt', params=AttrDict( maxCorners = 800, qualityLevel = 0.04, 
+    fast_detector_params = AttrDict(default_detector_params, type='fast', 
+                                    params=AttrDict( threshold=10, nonmaxSuppression=True ))
+    gftt_detector_params = AttrDict(default_detector_params, type='gftt', 
+                                    params=AttrDict( maxCorners = 800, qualityLevel = 0.04, 
                                                                   minDistance = 5, blockSize = 5 ))
+    apriltag_detector_params = AttrDict(subpixel=False, type='apriltag', 
+                                        params=AprilTagFeatureDetector.default_detector_params)
     def __init__(self, params=default_detector_params): 
         # FeatureDetector params
         self.params = params
@@ -104,6 +131,8 @@ class FeatureDetector(object):
                 detector=cv2.FastFeatureDetector(**self.params.params),  
                 maxLevel=self.params.levels
             )
+        elif self.params.type == 'apriltag': 
+            self.detector = AprilTagFeatureDetector(**self.params.params)
         else: 
             raise RuntimeError('Unknown detector_type: %s! Use fast or gftt' % self.params.type)
 
@@ -125,7 +154,6 @@ class FeatureDetector(object):
         term = ( cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_COUNT, 30, 0.1 )
         cv2.cornerSubPix(im, pts, (10, 10), (-1, -1), term)
         return
-
 
 class OpticalFlowTracker(object): 
     """
