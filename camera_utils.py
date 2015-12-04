@@ -87,6 +87,10 @@ class CameraIntrinsic(object):
     def from_calib_params(cls, fx, fy, cx, cy): 
         return cls(construct_K(fx, fy, cx, cy))
 
+    @classmethod
+    def from_calib_params_fov(cls, fov, cx, cy): 
+        return cls(construct_K(cx / np.tan(fov), cy / np.tan(fov), cx, cy))
+
     @property
     def fov(self): 
         """

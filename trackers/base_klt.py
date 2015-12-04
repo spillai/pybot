@@ -71,10 +71,14 @@ class BaseKLT(object):
         if not len(self.tm.pts): 
             return
 
+
+        N = 20
+        cols = colormap(np.linspace(0, 1, N))
         valid = finite_and_within_bounds(self.tm.pts, out.shape)
-        colors = colormap(np.float32(self.tm.ids % 20) / 20)
-        for col, pt in zip(colors, self.tm.pts[valid]): 
-            cv2.circle(out, tuple(map(int, pt)), 2, col, -1, lineType=cv2.CV_AA)
+        for tid, pt in zip(self.tm.ids[valid], self.tm.pts[valid]): 
+            cv2.circle(out, tuple(map(int, pt)), 2, 
+                       tuple(map(int, cols[tid % N])) if colored else (0,240,0),
+                       -1, lineType=cv2.CV_AA)
 
 
 
