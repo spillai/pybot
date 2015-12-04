@@ -106,7 +106,7 @@ class TfDecoderAndPublisher(Decoder):
 
     def decode(self, msg): 
         if self.pub_ is None: 
-            self.pub_ = rospy.Publisher('/tf', TFMessage, latch=False)
+            self.pub_ = rospy.Publisher('/tf', TFMessage, queue_size=10, latch=True)
         self.pub_.publish(msg)
         return None
 
@@ -148,7 +148,7 @@ class ROSBagReader(LogReader):
                 res, msg = self.decode_msg(channel, msg, t)
                 if res: 
                     yield msg
-
+                
     def decode_msg(self, channel, data, t): 
         try: 
             # Check if log index has reached desired start index, 
