@@ -98,6 +98,8 @@ class CounterWithPeriodicCallback(Counter):
         if self.check_divisibility(self.every_k_):
             self.process_cb_()
             self.reset()
+            return True
+        return False
 
     def register_callback(self, cls_instance, function_name): 
         """ Register a wrapped function that polls the counter """
