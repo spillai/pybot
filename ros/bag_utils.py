@@ -144,7 +144,11 @@ class ROSBagReader(LogReader):
                 raise RuntimeError('Cannot provide items in reverse when file is not indexed')
 
             # Decode only messages that are supposed to be decoded 
-            for channel, msg, t in self._log.read_messages(topics=self.decoder.keys()):
+            for self.idx, (channel, msg, t) in enumerate(self._log.read_messages(topics=self.decoder.keys())):
+
+                if self.idx < self.start_idx: 
+                    continue
+
                 res, msg = self.decode_msg(channel, msg, t)
                 if res: 
                     yield msg
@@ -154,18 +158,13 @@ class ROSBagReader(LogReader):
             # Check if log index has reached desired start index, 
             # and only then check if decode necessary  
             dec = self.decoder[channel]
-            if self.should_decode() and dec.should_decode(): 
+            if dec.should_decode(): 
                 return True, (t, channel, dec.decode(data))
         except Exception as e:
             print e
             # raise RuntimeError('Failed to decode data from channel: %s, mis-specified decoder?' % channel)
         
         return False, (None, None)
-
-
-    def should_decode(self): 
-        self.idx += 1
-        return self.idx >= self.start_idx
 
     def iter_frames(self):
         return self.iteritems()
