@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 import time, logging
 import numpy as np
 
@@ -9,10 +8,6 @@ from collections import deque
 # LCM libs
 import lcm, vs
 from bot_core import image_t, pose_t
-
-# Plotting
-import matplotlib.pylab as plt
-from matplotlib.colors import colorConverter
 
 # Utility imports
 from bot_vision.image_utils import to_color
