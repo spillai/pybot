@@ -1,7 +1,6 @@
-#!/usr/bin/env python
 # Helper functions for plotting
 import numpy as np
-import matplotlib.pylab as plt
+import matplotlib.pyplot as plt
 from matplotlib.colors import colorConverter
 from copy import deepcopy
 
@@ -50,18 +49,4 @@ def copy_pointcloud_data(_arr, _carr, flip_rb=False):
     N, D = arr.shape[:2]
     carr = get_color_arr(carr, N, flip_rb=flip_rb);
     return arr, carr
-
-
-
-def init(): 
-    pass
-
-# def publish_line_segments(*args, **kwargs): 
-#     pass
-
-# def publish_cloud(*args, **kwargs): 
-#     pass
-
-# def publish_pose_list(*args, **kwargs): 
-#     pass
 
