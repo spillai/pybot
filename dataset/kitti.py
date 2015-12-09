@@ -5,7 +5,7 @@ import cv2
 from itertools import izip
 from bot_utils.db_utils import AttrDict
 from bot_utils.dataset_readers import natural_sort, \
-    ImageDatasetReader, StereoDatasetReader, VelodyneDatasetReader
+    DatasetReader, ImageDatasetReader, StereoDatasetReader, VelodyneDatasetReader
 
 from .kitti_helpers import kitti_stereo_calib_params, kitti_load_poses
 
@@ -119,6 +119,72 @@ class KITTIDatasetReader(object):
             yield AttrDict(left=left, right=right, velodyne=None, 
                            noc=(noc/256).astype(np.float32), 
                            occ=(occ/256).astype(np.float32), pose=pose)
+
+class KITTIRawDatasetReader(KITTIDatasetReader): 
+    """
+    KITTIRawDatasetReader: KITTIDatasetReader + OXTS reader
+    """
+
+    def __init__(self, directory, 
+                 sequence='',
+                 left_template='image_00/data/%010i.png', 
+                 right_template='image_01/data/%010i.png', 
+                 velodyne_template='velodyne_points/data/%010i.bin', 
+                 oxt_template='oxts/data/%010i.txt',
+                 start_idx=0, max_files=50000, scale=1.0): 
+        super(KITTIRawDatasetReader, self).__init__(directory, sequence, 
+                                                    left_template=left_template, right_template=right_template, 
+                                                    velodyne_template=velodyne_template, 
+                                                    start_idx=start_idx, max_files=max_files, scale=scale)
+
+        # Read stereo images
+        self.stereo = StereoDatasetReader(directory=directory, 
+                                          left_template=left_template, 
+                                          right_template=right_template, 
+                                          start_idx=start_idx, max_files=max_files, scale=scale)
+
+        # Read poses
+        try: 
+            pose_fn = os.path.join(os.path.expanduser(directory), 'poses', ''.join([sequence, '.txt']))
+            self.poses = kitti_load_poses(fn=pose_fn)
+        except: 
+            self.poses = [None] * self.stereo.length
+
+        # Read velodyne
+        self.velodyne = VelodyneDatasetReader(
+            template=os.path.join(directory,velodyne_template), 
+            start_idx=start_idx, max_files=max_files
+        )
+
+        # Read oxts
+        def kitti_load_oxts(fn): 
+            return (np.fromfile(fn, dtype=np.float64, sep=' '))
+            
+        try: 
+            oxt_format_fn = os.path.join(os.path.expanduser(directory), 'oxts/dataformat.txt')
+            self.oxt_formats = [line.split(':')[0] for line in open(oxt_format_fn)]
+            
+            oxt_fn = os.path.join(os.path.expanduser(directory), oxt_template)
+            self.oxts = DatasetReader(template=oxt_fn, process_cb=lambda fn: kitti_load_oxts(fn), 
+                                      start_idx=start_idx, max_files=max_files)
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            raise RuntimeError()
+
+            # self.oxts = [None] * self.stereo.length
+            
+        
+    def iter_frames(self, *args, **kwargs): 
+        for (left, right), pose, oxt in izip(self.iter_stereo_frames(*args, **kwargs), self.poses, self.oxts.iteritems()): 
+            yield AttrDict(left=left, right=right, velodyne=None, pose=pose, oxt=oxt)
+    
+    @property
+    def oxt_fieldnames(self): 
+        return self.oxt_formats
+
+    def iter_oxts(self, *args, **kwargs): 
+        return self.oxts.iteritems()
 
 class OmnicamDatasetReader(object): 
     """
