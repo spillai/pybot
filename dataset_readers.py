@@ -87,18 +87,37 @@ class DatasetReader(object):
 
     # Get directory, and filename pattern
     def __init__(self, process_cb=lambda x: x, 
-                 template='data_%i.txt', start_idx=0, max_files=10000, 
+                 template='template_%i.txt', start_idx=0, max_files=10000, 
                  files=None):
         template = os.path.expanduser(template)
         self.process_cb = process_cb
 
-        # Index starts at 1
+        # Index starts at 0
         if files is None:
+
+            # Find files with matching patterns within 
+            # the directory, and only add up to required
+            # number of files (replace %010i with *
+            # for fast pattern matching)
+
+            directory, basename = os.path.split(template)
+            ext = os.path.splitext(basename)[-1]
+            st = basename.find('%')
+            end = basename.find('i', st)+1
+            pattern = basename.replace(basename[st:end], '*')
+
+            try: 
+                files = os.listdir(directory) 
+                nmatches = len(fnmatch.filter(files, pattern))
+            except: 
+                nmatches = 0
             self.files = [template % idx
-                          for idx in range(start_idx, max_files) 
-                          if os.path.exists(template % idx)]
+                          for idx in range(start_idx, max_files)]
         else: 
             self.files = files
+        
+        print('Found {:} files with pattern: {:}'.format(nmatches, pattern))
+        # print('First file: {:}: {:}'.format(template % start_idx, 'GOOD' if os.path.exists(template % start_idx) else 'BAD'))
 
     @staticmethod
     def from_filenames(process_cb, files): 
