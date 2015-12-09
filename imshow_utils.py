@@ -69,6 +69,13 @@ def imshow_cv(label, im, block=False, text=None):
     ch = cv2.waitKey(0 if block else 10) & 0xFF
     if ch == ord(' '):
         cv2.waitKey(0)
+    if ch == ord('v'):
+        print('Entering debug mode, image callbacks active')
+        while True: 
+            ch = cv2.waitKey(10) & 0xFF
+            if ch == ord('q'): 
+                print('Exiting debug mode!')
+                break
     if ch == ord('s'):
         fn = 'img-%s.png' % time.strftime("%Y-%m-%d-%H-%M-%S")
         print 'Saving %s' % fn
