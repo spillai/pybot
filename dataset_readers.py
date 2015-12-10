@@ -110,13 +110,14 @@ class DatasetReader(object):
                 files = os.listdir(directory) 
                 nmatches = len(fnmatch.filter(files, pattern))
             except: 
-                nmatches = 0
+                nmatches = start_idx + max_files
             self.files = [template % idx
-                          for idx in range(start_idx, max_files)]
+                          for idx in range(start_idx, min(nmatches, start_idx + max_files))]
         else: 
             self.files = files
         
         print('Found {:} files with pattern: {:}'.format(nmatches, pattern))
+        print self.files[-1]
         # print('First file: {:}: {:}'.format(template % start_idx, 'GOOD' if os.path.exists(template % start_idx) else 'BAD'))
 
     @staticmethod

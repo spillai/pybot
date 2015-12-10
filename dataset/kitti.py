@@ -2,15 +2,12 @@ import os
 import numpy as np
 import cv2
 
-from itertools import izip
+from itertools import izip, repeat
 from bot_utils.db_utils import AttrDict
 from bot_utils.dataset_readers import natural_sort, \
     DatasetReader, ImageDatasetReader, StereoDatasetReader, VelodyneDatasetReader
 
 from .kitti_helpers import kitti_stereo_calib_params, kitti_load_poses
-
-# class StereoDatasetMixin(): 
-# TODO
 
 class KITTIDatasetReader(object): 
     """
@@ -43,7 +40,7 @@ class KITTIDatasetReader(object):
             pose_fn = os.path.join(os.path.expanduser(directory), 'poses', ''.join([sequence, '.txt']))
             self.poses = kitti_load_poses(fn=pose_fn)
         except: 
-            self.poses = [None] * self.stereo.length
+            self.poses = repeat(None)
 
         # Read velodyne
         self.velodyne = VelodyneDatasetReader(
@@ -148,8 +145,8 @@ class KITTIRawDatasetReader(KITTIDatasetReader):
             pose_fn = os.path.join(os.path.expanduser(directory), 'poses', ''.join([sequence, '.txt']))
             self.poses = kitti_load_poses(fn=pose_fn)
         except: 
-            self.poses = [None] * self.stereo.length
-
+            self.poses = repeat(None)
+            
         # Read velodyne
         self.velodyne = VelodyneDatasetReader(
             template=os.path.join(directory,velodyne_template), 
@@ -168,16 +165,11 @@ class KITTIRawDatasetReader(KITTIDatasetReader):
             self.oxts = DatasetReader(template=oxt_fn, process_cb=lambda fn: kitti_load_oxts(fn), 
                                       start_idx=start_idx, max_files=max_files)
         except Exception as e:
-            import traceback
-            traceback.print_exc()
-            raise RuntimeError()
-
-            # self.oxts = [None] * self.stereo.length
-            
+            self.oxts = repeat(None)
         
     def iter_frames(self, *args, **kwargs): 
         for (left, right), pose, oxt in izip(self.iter_stereo_frames(*args, **kwargs), self.poses, self.oxts.iteritems()): 
-            yield AttrDict(left=left, right=right, velodyne=None, pose=pose, oxt=oxt)
+            yield AttrDict(left=left, right=right, velodyne=None, pose=pose, oxt=AttrDict(zip(self.oxt_formats, oxt)))
     
     @property
     def oxt_fieldnames(self): 
