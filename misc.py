@@ -23,7 +23,7 @@ class Counter(object):
 
     @property
     def index(self): 
-        return self.idx_
+        return self.idx_-1
 
 class Accumulator(Counter): 
     def __init__(self, maxlen=100): 
