@@ -29,6 +29,8 @@ class VisualizationMsgsPub:
 
         camera_pose = RigidTransform.from_roll_pitch_yaw_x_y_z(-np.pi/2, 0, -np.pi/2, 
                                                                0, 0, 1, axes='sxyz')
+
+        self.reset_visualization()
         self.publish_sensor_frame('camera', pose=camera_pose)
         self.publish_sensor_frame('origin', pose=RigidTransform.identity())
         
@@ -46,6 +48,11 @@ class VisualizationMsgsPub:
     def set_sensor_pose(self, channel, pose): 
         self._sensor_pose[channel] = pose
 
+    def reset_visualization(self): 
+        print('Reseting Visualizations')
+        msg = vs.reset_collections_t()
+        self.lc.publish("RESET_COLLECTIONS", msg.encode())
+
     def publish_sensor_frame(self, channel, pose=None): 
         """ 
         Publish sensor frame in which the point clouds
@@ -53,7 +60,7 @@ class VisualizationMsgsPub:
         by its channel (may be collisions since its right shifted by 32)
         """
         # Sensor frames msg
-        msg = vs.obj_collection_t();
+        msg = vs.obj_collection_t()
         msg.id = self.channel_uid(channel)
         msg.name = channel + '_BOTFRAME'
         msg.type = vs.obj_collection_t.AXIS3D
