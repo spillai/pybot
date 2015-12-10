@@ -75,7 +75,8 @@ class RigidTransform(object):
         self.tvec = np.array(tvec)
 
     def __repr__(self):
-        return 'rpy: %s tvec: %s' % (self.quat.to_roll_pitch_yaw(), self.tvec)
+        return 'rpy: %s tvec: %s' % (np.array_str(self.quat.to_roll_pitch_yaw(), precision=2, suppress_small=True), 
+                                     np.array_str(self.tvec, precision=2, suppress_small=True))
         # return 'quat: %s, tvec: %s' % (self.quat, self.tvec)
 
     def inverse(self):
