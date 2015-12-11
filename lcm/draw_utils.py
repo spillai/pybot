@@ -15,6 +15,7 @@ from bot_vision.draw_utils import reshape_arr, get_color_arr, height_map, \
     color_by_height_axis, copy_pointcloud_data
 from bot_utils.async_utils import run_async
 from bot_geometry.rigid_transform import RigidTransform
+from bot_vision.camera_utils import Frustum
 
 class VisualizationMsgsPub: 
     """
@@ -670,40 +671,38 @@ def publish_pose_list(pub_channel, poses, texts=[], frame_id='camera', reset=Tru
 #         g.text(arr[idx,0],arr[idx,1],arr[idx,2], text)
 #     g.switch_buffer()
 
-
 # Object Renderers ==============================================================
-def draw_camera(pose, depth=0.1, fov=np.deg2rad(60)): 
-    off = np.tan(fov / 2 * depth)
+def draw_camera(pose, zmin=0.0, zmax=0.1, fov=np.deg2rad(60)): 
 
-    p0, b0 = np.array([0,0,0]), np.array([0,0,depth])
-    tl, tr, br, bl = b0 + np.array([-1, 1, 0]) * off, \
-                     b0 + np.array([1, 1, 0]) * off, \
-                     b0 + np.array([1, -1, 0]) * off, \
-                     b0 + np.array([-1, -1, 0]) * off
+    frustum = Frustum(pose, zmin=zmin, zmax=zmax, fov=fov)
+    nll, nlr, nur, nul, fll, flr, fur, ful = frustum.get_vertices()
 
     # Front Face
     faces = []
-    faces.extend([tl, tr, br])
-    faces.extend([br, tl, bl])
+    faces.extend([ful, fur, flr])
+    faces.extend([flr, ful, fll])
 
     # Walls 
-    left, top, right, bottom = [bl, p0, tl], [tl, p0, tr], [tr, p0, br], [br, p0, bl]
-    faces.extend([left, top, right, bottom]) # left, top, right, bottom wall
-    faces = pose * np.vstack(faces)
+    left, top, right, bottom = [fll, frustum.p0, ful], [ful, frustum.p0, fur], [fur, frustum.p0, flr], [flr, frustum.p0, fll]
+    faces.extend([left, top, right, bottom]) # left, top, right, bottom wafll
+    faces = np.vstack(faces)
+    # faces = pose * np.vstack(faces)
 
     # Face
     pts = []
-    pts.extend([tl, tr, br, bl, tl])
+    pts.extend([ful, fur, flr, fll, ful])
     pts.extend([left, left[0]])
     pts.extend([top, top[0]])
     pts.extend([right, right[0]])
     pts.extend([bottom, bottom[0]])
-    pts = pose * np.vstack(pts)
+    pts = np.vstack(pts)
+    # pts = pose * np.vstack(pts)
     
     return (faces, np.hstack([pts[:-1], pts[1:]]).reshape((-1,3)))
 
-def publish_cameras(pub_channel, poses, c='y', texts=[], frame_id='camera', draw_faces=True, draw_edges=True, size=1, reset=True):
-    cam_feats = [draw_camera(pose, depth=0.05 * size) for pose in poses]
+def publish_cameras(pub_channel, poses, c='y', texts=[], frame_id='camera', 
+                    draw_faces=True, draw_edges=True, size=1, zmin=0.01, zmax=0.1, reset=True):
+    cam_feats = [draw_camera(pose, zmax=zmax * size) for pose in poses]
     cam_faces = map(lambda x: x[0], cam_feats)
     cam_edges = map(lambda x: x[1], cam_feats)
 
