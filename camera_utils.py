@@ -421,6 +421,35 @@ def plot_epipolar_line(im_1, F_10, x_0, im_0=None):
     
     return vis_1
 
+
+class Frustum(object): 
+    def __init__(self, pose, zmin=0.0, zmax=0.1, fov=np.deg2rad(60)): 
+    
+        self.p0 = np.array([0,0,0])
+        self.near, self.far = np.array([0,0,zmin]), np.array([0,0,zmax])
+        self.near_off, self.far_off = np.tan(fov / 2) * zmin, np.tan(fov / 2) * zmax
+        self.zmin = zmin
+        self.zmax = zmax
+        self.fov = fov
+
+        self.pose = pose
+        self.p0 = pose.tvec
+
+    def get_vertices(self): 
+        arr = [self.near + np.array([-1, -1, 0]) * self.near_off, 
+               self.near + np.array([1, -1, 0]) * self.near_off, 
+               self.near + np.array([1, 1, 0]) * self.near_off, 
+               self.near + np.array([-1, 1, 0]) * self.near_off, 
+               
+               self.far + np.array([-1, -1, 0]) * self.far_off, 
+               self.far + np.array([1, -1, 0]) * self.far_off, 
+               self.far + np.array([1, 1, 0]) * self.far_off, 
+               self.far + np.array([-1, 1, 0]) * self.far_off]
+        
+        nll, nlr, nur, nul, fll, flr, fur, ful = self.pose * np.vstack(arr)
+        return nll, nlr, nur, nul, fll, flr, fur, ful
+
+
 #   m, n = im.shape[:2]
 #   line = numpy.dot(F, x)
 
