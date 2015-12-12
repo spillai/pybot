@@ -6,6 +6,7 @@ from copy import deepcopy
 from collections import deque
 
 # LCM libs
+import cv2
 import lcm, vs
 from bot_core import image_t, pose_t
 
@@ -112,12 +113,6 @@ def publish_image_t(pub_channel, im, jpeg=False, flip_rb=True):
     out.width, out.height = w, h
     out.row_stride = w*c
     out.utime = 1
-
-    # Propagate appropriate encoding 
-    if jpeg: 
-        out.pixelformat = image_t.PIXEL_FORMAT_MJPEG
-    else: 
-        out.pixelformat = image_t.PIXEL_FORMAT_RGB
         
     # Propagate encoded/raw data, 
     image = to_color(im) if im.ndim == 2 else im
@@ -125,7 +120,13 @@ def publish_image_t(pub_channel, im, jpeg=False, flip_rb=True):
         rarr, barr = image[:,:,2].copy(), image[:,:,0].copy()
         image[:,:,0], image[:,:,2] = rarr, barr
 
-    out.data = image.tostring()
+    # Propagate appropriate encoding 
+    if jpeg: 
+        out.pixelformat = image_t.PIXEL_FORMAT_MJPEG
+    else: 
+        out.pixelformat = image_t.PIXEL_FORMAT_RGB
+        
+    out.data = cv2.imencode('.jpg', image)[1] if jpeg else image.tostring()
     out.size = len(out.data)
     out.nmetadata = 0
 
