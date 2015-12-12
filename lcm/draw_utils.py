@@ -284,6 +284,13 @@ def _publish_point_type(pub_channel, _arr, c='r', point_type='POINT', flip_rb=Fa
        Option 3: numpy array (N x 3) with r,g,b vals ranging from 0 to 1
     s: supported only by matplotlib plotting
     alpha: supported only by matplotlib plotting
+
+    Supports
+    
+    POINT=1, LINE_STRIP=2, LINE_LOOP=3, LINES=4,
+    TRIANGLE_STRIP=5, TRIANGLE_FAN=6, TRIANGLES=7,
+    QUAD_STRIP=8, QUADS=9, POLYGON=10;
+
     """
     global g_viz_pub
 
@@ -677,18 +684,17 @@ def draw_camera(pose, zmin=0.0, zmax=0.1, fov=np.deg2rad(60)):
     frustum = Frustum(pose, zmin=zmin, zmax=zmax, fov=fov)
     nll, nlr, nur, nul, fll, flr, fur, ful = frustum.get_vertices()
 
-    # Front Face
+    # Triangles: Front Face
     faces = []
     faces.extend([ful, fur, flr])
     faces.extend([flr, ful, fll])
 
-    # Walls 
+    # Triangles: Four walls 
     left, top, right, bottom = [fll, frustum.p0, ful], [ful, frustum.p0, fur], [fur, frustum.p0, flr], [flr, frustum.p0, fll]
-    faces.extend([left, top, right, bottom]) # left, top, right, bottom wafll
+    faces.extend([left, top, right, bottom]) # left, top, right, bottom wall
     faces = np.vstack(faces)
-    # faces = pose * np.vstack(faces)
 
-    # Face
+    # Lines: Face
     pts = []
     pts.extend([ful, fur, flr, fll, ful])
     pts.extend([left, left[0]])
@@ -696,12 +702,14 @@ def draw_camera(pose, zmin=0.0, zmax=0.1, fov=np.deg2rad(60)):
     pts.extend([right, right[0]])
     pts.extend([bottom, bottom[0]])
     pts = np.vstack(pts)
-    # pts = pose * np.vstack(pts)
     
     return (faces, np.hstack([pts[:-1], pts[1:]]).reshape((-1,3)))
 
+def publish_quads(pub_channel, quads, frame_id='camera', reset=True):
+    publish_point_type(pub_channel, quads, point_type='QUADS', frame_id=frame_id, reset=reset)
+
 def publish_cameras(pub_channel, poses, c='y', texts=[], frame_id='camera', 
-                    draw_faces=True, draw_edges=True, size=1, zmin=0.01, zmax=0.1, reset=True):
+                    draw_faces=False, draw_edges=True, size=1, zmin=0.01, zmax=0.1, reset=True):
     cam_feats = [draw_camera(pose, zmax=zmax * size) for pose in poses]
     cam_faces = map(lambda x: x[0], cam_feats)
     cam_edges = map(lambda x: x[1], cam_feats)
