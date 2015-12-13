@@ -42,6 +42,7 @@ class CalibratedPair(StereoPair):
         """Rectify and return current frames from cameras."""
         frames = super(CalibratedPair, self).get_frames()
         return self.calibration.rectify(frames)
+
     def get_point_cloud(self, pair):
         """Get 3D point cloud from image pair."""
         disparity = self.block_matcher.compute_disparity(pair)
@@ -199,7 +200,7 @@ def main():
 
     while input_files:
         image_pair = [cv2.imread(image) for image in input_files[:2]]
-        rectified_pair = calibration.rectify(image_pair)
+        # rectified_pair = calibration.rectify([image_pair[1], image_pair[0]])
         tuner.tune_pair(rectified_pair)
         input_files = input_files[2:]
 

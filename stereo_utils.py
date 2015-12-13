@@ -15,6 +15,7 @@ from bot_utils.db_utils import AttrDict
 from bot_vision.camera_utils import get_calib_params
 from bot_vision.image_utils import im_resize, gaussian_blur, to_color, to_gray
 from bot_vision.imshow_utils import imshow_cv, trackbar_create, trackbar_value
+from bot_vision.calib.calibrate_stereo import StereoCalibration, get_stereo_calibration_params
         
 from pybot_vision import FastStereo as _FastStereo
 from pybot_vision import scaled_color_disp

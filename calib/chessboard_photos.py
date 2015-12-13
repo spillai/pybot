@@ -20,33 +20,40 @@ import numpy as np
 from bot_vision.image_utils import to_color, im_resize, im_mosaic, im_pad
 from bot_vision.imshow_utils import imshow_cv
 
-class ChessboardFinder(webcams.LiveStereoPair):
-    """A ``StereoPair`` that can find chessboards."""
+def ChessboardFinder(name, devices): 
+    if name == 'webcam': 
+        parent = webcams.StereoPair
+    elif name == 'zed' or name == 'bb':
+        parent = webcams.CustomStereoPair
+    
+    class ChessboardFinder(parent):
+        """A ``StereoPair`` that can find chessboards."""
+        def get_chessboard(self, columns, rows, show=False):
+            """
+            Take a picture with a chessboard visible in both captures.
 
-    def get_chessboard(self, columns, rows, show=False):
-        """
-        Take a picture with a chessboard visible in both captures.
+            ``columns`` and ``rows`` should be the number of inside corners in the
+            chessboard's columns and rows. ``show`` determines whether the frames
+            are shown while the cameras search for a chessboard.
+            """
+            found_chessboard = [False, False]
+            fvis = [None, None]
+            while not all(found_chessboard):
+                frames = self.get_frames()
+                for i, frame in enumerate(frames):
+                    fvis[i] = to_color(frame.copy())
+                    (found_chessboard[i],
+                    corners) = cv2.findChessboardCorners(frame, (columns, rows),
+                                                      flags=cv2.CALIB_CB_FAST_CHECK)
+                    cv2.drawChessboardCorners(fvis[i], (columns, rows), corners, found_chessboard[i])
 
-        ``columns`` and ``rows`` should be the number of inside corners in the
-        chessboard's columns and rows. ``show`` determines whether the frames
-        are shown while the cameras search for a chessboard.
-        """
-        found_chessboard = [False, False]
-        fvis = [None, None]
-        while not all(found_chessboard):
-            frames = self.get_frames()
-            for i, frame in enumerate(frames):
-                fvis[i] = to_color(frame.copy())
-                (found_chessboard[i],
-                corners) = cv2.findChessboardCorners(frame, (columns, rows),
-                                                  flags=cv2.CALIB_CB_FAST_CHECK)
-                cv2.drawChessboardCorners(fvis[i], (columns, rows), corners, found_chessboard[i])
+                vis = np.hstack(fvis)
+                label = np.tile(np.uint8([[[0,255,0]]]), (20, vis.shape[1], 1)) \
+                       if all(found_chessboard) else np.tile(np.uint8([[[0,0,255]]]), (20, vis.shape[1], 1))
+                imshow_cv('Checkerboard', im_resize(np.vstack([vis, label]), scale=1))
+            return frames
 
-            vis = np.hstack(fvis)
-            label = np.tile(np.uint8([[[0,255,0]]]), (20, vis.shape[1], 1)) \
-                   if all(found_chessboard) else np.tile(np.uint8([[[0,0,255]]]), (20, vis.shape[1], 1))
-            imshow_cv('Checkerboard', im_resize(np.vstack([vis, label]), scale=0.5))
-        return frames
+    return ChessboardFinder(name, devices)
 
 PROGRAM_DESCRIPTION=(
 "Take a number of pictures with a stereo camera in which a chessboard is "
@@ -63,6 +70,8 @@ def main():
     """
     parser = argparse.ArgumentParser(description=PROGRAM_DESCRIPTION,
                                 parents=[calibrate_stereo.CHESSBOARD_ARGUMENTS])
+    parser.add_argument("name", metavar="name", type=str,
+                        help="Device name (zed/bb/webcam).", default="webcam")
     parser.add_argument("left", metavar="left", type=int,
                         help="Device numbers for the left camera.")
     parser.add_argument("right", metavar="right", type=int,
@@ -91,7 +100,8 @@ def main():
     # Interval captures
     pstamp = 0
 
-    with ChessboardFinder(name='zed') as pair:
+    # with ChessboardFinder(name='zed') as pair:
+    with ChessboardFinder(args.name, (args.left, args.right)) as pair:
 
         idx = 0
         while idx < args.num_pictures: 

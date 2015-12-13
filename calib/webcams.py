@@ -10,7 +10,7 @@ import cv2
 from bot_vision.image_utils import to_gray
 from bot_vision.imshow_utils import imshow_cv
 
-from pybot_drivers import DC1394Device, ZEDDevice
+# from pybot_drivers import DC1394Device, ZEDDevice
 
 class StereoPair(object):
     """
@@ -20,7 +20,7 @@ class StereoPair(object):
     freed properly after use.
     """
 
-    def __init__(self, devices):
+    def __init__(self, name, devices):
         """
         Initialize cameras.
 
@@ -28,6 +28,11 @@ class StereoPair(object):
         """
         #: Video captures associated with the ``StereoPair``
         self.captures = [cv2.VideoCapture(device) for device in devices]
+        
+        # for cap in self.captures: 
+        #     cap.set(cv2.cv.CV_CAP_PROP_FPS, 10)
+        # print('Setting capture rate to 10 Hz')
+
         #: Window names for showing captured frame from each camera
         self.windows = ["{} camera".format(side) for side in ("Left", "Right")]
 
@@ -42,7 +47,12 @@ class StereoPair(object):
 
     def get_frames(self):
         """Get current frames from cameras."""
-        return [capture.read()[1] for capture in self.captures]
+        return [cv2.transpose(capture.read()[1]) if idx == 0 else 
+                cv2.flip(cv2.transpose(capture.read()[1]), -1) for idx, capture in enumerate(self.captures)]
+
+    # def get_frames(self):
+    #     """Get current frames from cameras."""
+    #     return [capture.read()[1] for idx, capture in enumerate(self.captures)]
 
     def show_frames(self, wait=0):
         """
@@ -61,9 +71,7 @@ class StereoPair(object):
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
 
-
-
-class LiveStereoPair(object):
+class CustomStereoPair(object):
     """
     A stereo pair of cameras.
 
@@ -71,7 +79,7 @@ class LiveStereoPair(object):
     freed properly after use.
     """
 
-    def __init__(self, name='bb'):
+    def __init__(self, name='bb', devices=None):
         """
         Initialize cameras.
 
@@ -117,7 +125,6 @@ class LiveStereoPair(object):
                 break
 
 
-
 def main():
     """
     Show the video from two webcams successively.
@@ -138,8 +145,8 @@ def main():
                         help="Interval (s) to take pictures in.")
     args = parser.parse_args()
 
-    with LiveStereoPair(name='zed') as pair:
-    # with StereoPair(args.devices) as pair:
+    # with LiveStereoPair(name='zed') as pair:
+    with StereoPair('webcam', args.devices) as pair:
         if not args.output_folder:
             pair.show_videos()
         else:
