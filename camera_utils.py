@@ -76,6 +76,11 @@ class CameraIntrinsic(object):
         self.fx, self.fy = K[0,0], K[1,1]  # Focal length
         self.shape = shape                 # Image size (H,W,C): (480,640,3)
 
+    def __repr__(self): 
+        return ' K = {:}\n D = {:}\n fx={:}, fy={:}, cx={:}, cy={:}'.format(np.array_str(np.array(self.K), precision=2), 
+                                                                            np.array_str(self.D, precision=2),
+                                                                            self.fx, self.fy, self.cx, self.cy) 
+
     @classmethod
     def simulate(cls): 
         """
@@ -107,7 +112,16 @@ class CameraIntrinsic(object):
         im[::20, :] = 128
         im[:, ::20] = 128
         return self.undistort(im)
+
+    def save(self, filename): 
+        raise NotImplementedError()
         
+
+    @classmethod
+    def load(cls, filename):
+        raise NotImplementedError()
+        
+    
 class CameraExtrinsic(RigidTransform): 
     def __init__(self, R=npm.eye(3), t=npm.zeros(3)):
         """
@@ -143,6 +157,16 @@ class CameraExtrinsic(RigidTransform):
         """
         return cls.identity()
 
+
+    def save(self, filename): 
+        raise NotImplementedError()
+        
+
+    @classmethod
+    def load(cls, filename):
+        raise NotImplementedError()
+
+
 class Camera(CameraIntrinsic, CameraExtrinsic): 
     def __init__(self, K, R, t, D=np.zeros(4, dtype=np.float64), shape=None): 
         CameraIntrinsic.__init__(self, K, D, shape=shape)
@@ -151,7 +175,7 @@ class Camera(CameraIntrinsic, CameraExtrinsic):
     @property
     def P(self): 
         Rt = self.to_homogeneous_matrix()[:3]
-        return self.K * Rt     # Projection matrix
+        return self.K.dot(Rt)     # Projection matrix
 
     @classmethod
     def simulate(cls): 
@@ -225,6 +249,14 @@ class Camera(CameraIntrinsic, CameraExtrinsic):
                         [det(np.vstack([X1, Y3])), det(np.vstack([X2, Y3])), det(np.vstack([X3, Y3]))]])
 
 
+    def save(self, filename): 
+        raise NotImplementedError()
+
+    @classmethod
+    def load(cls, filename):
+        raise NotImplementedError()
+
+
 
 def KinectCamera(R=npm.eye(3), t=npm.zeros(3)): 
     return Camera(kinect_v1_params.K_depth, R, t)
@@ -260,6 +292,14 @@ class DepthCamera(CameraIntrinsic):
         return np.vstack([self.xs[pts[:,1], pts[:,0]] * depth,
                           self.ys[pts[:,1], pts[:,0]] * depth,
                           depth]).T
+
+    def save(self, filename): 
+        raise NotImplementedError()
+
+    @classmethod
+    def load(cls, filename):
+        raise NotImplementedError()
+        
 
 def KinectDepthCamera(K=kinect_v1_params.K_depth, shape=(480,640)): 
     return DepthCamera(K=K, shape=shape)
