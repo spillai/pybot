@@ -114,13 +114,18 @@ class CameraIntrinsic(object):
         return self.undistort(im)
 
     def save(self, filename): 
-        raise NotImplementedError()
+        AttrDict(
+            K=self.K.tolist(), D=self.D.tolist(), 
+            shape=self.shape.tolist() if self.shape is not None else None
+        ).save_json(filename)
         
-
     @classmethod
     def load(cls, filename):
-        raise NotImplementedError()
-        
+        db = AttrDict.load_json(filename)
+        return cls(
+            K=np.float64(db.K), D=np.float64(db.D), 
+            shape=np.int32(db.shape) if db.shape is not None else None
+        )
     
 class CameraExtrinsic(RigidTransform): 
     def __init__(self, R=npm.eye(3), t=npm.zeros(3)):
@@ -157,16 +162,15 @@ class CameraExtrinsic(RigidTransform):
         """
         return cls.identity()
 
-
     def save(self, filename): 
-        raise NotImplementedError()
+        R, t = p.to_Rt()
+        AttrDict(R=R.tolist(), t=t.tolist()).save_json(filename)
         
-
     @classmethod
     def load(cls, filename):
-        raise NotImplementedError()
-
-
+        db = AttrDict.load_json(filename)
+        return cls(R=np.float64(db.R), t=np.float64(db.t))
+        
 class Camera(CameraIntrinsic, CameraExtrinsic): 
     def __init__(self, K, R, t, D=np.zeros(4, dtype=np.float64), shape=None): 
         CameraIntrinsic.__init__(self, K, D, shape=shape)
@@ -331,7 +335,7 @@ def compute_epipole(F):
 
 def compute_essential(F, K): 
     """ Compute the Essential matrix, and R1, R2 """
-    return K.T * npm.mat(F) * K
+    return (K.T).dot(npm.mat(F)).dot(K)
 
 def check_visibility(camera, pts_w): 
     """
