@@ -3,6 +3,7 @@ import cv2, os.path, lcm, zlib
 
 import roslib
 # roslib.load_manifest(PKG)
+import tf
 
 import rosbag
 import rospy
@@ -124,9 +125,53 @@ class ROSBagReader(LogReader):
         if self.start_idx < 0 or self.start_idx > 100: 
             raise ValueError('start_idx in ROSBagReader expects a percentage [0,100], provided {:}'.format(self.start_idx))
 
+        # TF relations
+        self.relations_map = {}
+
     def load_log(self, filename): 
         return rosbag.Bag(filename, 'r')
 
+    def tf(self, from_tf, to_tf): 
+        try: 
+            return self.relations_map[(from_tf, to_tf)]
+        except: 
+            raise KeyError('Relations map does not contain {:}=>{:} tranformation'.format(from_tf, to_tf))
+
+    def establish_tfs(self, relations):
+
+        # Init node and tf listener
+        rospy.init_node(self.__class__.__name__, disable_signals=True)
+        tf_listener = tf.TransformListener()
+
+        # Create tf decoder
+        st, end = self._log.get_start_time(), self._log.get_end_time()
+        start_t = Time(st + (end-st) * self.start_idx / 100.0)
+        tf_dec = TfDecoderAndPublisher(channel='/tf')
+
+        # Establish tf relations
+        print('Establishing tfs from ROSBag')
+        for self.idx, (channel, msg, t) in enumerate(self._log.read_messages(topics='/tf')): 
+            tf_dec.decode(msg)
+
+            for (from_tf, to_tf) in relations:  
+                try:
+                    (trans,rot) = tf_listener.lookupTransform(from_tf, to_tf, t)
+                    self.relations_map[(from_tf,to_tf)] = RigidTransform(tvec=trans, xyzw=rot)
+                    print('Successfully received transform: {:} => {:} {:}'.format(from_tf, to_tf, self.relations_map[(from_tf,to_tf)]))
+                except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
+                    pass
+
+            # Finish up once we've established all the requested tfs
+            if len(self.relations_map) == len(relations): 
+                break
+
+        try: 
+            tfs = [self.relations_map[(from_tf,to_tf)] for (from_tf, to_tf) in relations] 
+        except: 
+            raise RuntimeError('Error concerning tf lookup')
+
+        return tfs 
+            
     def _index(self): 
         raise NotImplementedError()
 
@@ -146,7 +191,6 @@ class ROSBagReader(LogReader):
         else: 
             if reverse: 
                 raise RuntimeError('Cannot provide items in reverse when file is not indexed')
-
 
             # Decode only messages that are supposed to be decoded 
             # print self._log.get_message_count(topic_filters=self.decoder_keys())
