@@ -209,7 +209,8 @@ class ROSBagReader(LogReader):
             # Check if log index has reached desired start index, 
             # and only then check if decode necessary  
             dec = self.decoder[channel]
-            if dec.should_decode(): 
+            if dec.should_decode():
+                # print channel, data.header.frame_id
                 return True, (t, channel, dec.decode(data))
         except Exception as e:
             print e
