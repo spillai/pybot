@@ -138,6 +138,10 @@ class ROSBagReader(LogReader):
             raise KeyError('Relations map does not contain {:}=>{:} tranformation'.format(from_tf, to_tf))
 
     def establish_tfs(self, relations):
+        """
+        Perform a one-time look up of all the requested
+        *static* relations between frames (available via /tf)
+        """
 
         # Init node and tf listener
         rospy.init_node(self.__class__.__name__, disable_signals=True)
@@ -157,7 +161,8 @@ class ROSBagReader(LogReader):
                 try:
                     (trans,rot) = tf_listener.lookupTransform(from_tf, to_tf, t)
                     self.relations_map[(from_tf,to_tf)] = RigidTransform(tvec=trans, xyzw=rot)
-                    print('Successfully received transform: {:} => {:} {:}'.format(from_tf, to_tf, self.relations_map[(from_tf,to_tf)]))
+                    print('\tSuccessfully received transform: {:} => {:} {:}'
+                          .format(from_tf, to_tf, self.relations_map[(from_tf,to_tf)]))
                 except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
                     pass
 
@@ -171,6 +176,39 @@ class ROSBagReader(LogReader):
             raise RuntimeError('Error concerning tf lookup')
 
         return tfs 
+
+    def check_tf_relations(self, relations): 
+        """
+        Perform a one-time look up of all the 
+        *static* relations between frames (available via /tf)
+        and check if the expected relations hold
+
+        Channel => frame_id
+
+        """
+        # if not isinstance(relations, map): 
+        #     raise RuntimeError('Provided relations map is not a dict')
+
+        # Check tf relations map
+        print('Checking tf relations in ROSBag')
+        checked = set()
+        relations_lut = dict((k,v) for (k,v) in relations)
+        for self.idx, (channel, msg, t) in enumerate(self._log.read_messages(topics=self.decoder.keys())): 
+            print('\tChecking {:} => {:}'.format(channel, msg.header.frame_id))
+            try: 
+                if relations_lut[channel] == msg.header.frame_id: 
+                    checked.add(channel)
+                else: 
+                    raise RuntimeError('TF Check failed {:} mapped to {:} instead of {:}'
+                                       .format(channel, msg.header.frame_id, relations_lut[channel]))
+            except: 
+                raise ValueError('Wrongly defined relations_lut')
+            
+                # Finish up
+            if len(checked) == len(relations_lut):
+                break
+
+        return  
             
     def _index(self): 
         raise NotImplementedError()
