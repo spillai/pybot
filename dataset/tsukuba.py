@@ -30,7 +30,7 @@ class TsukubaStereo2012Reader(object):
     def __init__(self, directory='NewTsukubaStereoDataset/', 
                  left_template='illumination/daylight/left/tsukuba_daylight_L_%05i.png', 
                  right_template='illumination/daylight/right/tsukuba_daylight_R_%05i.png', 
-                 start_idx=0, max_files=50000, scale=1.0): 
+                 start_idx=1, max_files=50000, scale=1.0): 
 
         # Set args
         self.scale = scale
@@ -43,7 +43,7 @@ class TsukubaStereo2012Reader(object):
             pose_fn = os.path.join(os.path.expanduser(directory), 'groundtruth/camera_track.txt')
             self.poses = load_poses(pose_fn)
         except Exception as e: 
-            raise RuntimeError('Failed to load poses properly, cannot proceed')
+            raise RuntimeError('Failed to load poses properly, cannot proceed {:}'.format(e))
         draw_utils.publish_pose_list('POSES', self.poses, frame_id='camera')
 
         # Read stereo images
