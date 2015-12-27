@@ -11,7 +11,9 @@ import bot_externals.lcm.draw_utils as draw_utils
 def load_poses(fn): 
     """ Retrieve poses """ 
     P = np.loadtxt(os.path.expanduser(fn), dtype=np.float64, delimiter=',')
-    return [RigidTransform.from_roll_pitch_yaw_x_y_z(np.deg2rad(p[3]),np.deg2rad(p[4]),np.deg2rad(p[5]),p[0],p[1],p[2]) for p in P]
+    return [ RigidTransform.from_roll_pitch_yaw_x_y_z(
+        np.deg2rad(p[3]),np.deg2rad(p[4]),np.deg2rad(p[5]),
+        p[0]*.01,-p[1]*.01,-p[2]*.01) for p in P ]
 
 def scaled_calib_params(f, cx, cy, baseline, scale=1.0): 
     f = f * scale
@@ -36,7 +38,7 @@ class TsukubaStereo2012Reader(object):
         self.scale = scale
 
         # Get calib
-        self.calib = scaled_calib_params(f=615, cx=319.5, cy=239.5, baseline=0.1, scale=scale)
+        self.calib = scaled_calib_params(f=615, cx=319.5, cy=239.5, baseline=0.10, scale=scale)
 
         # Read poses
         try: 
