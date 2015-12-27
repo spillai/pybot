@@ -59,18 +59,17 @@ class BaseKLT(object):
         # Track Manager
         self.tm = TrackManager(maxlen=10)
 
-    def draw_tracks(self, im, colored=False):
+    def draw_tracks(self, out, colored=False):
         N = 20
         cols = colormap(np.linspace(0, 1, N))
         for tid, pts in self.tm.tracks.iteritems(): 
-            cv2.polylines(im,[np.vstack(pts).astype(np.int32)], False, 
-                              tuple(map(int, cols[tid % N])) if colored else (0,240,0), 
-                          thickness=1, lineType=cv2.CV_AA)
+            cv2.polylines(out, [np.vstack(pts).astype(np.int32)], False, 
+                          tuple(map(int, cols[tid % N])) if colored else (0,240,0), 
+                          thickness=1)
 
-    def viz(self, out): 
+    def viz(self, out, colored=False): 
         if not len(self.tm.pts): 
             return
-
 
         N = 20
         cols = colormap(np.linspace(0, 1, N))
