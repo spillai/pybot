@@ -174,7 +174,8 @@ class ROSBagReader(LogReader):
             tfs = [self.relations_map[(from_tf,to_tf)] for (from_tf, to_tf) in relations] 
         except: 
             raise RuntimeError('Error concerning tf lookup')
-
+        print('Established {:} relations\n'.format(len(tfs)))
+        
         return tfs 
 
     def check_tf_relations(self, relations): 
@@ -207,7 +208,7 @@ class ROSBagReader(LogReader):
                 # Finish up
             if len(checked) == len(relations_lut):
                 break
-
+        print('Checked {:} relations\n'.format(len(checked)))
         return  
             
     def _index(self): 
