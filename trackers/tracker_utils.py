@@ -14,6 +14,14 @@ def finite_and_within_bounds(xys, shape):
     return np.bitwise_and(np.isfinite(xys).all(axis=1), 
                           reduce(lambda x,y: np.bitwise_and(x,y), [xys[:,0] >= 0, xys[:,0] < W, 
                                                                    xys[:,1] >= 0, xys[:,1] < H]))
+def to_kpt(pt, size=1): 
+    return cv2.KeyPoint(pt[0], pt[1], size)
+
+def to_kpts(pts, size=1): 
+    return [cv2.KeyPoint(pt[0], pt[1], size) for pt in pts]
+    
+def to_pts(kpts): 
+    return np.float32([ kp.pt for kp in kpts ]).reshape(-1,2)
 
 class TrackManager(object): 
     def __init__(self, maxlen=20): 
@@ -136,17 +144,21 @@ class FeatureDetector(object):
         else: 
             raise RuntimeError('Unknown detector_type: %s! Use fast or gftt' % self.params.type)
 
-    def process(self, im, mask=None): 
+    def process(self, im, mask=None, return_keypoints=False): 
         if im.ndim != 2: 
             raise RuntimeError('Cannot process color image')
 
         # Detect features 
         kpts = self.detector.detect(im, mask=mask)
-        pts = np.float32([ kp.pt for kp in kpts ]).reshape(-1,2)
+        pts = to_pts(kpts)
         
         # Perform sub-pixel if necessary
-        if self.params.subpixel: self.perform_subpixel(im, pts)
+        if self.params.subpixel: self.subpixel_pts(im, pts)
 
+        # Return keypoints, if necessary
+        if return_keypoints: 
+            return kpts
+        
         return pts
 
     def subpixel_pts(self, im, pts): 
