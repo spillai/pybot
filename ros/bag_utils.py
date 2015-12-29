@@ -13,31 +13,10 @@ from sensor_msgs.msg import Image
 from cv_bridge import CvBridge, CvBridgeError
 from tf2_msgs.msg import TFMessage
 
-from bot_externals.log_utils import LogReader
+from bot_externals.log_utils import Decoder, LogReader
 from bot_vision.image_utils import im_resize
 from bot_vision.imshow_utils import imshow_cv
 from bot_geometry.rigid_transform import RigidTransform
-
-class Decoder(object): 
-    def __init__(self, channel='', every_k_frames=1, decode_cb=lambda data: None): 
-        self.channel = channel
-        self.every_k_frames = every_k_frames
-        self.decode_cb = decode_cb
-        self.idx = 0
-
-    def decode(self, data): 
-        try: 
-            return self.decode_cb(data)
-        except Exception as e:
-            print e
-            raise RuntimeError('Error decoding channel: %s by %s' % (self.channel, self))
-
-    def can_decode(self, channel): 
-        return self.channel == channel
-
-    def should_decode(self): 
-        self.idx += 1
-        return self.idx % self.every_k_frames == 0 
         
 class ImageDecoder(Decoder): 
     """

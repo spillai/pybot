@@ -7,41 +7,27 @@ from bot_utils.db_utils import AttrDict
 from bot_vision.camera_utils import construct_K, DepthCamera
 from bot_vision.image_utils import im_resize
 from bot_vision.imshow_utils import imshow_cv
-from bot_externals.log_utils import LogReader
+from bot_externals.log_utils import Decoder, LogReader
 
 import bot_core.image_t as image_t
 import bot_core.pose_t as pose_t
 import bot_param.update_t as update_t
 
 
-# class Decoder2(object): 
-#     def __init__(self): 
-#         pass
-
-#     def decode(self, data): 
-#         return None
-
-# class Channel(object): 
-#     def __init__(self, channel=''): 
-#         self.channel = channel
-
-#     def check(self, ch): 
-#         return self.channel == ch
-
 # class MicrostrainChannelDecoder(Channel, MicrostrainDecoder): 
 #     def __init__(self, channel=''): 
 #         Channel.__init__(self, channel=channel)
 #         MicrostrainDecoder.__init__(self)
 
-class Decoder(object): 
-    def __init__(self, channel=''): 
-        self.channel = channel
+# class Decoder(object): 
+#     def __init__(self, channel=''): 
+#         self.channel = channel
     
-    def decode(self, data): 
-        return None
+#     def decode(self, data): 
+#         return None
 
-    def can_decode(self, channel): 
-        return self.channel == channel
+#     def can_decode(self, channel): 
+#         return self.channel == channel
 
 class BotParamDecoder(Decoder): 
     def __init__(self, channel='PARAM_UPDATE'): 
@@ -209,7 +195,7 @@ class LCMLogReader(LogReader):
         self._log.c_eventlog.seek_to_timestamp(t)
         while True: 
             ev = self._log.next()
-            res, msg = self.decode_msgs(ev)
+            res, msg = self.decode_msgs(ev.channel, ev.data, ev.timestamp)
             if res: return msg
 
             # if ev.channel == self.decoder.channel: 
@@ -223,25 +209,41 @@ class LCMLogReader(LogReader):
         assert(idx >= 0 and idx < len(self.index))
         return self.get_frame_with_timestamp(self.index[idx])
 
-    def decode_msg(self, ev, dec):
-        if ev.channel == dec.channel: 
-            self.idx += 1
-            if self.idx >= self.start_idx and self.idx % self.every_k_frames == 0: 
-                return True, (ev.channel, dec.decode(ev.data))
+    def decode_msg(self, channel, data, t): 
+        try: 
+            # Check if log index has reached desired start index, 
+            # and only then check if decode necessary  
+            dec = self.decoder[channel]
+            if dec.should_decode():
+                # self.idx += 1
+                return True, (t, channel, dec.decode(data))
+        except Exception as e:
+            pass
+            # raise RuntimeError('Failed to decode data from channel: {:}, mis-specified decoder ? errmsg: {:}'.format(channel, e))
+        
         return False, (None, None)
 
-    def decode_msgs(self, ev): 
-        if isinstance(self.decoder, list):
-            res, msg = False, None
-            for dec in self.decoder: 
-                res, msg = self.decode_msg(ev, dec)
-                if res: break
-            return res, msg
-        else: 
-            # when accessing only single decoding, 
-            # return value as is
-            res, msg = self.decode_msg(ev, self.decoder)
-            return res, msg[1]
+
+    # def decode_msg(self, ev, dec):
+    #     print ev, dir(dec)
+    #     if ev.channel == dec.channel: 
+    #         self.idx += 1
+    #         if self.idx >= self.start_idx and self.idx % self.every_k_frames == 0: 
+    #             return True, (ev.channel, dec.decode(ev.data))
+    #     return False, (None, None)
+
+    # def decode_msgs(self, ev): 
+    #     if isinstance(self.decoder, list):
+    #         res, msg = False, None
+    #         for dec in self.decoder: 
+    #             res, msg = self.decode_msg(ev, dec)
+    #             if res: break
+    #         return res, msg
+    #     else: 
+    #         # when accessing only single decoding, 
+    #         # return value as is
+    #         res, msg = self.decode_msg(ev, self.decoder)
+    #         return res, msg[1]
             
     def iteritems(self, reverse=False): 
         if self.index is not None: 
@@ -260,7 +262,7 @@ class LCMLogReader(LogReader):
                 raise RuntimeError('Cannot provide items in reverse when file is not indexed')
 
             for ev in self._log: 
-                res, msg = self.decode_msgs(ev)
+                res, msg = self.decode_msg(ev.channel, ev.data, ev.timestamp)
                 if res: yield msg
 
                 # if ev.channel == self.decoder.channel: 
