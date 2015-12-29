@@ -316,6 +316,7 @@ def _publish_point_type(pub_channel, _arr, c='r', point_type='POINT', flip_rb=Fa
     else: 
         # print 'Single element: ', element_id
         arr, carr = copy_pointcloud_data(_arr, c, flip_rb=flip_rb)
+        print arr.shape, carr.shape
         pc_msg = arr_msg(arr, carr=carr, frame_uid=g_viz_pub.channel_uid(frame_id), element_id=element_id)
         pc_list_msg.point_lists.append(pc_msg)
 
