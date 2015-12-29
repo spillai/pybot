@@ -12,14 +12,21 @@ import pprint
 import datetime
 import pandas as pd
 
-import gop
+import warnings
+with warnings.catch_warnings():
+    warnings.simplefilter("ignore")
+    import gop
+
 from pybot_vision import BINGObjectness
 
 from bot_vision.image_utils import im_resize, gaussian_blur, median_blur, box_blur
 from bot_vision.bow_utils import BoWVectorizer, bow_codebook, bow_project, flair_project
-from bot_vision.caffe.detector import Detector, DetectorFastRCNN, nms
 from pybot_vision import FLAIR_code
 from fast_rcnn.config import cfg
+
+with warnings.catch_warnings():
+    warnings.simplefilter("ignore")
+    from bot_vision.caffe.detector import Detector, DetectorFastRCNN, nms
 
 from bot_utils.io_utils import memory_usage_psutil, format_time
 from bot_utils.db_utils import AttrDict, IterDB
