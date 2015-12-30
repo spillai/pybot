@@ -47,5 +47,38 @@ class LogReader(object):
         else: 
             self.index = None
 
+        # Create Look-up table for subscriptions
+        self.cb_ = {}
+
+
     def load_log(self, filename): 
         raise NotImplementedError('load_log not implemented in LogReader')
+
+    def subscribe(self, channel, callback): 
+        self.cb_[channel] = callback
+
+    def check_tf_relations(self, relations): 
+        raise NotImplementedError()
+
+    def establish_tfs(self, relations): 
+        raise NotImplementedError()
+
+    def iteritems(self): 
+        raise NotImplementedError()
+
+    def iter_frames(self): 
+        raise NotImplementedError()
+
+    def run(self):
+        if not len(self.cb_): 
+            raise RuntimeError('No callbacks registered yet, subscribe to channels first!')
+
+        for self.idx, (t, ch, data) in enumerate(self.iter_frames()): 
+            try: 
+                self.cb_[ch](t, data)
+            except KeyError: 
+                pass
+            except Exception, e: 
+                import traceback
+                traceback.print_exc()
+                raise RuntimeError()

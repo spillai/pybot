@@ -30,8 +30,8 @@ import bot_param.update_t as update_t
 #         return self.channel == channel
 
 class BotParamDecoder(Decoder): 
-    def __init__(self, channel='PARAM_UPDATE'): 
-        Decoder.__init__(self, channel=channel)
+    def __init__(self, channel='PARAM_UPDATE', every_k_frames=1): 
+        Decoder.__init__(self, channel=channel, every_k_frames=every_k_frames)
         
     def decode(self, data):
         msg = update_t.decode(data)
@@ -48,16 +48,16 @@ class MicrostrainDecoder(Decoder):
         return msg
 
 class PoseDecoder(Decoder): 
-    def __init__(self, channel='CAMERA'): 
-        Decoder.__init__(self, channel=channel)
+    def __init__(self, channel='CAMERA', every_k_frames=1): 
+        Decoder.__init__(self, channel=channel, every_k_frames=every_k_frames)
         
     def decode(self, data):
         msg = pose_t.decode(data)
         return msg
 
 class ImageDecoder(Decoder): 
-    def __init__(self, channel='CAMERA', scale=1.): 
-        Decoder.__init__(self, channel=channel)
+    def __init__(self, channel='CAMERA', scale=1., every_k_frames=1): 
+        Decoder.__init__(self, channel=channel, every_k_frames=every_k_frames)
         self.scale = scale
 
     def decode(self, data): 
@@ -71,8 +71,8 @@ class ImageDecoder(Decoder):
             raise RuntimeError('Unknown pixelformat for ImageDecoder')
 
 class StereoImageDecoder(ImageDecoder): 
-    def __init__(self, split='vertical', channel='CAMERA', scale=1.): 
-        ImageDecoder.__init__(self, channel=channel, scale=scale)
+    def __init__(self, split='vertical', channel='CAMERA', scale=1., every_k_frames=1): 
+        ImageDecoder.__init__(self, channel=channel, scale=scale, every_k_frames=every_k_frames)
         if split == 'vertical' or split == 0: 
             self.split = 0
         elif split == 'horizontal' or split == 1: 
@@ -106,8 +106,8 @@ class KinectFrame:
 class KinectDecoder(Decoder): 
     kinect_params = AttrDict(fx=576.09757860, fy=576.09757860, cx=319.50, cy=239.50)
     def __init__(self, channel='KINECT_FRAME', scale=1., 
-                 extract_rgb=True, extract_depth=True, extract_X=True, bgr=True):
-        Decoder.__init__(self, channel=channel)
+                 extract_rgb=True, extract_depth=True, extract_X=True, bgr=True, every_k_frames=1):
+        Decoder.__init__(self, channel=channel, every_k_frames=every_k_frames)
         self.skip = int(1.0 / scale);
         
         assert (self.skip >= 1)
