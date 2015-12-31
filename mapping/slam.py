@@ -132,22 +132,31 @@ class BaseSLAMMixin(object):
         """
 
         # Draw poses 
-        updated_poses = self.slam_.get_poses()
-        draw_utils.publish_pose_list('OPT_CAMERA_POSES', 
-                                     [Pose.from_rigid_transform(
-                                         p.id, RigidTransform.from_homogenous_matrix(p.getPose())) 
-                                      for p in updated_poses], frame_id=frame_id, reset=self.reset_required())
+        updated_poses = {p.id : Pose.from_rigid_transform(
+            p.id, RigidTransform.from_homogenous_matrix(p.getPose())) 
+                         for p in self.slam_.get_poses()}
+        draw_utils.publish_pose_list('optimized_node_poses', updated_poses.values(), frame_id=frame_id, reset=self.reset_required())
 
         # Draw targets (constantly updated, so draw with reset)
-        updated_targets = [Pose.from_rigid_transform(p.id, RigidTransform.from_homogenous_matrix(p.getPose())) 
-                           for p in self.slam_.get_targets()]
+        updated_targets = {p.id : Pose.from_rigid_transform(p.id, RigidTransform.from_homogenous_matrix(p.getPose())) 
+                           for p in self.slam_.get_targets()}
         if len(updated_targets): 
-            edges = np.vstack([draw_utils.draw_tag_edges(p) for p in updated_targets])
-            draw_utils.publish_line_segments('OPT_CAMERA_targets', edges[:,:3], edges[:,3:6], c='r', 
+            edges = np.vstack([draw_utils.draw_tag_edges(p) for p in updated_targets.itervalues()])
+            draw_utils.publish_line_segments('optimized_node_tag', edges[:,:3], edges[:,3:6], c='r', 
                                              frame_id=frame_id, reset=True)
 
+        # Draw edges (between landmarks and poses)
+        landmark_edges = self.slam_.get_landmark_edges()
+        # print landmark_edges, len(updated_poses), len(updated_targets)
+        if len(landmark_edges): 
+            factor_st = np.vstack([(updated_poses[xid].tvec).reshape(-1,3) for (xid, _) in landmark_edges])
+            factor_end = np.vstack([(updated_targets[lid].tvec).reshape(-1,3) for (_, lid) in landmark_edges])
+
+            draw_utils.publish_line_segments('optimized_factor_tag', factor_st, factor_end, c='b', 
+                                             frame_id=frame_id, reset=True) 
+
         # Maintain updated ids
-        self.updated_ids_ = set([p.id for p in updated_poses])
+        self.updated_ids_ = set(updated_poses.keys())
 
 
     def vis_odom(self, poses, frame_id='camera'): 
@@ -167,7 +176,7 @@ class BaseSLAMMixin(object):
         factor_st = (poses.items[-2].tvec).reshape(-1,3)
         factor_end = (poses.items[-1].tvec).reshape(-1,3)
 
-        draw_utils.publish_line_segments('RAW_factors_odom', factor_st, factor_end, c='r', 
+        draw_utils.publish_line_segments('measured_factor_odom', factor_st, factor_end, c='r', 
                                          frame_id=frame_id, reset=self.reset_required())
         
     
@@ -189,10 +198,10 @@ class BaseSLAMMixin(object):
         factor_ct_end = np.vstack([p.tvec for p in p_landmarks])
         factor_ct_st = np.zeros_like(factor_ct_end)
 
-        draw_utils.publish_line_segments('RAW_factors_{:}'.format(landmark_name), factor_st, factor_end, c='b', 
+        draw_utils.publish_line_segments('measured_factor_{:}'.format(landmark_name), factor_st, factor_end, c='b', 
                                          frame_id=frame_id, reset=self.reset_required())
         edges = np.vstack([draw_utils.draw_tag_edges(p) for p in p_Wt])
-        draw_utils.publish_line_segments('RAW_{:}'.format(landmark_name), edges[:,:3], edges[:,3:6], c='b', 
+        draw_utils.publish_line_segments('measured_node_{:}'.format(landmark_name), edges[:,:3], edges[:,3:6], c='b', 
                                          frame_id=frame_id, reset=self.reset_required())
 
         # Optionally plot as Tags
@@ -200,14 +209,14 @@ class BaseSLAMMixin(object):
         #                              frame_id=frame_id, reset=self.reset_required())
 
         
-        # Plot OPTIMIZED tag factors
-        if pose_id in self.updated_ids_: 
-            draw_utils.publish_line_segments('OPT_factors_{:}'.format(landmark_name), factor_ct_st, factor_ct_end, c='r', 
-                                         frame_id='OPT_CAMERA_poses', element_id=pose_id, reset=self.reset_required())
+        # # Plot OPTIMIZED tag factors
+        # if pose_id in self.updated_ids_: 
+        #     draw_utils.publish_line_segments('OPT_factors_{:}'.format(landmark_name), factor_ct_st, factor_ct_end, c='r', 
+        #                                  frame_id='optimized_poses', element_id=pose_id, reset=self.reset_required())
 
-            edges = np.vstack([draw_utils.draw_tag_edges(p) for p in p_landmarks])
-            draw_utils.publish_line_segments('OPT_{:}'.format(landmark_name), edges[:,:3], edges[:,3:6], c='r', 
-                                             frame_id='OPT_CAMERA_poses', element_id=pose_id, reset=self.reset_required())
+        #     edges = np.vstack([draw_utils.draw_tag_edges(p) for p in p_landmarks])
+        #     draw_utils.publish_line_segments('optimized_{:}'.format(landmark_name), edges[:,:3], edges[:,3:6], c='r', 
+        #                                      frame_id='optimized_poses', element_id=pose_id, reset=self.reset_required())
 
 
 class TagDetector(object): 
