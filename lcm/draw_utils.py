@@ -64,7 +64,7 @@ class VisualizationMsgsPub:
         # Sensor frames msg
         msg = vs.obj_collection_t()
         msg.id = self.channel_uid(channel)
-        msg.name = channel + '_BOTFRAME'
+        msg.name = 'BOTFRAME_' + channel
         msg.type = vs.obj_collection_t.AXIS3D
         msg.reset = True;
         
