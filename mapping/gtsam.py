@@ -32,25 +32,15 @@ def vec(*args):
 def plot2DTrajectory(values, linespec, marginals): 
     print values, marginals
 
-class PlanarSLAM(object): 
-    def __init__(self): 
-        pass
-
-    def on_odom(self): 
-        pass
-
-    def on_landmark(self): 
-        pass
-
 class BaseSLAM(object): 
     def __init__(self): 
         self.slam_ = ISAM2()
         self.idx_ = -1
 
         # Factor graph storage
-        self.graph_ = []
+        self.graph_ = NonlinearFactorGraph()
         self.initial_ = Values()
-        self.landmark_edges = []
+        self.landmark_edges_ = []
         self.landmarks_ = set()
 
         # Pose3D measurement
@@ -59,20 +49,37 @@ class BaseSLAM(object):
         self.odo_noise_ = Isotropic.Sigma(6, 0.01)
 
         # TODO: Update slam every landmark addition
-        
+        self.xs_ = {}
+        self.ls_ = {}
+
+        self.poses_ = {}
+        self.targets_ = {}
+
+    def get_poses(self): 
+        return self.poses_
+
+    def get_targets(self): 
+        return self.targets_
+
+    def get_landmark_edges(self): 
+        return self.landmark_edges_
+
+    def initialize(self, p_init=None): 
+        x_id = symbol('x', 0)
+        pose0 = Pose3(p_init) if p_init else Pose3()
+            
+        self.graph_.add(PriorFactorPose3(x_id, pose0, self.prior_noise_))
+        self.initial_.insert(x_id, pose0)
+        self.prev_pose_ = pose0
+        self.idx_ = 0
+
+        self.xs_[0] = pose0
 
     def add_odom_incremental(self, delta): 
-        
+        print('\t\tadd_odom_incr {:}->{:}'.format(self.latest(), self.latest()+1))
         # Add prior on first pose
         if self.latest() < 0: 
-
-            x_id = symbol('x', 0)
-            pose0 = Pose3()
-
-            self.graph_.append(PriorFactorPose3(x_id, pose0, self.prior_noise_))
-            self.initial_.insert(x_id, pose0)
-            self.prev_pose_ = pose0
-            self.idx_ = 0
+            self.initialize()
 
         # Add odometry factor
         self.add_odom(self.latest(), self.latest()+1, delta)
@@ -80,39 +87,47 @@ class BaseSLAM(object):
 
     def add_odom(self, xid1, xid2, delta): 
         # Add odometry factor
+        pdelta = Pose3(delta)
         x_id1, x_id2 = symbol('x', xid1), symbol('x', xid2)
-        self.graph_.append(BetweenFactorPose3(x_id1, x_id2, 
-                                              Pose3(delta), self.odo_noise_))
+        self.graph_.add(BetweenFactorPose3(x_id1, x_id2, 
+                                           pdelta, self.odo_noise_))
+
         
         # Predict pose and add as initial estimate
         # TODO: get latest estiamte for x_id1, and 
         # compose with delta to find initial estimate
-        pred_pose = self.prev_pose_.compose(Pose3(delta))
+        pred_pose = self.prev_pose_.compose(pdelta)
         self.initial_.insert(x_id2, pred_pose)
+        self.prev_pose_ = pred_pose
+
+        self.xs_[xid2] = pred_pose
 
     def add_landmark(self, xid, lid, delta): 
-        print('Adding landmark {:}->{:}'.format(xid, lid))
+        print('\t\tadd_landmark {:}->{:}'.format(xid, lid))
 
         # Add Pose-Pose landmark factor
         x_id = symbol('x', xid)
         l_id = symbol('l', lid)
         
         # Add landmark pose
-        self.graph_.append(BetweenFactorPose3(x_id, l_id, Pose3(delta), 
-                                              self.measurement_noise))
+        pdelta = Pose3(delta)
+        self.graph_.add(BetweenFactorPose3(x_id, l_id, pdelta, 
+                                           self.measurement_noise_))
 
         # Add to landmark measurements
         self.landmark_edges_.append((self.latest(), lid))
 
         if lid not in self.landmarks_: 
-            pred_pose = prev_pose_.compose(Pose3(delta))
+            pred_pose = self.prev_pose_.compose(pdelta)
             self.initial_.insert(l_id, pred_pose)
-            self.landmarks_.insert(lid)
+            self.landmarks_.add(lid)
+            self.ls_[lid] = pred_pose
 
         return 
 
     def add_landmark_incremental(self, lid, delta): 
         self.add_landmark(self.latest(), lid, delta)
+        pass
 
     def latest(self): 
         return self.idx_
@@ -124,66 +139,107 @@ class BaseSLAM(object):
         self.slam_.saveGraph(filename)
 
     def update(self): 
+        self.slam_.update(self.graph_, self.initial_)
         self.slam_.update()
 
-class SLAM2D(BaseSLAM): 
-    def __init__(self): 
-        BaseSLAM.__init__(self)
+        # Get current estimate
+        current = self.slam_.calculateEstimate()
 
-    def on_odom(self, p): 
-        pass
+        # self.targets_ = {}
+        # self.poses_ = {}
 
-    def on_landmark(self, p): 
-        pass
+        # # Update xs, ls
+        # for xid in self.xs_.keys(): 
+        #     self.xs_[xid] = current.at(symbol('x', xid))
+        # for lid in self.ls_.keys(): 
+        #     self.ls_[lid] = current.at(symbol('l', lid))
+
+        # print self.xs_
+        # for item in current: 
+        #     print item
+
+        self.graph_.resize(0)
+        self.initial_.clear()
+
+        self.save_graph("slam_fg.dot")
+
+# class SLAM2D(BaseSLAM): 
+#     def __init__(self): 
+#         BaseSLAM.__init__(self)
+
+#     def on_odom(self, p): 
+#         pass
+
+#     def on_landmark(self, p): 
+#         pass
+
+# class PlanarSLAM(object): 
+#     def __init__(self): 
+#         pass
+
+#     def on_odom(self): 
+#         pass
+
+#     def on_landmark(self): 
+#         pass
         
 class SLAM3D(BaseSLAM): 
     def __init__(self): 
         BaseSLAM.__init__(self)
 
     def on_odom(self, t, odom): 
+        print('\ton_odom')
         self.add_odom_incremental(odom)
         self.update()
-        return self.slam_.latest()
+        return self.latest()
 
     def on_pose_ids(self, t, ids, poses): 
+        print('\ton_pose_ids')
         for (pid, pose) in izip(ids, poses): 
             self.add_landmark_incremental(pid, pose)
         self.update()
-        return self.slam_.latest()
+        return self.latest()
 
     def on_landmark(self, p): 
         pass
 
-class Tag3D(BaseSLAM): 
-    def __init__(self, K): 
-        # TODO: Cal3_S2 datatype
-        self.K_ = None
+# class Tag3D(BaseSLAM): 
+#     def __init__(self, K): 
+#         BaseSLAM.__init__(self)
 
-    @staticmethod
-    def construct_tag_corners(tag_size): 
-        s = tag_size / 2.0
-        return [Point3(s,s,0), Point3(s,-s,0), 
-                Point3(-s,-s,0), Point3(-s,s,0)]  
+#         # TODO: Cal3_S2 datatype
+#         self.K_ = None
 
-    def set_calib(self, K): 
-        pass
+#     @staticmethod
+#     def construct_tag_corners(tag_size): 
+#         s = tag_size / 2.0
+#         return [Point3(s,s,0), Point3(s,-s,0), 
+#                 Point3(-s,-s,0), Point3(-s,s,0)]  
 
-    def on_tag_poses(self, tags): 
-        """
-        Add tag measurements as separate  
-        Pose3-Pose3 constraints        
-        """
-        for tag in tags: 
-            delta = Pose3(tag.getPose())
-            self.add_landmark_incremental(tag.getId(), delta)
-
-#     def on_tag_corners(self, tags): 
-#         """
-#         Add tag measurements as 4 separate 
-#         Pose3-Point3 constraints        
-#         """
-#         camera = SimpleCamera(self.prev_pose_)
+#     def set_calib(self, K): 
 #         pass
+
+#     def on_odom(self, t, odom): 
+#         self.add_odom_incremental(odom)
+#         self.update()
+#         return self.latest()
+
+#     def on_tags(self, t, tags, use_corners=False): 
+#         """
+#         Add tag measurements as separate  
+#         Pose3-Pose3 constraints        
+#         """
+#         for tag in tags: 
+#             delta = Pose3(tag.getPose())
+#             self.add_landmark_incremental(tag.getId(), delta)
+
+# #     def on_tag_corners(self, t, tags): 
+# #         """
+# #         Add tag measurements as 4 separate 
+# #         Pose3-Point3 constraints        
+# #         """
+# #         camera = SimpleCamera(self.prev_pose_)
+# #         pass
 
         
 def test_odometryExample(): 

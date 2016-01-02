@@ -100,7 +100,10 @@ class BaseSLAMMixin(object):
         TODO: currently GTSAM is only adding Pose3-Pose3 costraint. 
         Need to incorporate Pose3-Point2 constraint from tag corners
         """
-        self.pose_id_ = self.slam_.on_tags(t, tags)
+        ids = [tag.id for tag in tags]
+        poses = [tag.getPose() for tag in tags]
+        self.pose_id_ = self.slam_.on_pose_ids(t, ids, poses)
+        print ids, poses
 
         # Visualize SLAM updates
         self.vis_slam_updates()
@@ -112,24 +115,24 @@ class BaseSLAMMixin(object):
         
         return self.pose_id_
 
-    def on_landmarks(self, t, poses_w_ids): 
-        """
-        Add pose landmarks to factor graph 
-        Pose3-Pose3 costraint. 
+    # def on_landmarks(self, t, poses_w_ids): 
+    #     """
+    #     Add pose landmarks to factor graph 
+    #     Pose3-Pose3 costraint. 
 
-        poses: Pose (with ID)
-        """
-        ids = [p.id for p in poses_w_ids]
-        poses = [p.to_homogeneous_matrix() for p in poses_w_ids]
-        self.pose_id_ = self.slam_.on_pose_ids(t, ids, poses)
+    #     poses: Pose (with ID)
+    #     """
+    #     ids = [p.id for p in poses_w_ids]
+    #     poses = [p.to_homogeneous_matrix() for p in poses_w_ids]
+    #     self.pose_id_ = self.slam_.on_pose_ids(t, ids, poses)
 
-        # Visualize SLAM updates
-        self.vis_slam_updates()
+    #     # Visualize SLAM updates
+    #     self.vis_slam_updates()
 
-        # Visualize tags/landmarks
-        self.vis_landmarks(self.pose_id_, self.poses_.latest, poses_w_ids)
+    #     # Visualize tags/landmarks
+    #     self.vis_landmarks(self.pose_id_, self.poses_.latest, poses_w_ids)
         
-        return self.pose_id_
+    #     return self.pose_id_
 
     def vis_slam_updates(self, frame_id='optcamera'): 
         """
