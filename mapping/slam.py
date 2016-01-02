@@ -9,6 +9,7 @@ from bot_geometry.rigid_transform import RigidTransform, Pose, Quaternion
 
 import bot_externals.draw_utils as draw_utils
 
+from .gtsam import BaseSLAM, SLAM3D
 from pybot_gtsam import GTSAMTags
 from pybot_slam import ISAMTags, draw_tags
 from pybot_apriltags import AprilTag, AprilTagsWrapper
@@ -24,7 +25,11 @@ class BaseSLAMMixin(object):
     def __init__(self, ref_frames={}, absolute_measurements=True, visualize=True): 
 
         # Initialize SLAM (GTSAM / ISAM)
-        self.slam_ = GTSAMTags() # FIX: TODO
+        # self.slam_ = GTSAMTags() # FIX: TODO
+        # self.slam_ = BaseSLAM()
+        self.slam_ = SLAM3D()
+
+
         # self.slam_cb_ = CounterWithPeriodicCallback(
         #     every_k=10, 
         #     process_cb=lambda:  self.slam_.save_graph("slam_fg.dot")

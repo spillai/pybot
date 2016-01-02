@@ -1,12 +1,18 @@
 import numpy as np
+from itertools import izip
 
 from pygtsam import symbol as _symbol
+
+from pygtsam import Point3, Rot3, Pose3, \
+    PriorFactorPose3, BetweenFactorPose3
+    
 from pygtsam import Point2, Rot2, Pose2, \
     PriorFactorPose2, BetweenFactorPose2, \
-    BearingRangeFactorPose2Point2, \
-    Diagonal, Values, Marginals
+    BearingRangeFactorPose2Point2
 
-from pygtsam import NonlinearOptimizer, \
+from pygtsam import Isotropic
+from pygtsam import Diagonal, Values, Marginals
+from pygtsam import ISAM2, NonlinearOptimizer, \
     NonlinearFactorGraph, LevenbergMarquardtOptimizer
 
 np.set_printoptions(precision=2, suppress=True)
@@ -43,14 +49,14 @@ class BaseSLAM(object):
 
         # Factor graph storage
         self.graph_ = []
-        self.values_ = Values()
+        self.initial_ = Values()
         self.landmark_edges = []
         self.landmarks_ = set()
 
-        # Pose2D measurement
-        self.measurement_noise_ = Isotropic.Sigma(4, 0.4)
-        self.prior_noise_ = Isotropic.Sigma(4, 0.01)
-        self.odo_noise_ = Isotropic.Sigma(4, 0.01)
+        # Pose3D measurement
+        self.measurement_noise_ = Isotropic.Sigma(6, 0.4)
+        self.prior_noise_ = Isotropic.Sigma(6, 0.01)
+        self.odo_noise_ = Isotropic.Sigma(6, 0.01)
 
         # TODO: Update slam every landmark addition
         
@@ -61,9 +67,9 @@ class BaseSLAM(object):
         if self.latest() < 0: 
 
             x_id = symbol('x', 0)
-            pose0 = Pose2()
+            pose0 = Pose3()
 
-            self.graph_.append(PriorFactorPose2(x_id, pose0, self.prior_noise_))
+            self.graph_.append(PriorFactorPose3(x_id, pose0, self.prior_noise_))
             self.initial_.insert(x_id, pose0)
             self.prev_pose_ = pose0
             self.idx_ = 0
@@ -75,13 +81,13 @@ class BaseSLAM(object):
     def add_odom(self, xid1, xid2, delta): 
         # Add odometry factor
         x_id1, x_id2 = symbol('x', xid1), symbol('x', xid2)
-        self.graph_.append(BetweenFactorPose2(x_id1, x_id2, 
-                                              delta, self.odo_noise_))
+        self.graph_.append(BetweenFactorPose3(x_id1, x_id2, 
+                                              Pose3(delta), self.odo_noise_))
         
         # Predict pose and add as initial estimate
         # TODO: get latest estiamte for x_id1, and 
         # compose with delta to find initial estimate
-        pred_pose = self.prev_pose_.compose(delta)
+        pred_pose = self.prev_pose_.compose(Pose3(delta))
         self.initial_.insert(x_id2, pred_pose)
 
     def add_landmark(self, xid, lid, delta): 
@@ -90,17 +96,17 @@ class BaseSLAM(object):
         # Add Pose-Pose landmark factor
         x_id = symbol('x', xid)
         l_id = symbol('l', lid)
-
+        
         # Add landmark pose
-        self.graph_.append(BetweenFactorPose2(x_id, l_id, delta, 
+        self.graph_.append(BetweenFactorPose3(x_id, l_id, Pose3(delta), 
                                               self.measurement_noise))
 
         # Add to landmark measurements
         self.landmark_edges_.append((self.latest(), lid))
 
         if lid not in self.landmarks_: 
-            pred_pose = prev_pose_.compose(delta)
-            initial_.insert(l_id, pred_pose)
+            pred_pose = prev_pose_.compose(Pose3(delta))
+            self.initial_.insert(l_id, pred_pose)
             self.landmarks_.insert(lid)
 
         return 
@@ -122,7 +128,7 @@ class BaseSLAM(object):
 
 class SLAM2D(BaseSLAM): 
     def __init__(self): 
-        BaseSLAM.init__(self)
+        BaseSLAM.__init__(self)
 
     def on_odom(self, p): 
         pass
@@ -132,10 +138,18 @@ class SLAM2D(BaseSLAM):
         
 class SLAM3D(BaseSLAM): 
     def __init__(self): 
-        BaseSLAM.init__(self)
+        BaseSLAM.__init__(self)
 
-    def on_odom(self, p): 
-        pass
+    def on_odom(self, t, odom): 
+        self.add_odom_incremental(odom)
+        self.update()
+        return self.slam_.latest()
+
+    def on_pose_ids(self, t, ids, poses): 
+        for (pid, pose) in izip(ids, poses): 
+            self.add_landmark_incremental(pid, pose)
+        self.update()
+        return self.slam_.latest()
 
     def on_landmark(self, p): 
         pass
