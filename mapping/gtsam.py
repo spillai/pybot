@@ -1,6 +1,7 @@
 import numpy as np
 from itertools import izip
 
+from pygtsam import extractPose3
 from pygtsam import symbol as _symbol
 
 from pygtsam import Point3, Rot3, Pose3, \
@@ -55,13 +56,16 @@ class BaseSLAM(object):
         self.poses_ = {}
         self.targets_ = {}
 
-    def get_poses(self): 
+    @property
+    def poses(self): 
         return self.poses_
-
-    def get_targets(self): 
+    
+    @property
+    def targets(self): 
         return self.targets_
 
-    def get_landmark_edges(self): 
+    @property
+    def landmark_edges(self): 
         return self.landmark_edges_
 
     def initialize(self, p_init=None): 
@@ -127,7 +131,6 @@ class BaseSLAM(object):
 
     def add_landmark_incremental(self, lid, delta): 
         self.add_landmark(self.latest(), lid, delta)
-        pass
 
     def latest(self): 
         return self.idx_
@@ -144,9 +147,18 @@ class BaseSLAM(object):
 
         # Get current estimate
         current = self.slam_.calculateEstimate()
+        poses = extractPose3(current)
 
-        # self.targets_ = {}
-        # self.poses_ = {}
+        self.targets_ = {}
+        self.poses_ = {}
+        for k,v in poses.iteritems():
+            if k.chr() == ord('l'): 
+                self.targets_[k.index()] = v.matrix()
+            elif k.chr() == ord('x'): 
+                self.poses_[k.index()] = v.matrix()
+            else: 
+                raise RuntimeError('Unknown key chr {:}'.format(k.chr))
+        
 
         # # Update xs, ls
         # for xid in self.xs_.keys(): 

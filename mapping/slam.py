@@ -140,21 +140,21 @@ class BaseSLAMMixin(object):
         """
 
         # Draw poses 
-        updated_poses = {p.id : Pose.from_rigid_transform(
-            p.id, RigidTransform.from_homogenous_matrix(p.getPose())) 
-                         for p in self.slam_.get_poses()}
+        updated_poses = {pid : Pose.from_rigid_transform(
+            pid, RigidTransform.from_homogenous_matrix(p)) 
+                         for (pid,p) in self.slam_.poses.iteritems()}
         draw_utils.publish_pose_list('optimized_node_poses', updated_poses.values(), frame_id=frame_id, reset=self.reset_required())
 
         # Draw targets (constantly updated, so draw with reset)
-        updated_targets = {p.id : Pose.from_rigid_transform(p.id, RigidTransform.from_homogenous_matrix(p.getPose())) 
-                           for p in self.slam_.get_targets()}
+        updated_targets = {pid : Pose.from_rigid_transform(pid, RigidTransform.from_homogenous_matrix(p)) 
+                           for (pid, p) in self.slam_.targets.iteritems()}
         if len(updated_targets): 
             edges = np.vstack([draw_utils.draw_tag_edges(p) for p in updated_targets.itervalues()])
             draw_utils.publish_line_segments('optimized_node_tag', edges[:,:3], edges[:,3:6], c='r', 
                                              frame_id=frame_id, reset=True)
 
         # Draw edges (between landmarks and poses)
-        landmark_edges = self.slam_.get_landmark_edges()
+        landmark_edges = self.slam_.landmark_edges
         # print landmark_edges, len(updated_poses), len(updated_targets)
         if len(landmark_edges): 
             factor_st = np.vstack([(updated_poses[xid].tvec).reshape(-1,3) for (xid, _) in landmark_edges])
