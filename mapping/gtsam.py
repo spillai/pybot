@@ -3,14 +3,11 @@ from itertools import izip
 
 from pygtsam import extractPose3
 from pygtsam import symbol as _symbol
-
-from pygtsam import Point3, Rot3, Pose3, \
-    PriorFactorPose3, BetweenFactorPose3
-    
 from pygtsam import Point2, Rot2, Pose2, \
     PriorFactorPose2, BetweenFactorPose2, \
     BearingRangeFactorPose2Point2
-
+from pygtsam import Point3, Rot3, Pose3, \
+    PriorFactorPose3, BetweenFactorPose3
 from pygtsam import Isotropic
 from pygtsam import Diagonal, Values, Marginals
 from pygtsam import ISAM2, NonlinearOptimizer, \
@@ -42,8 +39,7 @@ class BaseSLAM(object):
         self.graph_ = NonlinearFactorGraph()
         self.initial_ = Values()
         self.landmark_edges_ = []
-        self.landmarks_ = set()
-
+        
         # Pose3D measurement
         self.measurement_noise_ = Isotropic.Sigma(6, 0.4)
         self.prior_noise_ = Isotropic.Sigma(6, 0.01)
@@ -53,17 +49,14 @@ class BaseSLAM(object):
         self.xs_ = {}
         self.ls_ = {}
 
-        self.poses_ = {}
-        self.targets_ = {}
-
     @property
     def poses(self): 
-        return self.poses_
-    
+        return {k: v.matrix() for k,v in self.xs_.iteritems()}
+        
     @property
     def targets(self): 
-        return self.targets_
-
+        return {k: v.matrix() for k,v in self.ls_.iteritems()}
+        
     @property
     def landmark_edges(self): 
         return self.landmark_edges_
@@ -74,7 +67,8 @@ class BaseSLAM(object):
             
         self.graph_.add(PriorFactorPose3(x_id, pose0, self.prior_noise_))
         self.initial_.insert(x_id, pose0)
-        self.prev_pose_ = pose0
+        # self.prev_pose_ = pose0
+        self.xs_[0] = pose0
         self.idx_ = 0
 
         self.xs_[0] = pose0
@@ -100,10 +94,14 @@ class BaseSLAM(object):
         # Predict pose and add as initial estimate
         # TODO: get latest estiamte for x_id1, and 
         # compose with delta to find initial estimate
-        pred_pose = self.prev_pose_.compose(pdelta)
-        self.initial_.insert(x_id2, pred_pose)
-        self.prev_pose_ = pred_pose
 
+        # pred_pose = self.prev_pose_.compose(pdelta)
+        # self.initial_.insert(x_id2, pred_pose)
+        # self.prev_pose_ = pred_pose
+        # self.xs_[xid2] = pred_pose
+
+        pred_pose = self.xs_[self.latest()].compose(pdelta)
+        self.initial_.insert(x_id2, pred_pose)
         self.xs_[xid2] = pred_pose
 
     def add_landmark(self, xid, lid, delta): 
@@ -121,11 +119,17 @@ class BaseSLAM(object):
         # Add to landmark measurements
         self.landmark_edges_.append((self.latest(), lid))
 
-        if lid not in self.landmarks_: 
-            pred_pose = self.prev_pose_.compose(pdelta)
-            self.initial_.insert(l_id, pred_pose)
-            self.landmarks_.add(lid)
-            self.ls_[lid] = pred_pose
+        # Initialize new pose node
+        if lid not in self.ls_:
+
+            # Initialize landmark with latest robot pose
+            try: 
+                pred_pose = self.xs_[self.latest()].compose(pdelta)
+                self.initial_.insert(l_id, pred_pose)
+                self.ls_[lid] = pred_pose
+                # pred_pose = self.prev_pose_.compose(pdelta)
+            except: 
+                raise KeyError('Pose {:} not available'.format(self.latest()))
 
         return 
 
@@ -149,26 +153,16 @@ class BaseSLAM(object):
         current = self.slam_.calculateEstimate()
         poses = extractPose3(current)
 
-        self.targets_ = {}
-        self.poses_ = {}
+        # self.targets_ = {}
+        # self.poses_ = {}
+
         for k,v in poses.iteritems():
             if k.chr() == ord('l'): 
-                self.targets_[k.index()] = v.matrix()
+                self.ls_[k.index()] = v
             elif k.chr() == ord('x'): 
-                self.poses_[k.index()] = v.matrix()
+                self.xs_[k.index()] = v
             else: 
                 raise RuntimeError('Unknown key chr {:}'.format(k.chr))
-        
-
-        # # Update xs, ls
-        # for xid in self.xs_.keys(): 
-        #     self.xs_[xid] = current.at(symbol('x', xid))
-        # for lid in self.ls_.keys(): 
-        #     self.ls_[lid] = current.at(symbol('l', lid))
-
-        # print self.xs_
-        # for item in current: 
-        #     print item
 
         self.graph_.resize(0)
         self.initial_.clear()
