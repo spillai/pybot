@@ -31,7 +31,27 @@ def plot2DTrajectory(values, linespec, marginals):
     print values, marginals
 
 class BaseSLAM(object): 
+    """
+    Basic SLAM interface with GTSAM::ISAM2
+
+    This is a basic interface that allows hot-swapping factors without
+    having to write much boilerplate and templated code.
+    
+    Factor graph is constructed and grown dynamically, with
+    Pose3-Pose3 constraints, and finally optimized.
+
+    Params: 
+        xs: Robot poses
+        ls: Landmark measurements
+        xls: Edge list between x and l 
+
+    Todo: 
+        Updated slam every landmark addition
+
+    """
+
     def __init__(self): 
+        # ISAM2 interface
         self.slam_ = ISAM2()
         self.idx_ = -1
 
@@ -39,19 +59,12 @@ class BaseSLAM(object):
         self.graph_ = NonlinearFactorGraph()
         self.initial_ = Values()
         
-        
         # Pose3D measurement
         self.measurement_noise_ = Isotropic.Sigma(6, 0.4)
         self.prior_noise_ = Isotropic.Sigma(6, 0.01)
         self.odo_noise_ = Isotropic.Sigma(6, 0.01)
 
-        # TODO: Updated slam every landmark addition
-
         # Optimized robot state
-        # xs: Robot poses
-        # ls: Landmark measurements
-        # xls: Edge list between x and l 
-        
         self.xs_ = {}
         self.ls_ = {}
         self.xls_ = []
@@ -72,16 +85,18 @@ class BaseSLAM(object):
         x_id = symbol('x', 0)
         pose0 = Pose3(p_init) if p_init else Pose3()
             
-        self.graph_.add(PriorFactorPose3(x_id, pose0, self.prior_noise_))
+        self.graph_.add(
+            PriorFactorPose3(x_id, pose0, self.prior_noise_)
+        )
         self.initial_.insert(x_id, pose0)
-        # self.prev_pose_ = pose0
         self.xs_[0] = pose0
         self.idx_ = 0
 
-        self.xs_[0] = pose0
-
     def add_odom_incremental(self, delta): 
-        print('\t\tadd_odom_incr {:}->{:}'.format(self.latest(), self.latest()+1))
+        """
+        Add odometry measurement from the latest robot pose to a new
+        robot pose
+        """
         # Add prior on first pose
         if self.latest() < 0: 
             self.initialize()
@@ -91,6 +106,8 @@ class BaseSLAM(object):
         self.idx_ += 1
 
     def add_odom(self, xid1, xid2, delta): 
+        print('\t\tadd_odom {:}->{:}'.format(xid1, xid2))
+
         # Add odometry factor
         pdelta = Pose3(delta)
         x_id1, x_id2 = symbol('x', xid1), symbol('x', xid2)
@@ -99,15 +116,7 @@ class BaseSLAM(object):
 
         
         # Predict pose and add as initial estimate
-        # TODO: get latest estiamte for x_id1, and 
-        # compose with delta to find initial estimate
-
-        # pred_pose = self.prev_pose_.compose(pdelta)
-        # self.initial_.insert(x_id2, pred_pose)
-        # self.prev_pose_ = pred_pose
-        # self.xs_[xid2] = pred_pose
-
-        pred_pose = self.xs_[self.latest()].compose(pdelta)
+        pred_pose = self.xs_[xid1].compose(pdelta)
         self.initial_.insert(x_id2, pred_pose)
         self.xs_[xid2] = pred_pose
 
@@ -124,23 +133,26 @@ class BaseSLAM(object):
                                            self.measurement_noise_))
 
         # Add to landmark measurements
-        self.xls_.append((self.latest(), lid))
+        self.xls_.append((xid, lid))
 
-        # Initialize new pose node
+        # Initialize new landmark pose node from the latest robot
+        # pose. This should be done just once
         if lid not in self.ls_:
-
-            # Initialize landmark with latest robot pose
             try: 
-                pred_pose = self.xs_[self.latest()].compose(pdelta)
+                pred_pose = self.xs_[xid].compose(pdelta)
                 self.initial_.insert(l_id, pred_pose)
                 self.ls_[lid] = pred_pose
-                # pred_pose = self.prev_pose_.compose(pdelta)
             except: 
-                raise KeyError('Pose {:} not available'.format(self.latest()))
+                raise KeyError('Pose {:} not available'
+                               .format(xid))
 
         return 
 
     def add_landmark_incremental(self, lid, delta): 
+        """
+        Add landmark measurement from the latest robot pose to the
+        specified landmark id
+        """
         self.add_landmark(self.latest(), lid, delta)
 
     def latest(self): 
@@ -153,6 +165,7 @@ class BaseSLAM(object):
         self.slam_.saveGraph(filename)
 
     def update(self): 
+        # Update ISAM with new nodes/factors and initial estimates
         self.slam_.update(self.graph_, self.initial_)
         self.slam_.update()
 
@@ -160,9 +173,7 @@ class BaseSLAM(object):
         current = self.slam_.calculateEstimate()
         poses = extractPose3(current)
 
-        # self.targets_ = {}
-        # self.poses_ = {}
-
+        # Extract and update landmarks and poses
         for k,v in poses.iteritems():
             if k.chr() == ord('l'): 
                 self.ls_[k.index()] = v
