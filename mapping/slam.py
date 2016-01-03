@@ -154,7 +154,7 @@ class BaseSLAMMixin(object):
                                              frame_id=frame_id, reset=True)
 
         # Draw edges (between landmarks and poses)
-        landmark_edges = self.slam_.landmark_edges
+        landmark_edges = self.slam_.edges
         # print landmark_edges, len(updated_poses), len(updated_targets)
         if len(landmark_edges): 
             factor_st = np.vstack([(updated_poses[xid].tvec).reshape(-1,3) for (xid, _) in landmark_edges])

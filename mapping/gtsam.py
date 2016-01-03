@@ -38,16 +38,23 @@ class BaseSLAM(object):
         # Factor graph storage
         self.graph_ = NonlinearFactorGraph()
         self.initial_ = Values()
-        self.landmark_edges_ = []
+        
         
         # Pose3D measurement
         self.measurement_noise_ = Isotropic.Sigma(6, 0.4)
         self.prior_noise_ = Isotropic.Sigma(6, 0.01)
         self.odo_noise_ = Isotropic.Sigma(6, 0.01)
 
-        # TODO: Update slam every landmark addition
+        # TODO: Updated slam every landmark addition
+
+        # Optimized robot state
+        # xs: Robot poses
+        # ls: Landmark measurements
+        # xls: Edge list between x and l 
+        
         self.xs_ = {}
         self.ls_ = {}
+        self.xls_ = []
 
     @property
     def poses(self): 
@@ -58,8 +65,8 @@ class BaseSLAM(object):
         return {k: v.matrix() for k,v in self.ls_.iteritems()}
         
     @property
-    def landmark_edges(self): 
-        return self.landmark_edges_
+    def edges(self): 
+        return self.xls_
 
     def initialize(self, p_init=None): 
         x_id = symbol('x', 0)
@@ -117,7 +124,7 @@ class BaseSLAM(object):
                                            self.measurement_noise_))
 
         # Add to landmark measurements
-        self.landmark_edges_.append((self.latest(), lid))
+        self.xls_.append((self.latest(), lid))
 
         # Initialize new pose node
         if lid not in self.ls_:
