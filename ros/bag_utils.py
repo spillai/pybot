@@ -23,19 +23,24 @@ class ImageDecoder(Decoder):
     Encoding types supported: 
         bgr8, 32FC1
     """
-    def __init__(self, channel='/camera/rgb/image_raw', every_k_frames=1, scale=1., encoding='bgr8'): 
+    def __init__(self, channel='/camera/rgb/image_raw', every_k_frames=1, scale=1., encoding='bgr8', compressed=False): 
         Decoder.__init__(self, channel=channel, every_k_frames=every_k_frames)
         self.scale = scale
         self.encoding = encoding
         self.bridge = CvBridge()
+        self.compressed = compressed
 
     def decode(self, msg): 
-        try:
-            im = self.bridge.imgmsg_to_cv2(msg, self.encoding)
-            # print("%.6f" % msg.header.stamp.to_sec())
-            return im_resize(im, scale=self.scale)
-        except CvBridgeError, e:
-            print e
+        if self.compressed: 
+            im = cv2.imdecode(np.fromstring(msg.data, np.uint8), cv2.CV_LOAD_IMAGE_COLOR)
+        else: 
+            try: 
+                im = self.bridge.imgmsg_to_cv2(msg, self.encoding)
+                # print("%.6f" % msg.header.stamp.to_sec())
+            except CvBridgeError, e:
+                print e
+
+        return im_resize(im, scale=self.scale)
 
 class LaserScanDecoder(Decoder): 
     """
