@@ -124,6 +124,82 @@ def flair_project(data, codebook, pts=None, shape=None, method='bow', levels=(1,
 # General-purpose bag-of-words interfaces
 # ---------------------------------------------------------------------
 
+class VocabBuilder(object): 
+    def __init__(self, D, K=300, N=100000):
+        self.D_ = D
+        self.K_ = K
+        self.built_ = False
+        print('Initializing vocabulary builder K={:}, D={:}'.format(K,D))
+
+        # Binary Vocab builder 
+        # self.voc_ = BinaryVocabulary()
+        self.vocab_ = None
+
+        # Vocab Training
+        self.N_ = N
+        if N: 
+            self.vocab_len_ = 0
+            self.vocab_data_ = np.empty((N, D), dtype=np.uint8)
+        
+    def add(self, desc):
+        if self.built_: 
+            return
+ 
+        if self.vocab_len_ < self.N_:
+            Nd = len(desc)
+            st, end = self.vocab_len_, min(self.vocab_len_ + Nd, self.N_)
+            print st, end, Nd
+            self.vocab_data_[st:end] = desc[:end-st]
+            self.vocab_len_ += len(desc)
+            print('Vocabulary building: {:}/{:}'.format(self.vocab_len_, self.N_))
+        else: 
+            print('Vocabulary built')
+            self.built_ = True
+
+        # else: 
+        #     # Build vocab if not built already
+        #     self.voc_.build(self.vocab_data_, self.K_)
+        #     self.vocab_ = self.voc_.getCentroids()
+            
+        #     sz = self.vocab_.shape[:2]
+        #     if sz[0] != self.K_ or sz[1] != self.D_: 
+        #         raise RuntimeError('Voc error! KxD={:}x{:}, expected'.format(sz[0],sz[1],self.K_,self.D_))
+
+        #     self.save('vocab.yaml.gz')
+
+    @property
+    def vocab_data(self): 
+        return self.vocab_data_
+            
+    # def project(self, desc): 
+    #     return self.voc_.getClusterAssignments()
+
+    # @classmethod
+    # def load(cls, fn): 
+
+    #     voc = ORBVocabulary()
+    #     voc.load(fn)
+    #     vocab = self.voc.getCentroids()
+
+    #     K, D = vocab.shape[:2]
+    #     vocab_builder = cls(D, K=K, N=0)
+    #     vocab_builder.voc_ = voc
+    #     vocab_builder.vocab_ = vocab
+    #     vocab_builder.built_ = True
+        
+    #     return vocab_builder
+
+    # def save(self, fn): 
+    #     fn = os.path.expanduser(fn)
+    #     print('Saving vocabulary to {:}'.format(fn))
+    #     self.voc_.save(fn)
+    #     self.built_ = True
+
+    @property
+    def built(self): 
+        return self.built_
+
+
 class BoWVectorizer(object): 
     default_params = AttrDict(K=64, levels=(1,2,4), 
                               method='vlad', quantizer='kdtree', norm_method='square-rooting')
@@ -133,6 +209,7 @@ class BoWVectorizer(object):
         self.levels = levels
         self.method, self.quantizer = method, quantizer
         self.norm_method = norm_method
+        self.codebook = None
 
     def _build_codebook(self, data): 
         """
@@ -166,6 +243,9 @@ class BoWVectorizer(object):
         # Save codebook, and index
         self.index_codebook()
 
+    def ready(self): 
+        return self.codebook is not None
+
     def build(self, data): 
         """
         Build a codebook/vocabulary from data
@@ -177,6 +257,16 @@ class BoWVectorizer(object):
             # self._build_codebook(np.vstack(data))
             self._build_codebook(data)
 
+    def build_incremental(self, data, N=100000): 
+        if not hasattr(self, 'vbuilder__'): 
+            self.vbuilder__ = VocabBuilder(data.shape[1], K=-1, N=N)
+
+        if not self.vbuilder__.built: 
+            self.vbuilder__.add(data)
+        else: 
+            train_data = self.vbuilder__.vocab_data
+            self.build(train_data)
+        
     @staticmethod
     def compute_index(codebook): 
         return cKDTree(codebook)
@@ -253,35 +343,38 @@ class BoWVectorizer(object):
         Otherwise, if kpts and bbox shape specified, perform spatial pooling
         """
         
-        if pts is None or shape is None: 
+        if pts is None: #  or shape is None: 
             return self.get_histogram(data)
-        else: 
-            # Compute histogram for each spatial level
-            # assert(pts.dtype == np.int32)
-            pts = pts.astype(np.int32)
-            xmin, ymin = shape[0], shape[1]
-            xs, ys = pts[:,0]-xmin, pts[:,1]-ymin
 
-            # Ownership bin 
-            # For each pt, and each level find the x and y bin
-            # and assign to appropriate bin
-            # nbins = np.sum(np.array(self.levels) ** 2)
+        if shape is None: 
+            shape = (np.min(pts[:,0]), np.min(pts[:,1]), np.max(pts[:,0]), np.max(pts[:,1]))
 
-            # levels = [1, 2, 4]
-            hist = []
-            for j,level in enumerate(self.levels): 
-                # Determine the bin each point belongs to given level, and assign
-                xdim, ydim = (shape[2]-shape[0]+1) / level, (shape[3]-shape[1]+1) / level
-                xbin, ybin = xs / xdim, ys / ydim
-                bin_idx = ybin * level + xbin
+        # Compute histogram for each spatial level
+        # assert(pts.dtype == np.int32)
+        pts = pts.astype(np.int32)
+        xmin, ymin = shape[0], shape[1]
+        xs, ys = pts[:,0]-xmin, pts[:,1]-ymin
 
-                # Compute histogram for each bin                
-                for lbin in range(level * level): 
-                    inds, = np.where(bin_idx == lbin)
-                    hist.append(self.get_histogram(data[inds]))
+        # Ownership bin 
+        # For each pt, and each level find the x and y bin
+        # and assign to appropriate bin
+        # nbins = np.sum(np.array(self.levels) ** 2)
 
-            # Stack all histograms together
-            return np.hstack(hist)
+        # levels = [1, 2, 4]
+        hist = []
+        for j,level in enumerate(self.levels): 
+            # Determine the bin each point belongs to given level, and assign
+            xdim, ydim = (shape[2]-shape[0]+1) / level, (shape[3]-shape[1]+1) / level
+            xbin, ybin = xs / xdim, ys / ydim
+            bin_idx = ybin * level + xbin
+
+            # Compute histogram for each bin                
+            for lbin in range(level * level): 
+                inds, = np.where(bin_idx == lbin)
+                hist.append(self.get_histogram(data[inds]))
+
+        # Stack all histograms together
+        return np.hstack(hist)
                     
                 
             
