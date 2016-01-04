@@ -148,7 +148,6 @@ class VocabBuilder(object):
         if self.vocab_len_ < self.N_:
             Nd = len(desc)
             st, end = self.vocab_len_, min(self.vocab_len_ + Nd, self.N_)
-            print st, end, Nd
             self.vocab_data_[st:end] = desc[:end-st]
             self.vocab_len_ += len(desc)
             print('Vocabulary building: {:}/{:}'.format(self.vocab_len_, self.N_))
