@@ -29,7 +29,16 @@ def matrix(m):
 def vec(*args):
     return vector(list(args)) 
 
-def plot2DTrajectory(values, linespec, marginals): 
+def plot2DTrajectory(values, linespec, marginals=[]): 
+    poses = extractPose2(values)
+    X = poses[:,1]
+    Y = poses[:,2]
+    theta = poses[:,3]
+
+    # if len(marginals): 
+    #     C = np.cos(theta)
+    #     S = np.sin(theta)
+
     print values, marginals
 
 class BaseSLAM(object): 
