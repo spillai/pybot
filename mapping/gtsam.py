@@ -1,5 +1,9 @@
 import numpy as np
+import networkx as nx
+
 from itertools import izip
+
+from bot_js.force import nx_force_draw
 
 from pygtsam import extractPose3
 from pygtsam import symbol as _symbol
@@ -80,6 +84,9 @@ class BaseSLAM(object):
         self.ls_ = {}
         self.xls_ = []
 
+        # Graph visualization
+        self.gviz_ = nx.Graph()
+
     @property
     def poses(self): 
         return {k: v.matrix() for k,v in self.xs_.iteritems()}
@@ -103,6 +110,18 @@ class BaseSLAM(object):
         self.xs_[0] = pose0
         self.idx_ = 0
 
+        # Add node to graphviz
+        self.gviz_.add_node(x_id) # , label='x0')
+        self.gviz_.node[x_id]['label'] = 'X 0'
+
+        # Add prior factor to graphviz
+        p_id = symbol('p', 0)
+        self.gviz_.add_edge(p_id, symbol('x', 0))
+        self.gviz_.node[p_id]['label'] = 'P 0'
+        self.gviz_.node[p_id]['color'] = 'blue'
+        self.gviz_.node[p_id]['style'] = 'filled'
+        self.gviz_.node[p_id]['shape'] = 'box'
+
     def add_odom_incremental(self, delta): 
         """
         Add odometry measurement from the latest robot pose to a new
@@ -124,12 +143,15 @@ class BaseSLAM(object):
         x_id1, x_id2 = symbol('x', xid1), symbol('x', xid2)
         self.graph_.add(BetweenFactorPose3(x_id1, x_id2, 
                                            pdelta, self.odo_noise_))
-
         
         # Predict pose and add as initial estimate
         pred_pose = self.xs_[xid1].compose(pdelta)
         self.initial_.insert(x_id2, pred_pose)
         self.xs_[xid2] = pred_pose
+
+        # Add edge to graphviz
+        self.gviz_.add_edge(x_id1, x_id2)
+        self.gviz_.node[x_id2]['label'] = 'X ' + str(xid2)
 
     def add_landmark(self, xid, lid, delta): 
         print('\t\tadd_landmark {:}->{:}'.format(xid, lid))
@@ -146,6 +168,9 @@ class BaseSLAM(object):
         # Add to landmark measurements
         self.xls_.append((xid, lid))
 
+        # Add landmark edge to graphviz
+        self.gviz_.add_edge(x_id, l_id)
+
         # Initialize new landmark pose node from the latest robot
         # pose. This should be done just once
         if lid not in self.ls_:
@@ -157,6 +182,11 @@ class BaseSLAM(object):
                 raise KeyError('Pose {:} not available'
                                .format(xid))
 
+            # Label landmark node
+            self.gviz_.node[l_id]['label'] = 'L ' + str(lid)            
+            self.gviz_.node[l_id]['color'] = 'red'
+            self.gviz_.node[l_id]['style'] = 'filled'
+            
         return 
 
     def add_landmark_incremental(self, lid, delta): 
@@ -174,6 +204,11 @@ class BaseSLAM(object):
 
     def save_graph(self, filename): 
         self.slam_.saveGraph(filename)
+
+    def save_dot_graph(self, filename): 
+        nx.write_dot(self.gviz_, filename)
+        # nx.draw_graphviz(self.gviz_, prog='neato')
+        # nx_force_draw(self.gviz_)
 
     def update(self): 
         # Update ISAM with new nodes/factors and initial estimates
@@ -196,7 +231,9 @@ class BaseSLAM(object):
         self.graph_.resize(0)
         self.initial_.clear()
 
-        self.save_graph("slam_fg.dot")
+        if self.index() % 50 == 0 and self.index() > 0: 
+            self.save_graph("slam_fg.dot")
+            self.save_dot_graph("slam_graph.dot")
 
 # class SLAM2D(BaseSLAM): 
 #     def __init__(self): 

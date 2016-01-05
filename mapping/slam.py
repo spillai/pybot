@@ -14,6 +14,8 @@ from pybot_gtsam import GTSAMTags
 from pybot_slam import ISAMTags, draw_tags
 from pybot_apriltags import AprilTag, AprilTagsWrapper
 
+
+
 class BaseSLAMMixin(object):
     """
     Basic Mixin SLAM
@@ -52,7 +54,7 @@ class BaseSLAMMixin(object):
         # Visualization: Publish reference frames
         for k, v in ref_frames.iteritems(): 
             draw_utils.publish_sensor_frame(k, v)
-
+        
     def update(self, iterations=10): 
         # Finalize updates
         for j in range(iterations): 
@@ -68,7 +70,7 @@ class BaseSLAMMixin(object):
         self.poses_.accumulate(p) 
         
         if self.poses_.length < 2:
-            return
+            return 
             
         p_odom = (self.poses_.items[-2].inverse()).oplus(self.poses_.items[-1])
         self.pose_id_ = self.slam_.on_odom(t, p_odom.to_homogeneous_matrix())
