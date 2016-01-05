@@ -299,7 +299,7 @@ def im_detect_and_describe(img, mask=None, detector='dense', descriptor='SIFT', 
     try:     
         kpts = detector.detect(img, mask=mask)
         kpts, desc = extractor.compute(img, kpts)
-
+        
         if descriptor == 'SIFT': 
             kpts, desc = root_sift(kpts, desc)
 
@@ -360,8 +360,9 @@ class ImageDescription(object):
         self.cache_keypoints = cache_keypoints
 
         # Setup feature detector (cache keypoints for dense detector)
-        self.detector = get_dense_detector(step=step, levels=levels, scale=scale)
-        self.kpts = None 
+        self.detector_type = detector
+        self.dense_kpts = None 
+        self.detector = get_detector(detector=detector, step=step, levels=levels, scale=scale)
 
         # Setup feature extractor
         self.extractor = cv2.DescriptorExtractor_create(descriptor)
@@ -377,11 +378,11 @@ class ImageDescription(object):
 
         # One-time caching (assuming the rest of the images)
         kpts = None
-        if self.kpts is None or not self.cache_keypoints: 
+        if (self.dense_kpts is None or not self.cache_keypoints) or self.detector_type != 'dense': 
             kpts = self.detector.detect(img, mask=mask)
-            self.kpts = kpts
+            self.dense_kpts = kpts
         else: 
-            kpts = self.kpts
+            kpts = self.dense_kpts
 
         try: 
             # Descriptor extraction

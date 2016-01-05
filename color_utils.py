@@ -33,5 +33,8 @@ def get_color_by_label(labels, default='b', colormap='jet'):
         colormap_func = getattr(plt.cm, colormap)
         return colormap_func((labels - lo) * 1.0 / (hi - lo))
 
+def get_random_colors(n, colormap='random'): 
+    return get_color_by_label(np.arange(n), colormap=colormap)
+
 def color_from_string(c, n): 
     return np.tile(np.array(colorConverter.to_rgb(c)), [n,1])

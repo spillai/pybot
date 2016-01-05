@@ -7,6 +7,7 @@ from scipy.spatial import cKDTree
 from sklearn.cluster import KMeans, MiniBatchKMeans
 from sklearn.mixture import GMM
 
+from bot_vision.color_utils import get_random_colors
 from bot_utils.db_utils import AttrDict
 
 from pybot_vision import flair_code
@@ -333,6 +334,22 @@ class BoWVectorizer(object):
                                       '''Use vq/bow or vlad or fisher!''' % self.method)            
         return code_hist
 
+    def visualize(self, img, data, pts, level=0, code=None): 
+        """
+        Visualize the quantized words onto the image. 
+        
+        level: visualize the spatial pooling level
+        """
+        if not hasattr(self, 'visualize_cols__'): 
+            self.visualize_cols__ = (get_random_colors(self.K) * 255).astype(np.int32)[:,:3]
+
+        code_ids = self.get_code(data)
+        for (label, pt) in zip(code_ids, pts):
+            if code is None or label == code: 
+                col = tuple(map(int, self.visualize_cols__[label % self.K].ravel()))
+                cv2.circle(img, (pt[0], pt[1]), 2, col, -1)
+
+            
     def project(self, data, pts=None, shape=None): 
         """
         Project the descriptions on to the codebook/vocabulary, 
