@@ -353,15 +353,16 @@ def stereo_dataset(filename, channel='CAMERA', start_idx=0, every_k_frames=1, sc
     dataset = LCMLogReader(filename=filename, start_idx=start_idx, every_k_frames=every_k_frames, 
                            decoder=StereoImageDecoder(channel=channel,scale=scale), index=False)
     
-    def iter_frames(*args, **kwargs): 
-        for (l,r) in dataset.iteritems(*args, **kwargs):
+    def iter_frames(*args, **kwargs):
+        
+        for (t, ch, (l,r)) in dataset.iteritems(*args, **kwargs):
             # h,w = im.shape[:2]
             # l,r = np.split(im, 2, axis=0)
             yield AttrDict(left=l, right=r)
             
     def iter_gt_frames(*args, **kwargs): 
         gt = StereoSGBM()
-        for (l,r) in dataset.iteritems(*args, **kwargs): 
+        for (t, ch, (l,r)) in dataset.iteritems(*args, **kwargs): 
             # h,w = im.shape[:2]
             # l,r = np.split(im, 2, axis=0)
             disp = gt.process(l,r)
