@@ -5,18 +5,18 @@ class SimpleTimer:
         self._counter = 0
         self._last = time.time()
         self._name = name
-        self.iterations = iterations
+        # self.iterations = iterations
         self.period_ = 0
 
     def poll(self): 
         self._counter += 1
-        if self._counter == self.iterations: 
-            self._counter = 0
-            now = time.time()
-            self.period_ = (now - self._last) * 1e3 / self.iterations
-            print('%s: %4.3f ms (avg over %i iterations)' % (self._name, self.period_, self.iterations))
+        now = time.time()
+        if now - self._last > 1: 
+            self.period_ = (now - self._last) * 1e3 / self._counter
+            print('%s: %4.3f ms (avg over %i iterations)' % (self._name, self.period_, self._counter))
             self._last = now
-
+            self._counter = 0
+            
     def start(self): 
         self._last = time.time()
 
