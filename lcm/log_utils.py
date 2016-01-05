@@ -251,12 +251,10 @@ class LCMLogReader(LogReader):
                 for t in self.index[::-1]: 
                     if self.start_idx != 0: 
                         raise RuntimeWarning('No support for start_idx != 0')
-                    frame = self.get_frame_with_timestamp(t)
-                    yield frame
+                    yield self.get_frame_with_timestamp(t)                    
             else: 
                 for t in self.index: 
-                    frame = self.get_frame_with_timestamp(t)
-                    yield frame
+                    yield self.get_frame_with_timestamp(t)                    
         else: 
             if reverse: 
                 raise RuntimeError('Cannot provide items in reverse when file is not indexed')
