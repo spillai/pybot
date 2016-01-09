@@ -295,7 +295,7 @@ class CalibratedFastStereo(object):
             # Set fake calibration parameters if None
             if calib_params is None: 
                 def calibration_lambda(H,W): 
-                    new_calib_params = get_calib_params(1000, 1000, W/2-0.5, H/2-0.5, 0.120)
+                    new_calib_params = get_calib_params(1000, 1000, W/2-0.5, H/2-0.5, baseline=0.120)
                     return self.stereo_.set_calib(new_calib_params.P0[:3,:3], 
                                                               new_calib_params.P1[:3,:3], # K0, K1
                                                               np.zeros(5), np.zeros(5),
@@ -335,7 +335,13 @@ def setup_zed(scale=1.0):
     # calibration = StereoCalibration(input_folder=calib_path)
 
     # Setup one-time calibration
-    calib_params = get_calib_params(702.429138*scale, 702.429138*scale, 652.789368*scale, 360.765472*scale, 0.120)
+    # fx, fy, cx, cy = 702.429138, 702.429138, 652.789368, 360.765472
+    
+    s =  360.0 / 1080.0
+    fx, fy, cx, cy = 1396.555664 * s, 1396.555664 * s, 972.651123 * s, 540.047119 * s
+    print 'fx, fy, cx, cy', fx, fy, cx, cy, scale
+    baseline_px = 84.29
+    calib_params = get_calib_params(fx*scale, fy*scale, cx*scale, cy*scale, baseline=0.12) # baseline_px=baseline_px * scale)
     calib_params.D0 = np.array([0, 0, 0, 0, 0], np.float64)
     # calib_params.D0 = np.array([-0.16, 0, 0, 0, 0], np.float64)
     calib_params.D1 = calib_params.D0
@@ -378,7 +384,7 @@ def setup_zed_dataset(filename, start_idx=0, every_k_frames=1, scale=1):
                              every_k_frames=every_k_frames, scale=scale)
 
     # Setup one-time calibration
-    calib_params = setup_zed(scale=0.5)
+    calib_params = setup_zed(scale=scale)
     dataset.calib = calib_params
     dataset.scale = scale
     return dataset
