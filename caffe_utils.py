@@ -10,6 +10,8 @@ with warnings.catch_warnings():
     warnings.simplefilter("ignore")
     from bot_vision.caffe.detector import Detector, DetectorFastRCNN, nms
 
+from bot_vision.recognition_utils import BOWClassifier
+
 class FastRCNNDescription(object): 
     def __init__(self): 
         
