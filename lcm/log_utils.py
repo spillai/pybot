@@ -259,10 +259,11 @@ class LCMLogReader(LogReader):
             if reverse: 
                 raise RuntimeError('Cannot provide items in reverse when file is not indexed')
 
-            for ev in self._log: 
-                res, msg = self.decode_msg(ev.channel, ev.data, ev.timestamp)
-                if res: yield msg
-
+            for self.idx, ev in enumerate(self._log): 
+                if self.idx > self.start_idx and self.idx % self.every_k_frames == 0: 
+                    res, msg = self.decode_msg(ev.channel, ev.data, ev.timestamp)
+                    if res: yield msg
+                
                 # if ev.channel == self.decoder.channel: 
                 #     self.idx += 1
                 #     if idx % self.every_k_frames == 0: 
