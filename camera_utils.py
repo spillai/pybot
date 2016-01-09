@@ -54,7 +54,8 @@ def get_calib_params(fx, fy, cx, cy, baseline=None, baseline_px=None):
     K0, K1 = P0[:3,:3], P1[:3,:3]
 
     R0, R1 = np.eye(3), np.eye(3)
-    T0, T1 = np.zeros(3), np.float32([-baseline_px, 0, 0])
+    T0, T1 = np.zeros(3), np.float32([baseline, 0, 0])
+    # T0, T1 = np.zeros(3), np.float32([-baseline_px, 0, 0])
 
     Q = np.float32([[-1, 0, 0, cx],
                     [0, -1, 0, cy], 
