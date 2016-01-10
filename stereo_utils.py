@@ -74,14 +74,14 @@ class StereoBM:
 
 
 class FastStereo(object): 
-    def __init__(self, calib, scale=1.0): 
+    def __init__(self, calib, scale=1.0, iterations=1): 
 
         # Stereo Methods: CROSS_RATIO_DISPARITY, TESSELLATED_DISPARITY, PLANAR_INTERP_DISPARITY
         self.stereo = _FastStereo(threshold=10, stereo_method=_FastStereo.TESSELLATED_DISPARITY, lr_consistency_check=True)
         self.stereo.set_calib(calib.K0, calib.K1, 
                          calib.D1, calib.D0, calib.R0, calib.R1, 
                          calib.P0, calib.P1, calib.Q, calib.T1)
-        self.stereo.iterations = 1
+        self.stereo.iterations = iterations
 
         self.calib = calib
         self.scale = scale
@@ -89,10 +89,10 @@ class FastStereo(object):
         # Trackbar
         trackbar_create('cost_threshold', 'disparity', 40, 100, scale=0.01)
         trackbar_create('fast_threshold', 'disparity', 20, 50, scale=1)
-        trackbar_create('iterations', 'disparity', 1, 10, scale=1)
+        trackbar_create('iterations', 'disparity', iterations, 10, scale=1)
 
     def process(self, left_im, right_im): 
-
+        
         # Stereo process
         disp = self.stereo.process(to_gray(left_im), to_gray(right_im))
 
@@ -330,21 +330,59 @@ class CalibratedFastStereo(object):
         return self.stereo_.process(left_im, right_im)
 
 def setup_zed(scale=1.0): 
+    """
+    Run calibration: 
+
+    Scale (0.5): 
+        python calibrate_stereo.py --scale 0.5 --rows 8 --columns 6 --square-size 9.3 zed/data/ zed/calib
+
+    Scale (1.0): 
+        python calibrate_stereo.py --scale 1.0 --rows 8 --columns 6 --square-size 9.3 zed/data/ zed/calib
+    
+    Print calibration: 
+        python bot_vision/calib/print_calib.py zed/calib_1.0
+    """
     # Saved Calibration
     # calib_path = '/home/spillai/perceptual-learning/software/python/bot_vision/calib/zed/calib'
     # calibration = StereoCalibration(input_folder=calib_path)
 
+    # Scale
+    # Determine scale from image width (720p)
+    # scale = float(width) / 720.0
+
     # Setup one-time calibration
     # fx, fy, cx, cy = 702.429138, 702.429138, 652.789368, 360.765472
+    # @ 1080: fx, fy, cx, cy = 1396.555664 * s, 1396.555664 * s, 972.651123 * s, 540.047119 * s
     
-    s =  360.0 / 1080.0
-    fx, fy, cx, cy = 1396.555664 * s, 1396.555664 * s, 972.651123 * s, 540.047119 * s
+    # @ 360p
+    # D0: [-0.0254902 , -0.00319033,  0.        ,  0.        ,  0.03270019]    
+    # D1: [-0.03288394,  0.0149428 ,  0.        ,  0.        ,  0.01202393]
+    # K0: [ 337.10210476,    0.        ,  329.15867687],
+    #     [   0.        ,  337.10210476,  178.30881956],
+    #     [   0.        ,    0.        ,    1.        ]
+
+    # @ 720p
+    # D0: [-0.01704945, -0.01655319,  0.        ,  0.        ,  0.04144856]
+    # D1: [-0.02413693,  0.00169603,  0.        ,  0.        ,  0.023676  ]
+    # K0: [ 677.57005977,    0.        ,  658.49378727],
+    #     [   0.        ,  677.57005977,  358.58253284],
+    #     [   0.        ,    0.        ,    1.        ]
+
+    # @ 360p
+    image_width = 360
+    fx, fy, cx, cy = 337.10210476, 337.10210476, 329.15867687, 178.30881956
+
+    # @ 720p
+    # image_width = 720
+    # fx, fy, cx, cy = 677.57005977463643, 677.57005977463643, 658.49378727401586, 358.58253283725276
     print 'fx, fy, cx, cy', fx, fy, cx, cy, scale
-    baseline_px = 84.29
+
     calib_params = get_calib_params(fx*scale, fy*scale, cx*scale, cy*scale, baseline=0.12) # baseline_px=baseline_px * scale)
     calib_params.D0 = np.array([0, 0, 0, 0, 0], np.float64)
     # calib_params.D0 = np.array([-0.16, 0, 0, 0, 0], np.float64)
     calib_params.D1 = calib_params.D0
+    calib_params.image_width = image_width * scale
+
     return calib_params
 
 def setup_bb(scale=1.0): 
@@ -360,11 +398,12 @@ def stereo_dataset(filename, channel='CAMERA', start_idx=0, every_k_frames=1, sc
                            decoder=StereoImageDecoder(channel=channel,scale=scale), index=False)
     
     def iter_frames(*args, **kwargs):
-        
         for (t, ch, (l,r)) in dataset.iteritems(*args, **kwargs):
-            # h,w = im.shape[:2]
-            # l,r = np.split(im, 2, axis=0)
             yield AttrDict(left=l, right=r)
+
+    def iter_stereo_frames(*args, **kwargs):
+        for (t, ch, (l,r)) in dataset.iteritems(*args, **kwargs):
+            yield l, r
             
     def iter_gt_frames(*args, **kwargs): 
         gt = StereoSGBM()
@@ -375,6 +414,7 @@ def stereo_dataset(filename, channel='CAMERA', start_idx=0, every_k_frames=1, sc
             yield AttrDict(left=l, right=r, noc=disp, occ=disp)
             
     dataset.iter_frames = iter_frames
+    dataset.iter_stereo_frames = iter_stereo_frames
     dataset.iter_gt_frames = iter_gt_frames
     return dataset
 
