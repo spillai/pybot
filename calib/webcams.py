@@ -89,9 +89,15 @@ class CustomStereoPair(object):
         if name == 'bb': 
             self.capture = DC1394Device()
             self.capture.init()
-        elif name == 'zed': 
+        elif name == 'zed-sdk': 
             self.capture = ZEDDevice('720')
             self.capture.init()
+        elif name == 'zed': 
+            # try: 
+            self.capture = cv2.VideoCapture(int(devices))
+
+            # except: 
+            #     raise RuntimeError('Failed to open ZED camera via UVC')
         else: 
             raise RuntimeError('Unknown stereo camera name: %s' % name)
 
@@ -124,6 +130,65 @@ class CustomStereoPair(object):
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
 
+class BaseStereoPair(object): 
+    def __init__(self): 
+        """
+        Base stereo pair
+        Setup windows and basic stereo pair utilities
+        """
+
+        #: Window names for showing captured frame from each camera
+        self.windows = ["{} camera".format(side) for side in ("Left", "Right")]
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, type, value, traceback):
+        pass
+
+    def show_frames(self, wait=0):
+        """
+        Show current frames from cameras.
+
+        ``wait`` is the wait interval before the window closes.
+        """
+        imshow_cv('stereo', np.hstack([frame for window, frame in zip(self.windows, self.get_frames())]))
+
+    def show_videos(self):
+        """Show video from cameras."""
+        while True:
+            self.show_frames(1)
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
+
+    def get_frames(self):
+        """Get current frames from cameras."""
+        raise NotImplementedError    
+
+class ZEDStereoPair(BaseStereoPair): 
+    def __init__(self, device=None): 
+        """
+        Initialize ZED stereo pair from UVC or via SDK.
+
+        ``devices`` is an iterable containing the device numbers.
+        """
+        BaseStereoPair.__init__(self)
+
+        #: Video captures associated with the ``StereoPair``
+        if device is None:
+            self.capture = ZEDDevice('720')
+            self.capture.init()
+        else: 
+            try: 
+                self.capture = cv2.VideoCapture(int(device))
+            except: 
+                raise RuntimeError('Failed to open ZED camera via UVC')
+
+    def get_frames(self):
+        """Get current frames from cameras."""
+        ret, im = self.capture.read()
+        l, r = np.split(im, 2, axis=1)
+        return l, r
 
 def main():
     """
@@ -145,8 +210,9 @@ def main():
                         help="Interval (s) to take pictures in.")
     args = parser.parse_args()
 
-    # with LiveStereoPair(name='zed') as pair:
-    with StereoPair('webcam', args.devices) as pair:
+    with ZEDStereoPair(device=args.devices[0]) as pair: 
+    # with CustomStereoPair(name='zed', devices=args.devices[0]) as pair:
+    # with StereoPair('webcam', args.devices) as pair:
         if not args.output_folder:
             pair.show_videos()
         else:
