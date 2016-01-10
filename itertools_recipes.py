@@ -1,6 +1,6 @@
 from itertools import *
 
-def take(n, iterable):
+def take(iterable, n):
     "Return first n items of the iterable as a list"
     return list(islice(iterable, n))
 
