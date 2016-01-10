@@ -46,12 +46,14 @@ def find_files(folder):
     return files
 
 def get_stereo_calibration_params(input_folder=None): 
-    P0 = np.load(os.path.join(input_folder, 'proj_mats_left.npy'))
+    K0 = np.load(os.path.join(input_folder, 'cam_mats_left.npy'))
+    K1 = np.load(os.path.join(input_folder, 'cam_mats_right.npy'))
     Q = np.load(os.path.join(input_folder, 'disp_to_depth_mat.npy')) 
-    fx, fy, cx, cy = P0[0,0], P0[1,1], P0[0,3], P0[1,3]
+    fx, fy, cx, cy = K0[0,0], K0[1,1], K0[0,2], K0[1,2]
     baseline = -1/Q[3,2]
     return dict(fx=fx, fy=fy, cx=cx, cy=cy, baseline=baseline,
-                P0=P0, 
+                K0=K0, K1=K1, 
+                P0=np.load(os.path.join(input_folder, 'proj_mats_left.npy')), 
                 P1=np.load(os.path.join(input_folder, 'proj_mats_right.npy')), 
                 D0=np.load(os.path.join(input_folder, 'dist_coefs_left.npy')), 
                 D1=np.load(os.path.join(input_folder, 'dist_coefs_right.npy')), 
@@ -280,10 +282,10 @@ class StereoCalibrator(object):
                                                         calib.rect_trans[side],
                                                         calib.proj_mats[side],
                                                         self.image_size, cv2.CV_32FC1)
+
         # This is replaced because my results were always bad. Estimates are
         # taken from the OpenCV samples.
         width, height = self.image_size
-        # focal_length = 0.8 * width
         calib.disp_to_depth_mat = np.float32([[1, 0, 0, -0.5 * width],
                                               [0, -1, 0, 0.5 * height],
                                               [0, 0, 0, -calib.cam_mats["left"][0,0]],
@@ -350,13 +352,17 @@ def calibrate_folder(args):
     while args.input_files:
         left, right = args.input_files[:2]
         im_left, im_right = cv2.imread(left), cv2.imread(right)
+        im_left, im_right = im_resize(im_left, scale=args.scale, interpolation=cv2.INTER_CUBIC), \
+                            im_resize(im_right, scale=args.scale, interpolation=cv2.INTER_CUBIC)
+        print 'Image: {:}, Calib. Resolution: {}'.format(args.scale, im_left.shape)
         calibrator.add_corners((im_left, im_right),
                                write_path=os.path.join(args.output_folder, os.path.basename(left).replace('left', 'debug_%s')))
         args.input_files = args.input_files[2:]
-        imshow_cv('left/right', np.hstack([im_left, im_right]), block=True)
+        if args.show_chessboards: 
+            imshow_cv('left/right', np.hstack([im_left, im_right]), block=True)
         progress.update(progress.maxval - len(args.input_files))
-
         # mosaic.append(im_pad(im_resize(np.hstack([im_left, im_right]), scale=0.125), pad=3))
+
     progress.finish()
 
     st = time.time()
@@ -397,6 +403,7 @@ def main():
                         "that should be calibrated.")
     parser.add_argument("output_folder", help="Folder to write calibration "
                         "files to.", default="/tmp/")
+    parser.add_argument("--scale", help="Scale of images", type=float, default=1.0)
     parser.add_argument("--show-chessboards", help="Display detected "
                         "chessboard corners.", action="store_true")
     args = parser.parse_args()
