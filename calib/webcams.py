@@ -7,128 +7,13 @@ import time
 import numpy as np
 
 import cv2
+
+from bot_utils.io_utils import VideoCapture
 from bot_vision.image_utils import to_gray
 from bot_vision.imshow_utils import imshow_cv
 
-# from pybot_drivers import DC1394Device, ZEDDevice
+# 
 
-class StereoPair(object):
-    """
-    A stereo pair of cameras.
-
-    Should be initialized with a context manager to ensure that the cameras are
-    freed properly after use.
-    """
-
-    def __init__(self, name, devices):
-        """
-        Initialize cameras.
-
-        ``devices`` is an iterable containing the device numbers.
-        """
-        #: Video captures associated with the ``StereoPair``
-        self.captures = [cv2.VideoCapture(device) for device in devices]
-        
-        # for cap in self.captures: 
-        #     cap.set(cv2.cv.CV_CAP_PROP_FPS, 10)
-        # print('Setting capture rate to 10 Hz')
-
-        #: Window names for showing captured frame from each camera
-        self.windows = ["{} camera".format(side) for side in ("Left", "Right")]
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, type, value, traceback):
-        for capture in self.captures:
-            capture.release()
-        for window in self.windows:
-            cv2.destroyWindow(window)
-
-    def get_frames(self):
-        """Get current frames from cameras."""
-        return [cv2.transpose(capture.read()[1]) if idx == 0 else 
-                cv2.flip(cv2.transpose(capture.read()[1]), -1) for idx, capture in enumerate(self.captures)]
-
-    # def get_frames(self):
-    #     """Get current frames from cameras."""
-    #     return [capture.read()[1] for idx, capture in enumerate(self.captures)]
-
-    def show_frames(self, wait=0):
-        """
-        Show current frames from cameras.
-
-        ``wait`` is the wait interval before the window closes.
-        """
-        for window, frame in zip(self.windows, self.get_frames()):
-            cv2.imshow(window, frame)
-        cv2.waitKey(wait)
-
-    def show_videos(self):
-        """Show video from cameras."""
-        while True:
-            self.show_frames(1)
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                break
-
-class CustomStereoPair(object):
-    """
-    A stereo pair of cameras.
-
-    Should be initialized with a context manager to ensure that the cameras are
-    freed properly after use.
-    """
-
-    def __init__(self, name='bb', devices=None):
-        """
-        Initialize cameras.
-
-        ``devices`` is an iterable containing the device numbers.
-        """
-        #: Video captures associated with the ``StereoPair``
-        if name == 'bb': 
-            self.capture = DC1394Device()
-            self.capture.init()
-        elif name == 'zed-sdk': 
-            self.capture = ZEDDevice('720')
-            self.capture.init()
-        elif name == 'zed': 
-            # try: 
-            self.capture = cv2.VideoCapture(int(devices))
-
-            # except: 
-            #     raise RuntimeError('Failed to open ZED camera via UVC')
-        else: 
-            raise RuntimeError('Unknown stereo camera name: %s' % name)
-
-        #: Window names for showing captured frame from each camera
-        self.windows = ["{} camera".format(side) for side in ("Left", "Right")]
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, type, value, traceback):
-        pass
-
-    def get_frames(self):
-        """Get current frames from cameras."""
-        l,r = self.capture.getImages()
-        return to_gray(l), to_gray(r)
-
-    def show_frames(self, wait=0):
-        """
-        Show current frames from cameras.
-
-        ``wait`` is the wait interval before the window closes.
-        """
-        imshow_cv('stereo', np.hstack([frame for window, frame in zip(self.windows, self.get_frames())]))
-
-    def show_videos(self):
-        """Show video from cameras."""
-        while True:
-            self.show_frames(1)
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                break
 
 class BaseStereoPair(object): 
     def __init__(self): 
@@ -165,6 +50,7 @@ class BaseStereoPair(object):
         """Get current frames from cameras."""
         raise NotImplementedError    
 
+
 class ZEDStereoPair(BaseStereoPair): 
     def __init__(self, device=None): 
         """
@@ -176,19 +62,183 @@ class ZEDStereoPair(BaseStereoPair):
 
         #: Video captures associated with the ``StereoPair``
         if device is None:
+            from pybot_drivers import ZEDDevice
             self.capture = ZEDDevice('720')
             self.capture.init()
         else: 
             try: 
-                self.capture = cv2.VideoCapture(int(device))
+                self.capture = VideoCapture(filename=int(device), fps=60, size=(2560,720))
             except: 
                 raise RuntimeError('Failed to open ZED camera via UVC')
 
     def get_frames(self):
         """Get current frames from cameras."""
-        ret, im = self.capture.read()
+        im = self.capture.get()
         l, r = np.split(im, 2, axis=1)
-        return l, r
+        return to_gray(l), to_gray(r)
+
+class UVCStereoPair(BaseStereoPair): 
+    def __init__(self, device=None): 
+        """
+        Initialize ZED stereo pair from UVC or via SDK.
+        """
+        BaseStereoPair.__init__(self)
+
+        #: Video captures associated with the ``StereoPair``
+        self.captures = [cv2.VideoCapture(device) for device in devices]
+        
+        # for cap in self.captures: 
+        #     cap.set(cv2.cv.CV_CAP_PROP_FPS, 10)
+        # print('Setting capture rate to 10 Hz')
+
+    def __exit__(self, type, value, traceback):
+        for capture in self.captures:
+            capture.release()
+        for window in self.windows:
+            cv2.destroyWindow(window)
+
+    def get_frames(self):
+        """Get current frames from cameras."""
+        return [cv2.transpose(capture.read()[1]) if idx == 0 else 
+                cv2.flip(cv2.transpose(capture.read()[1]), -1) for idx, capture in enumerate(self.captures)]
+
+class BBStereoPair(BaseStereoPair): 
+    def __init__(self, device=None): 
+        """
+        Initialize BB stereo pair from FireWire.
+        """
+        BaseStereoPair.__init__(self)
+
+        try: 
+            from pybot_drivers import DC1394Device
+            self.capture = DC1394Device()
+            self.capture.init()
+        except: 
+            raise RuntimeError('Failed to open BB camera via FireWire')
+
+    def get_frames(self):
+        """Get current frames from cameras."""
+        l,r = self.capture.getImages()
+        return to_gray(l), to_gray(r)
+
+
+# class StereoPair(object):
+#     """
+#     A stereo pair of cameras.
+
+#     Should be initialized with a context manager to ensure that the cameras are
+#     freed properly after use.
+#     """
+
+#     def __init__(self, name, devices):
+#         """
+#         Initialize cameras.
+
+#         ``devices`` is an iterable containing the device numbers.
+#         """
+#         #: Video captures associated with the ``StereoPair``
+#         self.captures = [cv2.VideoCapture(device) for device in devices]
+        
+#         # for cap in self.captures: 
+#         #     cap.set(cv2.cv.CV_CAP_PROP_FPS, 10)
+#         # print('Setting capture rate to 10 Hz')
+
+#         #: Window names for showing captured frame from each camera
+#         self.windows = ["{} camera".format(side) for side in ("Left", "Right")]
+
+#     def __enter__(self):
+#         return self
+
+#     def __exit__(self, type, value, traceback):
+#         for capture in self.captures:
+#             capture.release()
+#         for window in self.windows:
+#             cv2.destroyWindow(window)
+
+#     def get_frames(self):
+#         """Get current frames from cameras."""
+#         return [cv2.transpose(capture.read()[1]) if idx == 0 else 
+#                 cv2.flip(cv2.transpose(capture.read()[1]), -1) for idx, capture in enumerate(self.captures)]
+
+#     # def get_frames(self):
+#     #     """Get current frames from cameras."""
+#     #     return [capture.read()[1] for idx, capture in enumerate(self.captures)]
+
+#     def show_frames(self, wait=0):
+#         """
+#         Show current frames from cameras.
+
+#         ``wait`` is the wait interval before the window closes.
+#         """
+#         for window, frame in zip(self.windows, self.get_frames()):
+#             cv2.imshow(window, frame)
+#         cv2.waitKey(wait)
+
+#     def show_videos(self):
+#         """Show video from cameras."""
+#         while True:
+#             self.show_frames(1)
+#             if cv2.waitKey(1) & 0xFF == ord('q'):
+#                 break
+
+# class CustomStereoPair(object):
+#     """
+#     A stereo pair of cameras.
+
+#     Should be initialized with a context manager to ensure that the cameras are
+#     freed properly after use.
+#     """
+
+#     def __init__(self, name='bb', devices=None):
+#         """
+#         Initialize cameras.
+
+#         ``devices`` is an iterable containing the device numbers.
+#         """
+#         #: Video captures associated with the ``StereoPair``
+#         if name == 'bb': 
+#             self.capture = DC1394Device()
+#             self.capture.init()
+#         elif name == 'zed-sdk': 
+#             self.capture = ZEDDevice('720')
+#             self.capture.init()
+#         elif name == 'zed': 
+#             # try: 
+#             self.capture = cv2.VideoCapture(int(devices))
+
+#             # except: 
+#             #     raise RuntimeError('Failed to open ZED camera via UVC')
+#         else: 
+#             raise RuntimeError('Unknown stereo camera name: %s' % name)
+
+#         #: Window names for showing captured frame from each camera
+#         self.windows = ["{} camera".format(side) for side in ("Left", "Right")]
+
+#     def __enter__(self):
+#         return self
+
+#     def __exit__(self, type, value, traceback):
+#         pass
+
+#     def get_frames(self):
+#         """Get current frames from cameras."""
+#         l,r = self.capture.getImages()
+#         return to_gray(l), to_gray(r)
+
+#     def show_frames(self, wait=0):
+#         """
+#         Show current frames from cameras.
+
+#         ``wait`` is the wait interval before the window closes.
+#         """
+#         imshow_cv('stereo', np.hstack([frame for window, frame in zip(self.windows, self.get_frames())]))
+
+#     def show_videos(self):
+#         """Show video from cameras."""
+#         while True:
+#             self.show_frames(1)
+#             if cv2.waitKey(1) & 0xFF == ord('q'):
+#                 break
 
 def main():
     """
@@ -201,6 +251,8 @@ def main():
     """
     parser = argparse.ArgumentParser(description="Show video from two "
                                      "webcams.\n\nPress 'q' to exit.")
+    parser.add_argument("--device", type=str, default="uvc", 
+                        help="Device name (zed, bb, uvc)")
     parser.add_argument("devices", type=int, nargs=2, help="Device numbers "
                         "for the cameras that should be accessed in order "
                         " (left, right).")
@@ -209,10 +261,19 @@ def main():
     parser.add_argument("--interval", type=float, default=1,
                         help="Interval (s) to take pictures in.")
     args = parser.parse_args()
+    
+    if args.device == 'uvc': 
+        device_setup = lambda: UVCStereoPair(devices=args.devices)
+    elif args.device == 'zed': 
+        device_setup = lambda: ZEDStereoPair(device=args.devices[0])
+    elif args.device == 'zed-gpu': 
+        device_setup = lambda: ZEDStereoPair(device=None)
+    elif args.device == 'bb': 
+        device_setup = lambda: BBStereoPair()
+    else: 
+        raise RuntimeError('Unknown stereo device')
 
-    with ZEDStereoPair(device=args.devices[0]) as pair: 
-    # with CustomStereoPair(name='zed', devices=args.devices[0]) as pair:
-    # with StereoPair('webcam', args.devices) as pair:
+    with device_setup() as pair:     
         if not args.output_folder:
             pair.show_videos()
         else:
