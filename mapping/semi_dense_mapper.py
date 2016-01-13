@@ -199,6 +199,7 @@ class LSDMapper(Mapper):
         #     print 'vis', vis.shape
         #     # imshow_cv('vis', vis)
 
+        return T
 
     def optimize(self): 
         # Final optimization on keyframes/map
@@ -243,9 +244,15 @@ class ORBMapper(Mapper):
 
         print 'Keyframes: ', len(self.keyframes), 'Poses: ', len(self.poses)
 
-    def process(self, im): 
+    def initialize_baseline(self, Tcw): 
+        self.slam.initialize_baseline(Tcw)
+
+    def process(self, im, right=None): 
         # Process input frame
-        self.slam.process(im)
+        if right is None: 
+            self.slam.process(im)
+        else: 
+            self.slam.process_stereo(im, right)
         
         # Retain intermediate poses
         Tcw = self.slam.getCurrentPoseEstimate()
@@ -254,12 +261,14 @@ class ORBMapper(Mapper):
             pose_cw = RigidTransform.from_homogenous_matrix(Tcw)
             pose_wc = pose_cw.inverse()
         except: 
-            return
+            return 
 
         # Add pose to map
         self.add(pose_wc)
 
         imshow_cv('orb-slam', im)
+
+        return Tcw
     
 class MultiViewMapper(Mapper): 
     """ 

@@ -73,43 +73,6 @@ class StereoBM:
         return self.bm.compute(left, right).astype(np.float32) / 16.0
 
 
-class FastStereo(object): 
-    def __init__(self, calib, scale=1.0, iterations=1): 
-
-        # Stereo Methods: CROSS_RATIO_DISPARITY, TESSELLATED_DISPARITY, PLANAR_INTERP_DISPARITY
-        self.stereo = _FastStereo(threshold=10, stereo_method=_FastStereo.TESSELLATED_DISPARITY, lr_consistency_check=True)
-        self.stereo.set_calib(calib.K0, calib.K1, 
-                         calib.D1, calib.D0, calib.R0, calib.R1, 
-                         calib.P0, calib.P1, calib.Q, calib.T1)
-        self.stereo.iterations = iterations
-
-        self.calib = calib
-        self.scale = scale
-
-        # Trackbar
-        trackbar_create('cost_threshold', 'disparity', 40, 100, scale=0.01)
-        trackbar_create('fast_threshold', 'disparity', 20, 50, scale=1)
-        trackbar_create('iterations', 'disparity', iterations, 10, scale=1)
-
-    def process(self, left_im, right_im): 
-        
-        # Stereo process
-        disp = self.stereo.process(to_gray(left_im), to_gray(right_im))
-
-        # Display colored depth
-        vis = scaled_color_disp(disp / self.scale, 32)
-        imshow_cv("disparity", im_resize(vis, scale=1/self.scale))
-        
-        # Update cost threshold for visualization
-        self.stereo.fast_threshold = trackbar_value(key='fast_threshold')
-        self.stereo.cost_threshold = trackbar_value(key='cost_threshold')
-        self.stereo.iterations = trackbar_value(key='iterations')
-
-    def evaluate(self, gt_disp): 
-        imshow_cv("gt", scaled_color_disp(gt_disp))               
-        # imshow_cv("gt", gt_disp)
-
-
 # class VoxelStereoBM: 
 #     def __init__(self, discretize=1, do_sgm=True): 
 #         self.discretize = discretize
@@ -392,10 +355,20 @@ def setup_bb(scale=1.0):
     calib_params = AttrDict(get_stereo_calibration_params(input_folder=calib_path))
     return calib_params
 
-def stereo_dataset(filename, channel='CAMERA', start_idx=0, every_k_frames=1, scale=1): 
+def setup_ps3eye(scale=1.0): 
+    # Setup one-time calibration
+    calib_path = '/home/spillai/perceptual-learning/software/python/bot_vision/calib/ps3_stereo/calib'
+    calibration = StereoCalibration(input_folder=calib_path)
+    calib_params = AttrDict(get_stereo_calibration_params(input_folder=calib_path))
+    return calib_params
+
+def stereo_dataset(filename, channel='CAMERA', start_idx=0, every_k_frames=1, max_length=None, scale=1, split='vertical'): 
     from bot_externals.lcm.log_utils import LCMLogReader, ImageDecoder, StereoImageDecoder
-    dataset = LCMLogReader(filename=filename, start_idx=start_idx, every_k_frames=every_k_frames, 
-                           decoder=StereoImageDecoder(channel=channel,scale=scale), index=False)
+    dataset = LCMLogReader(filename=filename, start_idx=start_idx, 
+                           max_length=max_length, every_k_frames=every_k_frames, 
+                           index=False, 
+                           decoder=StereoImageDecoder(channel=channel,
+                                                      scale=scale, split=split))
     
     def iter_frames(*args, **kwargs):
         for (t, ch, (l,r)) in dataset.iteritems(*args, **kwargs):
@@ -418,9 +391,9 @@ def stereo_dataset(filename, channel='CAMERA', start_idx=0, every_k_frames=1, sc
     dataset.iter_gt_frames = iter_gt_frames
     return dataset
 
-def setup_zed_dataset(filename, start_idx=0, every_k_frames=1, scale=1): 
+def setup_zed_dataset(filename, start_idx=0, max_length=None, every_k_frames=1, scale=1): 
     dataset = stereo_dataset(filename=filename, 
-                             channel='CAMERA', start_idx=start_idx, 
+                             channel='CAMERA', start_idx=start_idx, max_length=max_length, 
                              every_k_frames=every_k_frames, scale=scale)
 
     # Setup one-time calibration
@@ -429,11 +402,23 @@ def setup_zed_dataset(filename, start_idx=0, every_k_frames=1, scale=1):
     dataset.scale = scale
     return dataset
  
-def setup_bb_dataset(filename, start_idx=0, every_k_frames=1, scale=1): 
-    dataset = stereo_dataset(filename=filename, start_idx=start_idx,
+def setup_bb_dataset(filename, start_idx=0, every_k_frames=1, max_length=None, scale=1): 
+    dataset = stereo_dataset(filename=filename, start_idx=start_idx, max_length=max_length, 
                              channel='CAMERA', every_k_frames=every_k_frames, scale=scale)
     
     # Setup one-time calibration
     calib_params = setup_bb(scale=scale)
     dataset.calib = calib_params
+    return dataset
+
+
+def setup_ps3eye_dataset(filename, start_idx=0, max_length=None, every_k_frames=1, scale=1): 
+    dataset = stereo_dataset(filename=filename, 
+                             channel='CAMERA', start_idx=start_idx, max_length=max_length, 
+                             every_k_frames=every_k_frames, scale=scale, split='horizontal')
+
+    # Setup one-time calibration
+    calib_params = setup_ps3eye(scale=scale)
+    dataset.calib = calib_params
+    dataset.scale = scale
     return dataset
