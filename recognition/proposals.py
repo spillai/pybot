@@ -12,16 +12,6 @@ class ObjectProposal(object):
         prop = ObjectProposal.create('GOP', params)
         bboxes = prop.process(im)
     """
-    @staticmethod
-    def create(method='GOP', scale=1, params=None): 
-        if method == 'GOP': 
-            return ScaledObjectProposal(GOPObjectProposal(**params), scale=scale)
-        elif method == 'BING': 
-            return ScaledObjectProposal(BINGObjectProposal(**params), scale=scale)
-        else: 
-            raise RuntimeError('Unknown proposals method: %s' % method)
-
-class ScaledObjectProposal(ObjectProposal): 
     def __init__(self, proposer, scale=1): 
         self.proposer_ = proposer
         self.scale_ = scale
@@ -30,7 +20,16 @@ class ScaledObjectProposal(ObjectProposal):
         boxes = self.proposer_.process(im_resize(im, scale=self.scale_))
         return (boxes * 1 / self.scale_).astype(np.int32)
 
-class GOPObjectProposal(ObjectProposal): 
+    @classmethod
+    def create(cls, method='GOP', scale=1, params=None): 
+        if method == 'GOP': 
+            return cls(GOPObjectProposal(**params), scale=scale)
+        elif method == 'BING': 
+            return cls(BINGObjectProposal(**params), scale=scale)
+        else: 
+            raise RuntimeError('Unknown proposals method: %s' % method)
+
+class GOPObjectProposal(object): 
     def __init__(self, detector='sf', num_proposals=1000): 
         gop_data_dir = """/home/spillai/perceptual-learning/software/externals/recognition-pod/proposals/gop/data/"""
         self.prop_ = gop.proposals.Proposal( gop_setuplearned( 140, 4, 0.8, gop_data_dir=gop_data_dir ) )
@@ -52,7 +51,7 @@ class GOPObjectProposal(ObjectProposal):
         b = self.prop_.propose( s )
         return s.maskToBox( b )
 
-# class BINGObjectProposal(ObjectProposal): 
+# class BINGObjectProposal(object): 
 #     def __init__(self, voc_dir, num_proposals=10): 
 #         self.proposer_ = BINGObjectness()
 #         self.num_proposals_ = num_proposals

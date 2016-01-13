@@ -285,8 +285,6 @@ class HistogramClassifier(BOWClassifier):
         db = AttrDict.load(path)
         return cls.from_dict(db)
 
-
-
 class ObjectClassifier(object): 
     """
     Usage: 
