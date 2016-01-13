@@ -232,6 +232,7 @@ def setupLearned(N_S,N_T,max_iou=0.85,N_MASKS=3,SEED_PROPOSAL=False, gop_data_di
     from gop import proposals
     prop_settings = proposals.ProposalSettings()
     prop_settings.max_iou = max_iou
+
     # Load the seeds
     seed = proposals.LearnedSeed()
     seed.load( os.path.join(gop_data_dir, 'seed_final.dat') )
