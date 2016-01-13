@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 import os, fnmatch, time
 import re
-from itertools import izip, imap, chain
+from itertools import izip, imap, chain, islice
 from collections import defaultdict, namedtuple
 
 from bot_vision.image_utils import im_resize
@@ -79,6 +79,17 @@ def read_dir(directory, pattern='*.png', recursive=True, expected=None, verbose=
         return list(chain([fn for fns in fn_map.values() for fn in fns]))
     return fn_map
 
+
+class FileReader(object): 
+    def __init__(self, filename, process_cb): 
+        self.filename = filename
+        self.items = process_cb(filename)
+
+    def iteritems(self, every_k_frames=1, reverse=False): 
+        if reverse: 
+            raise NotImplementedError
+        return islice(self.items, 0, None, every_k_frames)
+
 class DatasetReader(object): 
     """
     Simple Dataset Reader
@@ -118,7 +129,8 @@ class DatasetReader(object):
         
         print('Found {:} files with pattern: {:}'.format(nmatches, pattern))
         print self.files[-1]
-        # print('First file: {:}: {:}'.format(template % start_idx, 'GOOD' if os.path.exists(template % start_idx) else 'BAD'))
+        # print('First file: {:}: {:}'.format(template % start_idx, 'GOOD' if
+        # os.path.exists(template % start_idx) else 'BAD'))
 
     @staticmethod
     def from_filenames(process_cb, files): 

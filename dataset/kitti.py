@@ -3,9 +3,11 @@ import numpy as np
 import cv2
 
 from itertools import izip, repeat
+from bot_utils.misc import setup_pbar
 from bot_utils.db_utils import AttrDict
 from bot_utils.dataset_readers import natural_sort, \
-    DatasetReader, ImageDatasetReader, StereoDatasetReader, VelodyneDatasetReader
+    FileReader, DatasetReader, ImageDatasetReader, \
+    StereoDatasetReader, VelodyneDatasetReader
 
 from .kitti_helpers import kitti_stereo_calib_params, kitti_load_poses
 
@@ -38,7 +40,7 @@ class KITTIDatasetReader(object):
         # Read poses
         try: 
             pose_fn = os.path.join(os.path.expanduser(directory), 'poses', ''.join([sequence, '.txt']))
-            self.poses = kitti_load_poses(fn=pose_fn)
+            self.poses = FileReader(pose_fn, process_cb=kitti_load_poses)
         except: 
             self.poses = repeat(None)
 
@@ -69,7 +71,7 @@ class KITTIDatasetReader(object):
                     self.velodyne.iteritems(*args, **kwargs))
 
     def iter_frames(self, *args, **kwargs): 
-        for (left, right), pose in izip(self.iter_stereo_frames(*args, **kwargs), self.poses): 
+        for (left, right), pose in izip(self.iter_stereo_frames(*args, **kwargs), self.poses.iteritems(*args, **kwargs)): 
             yield AttrDict(left=left, right=right, velodyne=None, pose=pose)
 
     @property
@@ -112,10 +114,25 @@ class KITTIDatasetReader(object):
         for (left, right), noc, occ, pose in izip(self.iter_stereo_frames(*args, **kwargs), 
                                                   self.noc.iteritems(*args, **kwargs), 
                                                   self.occ.iteritems(*args, **kwargs), 
-                                                  self.poses): 
+                                                  self.iteritems(*args, **kwargs)): 
             yield AttrDict(left=left, right=right, velodyne=None, 
                            noc=(noc/256).astype(np.float32), 
                            occ=(occ/256).astype(np.float32), pose=pose)
+
+    @classmethod
+    def iterscenes(cls, sequences, directory='', 
+                   left_template='image_0/%06i.png', right_template='image_1/%06i.png', 
+                   velodyne_template='velodyne/%06i.bin', start_idx=0, max_files=50000, 
+                   scale=1.0, verbose=False): 
+
+        pbar = setup_pbar(len(sequences)) if verbose else None
+        for seq in sequences: 
+            if verbose: pbar.increment()
+            yield seq, cls(
+                directory=directory, sequence=seq, left_template=left_template, 
+                right_template=right_template, velodyne_template=velodyne_template, 
+                start_idx=start_idx, max_files=max_files)
+        if verbose: pbar.finish()
 
 class KITTIRawDatasetReader(KITTIDatasetReader): 
     """
@@ -143,7 +160,7 @@ class KITTIRawDatasetReader(KITTIDatasetReader):
         # Read poses
         try: 
             pose_fn = os.path.join(os.path.expanduser(directory), 'poses', ''.join([sequence, '.txt']))
-            self.poses = kitti_load_poses(fn=pose_fn)
+            self.poses = FileReader(pose_fn, process_cb=kitti_load_poses)
         except: 
             self.poses = repeat(None)
             
@@ -168,7 +185,9 @@ class KITTIRawDatasetReader(KITTIDatasetReader):
             self.oxts = repeat(None)
         
     def iter_frames(self, *args, **kwargs): 
-        for (left, right), pose, oxt in izip(self.iter_stereo_frames(*args, **kwargs), self.poses, self.oxts.iteritems()): 
+        for (left, right), pose, oxt in izip(self.iter_stereo_frames(*args, **kwargs), 
+                                             self.poses.iteritems(*args, **kwargs), 
+                                             self.oxts.iteritems(*args, **kwargs)): 
             yield AttrDict(left=left, right=right, velodyne=None, pose=pose, oxt=AttrDict(zip(self.oxt_formats, oxt)))
     
     @property

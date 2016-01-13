@@ -267,7 +267,7 @@ class IterDB(object):
             self.keys_.add(field)
 
     def append(self, key, item): 
-        if len(self.data_[key]) == self.batch_size_: 
+        if len(self.data_[key]) >= self.batch_size_: 
             self.flush()
         self.data_[key].append(item)
         # print [(k, len(v)) for k,v in self.data_.iteritems()]
@@ -288,6 +288,7 @@ class IterDB(object):
 
         inds = np.sort(inds) if inds is not None else None
         for chunk_idx, chunk in enumerate(self.meta_file_.chunks): 
+            print chunk_idx
             data = AttrDict.load(self.get_chunk_filename(chunk_idx))
             if verbose: pbar.increment()
         
