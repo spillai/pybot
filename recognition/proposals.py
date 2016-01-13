@@ -1,9 +1,15 @@
-import warnings
 
-with warnings.catch_warnings():
-    warnings.simplefilter("ignore")
-    import gop
-    from bot_vision.recognition.gop_util import setupLearned as gop_setuplearned
+import cv2
+import numpy as np
+
+from bot_vision.image_utils import im_resize
+
+import os.path
+import warnings
+# with warnings.catch_warnings():
+#     warnings.simplefilter("ignore")
+import gop
+from bot_vision.recognition.gop_util import setupLearned as gop_setuplearned
 
 class ObjectProposal(object): 
     """
@@ -15,14 +21,25 @@ class ObjectProposal(object):
     def __init__(self, proposer, scale=1): 
         self.proposer_ = proposer
         self.scale_ = scale
+        
+        if not hasattr(self.proposer_, 'process'): 
+            raise NotImplementedError('Proposer does not have process implemented')
 
     def process(self, im): 
         boxes = self.proposer_.process(im_resize(im, scale=self.scale_))
         return (boxes * 1 / self.scale_).astype(np.int32)
 
+    @staticmethod
+    def visualize(vis, bboxes): 
+        for b in bboxes: 
+            cv2.rectangle(vis, (b[0], b[1]), (b[2], b[3]), (200,200,200), 2)
+        return vis
+
     @classmethod
     def create(cls, method='GOP', scale=1, params=None): 
         if method == 'GOP': 
+            params = dict(detector='sobel', num_proposals=300) \
+                     if params is None else params
             return cls(GOPObjectProposal(**params), scale=scale)
         elif method == 'BING': 
             return cls(BINGObjectProposal(**params), scale=scale)
@@ -46,7 +63,6 @@ class GOPObjectProposal(object):
 
     def process(self, im): 
         im_ = gop.imgproc.npread(np.copy(im))
-        st = time.time()
         s = gop.segmentation.geodesicKMeans( im_, self.segmenter_, self.num_proposals_ )
         b = self.prop_.propose( s )
         return s.maskToBox( b )
