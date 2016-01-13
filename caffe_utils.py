@@ -1,6 +1,7 @@
 
 from fast_rcnn.config import cfg
-
+import os
+import warnings
 with warnings.catch_warnings():
     warnings.simplefilter("ignore")
     from bot_vision.caffe.detector import Detector, DetectorFastRCNN, nms
