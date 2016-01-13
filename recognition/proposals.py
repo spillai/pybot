@@ -6,10 +6,10 @@ from bot_vision.image_utils import im_resize
 
 import os.path
 import warnings
-# with warnings.catch_warnings():
-#     warnings.simplefilter("ignore")
-import gop
-from bot_vision.recognition.gop_util import setupLearned as gop_setuplearned
+with warnings.catch_warnings():
+    warnings.simplefilter("ignore")
+    import gop
+    from bot_vision.recognition.gop_util import setupLearned as gop_setuplearned
 
 class ObjectProposal(object): 
     """
@@ -36,9 +36,9 @@ class ObjectProposal(object):
         return vis
 
     @classmethod
-    def create(cls, method='GOP', scale=1, params=None): 
+    def create(cls, method='GOP', scale=1, num_proposals=1000, params=None): 
         if method == 'GOP': 
-            params = dict(detector='sobel', num_proposals=300) \
+            params = dict(detector='sobel', num_proposals=num_proposals) \
                      if params is None else params
             return cls(GOPObjectProposal(**params), scale=scale)
         elif method == 'BING': 
@@ -47,7 +47,7 @@ class ObjectProposal(object):
             raise RuntimeError('Unknown proposals method: %s' % method)
 
 class GOPObjectProposal(object): 
-    def __init__(self, detector='sf', num_proposals=1000): 
+    def __init__(self, detector='sobel', num_proposals=300): 
         gop_data_dir = """/home/spillai/perceptual-learning/software/externals/recognition-pod/proposals/gop/data/"""
         self.prop_ = gop.proposals.Proposal( gop_setuplearned( 140, 4, 0.8, gop_data_dir=gop_data_dir ) )
 
@@ -62,10 +62,26 @@ class GOPObjectProposal(object):
         self.num_proposals_ = num_proposals
 
     def process(self, im): 
+        # To get the 0th proposal segment: b[0, s.s]
+        # segmented = np.zeros(shape=s.s.shape[:2], dtype=np.uint8)
+
         im_ = gop.imgproc.npread(np.copy(im))
         s = gop.segmentation.geodesicKMeans( im_, self.segmenter_, self.num_proposals_ )
         b = self.prop_.propose( s )
         return s.maskToBox( b )
+
+        
+
+def gop_propose(im, detector='sf', num_proposals=1000, scale=1):
+    """
+    Simpler-function for gop proposals.
+    
+        Don't use this function if you expect to run this 
+        at high frame rates
+    
+    """
+    p = ObjectProposal.create(params=dict(detector=detector, num_proposals=num_proposals), scale=scale)
+    return p.process(im)
 
 # class BINGObjectProposal(object): 
 #     def __init__(self, voc_dir, num_proposals=10): 
