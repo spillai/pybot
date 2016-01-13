@@ -1,4 +1,8 @@
 import os.path
+from itertools import islice
+
+def take(iterable, max_length=None): 
+    return iterable if max_length is None else islice(iterable, max_length)
 
 class Decoder(object): 
     def __init__(self, channel='', every_k_frames=1, decode_cb=lambda data: None): 
@@ -22,7 +26,7 @@ class Decoder(object):
         return self.idx % self.every_k_frames == 0 
 
 class LogReader(object): 
-    def __init__(self, filename, decoder=None, start_idx=0, every_k_frames=1, index=False):
+    def __init__(self, filename, decoder=None, start_idx=0, every_k_frames=1, max_length=None, index=False):
         filename = os.path.expanduser(filename)
 		
         if filename is None or not os.path.exists(os.path.expanduser(filename)):
@@ -36,7 +40,8 @@ class LogReader(object):
             self.decoder = { decoder.channel: decoder }
         self.every_k_frames = every_k_frames
         self.start_idx = start_idx
-        
+        self.max_length = max_length
+
         # Load the log
         self._log = self.load_log(self.filename)
 
@@ -49,7 +54,6 @@ class LogReader(object):
 
         # Create Look-up table for subscriptions
         self.cb_ = {}
-
 
     def load_log(self, filename): 
         raise NotImplementedError('load_log not implemented in LogReader')
@@ -73,7 +77,8 @@ class LogReader(object):
         if not len(self.cb_): 
             raise RuntimeError('No callbacks registered yet, subscribe to channels first!')
 
-        for self.idx, (t, ch, data) in enumerate(self.iter_frames()): 
+        iterator = take(self.iter_frames(), max_length=self.max_length)
+        for self.idx, (t, ch, data) in enumerate(iterator): 
             try: 
                 self.cb_[ch](t, data)
             except KeyError: 

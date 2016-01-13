@@ -2,12 +2,13 @@
 import numpy as np
 import cv2, os.path, lcm, zlib
 from collections import OrderedDict
+from itertools import islice
 
 from bot_utils.db_utils import AttrDict
 from bot_vision.camera_utils import construct_K, DepthCamera
 from bot_vision.image_utils import im_resize
 from bot_vision.imshow_utils import imshow_cv
-from bot_externals.log_utils import Decoder, LogReader
+from bot_externals.log_utils import take, Decoder, LogReader
 
 import bot_core.image_t as image_t
 import bot_core.pose_t as pose_t
@@ -48,7 +49,7 @@ class MicrostrainDecoder(Decoder):
         return msg
 
 class PoseDecoder(Decoder): 
-    def __init__(self, channel='CAMERA', every_k_frames=1): 
+    def __init__(self, channel='POSE', every_k_frames=1): 
         Decoder.__init__(self, channel=channel, every_k_frames=every_k_frames)
         
     def decode(self, data):
@@ -244,8 +245,9 @@ class LCMLogReader(LogReader):
     #         # return value as is
     #         res, msg = self.decode_msg(ev, self.decoder)
     #         return res, msg[1]
-            
+
     def iteritems(self, reverse=False): 
+        # Indexed iteration
         if self.index is not None: 
             if reverse: 
                 for t in self.index[::-1]: 
@@ -255,15 +257,27 @@ class LCMLogReader(LogReader):
             else: 
                 for t in self.index: 
                     yield self.get_frame_with_timestamp(t)                    
+
+        # Unindexed iteration (usually much faster)
         else: 
             if reverse: 
                 raise RuntimeError('Cannot provide items in reverse when file is not indexed')
 
+            
+            # iterator = take(self._log, max_length=self.max_length)
+            max_length = 1e12 if self.max_length is None else self.max_length
+            print('Taking first {:} frames for lcm log'.format(max_length))
+
+            counts = 0
             for self.idx, ev in enumerate(self._log): 
-                if self.idx > self.start_idx and self.idx % self.every_k_frames == 0: 
+                if counts >= max_length: break
+                if self.idx > self.start_idx and \
+                   self.idx % self.every_k_frames == 0:
                     res, msg = self.decode_msg(ev.channel, ev.data, ev.timestamp)
-                    if res: yield msg
-                
+                    if res: 
+                        yield msg
+                        counts += 1
+
                 # if ev.channel == self.decoder.channel: 
                 #     self.idx += 1
                 #     if idx % self.every_k_frames == 0: 
