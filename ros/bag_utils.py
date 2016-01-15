@@ -113,7 +113,7 @@ class ROSBagReader(LogReader):
         self.relations_map = {}
 
     def load_log(self, filename): 
-        return rosbag.Bag(filename, 'r')
+        return rosbag.Bag(filename, 'r', chunk_threshold=100 * 1024 * 1024)
 
     def tf(self, from_tf, to_tf): 
         try: 
@@ -132,8 +132,8 @@ class ROSBagReader(LogReader):
         tf_listener = tf.TransformListener()
 
         # Create tf decoder
-        st, end = self._log.get_start_time(), self._log.get_end_time()
-        start_t = Time(st + (end-st) * self.start_idx / 100.0)
+        # st, end = self._log.get_start_time(), self._log.get_end_time()
+        # start_t = Time(st + (end-st) * self.start_idx / 100.0)
         tf_dec = TfDecoderAndPublisher(channel='/tf')
 
         # Establish tf relations
@@ -221,7 +221,11 @@ class ROSBagReader(LogReader):
             start_t = Time(st + (end-st) * self.start_idx / 100.0)
             
             print('Reading ROSBag from {:3.2f}% onwards'.format(self.start_idx))
-            for self.idx, (channel, msg, t) in enumerate(self._log.read_messages(topics=self.decoder.keys(), start_time=start_t)):
+            for self.idx, (channel, msg, t) in enumerate(
+                    self._log.read_messages(
+                        topics=self.decoder.keys(), start_time=start_t
+                    )
+            ):
 
                 res, msg = self.decode_msg(channel, msg, t)
                 if res: 
@@ -243,3 +247,39 @@ class ROSBagReader(LogReader):
 
     def iter_frames(self):
         return self.iteritems()
+
+
+class ROSBagController(object): 
+    def __init__(self, dataset): 
+        """
+        Setup channel => callbacks so that they are automatically called 
+        with appropriate decoded data and timestamp
+        """
+        self.dataset_ = dataset
+        self.cb_ = {}
+        self.idx = 0
+
+    def subscribe(self, channel, callback): 
+        self.cb_[channel] = callback
+
+    def check_tf_relations(self, relations): 
+        return self.dataset_.check_tf_relations(relations)
+
+    def establish_tfs(self, relations): 
+        return self.dataset_.establish_tfs(relations)
+
+    def run(self):
+        if not len(self.cb_): 
+            raise RuntimeError('No callbacks registered yet, subscribe to channels first!')
+
+        for self.idx, (t, ch, data) in enumerate(self.dataset_.iter_frames()): 
+            try: 
+                self.cb_[ch](t, data)
+            except Exception, e: 
+                import traceback
+                traceback.print_exc()
+                raise RuntimeError()
+            
+    @property
+    def filename(self): 
+        return self.dataset_.filename
