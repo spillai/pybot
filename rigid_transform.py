@@ -212,8 +212,8 @@ class Pose(RigidTransform):
         return cls(pid, pose.quat, pose.tvec)
     
     def __repr__(self): 
-        return 'Pose ID: %i, quat: %s, rpy: %s tvec: %s' % \
-            (self.id, self.quat, self.quat.to_roll_pitch_yaw(), self.tvec)
+        return 'Pose ID: %i, rpy: %s tvec: %s' % \
+            (self.id, np.array_str(self.quat.to_roll_pitch_yaw(), precision=2), np.array_str(self.tvec, precision=2))
 
 if __name__ == "__main__":
 
