@@ -74,7 +74,7 @@ if __name__ == "__main__":
     from bot_vision.imshow_utils import imshow_cv
     from bot_vision.image_utils import to_gray
 
-    dataset = TsukubaStereo2012Reader(directory='~/data/NewTsukubaStereoDataset/')
+    dataset = TsukubaStereo2012Reader(directory='~/HD1/data/NewTsukubaStereoDataset/')
     for f in dataset.iter_frames():
         lim, rim = to_gray(f.left), to_gray(f.right)
         out = np.dstack([np.zeros_like(lim), lim, rim])
