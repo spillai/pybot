@@ -1,3 +1,7 @@
+"""Basic dataset reader"""
+# Author: Sudeep Pillai <spillai@csail.mit.edu>
+# License: MIT
+
 import cv2
 import numpy as np
 import os, fnmatch, time
@@ -81,13 +85,17 @@ def read_dir(directory, pattern='*.png', recursive=True, expected=None, verbose=
 
 class FileReader(object): 
     def __init__(self, filename, process_cb): 
-        self.filename = filename
-        self.items = process_cb(filename)
+        self.filename_ = filename
+        self.items_ = process_cb(filename)
 
     def iteritems(self, every_k_frames=1, reverse=False): 
         if reverse: 
             raise NotImplementedError
-        return islice(self.items, 0, None, every_k_frames)
+        return islice(self.items_, 0, None, every_k_frames)
+
+    @property
+    def items(self): 
+        return self.items_
 
 class DatasetReader(object): 
     """
