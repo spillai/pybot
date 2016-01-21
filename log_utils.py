@@ -1,3 +1,8 @@
+"""Basic API for lcmlogs/rosbags"""
+
+# Author: Sudeep Pillai <spillai@csail.mit.edu>
+# License: MIT
+
 import os.path
 from itertools import islice
 
@@ -43,7 +48,7 @@ class LogReader(object):
         self.max_length = max_length
 
         # Load the log
-        self._log = self.load_log(self.filename)
+        self.log_ = self.load_log(self.filename)
 
         # Build index
         self.idx = 0
@@ -54,6 +59,10 @@ class LogReader(object):
 
         # Create Look-up table for subscriptions
         self.cb_ = {}
+
+    @property
+    def log(self): 
+        return self.log_
 
     def load_log(self, filename): 
         raise NotImplementedError('load_log not implemented in LogReader')

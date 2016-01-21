@@ -1,3 +1,8 @@
+""" LCM viewer drawing utils """
+
+# Author: Sudeep Pillai <spillai@csail.mit.edu>
+# License: MIT
+
 import time, logging
 import numpy as np
 
@@ -28,7 +33,6 @@ class VisualizationMsgsPub:
 
         self.lc = lcm.LCM()
         self.log = logging.getLogger(__name__)
-
         camera_pose = RigidTransform.from_roll_pitch_yaw_x_y_z(-np.pi/2, 0, -np.pi/2, 
                                                                0, 0, 1, axes='sxyz')
 

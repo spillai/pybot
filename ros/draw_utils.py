@@ -1,4 +1,8 @@
-#!/usr/bin/env python
+""" ROS RViz drawing utils """
+
+# Author: Sudeep Pillai <spillai@csail.mit.edu>
+# License: MIT
+
 import numpy as np
 
 # ROS libs, msgs
@@ -12,8 +16,8 @@ import sensor_msgs.msg as sensor_msg
 from copy import deepcopy
 
 # Utility imports
-from bot_vision.draw_utils import reshape_arr, get_color_arr, height_map, color_by_height_axis, copy_pointcloud_data
-from bot_utils.async_utils import run_async
+from bot_vision.draw_utils import reshape_arr, get_color_arr, \
+    height_map, color_by_height_axis, copy_pointcloud_data
 from bot_geometry.rigid_transform import RigidTransform
 from .pointclouds import xyz_array_to_pointcloud2, xyzrgb_array_to_pointcloud2
 
@@ -41,11 +45,16 @@ class VisualizationMsgsPub:
     Visualization publisher class
     """
     # Init publisher
-    marker_pub_ = rospy.Publisher('viz_msgs_marker_publisher', vis_msg.Marker, latch=True, queue_size=10)
-    pose_pub_ = rospy.Publisher('viz_msgs_pose_publisher', geom_msg.PoseArray, latch=False, queue_size=10)
-    geom_pose_pub_ = rospy.Publisher('viz_msgs_geom_pose_publisher', geom_msg.PoseStamped, latch=False, queue_size=10)
-    pc_pub_ = rospy.Publisher('viz_msgs_pc_publisher', sensor_msg.PointCloud2, latch=False, queue_size=10)
-    octomap_pub_ = rospy.Publisher('octomap_publisher', vis_msg.Marker, latch=True, queue_size=10)
+    marker_pub_ = rospy.Publisher('viz_msgs_marker_publisher', 
+                                  vis_msg.Marker, latch=True, queue_size=10)
+    pose_pub_ = rospy.Publisher('viz_msgs_pose_publisher', 
+                                geom_msg.PoseArray, latch=False, queue_size=10)
+    geom_pose_pub_ = rospy.Publisher('viz_msgs_geom_pose_publisher', 
+                                     geom_msg.PoseStamped, latch=False, queue_size=10)
+    pc_pub_ = rospy.Publisher('viz_msgs_pc_publisher', 
+                              sensor_msg.PointCloud2, latch=False, queue_size=10)
+    octomap_pub_ = rospy.Publisher('octomap_publisher', 
+                                   vis_msg.Marker, latch=True, queue_size=10)
     tf_pub_ = tf.TransformBroadcaster()
 
     def __init__(self): 
@@ -53,7 +62,8 @@ class VisualizationMsgsPub:
 
     def pc_map_pub(self, ns): 
         if ns not in self.pc_map: 
-            self.pc_map[ns] = rospy.Publisher(ns, sensor_msg.PointCloud2, latch=False, queue_size=10)
+            self.pc_map[ns] = rospy.Publisher(ns, 
+                                              sensor_msg.PointCloud2, latch=False, queue_size=10)
         return self.pc_map[ns]
 
 # Helper functions

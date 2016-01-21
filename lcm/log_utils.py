@@ -1,34 +1,23 @@
-#!/usr/bin/python
+"""LCM Log API"""
+
+# Author: Sudeep Pillai <spillai@csail.mit.edu>
+# License: MIT
+
 import numpy as np
-import cv2, os.path, lcm, zlib
-from collections import OrderedDict
+import cv2
+import os.path
+import lcm
+import zlib
 from itertools import islice
 
-from bot_utils.db_utils import AttrDict
 from bot_vision.camera_utils import construct_K, DepthCamera
 from bot_vision.image_utils import im_resize
-from bot_vision.imshow_utils import imshow_cv
+
 from bot_externals.log_utils import take, Decoder, LogReader
 
 import bot_core.image_t as image_t
 import bot_core.pose_t as pose_t
 import bot_param.update_t as update_t
-
-
-# class MicrostrainChannelDecoder(Channel, MicrostrainDecoder): 
-#     def __init__(self, channel=''): 
-#         Channel.__init__(self, channel=channel)
-#         MicrostrainDecoder.__init__(self)
-
-# class Decoder(object): 
-#     def __init__(self, channel=''): 
-#         self.channel = channel
-    
-#     def decode(self, data): 
-#         return None
-
-#     def can_decode(self, channel): 
-#         return self.channel == channel
 
 class BotParamDecoder(Decoder): 
     def __init__(self, channel='PARAM_UPDATE', every_k_frames=1): 
@@ -105,7 +94,7 @@ class KinectFrame:
         return self.compute_normals(self.Xest, depth_change_factor=0.5, smoothing_size=10.0)
 
 class KinectDecoder(Decoder): 
-    kinect_params = AttrDict(fx=576.09757860, fy=576.09757860, cx=319.50, cy=239.50)
+    kinect_params = dict(fx=576.09757860, fy=576.09757860, cx=319.50, cy=239.50)
     def __init__(self, channel='KINECT_FRAME', scale=1., 
                  extract_rgb=True, extract_depth=True, extract_X=True, bgr=True, every_k_frames=1):
         Decoder.__init__(self, channel=channel, every_k_frames=every_k_frames)
@@ -179,9 +168,9 @@ class LCMLogReader(LogReader):
         return lcm.EventLog(self.filename, 'r')
 
     def _index(self): 
-        utimes = np.array([ev.timestamp for ev in self._log], dtype=np.int64)
+        utimes = np.array([ev.timestamp for ev in self.log], dtype=np.int64)
         inds = np.array([idx
-                         for idx, ev in enumerate(self._log) 
+                         for idx, ev in enumerate(self.log) 
                          if ev.channel == self.decoder.channel], dtype=np.int64)
         try: 
             self.index = utimes[np.maximum(self.start_idx, inds-1)][::self.every_k_frames]
@@ -193,9 +182,9 @@ class LCMLogReader(LogReader):
         return len(self.index)
 
     def get_frame_with_timestamp(self, t): 
-        self._log.c_eventlog.seek_to_timestamp(t)
+        self.log.c_eventlog.seek_to_timestamp(t)
         while True: 
-            ev = self._log.next()
+            ev = self.log.next()
             res, msg = self.decode_msgs(ev.channel, ev.data, ev.timestamp)
             if res: return msg
 
@@ -220,31 +209,11 @@ class LCMLogReader(LogReader):
                 return True, (t, channel, dec.decode(data))
         except Exception as e:
             pass
-            # raise RuntimeError('Failed to decode data from channel: {:}, mis-specified decoder ? errmsg: {:}'.format(channel, e))
+            # raise RuntimeError("""Failed to decode data from"""
+            #                    """channel: {:}, mis-specified decoder"""
+            #                    """? errmsg: {:}""".format(channel, e))
         
         return False, (None, None)
-
-
-    # def decode_msg(self, ev, dec):
-    #     print ev, dir(dec)
-    #     if ev.channel == dec.channel: 
-    #         self.idx += 1
-    #         if self.idx >= self.start_idx and self.idx % self.every_k_frames == 0: 
-    #             return True, (ev.channel, dec.decode(ev.data))
-    #     return False, (None, None)
-
-    # def decode_msgs(self, ev): 
-    #     if isinstance(self.decoder, list):
-    #         res, msg = False, None
-    #         for dec in self.decoder: 
-    #             res, msg = self.decode_msg(ev, dec)
-    #             if res: break
-    #         return res, msg
-    #     else: 
-    #         # when accessing only single decoding, 
-    #         # return value as is
-    #         res, msg = self.decode_msg(ev, self.decoder)
-    #         return res, msg[1]
 
     def iteritems(self, reverse=False): 
         # Indexed iteration
@@ -264,12 +233,12 @@ class LCMLogReader(LogReader):
                 raise RuntimeError('Cannot provide items in reverse when file is not indexed')
 
             
-            # iterator = take(self._log, max_length=self.max_length)
+            # iterator = take(self.log, max_length=self.max_length)
             max_length = 1e12 if self.max_length is None else self.max_length
             print('Taking first {:} frames for lcm log'.format(max_length))
 
             counts = 0
-            for self.idx, ev in enumerate(self._log): 
+            for self.idx, ev in enumerate(self.log): 
                 if counts >= max_length: break
                 if self.idx > self.start_idx and \
                    self.idx % self.every_k_frames == 0:
@@ -294,7 +263,7 @@ def KinectLCMLogReader(filename=None, every_k_frames=1, **kwargs):
 
 if __name__ == "__main__": 
     import os.path
-    from pybot_pcl import compute_normals
+    from bot_vision.imshow_utils import imshow_cv
 
     log = KinectLCMLogReader(filename='~/data/2014_06_14_articulation_multibody/lcmlog-2014-06-14.05')
     # for frame in log.iter_frames(): 
@@ -304,10 +273,6 @@ if __name__ == "__main__":
     for frame in log.iteritems(reverse=True): 
         imshow_cv('frame', frame.img)
         imshow_cv('depth', frame.depth / 15)
-
-
-        # # Build Index
-        # self._build_index()
 
     # def _build_index(self): 
     #     """Build utime index for log"""

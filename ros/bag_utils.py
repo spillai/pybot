@@ -1,8 +1,12 @@
+"""ROS Bag API"""
+
+# Author: Sudeep Pillai <spillai@csail.mit.edu>
+# License: MIT
+
 import numpy as np
 import cv2, os.path, lcm, zlib
 
 import roslib
-# roslib.load_manifest(PKG)
 import tf
 
 import rosbag
@@ -132,13 +136,13 @@ class ROSBagReader(LogReader):
         tf_listener = tf.TransformListener()
 
         # Create tf decoder
-        # st, end = self._log.get_start_time(), self._log.get_end_time()
+        # st, end = self.log.get_start_time(), self.log.get_end_time()
         # start_t = Time(st + (end-st) * self.start_idx / 100.0)
         tf_dec = TfDecoderAndPublisher(channel='/tf')
 
         # Establish tf relations
         print('Establishing tfs from ROSBag')
-        for self.idx, (channel, msg, t) in enumerate(self._log.read_messages(topics='/tf')): 
+        for self.idx, (channel, msg, t) in enumerate(self.log.read_messages(topics='/tf')): 
             tf_dec.decode(msg)
 
             for (from_tf, to_tf) in relations:  
@@ -178,7 +182,7 @@ class ROSBagReader(LogReader):
         print('Checking tf relations in ROSBag')
         checked = set()
         relations_lut = dict((k,v) for (k,v) in relations)
-        for self.idx, (channel, msg, t) in enumerate(self._log.read_messages(topics=self.decoder.keys())): 
+        for self.idx, (channel, msg, t) in enumerate(self.log.read_messages(topics=self.decoder.keys())): 
             print('\tChecking {:} => {:}'.format(channel, msg.header.frame_id))
             try: 
                 if relations_lut[channel] == msg.header.frame_id: 
@@ -217,12 +221,12 @@ class ROSBagReader(LogReader):
 
             # Decode only messages that are supposed to be decoded 
             # print self._log.get_message_count(topic_filters=self.decoder_keys())
-            st, end = self._log.get_start_time(), self._log.get_end_time()
+            st, end = self.log.get_start_time(), self.log.get_end_time()
             start_t = Time(st + (end-st) * self.start_idx / 100.0)
             
             print('Reading ROSBag from {:3.2f}% onwards'.format(self.start_idx))
             for self.idx, (channel, msg, t) in enumerate(
-                    self._log.read_messages(
+                    self.log.read_messages(
                         topics=self.decoder.keys(), start_time=start_t
                     )
             ):
