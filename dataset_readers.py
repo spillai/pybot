@@ -79,7 +79,6 @@ def read_dir(directory, pattern='*.png', recursive=True, expected=None, verbose=
         return list(chain([fn for fns in fn_map.values() for fn in fns]))
     return fn_map
 
-
 class FileReader(object): 
     def __init__(self, filename, process_cb): 
         self.filename = filename
