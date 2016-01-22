@@ -55,10 +55,10 @@ class TsukubaStereo2012Reader(object):
                                           right_template=right_template, 
                                           start_idx=start_idx, max_files=max_files, scale=scale)
         print 'Initialized stereo dataset reader with %f scale' % scale
-        self.gt = ImageDatasetReader(template=
-                                     os.path.join(os.path.expanduser(directory), 
-                                                  'groundtruth/disparity_maps/left/tsukuba_disparity_L_%05i.png'), 
-                                     start_idx=start_idx, max_files=max_files, scale=scale)
+        gt_fn = os.path.join(os.path.expanduser(directory),
+                             'groundtruth/disparity_maps/left/tsukuba_disparity_L_%05i.png')
+        self.gt = ImageDatasetReader(template=gt_fn, start_idx=start_idx, 
+                                     max_files=max_files, scale=scale)
         
     def iter_frames(self, *args, **kwargs): 
         for (left, right), pose, depth in izip(self.iter_stereo_frames(*args, **kwargs), 
