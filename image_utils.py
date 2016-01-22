@@ -1,5 +1,6 @@
 import cv2
 import numpy as np
+from collections import deque
 
 def flip_rb(im): 
     return cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
@@ -115,18 +116,20 @@ class MosaicBuilder(object):
     def __init__(self, filename_template, maxlen=100, shape=(1600,900), glyph_shape=(50,50)): 
         self.idx_ = 0
         self.filename_template_ = filename_template
-
-        if '%i' not in self.filename_template_: 
-            raise RuntimeError('Failed to parse filename template, missing %%i')
-
+        self.save_mosaic_ = len(self.filename_template_) > 0
+        self.shape_ = shape
+        
+        # if '%i' not in self.filename_template_: 
+        #     raise RuntimeError('Failed to parse filename template, missing %%i')
+            
         self.maxlen_ = maxlen
-        self.ims_ = []
+        self.ims_ = deque(maxlen=self.maxlen_)
         self.resize_cb_ = lambda im: im_resize(im, shape=glyph_shape)
         self.mosaic_cb_ = lambda ims: im_mosaic_list(ims, shape=None)
 
     def add(self, im): 
         self.ims_.append(self.resize_cb_(im))
-        if len(self.ims_) % self.maxlen_ == 0: 
+        if self.save_mosaic_ and len(self.ims_) % self.maxlen_ == 0: 
             self._save()
 
     def _save(self): 
@@ -138,7 +141,17 @@ class MosaicBuilder(object):
         print('Saving mosaic: %s' % fn)
 
         self.idx_ += 1
-        self.ims_ = []
+        self.ims_ = deque(maxlen=self.maxlen_)
 
     def finalize(self): 
-        self._save()
+        if self.save_mosaic_: 
+            self._save()
+
+    @property
+    def mosaic(self):
+        """
+        """
+        return self.mosaic_cb_(list(self.ims_)) \
+            if len(self.ims_) else np.zeros(shape=shape, dtype=np.uint8) 
+        
+
