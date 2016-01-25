@@ -86,9 +86,9 @@ class TangoLogReader(LogReader):
                 for l in self.meta_:
                     try: 
                         t, ch, data = l.replace('\n', '').split('\t')
-                        yield ch, data, t
                     except: 
-                        pass
+                        continue
+                    yield ch, data, t
 
         return TangoLog(filename)
 
@@ -103,8 +103,8 @@ class TangoLogReader(LogReader):
             # # print self._log.get_message_count(topic_filters=self.decoder_keys())
             # st, end = self.log.get_start_time(), self.log.get_end_time()
             # start_t = Time(st + (end-st) * self.start_idx / 100.0)
-            
-            print('Reading ROSBag from {:3.2f}% onwards'.format(self.start_idx))
+             
+            print('Reading TangoLog from {:3.2f}% onwards'.format(self.start_idx))
             for self.idx, (channel, msg, t) in enumerate(self.log.read_messages()):
                 res, msg = self.decode_msg(channel, msg, t)
                 if res: 
