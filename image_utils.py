@@ -103,13 +103,33 @@ def box_blur(im, size=3):
 def median_blur(im, size=3): 
     return cv2.medianBlur(im, size)
 
-def blur_measure(im): 
-    cv2.imshow('im', im)
-    cv2.waitKey(0)
+def variance_of_laplacian(im): 
+    """
+    Compute the Laplacian of the image and then return the focus
+    measure, which is simply the variance of the Laplacian
+    http://www.pyimagesearch.com/2015/09/07/blur-detection-with-opencv/
+    """
     return cv2.Laplacian(im, cv2.CV_64F).var()
 
-def blur_detect(im, threshold=100): 
-    return blur_measure(im) > threshold
+def blur_measure(im): 
+    """ See cv::videostab::calcBlurriness """
+
+    H, W = im.shape[:2]
+    gx = cv2.Sobel(im, cv2.CV_32F, 1, 0)
+    gy = cv2.Sobel(im, cv2.CV_32F, 0, 1)
+    norm_gx, norm_gy = cv2.norm(gx), cv2.norm(gy)
+    return 1.0 / ((norm_gx ** 2 + norm_gy ** 2) / (H * W + 1e-6))
+
+def blur_detect(im, threshold=7):
+    """
+    Negative log-likelihood on the inverse gradient norm, 
+    normalized by image size
+    """
+    nll = -np.log(blur_measure(im))
+    return nll > threshold, nll
+
+def variance_of_laplacian(image):
+    return cv2.Laplacian(image, cv2.CV_64F).var()
 
 
 class MosaicBuilder(object): 
