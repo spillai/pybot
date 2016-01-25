@@ -7,6 +7,7 @@ import numpy as np
 import cv2
 import os.path
 
+from collections import Counter
 from bot_externals.log_utils import Decoder, LogReader
 from bot_vision.image_utils import im_resize
 from bot_vision.imshow_utils import imshow_cv
@@ -64,7 +65,17 @@ class TangoLogReader(LogReader):
         class TangoLog(object): 
             def __init__(self, filename): 
                 self.meta_ =  open(filename, 'r')
-    
+                topics = map(lambda (t,ch,data): ch, 
+                             map(lambda l: l.replace('\n','').split('\t'), self.meta_.readlines()))
+
+                # Save topics and counts
+                c = Counter(topics)
+                self.topics_ = list(set(topics))
+                self.topic_lengths_ = dict(c.items())
+                
+                messages_str = ', '.join(['{:} ({:})'.format(k,v) for k,v in c.iteritems()])
+                print('\nTangoLog\n========\n\tTopics: {:}\n\tMessages: {:}\n'.format(self.topics_, messages_str))
+
             def read_messages(self, topics=None, start_time=0): 
                 for l in self.meta_:
                     try: 
