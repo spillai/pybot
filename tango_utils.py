@@ -47,15 +47,18 @@ class TangoImageDecoder(Decoder):
             raise Exception()
 
 class TangoLogReader(LogReader): 
-    def __init__(self, directory): 
-        # if 'decoder' in kwargs: 
-        #     raise RuntimeError('Cannot set decoders in TangoReader, these are preset')
+    def __init__(self, directory, scale=1.): 
+        
+        # Set directory and filename for time synchronized log reads 
         self.directory_ = os.path.expanduser(directory)
         self.filename_ = os.path.join(self.directory_, 'tango_data.txt')
+        self.scale_ = scale
+        
+        # Initialize TangoLogReader with appropriate decoders
         super(TangoLogReader, self).__init__(self.filename_, 
                                              decoder=[
                                                  TangoOdomDecoder(channel='RGB_VIO'), 
-                                                 TangoImageDecoder(self.directory_, channel='RGB')
+                                                 TangoImageDecoder(self.directory_, channel='RGB', scale=scale)
                                              ])
         
         if self.start_idx < 0 or self.start_idx > 100: 
@@ -66,7 +69,9 @@ class TangoLogReader(LogReader):
             def __init__(self, filename): 
                 self.meta_ =  open(filename, 'r')
                 topics = map(lambda (t,ch,data): ch, 
-                             map(lambda l: l.replace('\n','').split('\t'), self.meta_.readlines()))
+                             filter(lambda ch: len(ch) == 3, 
+                                    map(lambda l: l.replace('\n','').split('\t'), 
+                                        filter(lambda l: '\n' in l, self.meta_.readlines()))))
 
                 # Save topics and counts
                 c = Counter(topics)
@@ -75,6 +80,7 @@ class TangoLogReader(LogReader):
                 
                 messages_str = ', '.join(['{:} ({:})'.format(k,v) for k,v in c.iteritems()])
                 print('\nTangoLog\n========\n\tTopics: {:}\n\tMessages: {:}\n'.format(self.topics_, messages_str))
+                self.meta_.seek(0)
 
             def read_messages(self, topics=None, start_time=0): 
                 for l in self.meta_:
@@ -85,89 +91,6 @@ class TangoLogReader(LogReader):
                         pass
 
         return TangoLog(filename)
-
-    # def tf(self, from_tf, to_tf): 
-    #     try: 
-    #         return self.relations_map[(from_tf, to_tf)]
-    #     except: 
-    #         raise KeyError('Relations map does not contain {:}=>{:} tranformation'.format(from_tf, to_tf))
-
-    # def establish_tfs(self, relations):
-    #     """
-    #     Perform a one-time look up of all the requested
-    #     *static* relations between frames (available via /tf)
-    #     """
-
-    #     # Init node and tf listener
-    #     rospy.init_node(self.__class__.__name__, disable_signals=True)
-    #     tf_listener = tf.TransformListener()
-
-    #     # Create tf decoder
-    #     # st, end = self.log.get_start_time(), self.log.get_end_time()
-    #     # start_t = Time(st + (end-st) * self.start_idx / 100.0)
-    #     tf_dec = TfDecoderAndPublisher(channel='/tf')
-
-    #     # Establish tf relations
-    #     print('Establishing tfs from ROSBag')
-    #     for self.idx, (channel, msg, t) in enumerate(self.log.read_messages(topics='/tf')): 
-    #         tf_dec.decode(msg)
-
-    #         for (from_tf, to_tf) in relations:  
-    #             try:
-    #                 (trans,rot) = tf_listener.lookupTransform(from_tf, to_tf, t)
-    #                 self.relations_map[(from_tf,to_tf)] = RigidTransform(tvec=trans, xyzw=rot)
-    #                 print('\tSuccessfully received transform: {:} => {:} {:}'
-    #                       .format(from_tf, to_tf, self.relations_map[(from_tf,to_tf)]))
-    #             except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
-    #                 pass
-
-    #         # Finish up once we've established all the requested tfs
-    #         if len(self.relations_map) == len(relations): 
-    #             break
-
-    #     try: 
-    #         tfs = [self.relations_map[(from_tf,to_tf)] for (from_tf, to_tf) in relations] 
-    #     except: 
-    #         raise RuntimeError('Error concerning tf lookup')
-    #     print('Established {:} relations\n'.format(len(tfs)))
-        
-    #     return tfs 
-
-    # def check_tf_relations(self, relations): 
-    #     """
-    #     Perform a one-time look up of all the 
-    #     *static* relations between frames (available via /tf)
-    #     and check if the expected relations hold
-
-    #     Channel => frame_id
-
-    #     """
-    #     # if not isinstance(relations, map): 
-    #     #     raise RuntimeError('Provided relations map is not a dict')
-
-    #     # Check tf relations map
-    #     print('Checking tf relations in ROSBag')
-    #     checked = set()
-    #     relations_lut = dict((k,v) for (k,v) in relations)
-    #     for self.idx, (channel, msg, t) in enumerate(self.log.read_messages(topics=self.decoder.keys())): 
-    #         print('\tChecking {:} => {:}'.format(channel, msg.header.frame_id))
-    #         try: 
-    #             if relations_lut[channel] == msg.header.frame_id: 
-    #                 checked.add(channel)
-    #             else: 
-    #                 raise RuntimeError('TF Check failed {:} mapped to {:} instead of {:}'
-    #                                    .format(channel, msg.header.frame_id, relations_lut[channel]))
-    #         except: 
-    #             raise ValueError('Wrongly defined relations_lut')
-            
-    #             # Finish up
-    #         if len(checked) == len(relations_lut):
-    #             break
-    #     print('Checked {:} relations\n'.format(len(checked)))
-    #     return  
-            
-    def _index(self): 
-        raise NotImplementedError()
 
     def iteritems(self, reverse=False): 
         if self.index is not None: 
