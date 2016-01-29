@@ -131,7 +131,6 @@ def blur_detect(im, threshold=7):
 def variance_of_laplacian(image):
     return cv2.Laplacian(image, cv2.CV_64F).var()
 
-
 class MosaicBuilder(object): 
     def __init__(self, filename_template, maxlen=100, shape=(1600,900), glyph_shape=(50,50)): 
         self.idx_ = 0

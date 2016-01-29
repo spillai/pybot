@@ -38,7 +38,7 @@ class ObjectProposal(object):
     @classmethod
     def create(cls, method='GOP', scale=1, num_proposals=1000, params=None): 
         if method == 'GOP': 
-            params = dict(detector='sobel', num_proposals=num_proposals) \
+            params = dict(detector='sf', num_proposals=num_proposals) \
                      if params is None else params
             return cls(GOPObjectProposal(**params), scale=scale)
         elif method == 'BING': 
