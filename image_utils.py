@@ -172,6 +172,6 @@ class MosaicBuilder(object):
         """
         """
         return self.mosaic_cb_(list(self.ims_)) \
-            if len(self.ims_) else np.zeros(shape=shape, dtype=np.uint8) 
+            if len(self.ims_) else np.zeros(shape=self.shape_, dtype=np.uint8) 
         
 

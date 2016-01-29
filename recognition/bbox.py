@@ -1,5 +1,8 @@
 import numpy as np
 
+def bbox_area(bbox): 
+    return (bbox[3] - bbox[1]) * (bbox[2] - bbox[0])
+
 def intersection_union(bbox1, bbox2): 
     # print bbox1, bbox2
     union_ = (bbox1[2]-bbox1[0]) * (bbox1[3]-bbox1[1]) + \
