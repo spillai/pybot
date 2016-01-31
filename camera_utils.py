@@ -71,9 +71,9 @@ class CameraIntrinsic(object):
         """
         Default init
         """
-        self.K = npm.mat(K)                # Calibration matrix.
+        self.K = npm.mat(K)                # Calibration matrix
         self.D = D                         # Distortion
-        self.cx, self.cy = K[0,2], K[1,2]  # Camera center.
+        self.cx, self.cy = K[0,2], K[1,2]  # Camera center
         self.fx, self.fy = K[0,0], K[1,1]  # Focal length
         self.shape = shape                 # Image size (H,W,C): (480,640,3)
 
