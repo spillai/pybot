@@ -12,6 +12,7 @@ from bot_externals.log_utils import Decoder, LogReader
 from bot_vision.image_utils import im_resize
 from bot_vision.imshow_utils import imshow_cv
 from bot_geometry.rigid_transform import RigidTransform
+from bot_vision.camera_utils import CameraIntrinsic
 
 def TangoOdomDecoder(channel, every_k_frames=1): 
     def odom_decode(data): 
@@ -46,14 +47,47 @@ class TangoImageDecoder(Decoder):
         else: 
             raise Exception()
 
+
+class TangoLog(object): 
+    def __init__(self, filename): 
+        self.meta_ =  open(filename, 'r')
+        topics = map(lambda (t,ch,data): ch, 
+                     filter(lambda ch: len(ch) == 3, 
+                            map(lambda l: l.replace('\n','').split('\t'), 
+                                filter(lambda l: '\n' in l, self.meta_.readlines()))))
+
+        # Save topics and counts
+        c = Counter(topics)
+        self.topics_ = list(set(topics))
+        self.topic_lengths_ = dict(c.items())
+        self.length_ = sum(self.topic_lengths_.values())
+
+        messages_str = ', '.join(['{:} ({:})'.format(k,v) for k,v in c.iteritems()])
+        print('\nTangoLog\n========\n\tTopics: {:}\n\tMessages: {:}\n'.format(self.topics_, messages_str))
+        self.meta_.seek(0)
+
+    @property
+    def length(self): 
+        return self.length_
+
+    def read_messages(self, topics=None, start_time=0): 
+        for l in self.meta_:
+            try: 
+                t, ch, data = l.replace('\n', '').split('\t')
+            except: 
+                continue
+            yield ch, data, t
+
+
 class TangoLogReader(LogReader): 
-    def __init__(self, directory, scale=1.): 
+    def __init__(self, directory, scale=1., start_idx=0): 
         
         # Set directory and filename for time synchronized log reads 
         self.directory_ = os.path.expanduser(directory)
         self.filename_ = os.path.join(self.directory_, 'tango_data.txt')
         self.scale_ = scale
-        
+        self.start_idx_ = start_idx
+
         # Initialize TangoLogReader with appropriate decoders
         super(TangoLogReader, self).__init__(self.filename_, 
                                              decoder=[
@@ -61,35 +95,24 @@ class TangoLogReader(LogReader):
                                                  TangoImageDecoder(self.directory_, channel='RGB', scale=scale)
                                              ])
         
-        if self.start_idx < 0 or self.start_idx > 100: 
+        if self.start_idx_ < 0 or self.start_idx_ > 100: 
             raise ValueError('start_idx in TangoReader expects a percentage [0,100], provided {:}'.format(self.start_idx))
 
+    @property
+    def calib(self): 
+        """
+        https://developers.google.com/project-tango/apis/c/
+        reference/group/camera#group___camera_1ga61f047f290983da9d16522371977cecf
+
+        See /sdcard/config/calibration.xml
+        """
+        f = 1042.0
+        H, W = 720, 1280
+        K = np.float64([f, 0, W/2-0.5, 0, f, H/2-0.5, 0, 0, 1]).reshape(3,3)
+        D = np.float64([0, 0, 0, 0, 0])
+        return CameraIntrinsic(K=K, D=D, shape=(H,W))
+
     def load_log(self, filename): 
-        class TangoLog(object): 
-            def __init__(self, filename): 
-                self.meta_ =  open(filename, 'r')
-                topics = map(lambda (t,ch,data): ch, 
-                             filter(lambda ch: len(ch) == 3, 
-                                    map(lambda l: l.replace('\n','').split('\t'), 
-                                        filter(lambda l: '\n' in l, self.meta_.readlines()))))
-
-                # Save topics and counts
-                c = Counter(topics)
-                self.topics_ = list(set(topics))
-                self.topic_lengths_ = dict(c.items())
-                
-                messages_str = ', '.join(['{:} ({:})'.format(k,v) for k,v in c.iteritems()])
-                print('\nTangoLog\n========\n\tTopics: {:}\n\tMessages: {:}\n'.format(self.topics_, messages_str))
-                self.meta_.seek(0)
-
-            def read_messages(self, topics=None, start_time=0): 
-                for l in self.meta_:
-                    try: 
-                        t, ch, data = l.replace('\n', '').split('\t')
-                    except: 
-                        continue
-                    yield ch, data, t
-
         return TangoLog(filename)
 
     def iteritems(self, reverse=False): 
@@ -104,8 +127,11 @@ class TangoLogReader(LogReader):
             # st, end = self.log.get_start_time(), self.log.get_end_time()
             # start_t = Time(st + (end-st) * self.start_idx / 100.0)
              
-            print('Reading TangoLog from {:3.2f}% onwards'.format(self.start_idx))
+            print('Reading TangoLog from {:3.2f}% onwards'.format(self.start_idx_))
             for self.idx, (channel, msg, t) in enumerate(self.log.read_messages()):
+                if self.idx < self.start_idx_: 
+                    continue
+                # self.idx % self.every_k_frames == 0:
                 res, msg = self.decode_msg(channel, msg, t)
                 if res: 
                     yield msg
