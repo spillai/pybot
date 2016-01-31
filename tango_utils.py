@@ -18,6 +18,9 @@ def TangoOdomDecoder(channel, every_k_frames=1):
     def odom_decode(data): 
         """ x, y, z, qx, qy, qz, qw, status_code, confidence, accuracy """
         p = np.float64(data.split(','))
+        if not p[7]: 
+            raise Warning('Pose initializing.., status_code: 0')
+
         tvec, ori = p[:3], p[3:7]
         pose = RigidTransform(xyzw=ori, tvec=tvec)
         
@@ -45,7 +48,7 @@ class TangoImageDecoder(Decoder):
             im = cv2.imread(fn, cv2.CV_LOAD_IMAGE_COLOR)
             return im_resize(im, scale=self.scale)
         else: 
-            raise Exception()
+            raise Exception('File does not exist')
 
 
 class TangoLog(object): 
@@ -105,11 +108,15 @@ class TangoLogReader(LogReader):
         reference/group/camera#group___camera_1ga61f047f290983da9d16522371977cecf
 
         See /sdcard/config/calibration.xml
+        1043.75;   1043.69;   638.797;   357.991;   0.234583;   -0.689864;   0.679871
         """
-        f = 1042.0
-        H, W = 720, 1280
+        f = 1043.75 * self.scale_
+        cx, cy = 638.797 * self.scale_, 357.991 * self.scale_
+        H, W = int(720 * self.scale_), int(1280 * self.scale_)
         K = np.float64([f, 0, W/2-0.5, 0, f, H/2-0.5, 0, 0, 1]).reshape(3,3)
-        D = np.float64([0, 0, 0, 0, 0])
+        # K = np.float64([f, 0, cx, 0, f, cy, 0, 0, 1]).reshape(3,3)
+        # D = np.float64([0, 0, 0, 0, 0])
+        D = np.float64([0.234583, -0.689864, 0.679871, 0, 0])
         return CameraIntrinsic(K=K, D=D, shape=(H,W))
 
     def load_log(self, filename): 
@@ -145,7 +152,6 @@ class TangoLogReader(LogReader):
                 return True, (t, channel, dec.decode(data))
         except Exception as e:
             pass
-            # print e
             # raise RuntimeError('Failed to decode data from channel: %s, mis-specified decoder?' % channel)
         
         return False, (None, None)
