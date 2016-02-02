@@ -11,6 +11,12 @@ from collections import defaultdict, namedtuple
 
 from bot_vision.image_utils import im_resize
 
+def valid_path(path): 
+    vpath = os.path.expanduser(path)
+    if not os.path.exists(vpath): 
+        raise RuntimeError('Path invalid {:}'.format(vpath))
+    return vpath
+
 def natural_sort(l): 
     convert = lambda text: int(text) if text.isdigit() else text.lower() 
     alphanum_key = lambda key: [ convert(c) for c in re.split('([0-9]+)', key) ] 
@@ -135,7 +141,7 @@ class DatasetReader(object):
             self.files = files
         
         print('Found {:} files with pattern: {:}'.format(nmatches, pattern))
-        print self.files[-1]
+        print('From {:} to {:}'.format(valid_path(self.files[0]), valid_path(self.files[-1])))
         # print('First file: {:}: {:}'.format(template % start_idx, 'GOOD' if
         # os.path.exists(template % start_idx) else 'BAD'))
 

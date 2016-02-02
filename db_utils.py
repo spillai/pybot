@@ -34,6 +34,15 @@ def save_json_dict(fn, d):
     with open(os.path.expanduser(fn), 'w') as fp:
         json.dump(d, fp, sort_keys=True, indent=4, separators=(',', ':'))
 
+def load_yaml_dict(fn): 
+    import yaml
+    return yaml.load(open(os.path.expanduser(fn), 'r'))
+
+def save_yaml_dict(fn, d): 
+    import yaml
+    with open(os.path.expanduser(fn), 'w') as fp:
+        fp.write(yaml.dump(d, default_flow_style=False))
+
 def load_mat(fn): 
     import scipy.io as io
     return io.loadmat(os.path.expanduser(fn))
@@ -167,6 +176,9 @@ class AttrDict(dict):
     def __setstate__(self): 
         pass
 
+    def to_dict(self): 
+        return dict(self)
+
     @staticmethod
     def load_dict(fn): 
         return AttrDict(load_pickled_dict(fn))
@@ -181,6 +193,14 @@ class AttrDict(dict):
 
     def save_json(self, fn): 
         save_json_dict(fn, self)
+
+    @staticmethod
+    def load_yaml(fn): 
+        return AttrDict(load_yaml_dict(fn))
+
+    def save_yaml(self, fn): 
+        print self.to_dict()
+        save_yaml_dict(fn, self.to_dict())
 
     @staticmethod
     def load_mat(fn): 

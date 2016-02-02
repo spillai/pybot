@@ -5,16 +5,54 @@ import cv2
 from itertools import izip, repeat
 from bot_utils.misc import setup_pbar
 from bot_utils.db_utils import AttrDict
+
+from bot_vision.camera_utils import StereoCamera
 from bot_utils.dataset_readers import natural_sort, \
     FileReader, DatasetReader, ImageDatasetReader, \
     StereoDatasetReader, VelodyneDatasetReader
 
-from .kitti_helpers import kitti_stereo_calib_params, kitti_load_poses
+def kitti_stereo_calib(sequence, scale=1.0): 
+    seq = int(sequence)
+    print('KITTI Dataset Reader: Sequence ({:}) @ Scale ({:})'.format(sequence, scale))
+    if seq >= 0 and seq <= 2: 
+        return KITTIDatasetReader.kitti_00_02.scaled(scale)
+    elif seq == 3: 
+        return KITTIDatasetReader.kitti_03.scaled(scale)
+    elif seq >= 4 and seq <= 12: 
+        return KITTIDatasetReader.kitti_04_12.scaled(scale)
+    else: 
+        raise RuntimeError('Error retrieving stereo calibration for KITTI sequence {:}'.format(sequence))
+
+# def kitti_stereo_calib_params(scale=1.0): 
+#     f = 718.856*scale
+#     cx, cy = 607.192*scale, 185.2157*scale
+#     baseline_px = 386.1448 * scale
+#     return get_calib_params(f, f, cx, cy, baseline_px=baseline_px)
+
+def kitti_load_poses(fn): 
+    X = (np.fromfile(fn, dtype=np.float64, sep=' ')).reshape(-1,12)
+    return map(lambda p: RigidTransform.from_Rt(p[:3,:3], p[:3,3]), 
+                map(lambda x: x.reshape(3,4), X))
+
+def kitti_poses_to_str(poses): 
+    return "\r\n".join(map(lambda x: " ".join(map(str, 
+                                                  (x.to_homogeneous_matrix()[:3,:4]).flatten())), poses))
+
+def kitti_poses_to_mat(poses): 
+    return np.vstack(map(lambda x: (x.to_homogeneous_matrix()[:3,:4]).flatten(), poses)).astype(np.float64)
+
 
 class KITTIDatasetReader(object): 
     """
     KITTIDatasetReader: ImageDatasetReader + VelodyneDatasetReader + Calib
     """
+    kitti_00_02 = StereoCamera.from_calib_params(718.86, 718.86, 607.19, 185.22, 
+                                                 baseline_px=386.1448, shape=np.int32([376, 1241]))
+    kitti_03 = StereoCamera.from_calib_params(721.5377, 721.5377, 609.5593, 172.854, 
+                                                 baseline_px=387.5744, shape=np.int32([376, 1241]))
+    kitti_04_12 = StereoCamera.from_calib_params(707.0912, 707.0912, 601.8873, 183.1104, 
+                                                    baseline_px=379.8145, shape=np.int32([376, 1241]))
+    baseline = 0.5371 # baseline_px / fx
 
     def __init__(self, directory='', 
                  sequence='', 
@@ -28,7 +66,7 @@ class KITTIDatasetReader(object):
         self.scale = scale
 
         # Get calib
-        self.calib = kitti_stereo_calib_params(scale=scale)
+        self.calib = kitti_stereo_calib(sequence, scale=scale)
 
         # Read stereo images
         seq_directory = os.path.join(os.path.expanduser(directory), 'sequences', sequence)
