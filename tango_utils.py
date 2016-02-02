@@ -39,7 +39,7 @@ class TangoImageDecoder(Decoder):
     """
     def __init__(self, directory, channel='RGB', every_k_frames=1, scale=1.): 
         Decoder.__init__(self, channel=channel, every_k_frames=every_k_frames)
-        self.scale = scale
+        self.scale = scale * 2 # HARD-CODED to compensate for scaling the logger
         self.directory = directory
 
     def decode(self, msg): 
