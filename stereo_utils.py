@@ -15,9 +15,10 @@ from bot_utils.db_utils import AttrDict
 from bot_vision.camera_utils import get_calib_params
 from bot_vision.image_utils import im_resize, gaussian_blur, to_color, to_gray
 from bot_vision.imshow_utils import imshow_cv, trackbar_create, trackbar_value
+
+from bot_vision.camera_utils import StereoCamera
 from bot_vision.calib.calibrate_stereo import StereoCalibration, get_stereo_calibration_params
         
-from pybot_vision import FastStereo as _FastStereo
 from pybot_vision import scaled_color_disp
 
 def colorize_stereo_disparity(disp, im=None, max_disparity=256): 
@@ -247,7 +248,7 @@ class CalibratedFastStereo(object):
     """
     This class has been deprecated
     """
-    def __init__(self, stereo, calib_params, rectify=None): 
+    def __init__(self, stereo, stereo_calib, rectify=None): 
         self.stereo_ = stereo
         self.calib_set_ = False
         self.rectify_ = rectify
@@ -256,25 +257,25 @@ class CalibratedFastStereo(object):
         if hasattr(self.stereo_, 'set_calib'): 
 
             # Set fake calibration parameters if None
-            if calib_params is None: 
+            if stereo_calib is None: 
                 def calibration_lambda(H,W): 
-                    new_calib_params = get_calib_params(1000, 1000, W/2-0.5, H/2-0.5, baseline=0.120)
-                    return self.stereo_.set_calib(new_calib_params.P0[:3,:3], 
-                                                              new_calib_params.P1[:3,:3], # K0, K1
-                                                              np.zeros(5), np.zeros(5),
-                                                              np.eye(3), np.eye(3),
-                                                              new_calib_params.P0, new_calib_params.P1, 
-                                                              new_calib_params.Q, new_calib_params.T1, 
-                                                              W, H # round to closest multiple of 16
+                    new_stereo_calib = get_stereo_calib(1000, 1000, W/2-0.5, H/2-0.5, baseline=0.120)
+                    return self.stereo_.set_calib(new_stereo_calib.left.K, 
+                                                  new_stereo_calib.right.K, 
+                                                  new_stereo_calib.left.D, new_stereo_calib.right.D, 
+                                                  new_stereo_calib.left.R, new_stereo_calib.right.R, 
+                                                  new_stereo_calib.left.P, new_stereo_calib.right.P, 
+                                                  new_stereo_calib.Q, new_stereo_calib.right.t, 
+                                                  W, H # round to closest multiple of 16
                     )
                 self.set_calibration = lambda H,W: calibration_lambda(H,W)
             else: 
-                self.set_calibration = lambda H,W: self.stereo_.set_calib(calib_params.P0[:3,:3], 
-                                                                          calib_params.P1[:3,:3], # K0, K1
-                                                                          calib_params.D1, calib_params.D0, 
-                                                                          calib_params.R0, calib_params.R1, 
-                                                                          calib_params.P0, calib_params.P1, 
-                                                                          calib_params.Q, calib_params.T1, 
+                self.set_calibration = lambda H,W: self.stereo_.set_calib(new_stereo_calib.left.K, 
+                                                                          new_stereo_calib.right.K, 
+                                                                          new_stereo_calib.left.D, new_stereo_calib.right.D, 
+                                                                          new_stereo_calib.left.R, new_stereo_calib.right.R, 
+                                                                          new_stereo_calib.left.P, new_stereo_calib.right.P, 
+                                                                          new_stereo_calib.Q, new_stereo_calib.right.t, 
                                                                           W, H # round to closest multiple of 16
                                                                       )
         else: 
@@ -340,11 +341,12 @@ def setup_zed(scale=1.0):
     # fx, fy, cx, cy = 677.57005977463643, 677.57005977463643, 658.49378727401586, 358.58253283725276
     print 'fx, fy, cx, cy', fx, fy, cx, cy, scale
 
-    calib_params = get_calib_params(fx*scale, fy*scale, cx*scale, cy*scale, baseline=0.12) # baseline_px=baseline_px * scale)
-    calib_params.D0 = np.array([0, 0, 0, 0, 0], np.float64)
+    calib_params = StereoCamera.from_calib_params(fx*scale, fy*scale, cx*scale, cy*scale, baseline=0.12)
+    # calib_params = get_calib_params() # baseline_px=baseline_px * scale)
+    # calib_params.D0 = np.array([0, 0, 0, 0, 0], np.float64)
     # calib_params.D0 = np.array([-0.16, 0, 0, 0, 0], np.float64)
-    calib_params.D1 = calib_params.D0
-    calib_params.image_width = image_width * scale
+    # calib_params.D1 = calib_params.D0
+    # calib_params.image_width = image_width * scale
 
     return calib_params
 
@@ -422,3 +424,17 @@ def setup_ps3eye_dataset(filename, start_idx=0, max_length=None, every_k_frames=
     dataset.calib = calib_params
     dataset.scale = scale
     return dataset
+
+
+# def bumblebee_stereo_calib_params_ming(scale=1.0): 
+#     fx, fy = 809.53*scale, 809.53*scale
+#     cx, cy = 321.819*scale, 244.555*scale
+#     baseline = 0.119909
+#     return get_calib_params(fx, fy, cx, cy, baseline=baseline)
+
+# def bumblebee_stereo_calib_params(scale=1.0): 
+#     fx, fy = 0.445057*640*scale, 0.59341*480*scale
+#     cx, cy = 0.496427*640*scale, 0.519434*480*scale
+#     baseline = 0.120018 
+#     return get_calib_params(fx, fy, cx, cy, baseline=baseline)
+

@@ -21,6 +21,19 @@ kinect_v1_params = AttrDict(
     projector_depth_baseline = 0.07214
 )
 
+def get_baseline(fx, baseline=None, baseline_px=None): 
+    """
+    Retrieve baseline / baseline(in pixels) using the focal length
+    """
+    assert(baseline is not None or baseline_px is not None)
+    if baseline is not None: 
+        baseline_px = baseline * fx
+    elif baseline_px is not None: 
+        baseline = baseline_px / fx
+    else: 
+        raise AssertionError('Ambiguous baseline and baseline_px values. Provide either, not both')
+    return baseline, baseline_px
+
 def construct_K(fx=500.0, fy=500.0, cx=319.5, cy=239.5): 
     """
     Create camera intrinsics from focal lengths and focal centers
@@ -30,19 +43,22 @@ def construct_K(fx=500.0, fy=500.0, cx=319.5, cy=239.5):
     K[0,2], K[1,2] = cx, cy
     return K
 
+def construct_D(k1=0, k2=0, k3=0, p1=0, p2=0): 
+    """
+    Create camera distortion params
+    """
+    return np.float64([k1,k2,k3,p1,p2])
+
 def undistort_image(im, K, D): 
-    # newcamera, roi = cv2.getOptimalNewCameraMatrix(self.K, self.D, (W,H), 0) 
+    """
+    Optionally: 
+        newcamera, roi = cv2.getOptimalNewCameraMatrix(self.K, self.D, (W,H), 0) 
+    """
     return cv2.undistort(im, K, D, None, K)
 
 def get_calib_params(fx, fy, cx, cy, baseline=None, baseline_px=None): 
-    assert(baseline is not None or baseline_px is not None)
-    if baseline is not None: 
-        baseline_px = baseline * fx
-    elif baseline_px is not None: 
-        baseline = baseline_px / fx
-    else: 
-        raise AssertionError('Ambiguous baseline and baseline_px values. Provide either, not both')
-        
+
+    baseline, baseline_px = get_baseline(fx, baseline=baseline, baseline_px=baseline_px)
     q43 = -1/baseline
     P0 = np.float32([fx, 0.0, cx, 0.0, 
                      0.0, fy, cy, 0.0, 
@@ -69,18 +85,20 @@ def get_calib_params(fx, fy, cx, cy, baseline=None, baseline_px=None):
 class CameraIntrinsic(object): 
     def __init__(self, K, D=np.zeros(5, dtype=np.float64), shape=None): 
         """
-        Default init
+        K: Calibration matrix
+        D: Distortion
+        shape: Image Size (H,W,C): (480,640,3)
         """
-        self.K = npm.mat(K)                # Calibration matrix
-        self.D = D                         # Distortion
-        self.cx, self.cy = K[0,2], K[1,2]  # Camera center
-        self.fx, self.fy = K[0,0], K[1,1]  # Focal length
-        self.shape = shape                 # Image size (H,W,C): (480,640,3)
+        self.K = npm.mat(K)
+        self.D = D
+        self.shape = shape
 
     def __repr__(self): 
-        return ' K = {:}\n D = {:}\n fx={:}, fy={:}, cx={:}, cy={:}'.format(np.array_str(np.array(self.K), precision=2), 
-                                                                            np.array_str(self.D, precision=2),
-                                                                            self.fx, self.fy, self.cx, self.cy) 
+        return 'CameraIntrinsic =======>\n K = {:}\n D = {:}\n fx={:}, fy={:},'\
+            'cx={:}, cy={:}, shape={:}'.format(
+                np.array_str(np.array(self.K), precision=2), 
+                np.array_str(self.D, precision=2),
+                self.fx, self.fy, self.cx, self.cy, self.shape) 
 
     @classmethod
     def simulate(cls): 
@@ -90,12 +108,49 @@ class CameraIntrinsic(object):
         return cls.from_calib_params(500., 500., 320., 240.)
 
     @classmethod
-    def from_calib_params(cls, fx, fy, cx, cy): 
-        return cls(construct_K(fx, fy, cx, cy))
+    def from_calib_params(cls, fx, fy, cx, cy, k1=0, k2=0, k3=0, p1=0, p2=0, shape=None): 
+        return cls(construct_K(fx, fy, cx, cy), 
+                   D=construct_D(k1, k2, k3, p1, p2), shape=shape)
 
     @classmethod
     def from_calib_params_fov(cls, fov, cx, cy, D=np.zeros(5, dtype=np.float64), shape=None): 
         return cls(construct_K(cx / np.tan(fov), cy / np.tan(fov), cx, cy), D=D, shape=shape)
+
+    @property
+    def fx(self): 
+        return self.K[0,0]
+
+    @property
+    def fy(self): 
+        return self.K[1,1]
+
+    @property
+    def cx(self): 
+        return self.K[0,2]
+
+    @property
+    def cy(self): 
+        return self.K[1,2]
+
+    @property
+    def k1(self): 
+        return self.D[0]
+
+    @property
+    def k2(self): 
+        return self.D[1]
+
+    @property
+    def k3(self): 
+        return self.D[2]
+
+    @property
+    def p1(self): 
+        return self.D[3]
+
+    @property
+    def p2(self): 
+        return self.D[4]
 
     @property
     def fov(self): 
@@ -103,6 +158,18 @@ class CameraIntrinsic(object):
         Returns the field of view for each axis
         """
         return np.array([np.arctan(self.cx / self.fx), np.arctan(self.cy / self.fy)]) * 2
+
+    def scaled(self, scale): 
+        """
+        Returns the scaled intrinsics of the camera, that results 
+        from resizing the image by the appropriate scale parameter
+        """
+        shape = np.int32([self.shape * scale]) if self.shape is not None else None
+        return CameraIntrinsic.from_calib_params(self.fx * scale, self.fy * scale, 
+                                                 self.cx * scale, self.cy * scale, 
+                                                 k1=self.k1, k2=self.k2, k3=self.k3, 
+                                                 p1=self.p1, p2=self.p2, 
+                                                 shape=shape)
 
     def undistort(self, im): 
         return undistort_image(im, self.K, self.D)
@@ -114,19 +181,24 @@ class CameraIntrinsic(object):
         im[:, ::20] = 128
         return self.undistort(im)
 
-    def save(self, filename): 
+    def save(self, filename):
+        try: 
+            height, width = self.shape[:2]
+        except: 
+            height, width = '', ''
         AttrDict(
-            K=self.K.tolist(), D=self.D.tolist(), 
-            shape=self.shape.tolist() if self.shape is not None else None
-        ).save_json(filename)
+            fx=float(self.fx), fy=float(self.fy), 
+            cx=float(self.cx), cy=float(self.cy), 
+            k1=float(self.D[0]), k2=float(self.D[1]), k3=float(self.D[2]), p1=float(self.D[3]), p2=float(self.D[4]),
+            width=int(width), height=int(height)
+        ).save_yaml(filename)
         
     @classmethod
     def load(cls, filename):
-        db = AttrDict.load_json(filename)
-        return cls(
-            K=np.float64(db.K), D=np.float64(db.D), 
-            shape=np.int32(db.shape) if db.shape is not None else None
-        )
+        db = AttrDict.load_yaml(filename)
+        shape = np.int32([db.width, db.height]) if hasattr(db, 'width') and hasattr(db, 'height') else None 
+        return cls.from_calib_params(db.fx, db.fy, db.cx, db.cy, 
+                                     k1=db.k1, k2=db.k2, k3=db.k3, p1=db.p1, p2=db.p2, shape=shape)
     
 class CameraExtrinsic(RigidTransform): 
     def __init__(self, R=npm.eye(3), t=npm.zeros(3)):
@@ -136,6 +208,9 @@ class CameraExtrinsic(RigidTransform):
         p = RigidTransform.from_Rt(R, t)
         RigidTransform.__init__(self, xyzw=p.quat.to_xyzw(), tvec=p.tvec)
 
+    def __repr__(self): 
+        return 'CameraExtrinsic =======>\npose = {:}'.format(RigidTransform.__repr__(self))
+
     @classmethod
     def from_rigid_transform(cls, p): 
         R, t = p.to_Rt()
@@ -144,6 +219,10 @@ class CameraExtrinsic(RigidTransform):
     @property
     def R(self): 
         return self.quat.to_homogeneous_matrix()[:3,:3]
+
+    @property
+    def Rt(self): 
+        return self.quat.to_homogeneous_matrix()[:3]
 
     @property
     def t(self): 
@@ -165,11 +244,11 @@ class CameraExtrinsic(RigidTransform):
 
     def save(self, filename): 
         R, t = p.to_Rt()
-        AttrDict(R=R.tolist(), t=t.tolist()).save_json(filename)
+        AttrDict(R=R.tolist(), t=t.tolist()).save_yaml(filename)
         
     @classmethod
     def load(cls, filename):
-        db = AttrDict.load_json(filename)
+        db = AttrDict.load_yaml(filename)
         return cls(R=np.float64(db.R), t=np.float64(db.t))
         
 class Camera(CameraIntrinsic, CameraExtrinsic): 
@@ -177,10 +256,14 @@ class Camera(CameraIntrinsic, CameraExtrinsic):
         CameraIntrinsic.__init__(self, K, D, shape=shape)
         CameraExtrinsic.__init__(self, R, t)
 
+    def __repr__(self): 
+        return '{:}\n{:}'.format(CameraIntrinsic.__repr__(self),
+                                 CameraExtrinsic.__repr__(self))
+
     @property
     def P(self): 
-        Rt = self.to_homogeneous_matrix()[:3]
-        return self.K.dot(Rt)     # Projection matrix
+        """ Projection matrix """
+        return self.K.dot(self.Rt)     
 
     @classmethod
     def simulate(cls): 
@@ -200,6 +283,12 @@ class Camera(CameraIntrinsic, CameraExtrinsic):
     @classmethod
     def from_KD(cls, K, D, shape=None): 
         return cls.from_intrinsics(CameraIntrinsic(K, D=D, shape=shape))
+
+    def intrinsics(self): 
+        return CameraIntrinsic(self.K, self.D, shape=self.shape)
+
+    def extrinsics(self): 
+        return CameraExtrinsic(self.R, self.t)
 
     def project(self, X):
         """
@@ -232,6 +321,16 @@ class Camera(CameraIntrinsic, CameraExtrinsic):
         self.quat = pose.quat
         self.tvec = pose.tvec
 
+    def scaled(self, scale): 
+        """
+        Returns the scaled (ext/intrinsics) of the camera, that results 
+        from resizing the image by the appropriate scale parameter
+        
+        The [R,t] portion of the extrinsics are unchanged, only the intrinsics
+        """
+        intrinsics = self.intrinsics().scaled(scale)
+        return Camera.from_intrinsics_extrinsics(intrinsics, self.extrinsics())
+
     def F(self, other): 
         """
         Compute the fundamental matrix with respect to other camera 
@@ -261,7 +360,84 @@ class Camera(CameraIntrinsic, CameraExtrinsic):
     def load(cls, filename):
         raise NotImplementedError()
 
+class StereoCamera(object): 
+    def __init__(self, lcamera, rcamera, baseline): 
+        self.left = lcamera
+        self.right = rcamera
+        self.baseline = baseline
 
+    def __repr__(self): 
+        return \
+            """\n############################# Stereo ##############################\n""" \
+            """Baseline (in meters): {:}\n""" \
+            """\n****************************** LEFT ******************************\n""" \
+            """{:}""" \
+            """\n******************************************************************\n""" \
+            """\n***************************** RIGHT ******************************\n""" \
+            """{:}""" \
+            """\n******************************************************************\n""" \
+            """##################################################################\n""" \
+            .format(self.baseline, self.left, self.right)
+
+    @property 
+    def baseline_px(self): 
+        return self.baseline * self.left.fx
+
+    @property
+    def Q(self): 
+        """
+        Q = [ 1 0 0      -c_x
+              0 1 0      -c_y
+              0 0 0      f
+              0 0 -1/T_x (c_x - c_x')/T_x ]')]
+        """
+        q43 = -1.0 / self.baseline
+        return np.float32([[-1, 0, 0, self.left.cx],
+                           [0, -1, 0, self.left.cy], 
+                           [0, 0, 0, -self.left.fx], 
+                           [0, 0, q43, 0]])
+
+    @classmethod
+    def from_calib_params(cls, fx, fy, cx, cy, k1=0, k2=0, k3=0, p1=0, p2=0, baseline=None, baseline_px=None, shape=None): 
+        baseline, baseline_px = get_baseline(fx, baseline=baseline, baseline_px=baseline_px)
+        lcamera = Camera.from_intrinsics(
+            CameraIntrinsic.from_calib_params(fx, fy, cx, cy, k1=k1, k2=k2, k3=k3, p1=p1, p2=p2, shape=shape))
+        rcamera = Camera.from_intrinsics_extrinsics(
+            CameraIntrinsic.from_calib_params(fx, fy, cx, cy, k1=k1, k2=k2, k3=k3, p1=p1, p2=p2, shape=shape), 
+            CameraExtrinsic(t=np.float32([baseline, 0, 0])))
+        return cls(lcamera, rcamera, baseline=baseline)
+
+    @classmethod
+    def from_left_with_baseline(cls, lcamera, baseline): 
+        """ Left extrinsics is assumed to be identity """
+        raise NotImplementedError()
+
+    @classmethod
+    def from_intrinsics_extrinsics(cls, lintrinsics, rintrinsics, rextrinsics): 
+        """ Left extrinsics is assumed to be identity """
+        raise NotImplementedError()
+
+    @classmethod
+    def from_intrinsics(cls, intrinsic): 
+        return cls.from_intrinsics_extrinsics(intrinsic, CameraExtrinsic.identity())
+
+    def scaled(self, scale): 
+        """
+        Returns the scaled (ext/intrinsics) of the camera, that results 
+        from resizing the image by the appropriate scale parameter
+        
+        The [R,t] portion of the extrinsics are unchanged, only the intrinsics
+        """
+        left = self.left.scaled(scale)
+        right = self.right.scaled(scale)
+        return StereoCamera(left, right, baseline=self.baseline)
+
+    @classmethod
+    def load(cls, filename): 
+        raise NotImplementedError()
+
+    def save(self, filename): 
+        raise NotImplementedError()
 
 def KinectCamera(R=npm.eye(3), t=npm.zeros(3)): 
     return Camera(kinect_v1_params.K_depth, R, t)
@@ -348,7 +524,7 @@ def check_visibility(camera, pts_w):
     # Camera: p_cw
     pts_c = camera * pts_w.reshape(-1, 3)
 
-    # Hack: only check max of the fovs
+    # TODO/FIX: Only check max of the fovs
     hfov = np.max(camera.fov) / 2
 
     # Determine look-at vector, and check angle 
@@ -494,6 +670,11 @@ class Frustum(object):
         nll, nlr, nur, nul, fll, flr, fur, ful = self.pose * np.vstack(arr)
         return nll, nlr, nur, nul, fll, flr, fur, ful
 
+
+if __name__ == "__main__": 
+    cam = CameraIntrinsic.from_calib_params(718.856, 718.856, 607.1928, 185.2157, shape=np.int32([1241,376]))
+    print cam.shape
+    cam.save('kitti00-02.yaml')
 
 #   m, n = im.shape[:2]
 #   line = numpy.dot(F, x)

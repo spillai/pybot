@@ -1,5 +1,5 @@
 from bot_vision.imshow_utils import imshow_cv, trackbar_create, trackbar_value
-from bot_vision.imshow_utils import imshow_cv, trackbar_create, trackbar_value
+from bot_vision.image_utils import im_resize, to_gray
 
 from pybot_vision import FastStereo as _FastStereo
 from pybot_vision import scaled_color_disp
@@ -10,9 +10,9 @@ class FastStereo(object):
         # Stereo Methods: CROSS_RATIO_DISPARITY, TESSELLATED_DISPARITY, PLANAR_INTERP_DISPARITY
         self.stereo = _FastStereo(threshold=threshold, 
                                   stereo_method=_FastStereo.TESSELLATED_DISPARITY, lr_consistency_check=True)
-        self.stereo.set_calibration(calib.K0, calib.K1, 
-                                    calib.D1, calib.D0, calib.R0, calib.R1, 
-                                    calib.P0, calib.P1, calib.Q, calib.T1)
+        self.stereo.set_calibration(calib.left.K, calib.right.K, 
+                                    calib.left.D, calib.right.D, calib.left.R, calib.right.R, 
+                                    calib.left.P, calib.right.P, calib.Q, calib.right.t)
         self.stereo.iterations = iterations
 
         self.calib = calib
