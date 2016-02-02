@@ -290,7 +290,7 @@ class MultiViewMapper(Mapper):
     def __init__(self, params=default_params): 
         from pybot_externals import SVO_DepthFilter
         self.depth_filter = SVO_DepthFilter(**params)
-        self.kf_every = 5
+        self.kf_every = 2
         self.idx = 0
 
     def load(self, path):
