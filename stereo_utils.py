@@ -250,47 +250,21 @@ class CalibratedFastStereo(object):
     """
     def __init__(self, stereo, stereo_calib, rectify=None): 
         self.stereo_ = stereo
-        self.calib_set_ = False
         self.rectify_ = rectify
 
-        # Only set calib if available
-        if hasattr(self.stereo_, 'set_calib'): 
-
-            # Set fake calibration parameters if None
-            if stereo_calib is None: 
-                def calibration_lambda(H,W): 
-                    new_stereo_calib = get_stereo_calib(1000, 1000, W/2-0.5, H/2-0.5, baseline=0.120)
-                    return self.stereo_.set_calib(new_stereo_calib.left.K, 
-                                                  new_stereo_calib.right.K, 
-                                                  new_stereo_calib.left.D, new_stereo_calib.right.D, 
-                                                  new_stereo_calib.left.R, new_stereo_calib.right.R, 
-                                                  new_stereo_calib.left.P, new_stereo_calib.right.P, 
-                                                  new_stereo_calib.Q, new_stereo_calib.right.t, 
-                                                  W, H # round to closest multiple of 16
-                    )
-                self.set_calibration = lambda H,W: calibration_lambda(H,W)
-            else: 
-                self.set_calibration = lambda H,W: self.stereo_.set_calib(new_stereo_calib.left.K, 
-                                                                          new_stereo_calib.right.K, 
-                                                                          new_stereo_calib.left.D, new_stereo_calib.right.D, 
-                                                                          new_stereo_calib.left.R, new_stereo_calib.right.R, 
-                                                                          new_stereo_calib.left.P, new_stereo_calib.right.P, 
-                                                                          new_stereo_calib.Q, new_stereo_calib.right.t, 
-                                                                          W, H # round to closest multiple of 16
-                                                                      )
-        else: 
-            self.set_calibration = lambda *args: None
+        # Set fake calibration parameters if None
+        if stereo_calib is None: 
+            stereo_calib = StereoCamera.from_calib_params(1000, 1000, W/2-0.5, H/2-0.5, baseline=0.12)
+        self.stereo_.set_calibration(stereo_calib.left.K, 
+                                     stereo_calib.right.K, 
+                                     stereo_calib.left.D, stereo_calib.right.D, 
+                                     stereo_calib.left.R, stereo_calib.right.R, 
+                                     stereo_calib.left.P, stereo_calib.right.P, 
+                                     stereo_calib.Q, stereo_calib.right.t)
 
     def process(self, left_im, right_im):
         if self.rectify_ is not None: 
             left_im, right_im = self.rectify_(left_im, right_im)
-
-        # Set one time calibration 
-        if not self.calib_set_: 
-            sz = left_im.shape[:2]
-            self.set_calibration(sz[0], sz[1])
-            self.calib_set_ = True
-
         return self.stereo_.process(left_im, right_im)
 
 def setup_zed(scale=1.0): 
@@ -355,14 +329,20 @@ def setup_bb(scale=1.0):
     calib_path = '/home/spillai/perceptual-learning/software/python/bot_vision/calib/bb/calib'
     calibration = StereoCalibration(input_folder=calib_path)
     calib_params = AttrDict(get_stereo_calibration_params(input_folder=calib_path))
-    return calib_params
+    return StereoCamera.from_calib_params(calib_params.fx, calib_params.fy, 
+                                         calib_params.cx, calib_params.cy, baseline=calib_params.baseline)
+    # return calib_params
 
 def setup_ps3eye(scale=1.0): 
     # Setup one-time calibration
     calib_path = '/home/spillai/perceptual-learning/software/python/bot_vision/calib/ps3_stereo/calib'
     calibration = StereoCalibration(input_folder=calib_path)
     calib_params = AttrDict(get_stereo_calibration_params(input_folder=calib_path))
-    return calib_params
+
+    print calib_params
+    return StereoCamera.from_calib_params(calib_params.fx, calib_params.fy, 
+                                          calib_params.cx, calib_params.cy, baseline=0.1) # calib_params.baseline)
+    # return calib_params
 
 def stereo_dataset(filename, channel='CAMERA', start_idx=0, every_k_frames=1, max_length=None, scale=1, split='vertical'): 
     from bot_externals.lcm.log_utils import LCMLogReader, ImageDecoder, StereoImageDecoder
