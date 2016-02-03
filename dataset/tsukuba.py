@@ -34,7 +34,7 @@ class TsukubaStereo2012Reader(object):
     def __init__(self, directory='NewTsukubaStereoDataset/', 
                  left_template='illumination/daylight/left/tsukuba_daylight_L_%05i.png', 
                  right_template='illumination/daylight/right/tsukuba_daylight_R_%05i.png', 
-                 start_idx=1, max_files=50000, scale=1.0): 
+                 start_idx=1, max_files=50000, scale=1.0, grayscale=False): 
 
         # Minor dataset related check
         if start_idx < 1: 
@@ -60,7 +60,7 @@ class TsukubaStereo2012Reader(object):
         self.stereo = StereoDatasetReader(directory=directory,
                                           left_template=left_template, 
                                           right_template=right_template, 
-                                          start_idx=start_idx, max_files=max_files, scale=scale)
+                                          start_idx=start_idx, max_files=max_files, scale=scale, grayscale=grayscale)
         print 'Initialized stereo dataset reader with %f scale' % scale
         gt_fn = os.path.join(os.path.expanduser(directory),
                              'groundtruth/disparity_maps/left/tsukuba_disparity_L_%05i.png')
@@ -68,6 +68,11 @@ class TsukubaStereo2012Reader(object):
                                      max_files=max_files, scale=scale)
         
     def iter_frames(self, *args, **kwargs): 
+        for (left, right), pose in izip(self.iter_stereo_frames(*args, **kwargs), 
+                                               self.poses.iteritems(*args, **kwargs)):
+            yield AttrDict(left=left, right=right, pose=pose)
+
+    def iter_gt_frames(self, *args, **kwargs): 
         for (left, right), pose, depth in izip(self.iter_stereo_frames(*args, **kwargs), 
                                                self.poses.iteritems(*args, **kwargs), 
                                                self.gt.iteritems(*args, **kwargs)): 
@@ -80,11 +85,14 @@ class TsukubaStereo2012Reader(object):
     def stereo_frames(self): 
         return self.iter_stereo_frames()
 
+def tsukuba_stereo_dataset(directory='~/HD1/data/NewTsukubaStereoDataset/', scale=1.0, grayscale=False): 
+    return TsukubaStereo2012Reader(directory=directory, scale=scale, grayscale=grayscale)
+
 if __name__ == "__main__": 
     from bot_vision.imshow_utils import imshow_cv
     from bot_vision.image_utils import to_gray
 
-    dataset = TsukubaStereo2012Reader(directory='~/HD1/data/NewTsukubaStereoDataset/')
+    dataset = tsukuba_stereo_dataset()
     for f in dataset.iter_frames():
         lim, rim = to_gray(f.left), to_gray(f.right)
         out = np.dstack([np.zeros_like(lim), lim, rim])

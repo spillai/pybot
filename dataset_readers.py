@@ -189,15 +189,14 @@ class VelodyneDatasetReader(DatasetReader):
     """
 
 
-    def __init__(self, **kwargs): 
+    def __init__(self, template='template_%i.txt', start_idx=0, max_files=10000, files=None):
         try: 
             from pybot_vision import read_velodyne_pc
         except: 
             raise RuntimeError('read_velodyne_pc missing in pybot_vision. Compile it first!')
-
-        if 'process_cb' in kwargs: 
-            raise RuntimeError('VelodyneDatasetReader does not support defining a process_cb')
-        DatasetReader.__init__(self, process_cb=lambda fn: read_velodyne_pc(fn), **kwargs)
+        DatasetReader.__init__(self, process_cb=lambda fn: read_velodyne_pc(fn), template=template, 
+                               start_idx=start_idx, max_files=max_files, files=files)
+        
 
 class ImageDatasetReader(DatasetReader): 
     """
@@ -210,20 +209,13 @@ class ImageDatasetReader(DatasetReader):
     """
 
     @staticmethod
-    def imread_process_cb(scale=1.0):
-        return lambda fn: im_resize(cv2.imread(fn, -1), scale=scale)
-        
-    def __init__(self, **kwargs): 
-        if 'process_cb' in kwargs: 
-            raise RuntimeError('ImageDatasetReader does not support defining a process_cb')
-
-        if 'scale' in kwargs: 
-            scale = kwargs.pop('scale', 1.0)
-            DatasetReader.__init__(self, 
-                                   process_cb=ImageDatasetReader.imread_process_cb(scale), 
-                                   **kwargs)
-        else: 
-            DatasetReader.__init__(self, process_cb=ImageDatasetReader.imread_process_cb(), **kwargs)
+    def imread_process_cb(scale=1.0, grayscale=False):
+        return lambda fn: im_resize(cv2.imread(fn, cv2.IMREAD_GRAYSCALE if grayscale else cv2.IMREAD_UNCHANGED), scale=scale)
+    
+    def __init__(self, template='template_%i.txt', start_idx=0, max_files=10000, files=None, scale=1.0, grayscale=False): 
+        DatasetReader.__init__(self, 
+                               process_cb=ImageDatasetReader.imread_process_cb(scale=scale, grayscale=grayscale), template=template, 
+                               start_idx=start_idx, max_files=max_files, files=files)
 
     @staticmethod
     def from_filenames(files, **kwargs): 
@@ -242,11 +234,11 @@ class StereoDatasetReader(object):
     def __init__(self, directory='', 
                  left_template='image_0/%06i.png', 
                  right_template='image_1/%06i.png', 
-                 start_idx=0, max_files=10000, scale=1.0): 
+                 start_idx=0, max_files=10000, scale=1.0, grayscale=False): 
         self.left = ImageDatasetReader(template=os.path.join(os.path.expanduser(directory),left_template), 
-                                       start_idx=start_idx, max_files=max_files, scale=scale)
+                                       start_idx=start_idx, max_files=max_files, scale=scale, grayscale=grayscale)
         self.right = ImageDatasetReader(template=os.path.join(os.path.expanduser(directory),right_template), 
-                                        start_idx=start_idx, max_files=max_files, scale=scale)
+                                        start_idx=start_idx, max_files=max_files, scale=scale, grayscale=grayscale)
 
     @classmethod 
     def from_filenames(cls, left_files, right_files, **kwargs): 
