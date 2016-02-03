@@ -137,11 +137,12 @@ class DatasetReader(object):
                 nmatches = start_idx + max_files
             self.files = [template % idx
                           for idx in range(start_idx, min(nmatches, start_idx + max_files))]
+
+            print('Found {:} files with pattern: {:}'.format(nmatches, pattern))
+            print('From {:} to {:}'.format(valid_path(self.files[0]), valid_path(self.files[-1])))
         else: 
             self.files = files
         
-        print('Found {:} files with pattern: {:}'.format(nmatches, pattern))
-        print('From {:} to {:}'.format(valid_path(self.files[0]), valid_path(self.files[-1])))
         # print('First file: {:}: {:}'.format(template % start_idx, 'GOOD' if
         # os.path.exists(template % start_idx) else 'BAD'))
 

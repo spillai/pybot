@@ -121,41 +121,28 @@ class KITTIDatasetReader(object):
         return self.iter_velodyne_frames()
 
     
-    @classmethod
-    def stereo_test_dataset(cls, directory, subdir, scale=1.0):
-        """
-        Ground truth dataset iterator
-        """
+    # @classmethod
+    # def stereo_test_dataset(cls, directory, subdir, scale=1.0):
+    #     """
+    #     Ground truth dataset iterator
+    #     """
 
-        left_directory = os.path.join(os.path.expanduser(directory), '%s_0' % subdir)
-        right_directory = os.path.join(os.path.expanduser(directory), '%s_1' % subdir)
-        noc_directory = os.path.join(os.path.expanduser(directory), 'disp_noc')
-        occ_directory = os.path.join(os.path.expanduser(directory), 'disp_occ')
+    #     left_directory = os.path.join(os.path.expanduser(directory), '%s_0' % subdir)
+    #     right_directory = os.path.join(os.path.expanduser(directory), '%s_1' % subdir)
+    #     noc_directory = os.path.join(os.path.expanduser(directory), 'disp_noc')
+    #     occ_directory = os.path.join(os.path.expanduser(directory), 'disp_occ')
 
-        c = cls()
-        c.scale = scale
-        c.calib = kitti_stereo_calib_params(scale=scale)
+    #     c = cls(sequence='00')
+    #     c.scale = scale
+    #     c.calib = kitti_stereo_calib(1, scale=scale)
 
-        # Stereo is only evaluated on the _10.png images
-        c.stereo = StereoDatasetReader.from_directory(left_directory, right_directory, pattern='*_10.png')
-        c.noc = ImageDatasetReader.from_directory(noc_directory)
-        c.occ = ImageDatasetReader.from_directory(occ_directory)
-        c.poses = [None] * c.stereo.length
+    #     # Stereo is only evaluated on the _10.png images
+    #     c.stereo = StereoDatasetReader.from_directory(left_directory, right_directory, pattern='*_10.png')
+    #     c.noc = ImageDatasetReader.from_directory(noc_directory)
+    #     c.occ = ImageDatasetReader.from_directory(occ_directory)
+    #     c.poses = [None] * c.stereo.length
 
-        return c
-
-    def iter_gt_frames(self, *args, **kwargs):
-        """
-        Iterate over all the ground-truth data
-           - For noc, occ disparity conversion, see devkit_stereo_flow/matlab/disp_read.m
-        """
-        for (left, right), noc, occ, pose in izip(self.iter_stereo_frames(*args, **kwargs), 
-                                                  self.noc.iteritems(*args, **kwargs), 
-                                                  self.occ.iteritems(*args, **kwargs), 
-                                                  self.iteritems(*args, **kwargs)): 
-            yield AttrDict(left=left, right=right, velodyne=None, 
-                           noc=(noc/256).astype(np.float32), 
-                           occ=(occ/256).astype(np.float32), pose=pose)
+    #     return c
 
     @classmethod
     def iterscenes(cls, sequences, directory='', 
@@ -171,6 +158,68 @@ class KITTIDatasetReader(object):
                 right_template=right_template, velodyne_template=velodyne_template, 
                 start_idx=start_idx, max_files=max_files)
         if verbose: pbar.finish()
+
+class KITTIStereoGroundTruthDatasetReader(object): 
+    def __init__(self, directory, subdir, scale=1.0):
+        """
+        Ground truth dataset iterator
+        """
+        left_directory = os.path.join(os.path.expanduser(directory), '%s_0' % subdir)
+        right_directory = os.path.join(os.path.expanduser(directory), '%s_1' % subdir)
+        noc_directory = os.path.join(os.path.expanduser(directory), 'disp_noc')
+        occ_directory = os.path.join(os.path.expanduser(directory), 'disp_occ')
+        left_dir, right_dir = '%s_0' % subdir, '%s_1' % subdir
+
+        self.scale = scale
+        # self.calib = kitti_stereo_calib(1, scale=scale)
+
+        # Stereo is only evaluated on the _10.png images
+        self.stereo = StereoDatasetReader(os.path.expanduser(directory), 
+                                          left_template=''.join([left_dir, '/%06i_10.png']), 
+                                          right_template=''.join([right_dir, '/%06i_10.png']), scale=scale)
+        self.noc = ImageDatasetReader(template=os.path.join(os.path.expanduser(directory), 'disp_noc/%06i_10.png'))
+        self.occ = ImageDatasetReader(template=os.path.join(os.path.expanduser(directory), 'disp_occ/%06i_10.png'))
+
+        def calib_read(fn, scale): 
+            db = AttrDict.load_yaml(fn)
+            P0 = np.float32(db['P0'].split(' '))
+            P1 = np.float32(db['P1'].split(' '))
+            fx, cx, cy = P0[0], P0[2], P0[6]
+            baseline_px = np.fabs(P1[3])
+            return StereoCamera.from_calib_params(fx, fx, cx, cy, baseline_px=baseline_px)
+
+        self.calib = DatasetReader(template=os.path.join(os.path.expanduser(directory), 'calib/%06i.txt'), 
+                                   process_cb=lambda fn: calib_read(fn, scale))
+
+        self.poses = repeat(None)
+
+    def iter_gt_frames(self, *args, **kwargs):
+        """
+        Iterate over all the ground-truth data
+           - For noc, occ disparity conversion, see devkit_stereo_flow/matlab/disp_read.m
+        """
+        for (left, right), noc, occ, calib in izip(self.iter_stereo_frames(*args, **kwargs), 
+                                                         self.noc.iteritems(*args, **kwargs), 
+                                                         self.occ.iteritems(*args, **kwargs), 
+                                                         self.calib.iteritems(*args, **kwargs)):
+            yield AttrDict(left=left, right=right, 
+                           noc=(noc/256).astype(np.float32), 
+                           occ=(occ/256).astype(np.float32), 
+                           calib=calib)
+                
+    def iteritems(self, *args, **kwargs): 
+        return self.stereo.left.iteritems(*args, **kwargs)
+
+    def iter_stereo_frames(self, *args, **kwargs): 
+        return self.stereo.iteritems(*args, **kwargs)
+
+    def iter_frames(self, *args, **kwargs): 
+        for (left, right), pose in izip(self.iter_stereo_frames(*args, **kwargs), self.poses.iteritems(*args, **kwargs)): 
+            yield AttrDict(left=left, right=right, velodyne=None, pose=pose)
+
+    @property
+    def stereo_frames(self): 
+        return self.iter_stereo_frames()
 
 class KITTIRawDatasetReader(KITTIDatasetReader): 
     """
