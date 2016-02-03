@@ -1,10 +1,12 @@
 import os 
+import cv2
 import numpy as np
 from itertools import izip, repeat
 
+from bot_vision.image_utils import im_resize
 from bot_vision.camera_utils import StereoCamera
 from bot_geometry.rigid_transform import Quaternion, RigidTransform
-from bot_utils.dataset_readers import FileReader, ImageDatasetReader, StereoDatasetReader
+from bot_utils.dataset_readers import FileReader, DatasetReader, ImageDatasetReader, StereoDatasetReader
 from bot_utils.db_utils import AttrDict
 import bot_externals.lcm.draw_utils as draw_utils
 
@@ -15,11 +17,6 @@ def tsukuba_load_poses(fn):
         np.deg2rad(p[3]),-np.deg2rad(p[4]),np.deg2rad(p[5]),
         p[0]*.01,-p[1]*.01,-p[2]*.01, axes='sxyz') for p in P ]
 
-# def scaled_calib_params(f, cx, cy, baseline, scale=1.0): 
-#     f = f * scale
-#     cx, cy = cx * scale, cy * scale
-#     return get_calib_params(f, f, cx, cy, baseline=baseline)
-
 class TsukubaStereo2012Reader(object): 
     """
     TsukubaStereo2012Reader: StereoDatasetReader + Calib
@@ -27,9 +24,13 @@ class TsukubaStereo2012Reader(object):
     The resolution of the images is 640x480 pixels, the baseline of the stereo 
     camera is 10cm and the focal length of the camera is 615 pixels.
 
+    https://github.com/pablospe/tsukuba_db/blob/master/README.Tsukuba
+
     """
     calib = StereoCamera.from_calib_params(615, 615, 319.5, 239.5, 
                                            baseline=0.10, shape=np.int32([480, 640]))
+
+
 
     def __init__(self, directory='NewTsukubaStereoDataset/', 
                  left_template='illumination/daylight/left/tsukuba_daylight_L_%05i.png', 
@@ -44,7 +45,6 @@ class TsukubaStereo2012Reader(object):
         self.scale = scale
 
         # Get calib
-        # scaled_calib_params(f=615, cx=319.5, cy=239.5, baseline=0.10, scale=scale)
         self.calib = TsukubaStereo2012Reader.calib.scaled(scale)
 
         # Read poses
@@ -64,9 +64,15 @@ class TsukubaStereo2012Reader(object):
         print 'Initialized stereo dataset reader with %f scale' % scale
         gt_fn = os.path.join(os.path.expanduser(directory),
                              'groundtruth/disparity_maps/left/tsukuba_disparity_L_%05i.png')
-        self.gt = ImageDatasetReader(template=gt_fn, start_idx=start_idx, 
-                                     max_files=max_files, scale=scale)
+        self.gt = DatasetReader(process_cb=TsukubaStereo2012Reader.dispread_process_cb(scale=scale), template=gt_fn, 
+                                start_idx=start_idx, max_files=max_files)
         
+    @staticmethod
+    def dispread_process_cb(scale=1.0):
+        """Scale disparity values for depth images"""
+        return lambda fn: im_resize(cv2.imread(fn, cv2.IMREAD_UNCHANGED), scale=scale) * scale
+
+
     def iter_frames(self, *args, **kwargs): 
         for (left, right), pose in izip(self.iter_stereo_frames(*args, **kwargs), 
                                                self.poses.iteritems(*args, **kwargs)):
