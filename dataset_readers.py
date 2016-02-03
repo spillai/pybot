@@ -8,6 +8,7 @@ import os, fnmatch, time
 import re
 from itertools import izip, imap, chain, islice
 from collections import defaultdict, namedtuple
+from bot_utils.async_utils import async_prefetch
 
 from bot_vision.image_utils import im_resize
 
@@ -150,12 +151,18 @@ class DatasetReader(object):
     def from_filenames(process_cb, files): 
         return DatasetReader(process_cb=process_cb, files=files)
 
+    def _prefetch(self, fnos): 
+        pass
+    def yield_data(self): 
+        pass
+
     @staticmethod
     def from_directory(process_cb, directory, pattern='*.png'):
         files = read_dir(directory, pattern=pattern, flatten=True)
         sorted_files = natural_sort(files)
         return DatasetReader.from_filenames(process_cb, sorted_files)
 
+    # @async_prefetch
     def iteritems(self, every_k_frames=1, reverse=False):
         fnos = np.arange(0, len(self.files), every_k_frames).astype(int)
         if reverse: 

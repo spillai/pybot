@@ -202,6 +202,7 @@ class KITTIStereoGroundTruthDatasetReader(object):
                                                          self.noc.iteritems(*args, **kwargs), 
                                                          self.occ.iteritems(*args, **kwargs), 
                                                          self.calib.iteritems(*args, **kwargs)):
+            print type(noc), type(occ)
             yield AttrDict(left=left, right=right, 
                            noc=(noc/256).astype(np.float32), 
                            occ=(occ/256).astype(np.float32), 
