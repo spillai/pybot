@@ -186,44 +186,8 @@ class OrderedStereoBM(object):
 
         return disp
 
-# Class for stereo reconstruction
 class StereoReconstruction(object): 
-    def __init__(self, calib=None):
-        self.calib = calib
-
-    def disparity_from_plane(self, rows, height): 
-        Z = height * self.calib.fy  /  (np.arange(rows) - self.calib.cy + 1e-9)
-        return self.calib.fx * self.calib.baseline / Z 
-
-    def depth_from_disparity(self, disp): 
-        return self.calib.fx * self.calib.baseline / disp
-
-    def reconstruct(self, disp): 
-        """
-        Reproject to 3D with calib params
-        """
-        X = cv2.reprojectImageTo3D(disp, self.calib.Q)
-        return X
-
-    def reconstruct_sparse(self, xyd): 
-        """
-        Reproject to 3D with calib params
-        """
-        N, _ = xyd.shape[:2]
-        xyd1 = np.hstack([xyd, np.ones(shape=(N,1))])
-        XYZW = np.dot(self.calib.Q, xyd1.T).T
-        W = (XYZW[:,3]).reshape(-1,1)
-        return (XYZW / W)[:,:3]
-                          
-    def reconstruct_with_texture(self, disp, im, sample=1): 
-        """
-        Reproject to 3D with calib params and texture mapped
-        """
-        assert(im.ndim == 3)
-        X = cv2.reprojectImageTo3D(disp, self.calib.Q)
-        im_pub, X_pub = np.copy(im[::sample,::sample]).reshape(-1,3 if im.ndim == 3 else 1), \
-                        np.copy(X[::sample,::sample]).reshape(-1,3)
-        return im_pub, X_pub
+    raise RuntimeError('Deprecated, see camera_utils.StereoCamera')
 
 class CalibratedStereo(object): 
     def __init__(self, left, right):

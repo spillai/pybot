@@ -57,6 +57,7 @@ def undistort_image(im, K, D):
     return cv2.undistort(im, K, D, None, K)
 
 def get_calib_params(fx, fy, cx, cy, baseline=None, baseline_px=None): 
+    raise RuntimeError('Deprecated, see camera_utils.StereoCamera')
 
     baseline, baseline_px = get_baseline(fx, baseline=baseline, baseline_px=baseline_px)
     q43 = -1/baseline
@@ -164,7 +165,7 @@ class CameraIntrinsic(object):
         Returns the scaled intrinsics of the camera, that results 
         from resizing the image by the appropriate scale parameter
         """
-        shape = np.int32([self.shape * scale]) if self.shape is not None else None
+        shape = np.int32(self.shape * scale) if self.shape is not None else None
         return CameraIntrinsic.from_calib_params(self.fx * scale, self.fy * scale, 
                                                  self.cx * scale, self.cy * scale, 
                                                  k1=self.k1, k2=self.k2, k3=self.k3, 
@@ -284,9 +285,11 @@ class Camera(CameraIntrinsic, CameraExtrinsic):
     def from_KD(cls, K, D, shape=None): 
         return cls.from_intrinsics(CameraIntrinsic(K, D=D, shape=shape))
 
+    @property
     def intrinsics(self): 
         return CameraIntrinsic(self.K, self.D, shape=self.shape)
 
+    @property
     def extrinsics(self): 
         return CameraExtrinsic(self.R, self.t)
 
@@ -328,8 +331,8 @@ class Camera(CameraIntrinsic, CameraExtrinsic):
         
         The [R,t] portion of the extrinsics are unchanged, only the intrinsics
         """
-        intrinsics = self.intrinsics().scaled(scale)
-        return Camera.from_intrinsics_extrinsics(intrinsics, self.extrinsics())
+        intrinsics = self.intrinsics.scaled(scale)
+        return Camera.from_intrinsics_extrinsics(intrinsics, self.extrinsics)
 
     def F(self, other): 
         """
@@ -431,6 +434,49 @@ class StereoCamera(object):
         left = self.left.scaled(scale)
         right = self.right.scaled(scale)
         return StereoCamera(left, right, baseline=self.baseline)
+
+    def disparity_from_plane(self, rows, height): 
+        """
+        Computes the disparity image from expected height for each of
+        the provided rows
+        """
+
+        Z = height * self.left.fy  /  (np.arange(rows) - self.left.cy + 1e-9)
+        return self.left.fx * self.baseline / Z 
+
+    def depth_from_disparity(self, disp): 
+        """
+        Computes the depth given disparity
+        """
+        return self.left.fx * self.baseline / disp
+
+    def reconstruct(self, disp): 
+        """
+        Reproject to 3D with calib params
+        """
+        X = cv2.reprojectImageTo3D(disp, self.Q)
+        return X
+
+    def reconstruct_sparse(self, xyd): 
+        """
+        Reproject to 3D with calib params
+        """
+        N, _ = xyd.shape[:2]
+        xyd1 = np.hstack([xyd, np.ones(shape=(N,1))])
+        XYZW = np.dot(self.Q, xyd1.T).T
+        W = (XYZW[:,3]).reshape(-1,1)
+        return (XYZW / W)[:,:3]
+                          
+    def reconstruct_with_texture(self, disp, im, sample=1): 
+        """
+        Reproject to 3D with calib params and texture mapped
+        """
+        assert(im.ndim == 3)
+        X = cv2.reprojectImageTo3D(disp, self.Q)
+        im_pub, X_pub = np.copy(im[::sample,::sample]).reshape(-1,3 if im.ndim == 3 else 1), \
+                        np.copy(X[::sample,::sample]).reshape(-1,3)
+        return im_pub, X_pub
+
 
     @classmethod
     def load(cls, filename): 
@@ -544,7 +590,7 @@ def get_median_depth(camera, pts, subsample=10):
     """
     return np.median((camera * pts[::subsample])[:,2])
 
-def get_bounded_projection(camera, pts, subsample=10, min_height=10, min_width=10): 
+def get_bounded_projection(camera, pts, subsample=10): 
     """ Project points and only return points that are within image bounds """
 
     # Project points
