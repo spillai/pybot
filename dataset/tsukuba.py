@@ -11,10 +11,16 @@ from bot_utils.db_utils import AttrDict
 import bot_externals.lcm.draw_utils as draw_utils
 
 def tsukuba_load_poses(fn): 
-    """ Retrieve poses """ 
+    """ 
+    Retrieve poses
+    X Y Z R P Y => X -Y -Z R -P -Y
+    
+    np.deg2rad(p[3]),-np.deg2rad(p[4]),-np.deg2rad(p[5]),
+        p[0]*.01,-p[1]*.01,-p[2]*.01, axes='sxyz') for p in P ]
+    """ 
     P = np.loadtxt(os.path.expanduser(fn), dtype=np.float64, delimiter=',')
     return [ RigidTransform.from_roll_pitch_yaw_x_y_z(
-        np.deg2rad(p[3]),-np.deg2rad(p[4]),np.deg2rad(p[5]),
+        np.deg2rad(p[3]),-np.deg2rad(p[4]),-np.deg2rad(p[5]),
         p[0]*.01,-p[1]*.01,-p[2]*.01, axes='sxyz') for p in P ]
 
 class TsukubaStereo2012Reader(object): 
