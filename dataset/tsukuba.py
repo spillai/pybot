@@ -50,11 +50,11 @@ class TsukubaStereo2012Reader(object):
         # Read poses
         try: 
             pose_fn = os.path.join(os.path.expanduser(directory), 'groundtruth/camera_track.txt')
-            self.poses = FileReader(pose_fn, process_cb=tsukuba_load_poses)                    
+            self.poses = FileReader(pose_fn, start_idx=start_idx, process_cb=tsukuba_load_poses)                    
         except Exception as e: 
             self.poses = repeat(None)
             raise RuntimeError('Failed to load poses properly, cannot proceed {:}'.format(e))
-        draw_utils.publish_pose_list('POSES', self.poses.items, frame_id='camera')
+        # draw_utils.publish_pose_list('POSES', self.poses.items, frame_id='camera')
 
         # Read stereo images
         self.stereo = StereoDatasetReader(directory=directory,

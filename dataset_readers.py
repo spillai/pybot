@@ -91,14 +91,15 @@ def read_dir(directory, pattern='*.png', recursive=True, expected=None, verbose=
     return fn_map
 
 class FileReader(object): 
-    def __init__(self, filename, process_cb): 
+    def __init__(self, filename, process_cb, start_idx=0): 
         self.filename_ = filename
+        self.start_idx_ = start_idx
         self.items_ = process_cb(filename)
 
     def iteritems(self, every_k_frames=1, reverse=False): 
         if reverse: 
             raise NotImplementedError
-        return islice(self.items_, 0, None, every_k_frames)
+        return islice(self.items_, self.start_idx_, None, every_k_frames)
 
     @property
     def items(self): 
