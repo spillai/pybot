@@ -13,15 +13,22 @@ import bot_externals.lcm.draw_utils as draw_utils
 def tsukuba_load_poses(fn): 
     """ 
     Retrieve poses
-    X Y Z R P Y => X -Y -Z R -P -Y
+    X Y Z R P Y - > X -Y -Z R -P -Y
     
     np.deg2rad(p[3]),-np.deg2rad(p[4]),-np.deg2rad(p[5]),
         p[0]*.01,-p[1]*.01,-p[2]*.01, axes='sxyz') for p in P ]
+
     """ 
     P = np.loadtxt(os.path.expanduser(fn), dtype=np.float64, delimiter=',')
-    return [ RigidTransform.from_roll_pitch_yaw_x_y_z(
-        np.deg2rad(p[3]),-np.deg2rad(p[4]),-np.deg2rad(p[5]),
-        p[0]*.01,-p[1]*.01,-p[2]*.01, axes='sxyz') for p in P ]
+    return [ RigidTransform.from_roll_pitch_yaw_x_y_z(np.pi, 0, 0, 0, 0, 0) * \
+             RigidTransform.from_roll_pitch_yaw_x_y_z(
+                 np.deg2rad(p[3]),np.deg2rad(p[4]),np.deg2rad(p[5]),
+                 p[0]*.01,p[1]*.01,p[2]*.01, axes='sxyz') * \
+             RigidTransform.from_roll_pitch_yaw_x_y_z(np.pi, 0, 0, 0, 0, 0) for p in P ]
+    
+    # return [ RigidTransform.from_roll_pitch_yaw_x_y_z(
+    #     np.deg2rad(p[3]),-np.deg2rad(p[4]),-np.deg2rad(p[5]),
+    #     p[0]*.01,-p[1]*.01,-p[2]*.01, axes='sxyz') for p in P ]
 
 class TsukubaStereo2012Reader(object): 
     """
@@ -60,7 +67,8 @@ class TsukubaStereo2012Reader(object):
         except Exception as e: 
             self.poses = repeat(None)
             raise RuntimeError('Failed to load poses properly, cannot proceed {:}'.format(e))
-        # draw_utils.publish_pose_list('POSES', self.poses.items, frame_id='camera')
+        draw_utils.publish_pose_list('POSES', self.poses.items, frame_id='camera')
+        print np.vstack([item.to_roll_pitch_yaw_x_y_z()[:3] for item in self.poses.items])[::10]
 
         # Read stereo images
         self.stereo = StereoDatasetReader(directory=directory,
