@@ -10,6 +10,7 @@ from bot_vision.camera_utils import StereoCamera
 from bot_utils.dataset_readers import natural_sort, \
     FileReader, DatasetReader, ImageDatasetReader, \
     StereoDatasetReader, VelodyneDatasetReader
+from bot_geometry.rigid_transform import RigidTransform
 
 def kitti_stereo_calib(sequence, scale=1.0): 
     seq = int(sequence)
@@ -79,7 +80,7 @@ class KITTIDatasetReader(object):
         try: 
             pose_fn = os.path.join(os.path.expanduser(directory), 'poses', ''.join([sequence, '.txt']))
             self.poses = FileReader(pose_fn, process_cb=kitti_load_poses)
-        except: 
+        except Exception as e:
             self.poses = repeat(None)
 
         # Read velodyne
@@ -109,6 +110,10 @@ class KITTIDatasetReader(object):
                     self.velodyne.iteritems(*args, **kwargs))
 
     def iter_frames(self, *args, **kwargs): 
+        for (left, right), pose in izip(self.iter_stereo_frames(*args, **kwargs), self.poses.iteritems(*args, **kwargs)): 
+            yield AttrDict(left=left, right=right, velodyne=None, pose=pose)
+
+    def iter_gt_frames(self, *args, **kwargs): 
         for (left, right), pose in izip(self.iter_stereo_frames(*args, **kwargs), self.poses.iteritems(*args, **kwargs)): 
             yield AttrDict(left=left, right=right, velodyne=None, pose=pose)
 
@@ -198,15 +203,16 @@ class KITTIStereoGroundTruthDatasetReader(object):
         Iterate over all the ground-truth data
            - For noc, occ disparity conversion, see devkit_stereo_flow/matlab/disp_read.m
         """
-        for (left, right), noc, occ, calib in izip(self.iter_stereo_frames(*args, **kwargs), 
+        for (left, right), noc, occ, calib, pose in izip(self.iter_stereo_frames(*args, **kwargs), 
                                                          self.noc.iteritems(*args, **kwargs), 
                                                          self.occ.iteritems(*args, **kwargs), 
-                                                         self.calib.iteritems(*args, **kwargs)):
-            print type(noc), type(occ)
+                                                         self.calib.iteritems(*args, **kwargs), 
+                                                         self.poses.iteritems(*args, **kwargs)):
             yield AttrDict(left=left, right=right, 
+                           depth=(occ/256).astype(np.float32),
                            noc=(noc/256).astype(np.float32), 
                            occ=(occ/256).astype(np.float32), 
-                           calib=calib)
+                           calib=calib, pose=pose)
                 
     def iteritems(self, *args, **kwargs): 
         return self.stereo.left.iteritems(*args, **kwargs)
