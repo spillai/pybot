@@ -67,8 +67,6 @@ class TsukubaStereo2012Reader(object):
         except Exception as e: 
             self.poses = repeat(None)
             raise RuntimeError('Failed to load poses properly, cannot proceed {:}'.format(e))
-        draw_utils.publish_pose_list('POSES', self.poses.items, frame_id='camera')
-        print np.vstack([item.to_roll_pitch_yaw_x_y_z()[:3] for item in self.poses.items])[::10]
 
         # Read stereo images
         self.stereo = StereoDatasetReader(directory=directory,
@@ -104,6 +102,9 @@ class TsukubaStereo2012Reader(object):
     @property
     def stereo_frames(self): 
         return self.iter_stereo_frames()
+
+    def viz_gt_poses(self): 
+        draw_utils.publish_pose_list('POSES', self.poses.items, frame_id='camera')
 
 def tsukuba_stereo_dataset(directory='~/HD1/data/NewTsukubaStereoDataset/', scale=1.0, grayscale=False): 
     return TsukubaStereo2012Reader(directory=directory, scale=scale, grayscale=grayscale)
