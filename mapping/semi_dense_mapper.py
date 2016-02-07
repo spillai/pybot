@@ -287,10 +287,11 @@ class MultiViewMapper(Mapper):
         W = 640, H = 480
         ,gridSize=30, nPyrLevels=1, max_n_kfs=4
     )
-    def __init__(self, params=default_params): 
+    def __init__(self, K, W, H, gridSize=30, nPyrLevels=1, max_n_kfs=4): 
         from pybot_externals import SVO_DepthFilter
-        self.depth_filter = SVO_DepthFilter(**params)
-        self.kf_every = 2
+        self.depth_filter = SVO_DepthFilter(np.float64(K), int(W), int(H), 
+                                            gridSize=gridSize, nPyrLevels=nPyrLevels, max_n_kfs=max_n_kfs)
+        self.kf_every = 5
         self.idx = 0
 
     def load(self, path):
