@@ -83,6 +83,15 @@ def get_calib_params(fx, fy, cx, cy, baseline=None, baseline_px=None):
     return AttrDict(R0=R0, R1=R1, K0=K0, K1=K1, P0=P0, P1=P1, Q=Q, T0=T0, T1=T1, 
                     D0=D0, D1=D1, fx=fx, fy=fy, cx=cx, cy=cy, baseline=baseline, baseline_px=baseline * fx)
 
+def nonzero_pixels(disp): 
+    """
+    Determine the non zero pixel (x,y) coordinates for the 
+    disparity image
+    """
+    valid = disp > 0
+    xs, ys = np.meshgrid(np.arange(disp.shape[1]), np.arange(disp.shape[0]))
+    return np.dstack([xs[valid], ys[valid], disp[valid]]).reshape(-1,3)
+
 class CameraIntrinsic(object): 
     def __init__(self, K, D=np.zeros(5, dtype=np.float64), shape=None): 
         """
