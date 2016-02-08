@@ -386,11 +386,20 @@ class Camera(CameraIntrinsic, CameraExtrinsic):
     def load(cls, filename):
         raise NotImplementedError()
 
-class StereoCamera(object): 
+class StereoCamera(Camera): 
     def __init__(self, lcamera, rcamera, baseline): 
-        self.left = lcamera
+        Camera.__init__(self, lcamera.K, lcamera.R, lcamera.t, D=lcamera.D, shape=lcamera.shape) 
+
+        # CameraIntrinsic.__init__(self, K, D, shape=shape)
+        # CameraExtrinsic.__init__(self, R, t)
+
+        # self.left = lcamera
         self.right = rcamera
         self.baseline = baseline
+
+    @property
+    def left(self): 
+        return self
 
     def __repr__(self): 
         return \
@@ -428,15 +437,24 @@ class StereoCamera(object):
         baseline, baseline_px = get_baseline(fx, baseline=baseline, baseline_px=baseline_px)
         lcamera = Camera.from_intrinsics(
             CameraIntrinsic.from_calib_params(fx, fy, cx, cy, k1=k1, k2=k2, k3=k3, p1=p1, p2=p2, shape=shape))
-        rcamera = Camera.from_intrinsics_extrinsics(
-            CameraIntrinsic.from_calib_params(fx, fy, cx, cy, k1=k1, k2=k2, k3=k3, p1=p1, p2=p2, shape=shape), 
-            CameraExtrinsic(t=np.float32([baseline, 0, 0])))
-        return cls(lcamera, rcamera, baseline=baseline)
+        return cls.from_left_with_baseline(lcamera, baseline=baseline)
+
+        # rcamera = Camera.from_intrinsics_extrinsics(
+        #     CameraIntrinsic.from_calib_params(fx, fy, cx, cy, k1=k1, k2=k2, k3=k3, p1=p1, p2=p2, shape=shape), 
+        #     CameraExtrinsic(t=np.float32([baseline, 0, 0])))
+
+        # return cls(lcamera, rcamera, baseline=baseline)
 
     @classmethod
     def from_left_with_baseline(cls, lcamera, baseline): 
         """ Left extrinsics is assumed to be identity """
-        raise NotImplementedError()
+        rcamera = Camera.from_intrinsics_extrinsics(
+            lcamera.intrinsics, 
+            CameraExtrinsic.from_rigid_transform(
+                lcamera.oplus(RigidTransform.from_roll_pitch_yaw_x_y_z(0,0,0,baseline,0,0))
+            )
+        )
+        return cls(lcamera, rcamera, baseline=baseline)
 
     @classmethod
     def from_intrinsics_extrinsics(cls, lintrinsics, rintrinsics, rextrinsics): 
@@ -454,7 +472,7 @@ class StereoCamera(object):
         
         The [R,t] portion of the extrinsics are unchanged, only the intrinsics
         """
-        left = self.left.scaled(scale)
+        left = super(StereoCamera, self).scaled(scale)
         right = self.right.scaled(scale)
         return StereoCamera(left, right, baseline=self.baseline)
 
@@ -472,6 +490,12 @@ class StereoCamera(object):
         Computes the depth given disparity
         """
         return self.left.fx * self.baseline / disp
+
+    def disparity_from_depth(self, depth): 
+        """
+        Computes the disparity given depth 
+        """
+        return self.left.fx * self.baseline / depth
 
     def reconstruct(self, disp): 
         """
@@ -500,7 +524,15 @@ class StereoCamera(object):
                         np.copy(X[::sample,::sample]).reshape(-1,3)
         return im_pub, X_pub
 
-
+    def set_pose(self, left_pose): 
+        """
+        Provide extrinsics to the left camera
+        """
+        super(StereoCamera, self).set_pose(left_pose)
+        self.right.set_pose(
+            self.left.oplus(RigidTransform.from_roll_pitch_yaw_x_y_z(0,0,0,self.baseline,0,0))
+        )
+        
     @classmethod
     def load(cls, filename): 
         raise NotImplementedError()
