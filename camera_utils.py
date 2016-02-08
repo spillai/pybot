@@ -412,7 +412,7 @@ class StereoCamera(Camera):
             """{:}""" \
             """\n******************************************************************\n""" \
             """##################################################################\n""" \
-            .format(self.baseline, self.left, self.right)
+            .format(self.baseline, super(StereoCamera, self).__repr__(), self.right)
 
     @property 
     def baseline_px(self): 

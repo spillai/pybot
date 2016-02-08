@@ -186,8 +186,8 @@ class OrderedStereoBM(object):
 
         return disp
 
-class StereoReconstruction(object): 
-    raise RuntimeError('Deprecated, see camera_utils.StereoCamera')
+# class StereoReconstruction(object): 
+#     raise RuntimeError('Deprecated, see camera_utils.StereoCamera')
 
 class CalibratedStereo(object): 
     def __init__(self, left, right):
