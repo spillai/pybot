@@ -104,7 +104,7 @@ class CameraIntrinsic(object):
         self.shape = shape
 
     def __repr__(self): 
-        return 'CameraIntrinsic =======>\n K = {:}\n D = {:}\n fx={:}, fy={:},'\
+        return 'CameraIntrinsic =======>\n K = {:}\n D = {:}\n fx={:}, fy={:}, '\
             'cx={:}, cy={:}, shape={:}'.format(
                 np.array_str(np.array(self.K), precision=2), 
                 np.array_str(self.D, precision=2),
