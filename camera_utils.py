@@ -302,14 +302,28 @@ class Camera(CameraIntrinsic, CameraExtrinsic):
     def extrinsics(self): 
         return CameraExtrinsic(self.R, self.t)
 
-    def project(self, X):
+    def project(self, X, check_bounds=False, return_depth=False):
         """
         Project [Nx3] points onto 2-D image plane [Nx2]
         """
         R, t = self.to_Rt()
 	rvec,_ = cv2.Rodrigues(R)
 	proj,_ = cv2.projectPoints(X, rvec, t, self.K, self.D)
-	return proj.reshape((-1,2))
+        x = proj.reshape(-1,2)
+        
+        if check_bounds: 
+            # Only return points within-image bounds
+            valid = np.bitwise_and(np.bitwise_and(x[:,0] >= 0, x[:,0] < self.shape[1]), \
+                                   np.bitwise_and(x[:,1] >= 0, x[:,1] < self.shape[0]))
+            x, X = x[valid], X[valid]
+            
+        if return_depth: 
+            # Transform points in camera frame, and check z-vector: 
+            # [p_c = T_cw * p_w]
+            depths = (self.extrinsics * X)[:,2]
+            return x, depths
+	
+        return x
 
     def factor(self): 
         """
