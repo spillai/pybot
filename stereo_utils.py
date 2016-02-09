@@ -1,33 +1,45 @@
 import cv2, time
 import numpy as np
 from collections import deque
+from scipy.interpolate import LinearNDInterpolator
 
-import bot_vision.color_utils as color_utils 
-import bot_vision.image_utils as image_utils 
+from bot_utils.db_utils import AttrDict
+
+from bot_vision.camera_utils import StereoCamera
+from bot_vision.image_utils import im_resize, gaussian_blur, to_color, to_gray, valid_pixels
+from bot_vision.imshow_utils import imshow_cv, trackbar_create, trackbar_value
+from bot_vision.color_utils import colormap
+from bot_vision.calib.calibrate_stereo import StereoCalibration, get_stereo_calibration_params
+        
+from pybot_vision import scaled_color_disp
+from pybot_externals import StereoELAS
+
+# from pybot_externals import fast_cost_volume_filtering, ordered_row_disparity
 
 # from pybot_vision import VoxelStereoBM as _VoxelStereoBM
 # from pybot_vision import EdgeStereoBM as _EdgeStereoBM
 # from pybot_vision import EdgeStereo as _EdgeStereo
 
-from pybot_externals import StereoELAS # , OrderedCostVolumeStereo
-# from pybot_externals import fast_cost_volume_filtering, ordered_row_disparity
-from bot_utils.db_utils import AttrDict
-from bot_vision.camera_utils import get_calib_params
-from bot_vision.image_utils import im_resize, gaussian_blur, to_color, to_gray
-from bot_vision.imshow_utils import imshow_cv, trackbar_create, trackbar_value
-
-from bot_vision.camera_utils import StereoCamera
-from bot_vision.calib.calibrate_stereo import StereoCalibration, get_stereo_calibration_params
-        
-from pybot_vision import scaled_color_disp
-
 def colorize_stereo_disparity(disp, im=None, max_disparity=256): 
     # Display colored disparity
-    disp_color = color_utils.colormap(disp.astype(np.float32) / max_disparity) 
+    disp_color = colormap(disp.astype(np.float32) / max_disparity) 
     if im is None: 
         return disp_color 
     else: 
-        return np.vstack([image_utils.to_color(im), disp_color])
+        return np.vstack([to_color(im), disp_color])
+
+
+def disparity_interpolate(disp, fill_zeros=True): 
+    # Determine valid positive disparity pixels
+    xyd = valid_pixels(disp, disp > 0)
+
+    # Nearest neighbor interpolator
+    nn = LinearNDInterpolator(xyd[:,:2], xyd[:,2])
+
+    # Interpolate all pixels
+    xyd = valid_pixels(disp, np.ones(shape=disp.shape, dtype=np.bool))
+    return nn(xyd[:,:2]).reshape(disp.shape[:2])
+
 
 class StereoSGBM: 
     # Parameters from KITTI dataset

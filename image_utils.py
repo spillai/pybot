@@ -131,6 +131,19 @@ def blur_detect(im, threshold=7):
 def variance_of_laplacian(image):
     return cv2.Laplacian(image, cv2.CV_64F).var()
 
+def valid_pixels(im, valid): 
+    """
+    Determine valid pixel (x,y) coords for the image
+    """
+    if valid.dtype != np.bool: 
+        raise ValueError('valid_pixels requires boolean image')
+    assert(im.shape == valid.shape)
+
+    H,W = valid.shape[:2]
+    xs, ys = np.meshgrid(np.arange(W), np.arange(H))
+    return np.dstack([xs[valid], ys[valid], im[valid]]).reshape(-1,3)
+
+
 class MosaicBuilder(object): 
     def __init__(self, filename_template, maxlen=100, shape=(1600,900), glyph_shape=(50,50)): 
         self.idx_ = 0
