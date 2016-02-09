@@ -14,7 +14,10 @@ def kitti_stereo_training_color_dataset(*args, **kwargs):
     return KITTIStereoGroundTruthDatasetReader(directory='~/HD1/data/KITTI/data_stereo_flow/training', subdir='colored', **kwargs)
 
 def kitti_stereo_training_dataset(*args, **kwargs): 
-    return KITTIStereoGroundTruthDatasetReader(directory='~/HD1/data/KITTI/data_stereo_flow/training', subdir='image', **kwargs)
+    return KITTIStereoGroundTruthDatasetReader(directory='~/HD1/data/KITTI/data_stereo_flow/training', is_2015=False, **kwargs)
+
+def kitti_stereo_2015_training_dataset(*args, **kwargs): 
+    return KITTIStereoGroundTruthDatasetReader(directory='~/HD1/data/KITTI/2015/data_scene_flow/training', is_2015=True, **kwargs)
     
 def test_color_dataset(*args, **kwargs): 
     return KITTIDatasetReader(directory='~/data/dataset/', sequence='08', 

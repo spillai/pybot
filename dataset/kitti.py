@@ -165,30 +165,32 @@ class KITTIDatasetReader(object):
         if verbose: pbar.finish()
 
 class KITTIStereoGroundTruthDatasetReader(object): 
-    def __init__(self, directory, subdir, scale=1.0):
+    def __init__(self, directory, is_2015=False, scale=1.0):
         """
         Ground truth dataset iterator
         """
-        left_directory = os.path.join(os.path.expanduser(directory), '%s_0' % subdir)
-        right_directory = os.path.join(os.path.expanduser(directory), '%s_1' % subdir)
-        noc_directory = os.path.join(os.path.expanduser(directory), 'disp_noc')
-        occ_directory = os.path.join(os.path.expanduser(directory), 'disp_occ')
-        left_dir, right_dir = '%s_0' % subdir, '%s_1' % subdir
+        if is_2015: 
+            left_dir, right_dir = 'image_2', 'image_3'
+            noc_dir, occ_dir = 'disp_noc_0', 'disp_occ_0'
+            calib_left, calib_right = 'P2', 'P3'
+        else: 
+            left_dir, right_dir = 'image_0', 'image_1'
+            noc_dir, occ_dir = 'disp_noc', 'disp_occ'
+            calib_left, calib_right = 'P0', 'P1'
 
         self.scale = scale
-        # self.calib = kitti_stereo_calib(1, scale=scale)
 
         # Stereo is only evaluated on the _10.png images
         self.stereo = StereoDatasetReader(os.path.expanduser(directory), 
                                           left_template=''.join([left_dir, '/%06i_10.png']), 
-                                          right_template=''.join([right_dir, '/%06i_10.png']), scale=scale)
-        self.noc = ImageDatasetReader(template=os.path.join(os.path.expanduser(directory), 'disp_noc/%06i_10.png'))
-        self.occ = ImageDatasetReader(template=os.path.join(os.path.expanduser(directory), 'disp_occ/%06i_10.png'))
+                                          right_template=''.join([right_dir, '/%06i_10.png']), scale=scale, grayscale=True)
+        self.noc = ImageDatasetReader(template=os.path.join(os.path.expanduser(directory), noc_dir, '%06i_10.png'))
+        self.occ = ImageDatasetReader(template=os.path.join(os.path.expanduser(directory), occ_dir, '%06i_10.png'))
 
         def calib_read(fn, scale): 
             db = AttrDict.load_yaml(fn)
-            P0 = np.float32(db['P0'].split(' '))
-            P1 = np.float32(db['P1'].split(' '))
+            P0 = np.float32(db[calib_left].split(' '))
+            P1 = np.float32(db[calib_right].split(' '))
             fx, cx, cy = P0[0], P0[2], P0[6]
             baseline_px = np.fabs(P1[3])
             return StereoCamera.from_calib_params(fx, fx, cx, cy, baseline_px=baseline_px)
@@ -203,16 +205,15 @@ class KITTIStereoGroundTruthDatasetReader(object):
         Iterate over all the ground-truth data
            - For noc, occ disparity conversion, see devkit_stereo_flow/matlab/disp_read.m
         """
-        for (left, right), noc, occ, calib, pose in izip(self.iter_stereo_frames(*args, **kwargs), 
+        for (left, right), noc, occ, calib in izip(self.iter_stereo_frames(*args, **kwargs), 
                                                          self.noc.iteritems(*args, **kwargs), 
                                                          self.occ.iteritems(*args, **kwargs), 
-                                                         self.calib.iteritems(*args, **kwargs), 
-                                                         self.poses.iteritems(*args, **kwargs)):
+                                                         self.calib.iteritems(*args, **kwargs)):
             yield AttrDict(left=left, right=right, 
                            depth=(occ/256).astype(np.float32),
                            noc=(noc/256).astype(np.float32), 
                            occ=(occ/256).astype(np.float32), 
-                           calib=calib, pose=pose)
+                           calib=calib, pose=None)
                 
     def iteritems(self, *args, **kwargs): 
         return self.stereo.left.iteritems(*args, **kwargs)
@@ -319,7 +320,7 @@ class OmnicamDatasetReader(object):
 
         # Read stereo images
         seq_directory = os.path.join(os.path.expanduser(directory), sequence)
-        print os.path.join(seq_directory, left_template)
+        
         self.stereo = StereoDatasetReader(directory=seq_directory,
                                           left_template=os.path.join(seq_directory,left_template), 
                                           right_template=os.path.join(seq_directory,right_template), 
