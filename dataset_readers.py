@@ -1,3 +1,10 @@
+"""
+Basic utilities for dataset reader 
+"""
+
+# Copyright (c) 2015 Sudeep Pillai <spillai@csail.mit.edu>
+# License: BSD 3 clause
+
 import cv2
 import numpy as np
 import os, fnmatch, time
