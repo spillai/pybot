@@ -6,6 +6,7 @@ from pybot_vision import scaled_color_disp
 
 class FastStereo(object): 
     def __init__(self, calib, threshold=10, scale=1.0, iterations=1): 
+        print calib
 
         # Stereo Methods: CROSS_RATIO_DISPARITY, TESSELLATED_DISPARITY, PLANAR_INTERP_DISPARITY
         self.stereo = _FastStereo(threshold=threshold, 
