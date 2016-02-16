@@ -1,15 +1,9 @@
-<<<<<<< HEAD
 """
 Basic utilities for dataset reader 
 """
-
 # Copyright (c) 2015 Sudeep Pillai <spillai@csail.mit.edu>
-# License: BSD 3 clause
-=======
-"""Basic dataset reader"""
 # Author: Sudeep Pillai <spillai@csail.mit.edu>
 # License: MIT
->>>>>>> 5f3d1790c4ecc51ff5fca0f48789e7a49803697b
 
 import cv2
 import numpy as np
