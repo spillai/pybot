@@ -70,15 +70,29 @@ class StereoSGBM:
         return self.sgbm.compute(left, right).astype(np.float32) / 16.0
 
 class StereoBM: 
+    
+    # From KITTI dataset
+    # pre_filter_size 41 
+    # pre_filter_cap 31 
+    # sad_window_size 9 
+    # number_of_disparities 128 
+    # texture_threshold 20 
+    # uniqueness_ratio 10 
+    # speckleWindowSize 100 
+    # speckleRange 32
+
     sad_window_size = 9
     default_params = dict( preset=cv2.STEREO_BM_BASIC_PRESET, uniquenessRatio = 10, 
                            speckleWindowSize = 20, preFilterCap = 31, 
+                           ndisparities=128, SADWindowSize=sad_window_size )
+    kitti_params = dict( preset=cv2.STEREO_BM_BASIC_PRESET, uniquenessRatio = 10, 
+                           speckleWindowSize = 100, speckleRange = 32, preFilterSize = 41, preFilterCap = 31, 
                            ndisparities=128, SADWindowSize=sad_window_size )
     def __init__(self, params=default_params): 
         self.params = params
 
         # Initilize stereo block matching
-        self.bm = cv2.StereoBM(cv2.STEREO_BM_BASIC_PRESET, 128, 11) # **self.params)
+        self.bm = cv2.StereoBM(cv2.STEREO_BM_NARROW_PRESET, 128, 9)
 
         self.process = self.compute
 
@@ -338,7 +352,7 @@ def stereo_dataset(filename, channel='CAMERA', start_idx=0, every_k_frames=1, ma
             
     def iter_gt_frames(*args, **kwargs): 
         gt = StereoSGBM()
-        for (t, ch, (l,r)) in dataset.iteritems(*args, **kwargs): 
+        for (t, ch, (l,r)) in dataset.iteritems(): 
             # h,w = im.shape[:2]
             # l,r = np.split(im, 2, axis=0)
             disp = gt.process(l,r)
