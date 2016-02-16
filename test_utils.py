@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 from bot_vision.image_utils import to_color, to_gray
-from bot_utils.dataset.kitti import KITTIDatasetReader
+from bot_utils.dataset.kitti import KITTIDatasetReader, KITTIStereoGroundTruthDatasetReader
 
 # def eval_kitti_dataset(color=False, **kwargs): 
 #     # if color: 
@@ -10,19 +10,21 @@ from bot_utils.dataset.kitti import KITTIDatasetReader
 #     # else: 
 #         return KITTIDatasetReader(directory='~/HD1/data/KITTI/data_stereo_flow/', sequence='training', **kwargs)
 
-def test_kitti_dataset(color=False, **kwargs): 
-    if color: 
-        return KITTIDatasetReader.stereo_test_dataset(directory='~/HD1/data/KITTI/data_stereo_flow/training', subdir='colored', **kwargs)
-    else: 
-        return KITTIDatasetReader.stereo_test_dataset(directory='~/HD1/data/KITTI/data_stereo_flow/training', subdir='image', **kwargs)
+def kitti_stereo_training_color_dataset(*args, **kwargs): 
+    return KITTIStereoGroundTruthDatasetReader(directory='~/HD1/data/KITTI/data_stereo_flow/training', subdir='colored', **kwargs)
+
+def kitti_stereo_training_dataset(*args, **kwargs): 
+    return KITTIStereoGroundTruthDatasetReader(directory='~/HD1/data/KITTI/data_stereo_flow/training', is_2015=False, **kwargs)
+
+def kitti_stereo_2015_training_dataset(*args, **kwargs): 
+    return KITTIStereoGroundTruthDatasetReader(directory='~/HD1/data/KITTI/2015/data_scene_flow/training', is_2015=True, **kwargs)
     
-def test_dataset(color=False, **kwargs): 
-    if color: 
-        return KITTIDatasetReader(directory='~/data/dataset/', sequence='08', 
-                                        left_template='image_2/%06i.png', right_template='image_3/%06i.png', 
-                                        start_idx=0, **kwargs)
-    else: 
-        return KITTIDatasetReader(directory='~/data/dataset/', sequence='08', **kwargs)
+def test_color_dataset(*args, **kwargs): 
+    return KITTIDatasetReader(directory='~/data/dataset/', sequence='08', 
+                              left_template='image_2/%06i.png', right_template='image_3/%06i.png', 
+                              start_idx=0, **kwargs)
+def test_dataset(*args, **kwargs): 
+    return KITTIDatasetReader(directory='~/data/dataset/', sequence='08', **kwargs)
 
 def test_image(color=True, scale=1.0, stereo=False): 
     for l,r in test_dataset(color=True).iter_stereo_frames(): 

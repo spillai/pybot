@@ -244,7 +244,7 @@ class VideoCapture(object):
                 break
         
 
-    def run(self): 
+    def run(self, l=None): 
         assert(self.process_cb is not None)
         while True: 
             try: 
@@ -253,7 +253,7 @@ class VideoCapture(object):
                 self.process_cb(im)
             except KeyboardInterrupt: 
                 break
-
+        
 if __name__ == "__main__": 
     parser = argparse.ArgumentParser(
         usage='python video_writer.py -t <template> -o <output_filename>'

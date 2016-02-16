@@ -1,18 +1,31 @@
+<<<<<<< HEAD
 """
 Basic utilities for dataset reader 
 """
 
 # Copyright (c) 2015 Sudeep Pillai <spillai@csail.mit.edu>
 # License: BSD 3 clause
+=======
+"""Basic dataset reader"""
+# Author: Sudeep Pillai <spillai@csail.mit.edu>
+# License: MIT
+>>>>>>> 5f3d1790c4ecc51ff5fca0f48789e7a49803697b
 
 import cv2
 import numpy as np
 import os, fnmatch, time
 import re
-from itertools import izip, imap, chain
+from itertools import izip, imap, chain, islice
 from collections import defaultdict, namedtuple
+from bot_utils.async_utils import async_prefetch
 
 from bot_vision.image_utils import im_resize
+
+def valid_path(path): 
+    vpath = os.path.expanduser(path)
+    if not os.path.exists(vpath): 
+        raise RuntimeError('Path invalid {:}'.format(vpath))
+    return vpath
 
 def natural_sort(l): 
     convert = lambda text: int(text) if text.isdigit() else text.lower() 
@@ -86,6 +99,21 @@ def read_dir(directory, pattern='*.png', recursive=True, expected=None, verbose=
         return list(chain([fn for fns in fn_map.values() for fn in fns]))
     return fn_map
 
+class FileReader(object): 
+    def __init__(self, filename, process_cb, start_idx=0): 
+        self.filename_ = filename
+        self.start_idx_ = start_idx
+        self.items_ = process_cb(filename)
+
+    def iteritems(self, every_k_frames=1, reverse=False): 
+        if reverse: 
+            raise NotImplementedError
+        return islice(self.items_, self.start_idx_, None, every_k_frames)
+
+    @property
+    def items(self): 
+        return self.items_
+
 class DatasetReader(object): 
     """
     Simple Dataset Reader
@@ -120,16 +148,23 @@ class DatasetReader(object):
                 nmatches = start_idx + max_files
             self.files = [template % idx
                           for idx in range(start_idx, min(nmatches, start_idx + max_files))]
+
+            print('Found {:} files with pattern: {:}'.format(nmatches, pattern))
+            print('From {:} to {:}'.format(valid_path(self.files[0]), valid_path(self.files[-1])))
         else: 
             self.files = files
         
-        print('Found {:} files with pattern: {:}'.format(nmatches, pattern))
-        print self.files[-1]
-        # print('First file: {:}: {:}'.format(template % start_idx, 'GOOD' if os.path.exists(template % start_idx) else 'BAD'))
+        # print('First file: {:}: {:}'.format(template % start_idx, 'GOOD' if
+        # os.path.exists(template % start_idx) else 'BAD'))
 
     @staticmethod
     def from_filenames(process_cb, files): 
         return DatasetReader(process_cb=process_cb, files=files)
+
+    def _prefetch(self, fnos): 
+        pass
+    def yield_data(self): 
+        pass
 
     @staticmethod
     def from_directory(process_cb, directory, pattern='*.png'):
@@ -137,6 +172,7 @@ class DatasetReader(object):
         sorted_files = natural_sort(files)
         return DatasetReader.from_filenames(process_cb, sorted_files)
 
+    # @async_prefetch
     def iteritems(self, every_k_frames=1, reverse=False):
         fnos = np.arange(0, len(self.files), every_k_frames).astype(int)
         if reverse: 
@@ -170,15 +206,14 @@ class VelodyneDatasetReader(DatasetReader):
     """
 
 
-    def __init__(self, **kwargs): 
+    def __init__(self, template='template_%i.txt', start_idx=0, max_files=10000, files=None):
         try: 
             from pybot_vision import read_velodyne_pc
         except: 
             raise RuntimeError('read_velodyne_pc missing in pybot_vision. Compile it first!')
-
-        if 'process_cb' in kwargs: 
-            raise RuntimeError('VelodyneDatasetReader does not support defining a process_cb')
-        DatasetReader.__init__(self, process_cb=lambda fn: read_velodyne_pc(fn), **kwargs)
+        DatasetReader.__init__(self, process_cb=lambda fn: read_velodyne_pc(fn), template=template, 
+                               start_idx=start_idx, max_files=max_files, files=files)
+        
 
 class ImageDatasetReader(DatasetReader): 
     """
@@ -191,20 +226,13 @@ class ImageDatasetReader(DatasetReader):
     """
 
     @staticmethod
-    def imread_process_cb(scale=1.0):
-        return lambda fn: im_resize(cv2.imread(fn, -1), scale=scale)
-        
-    def __init__(self, **kwargs): 
-        if 'process_cb' in kwargs: 
-            raise RuntimeError('ImageDatasetReader does not support defining a process_cb')
-
-        if 'scale' in kwargs: 
-            scale = kwargs.pop('scale', 1.0)
-            DatasetReader.__init__(self, 
-                                   process_cb=ImageDatasetReader.imread_process_cb(scale), 
-                                   **kwargs)
-        else: 
-            DatasetReader.__init__(self, process_cb=ImageDatasetReader.imread_process_cb(), **kwargs)
+    def imread_process_cb(scale=1.0, grayscale=False):
+        return lambda fn: im_resize(cv2.imread(fn, cv2.IMREAD_GRAYSCALE if grayscale else cv2.IMREAD_UNCHANGED), scale=scale)
+    
+    def __init__(self, template='template_%i.txt', start_idx=0, max_files=10000, files=None, scale=1.0, grayscale=False): 
+        DatasetReader.__init__(self, 
+                               process_cb=ImageDatasetReader.imread_process_cb(scale=scale, grayscale=grayscale), template=template, 
+                               start_idx=start_idx, max_files=max_files, files=files)
 
     @staticmethod
     def from_filenames(files, **kwargs): 
@@ -223,11 +251,11 @@ class StereoDatasetReader(object):
     def __init__(self, directory='', 
                  left_template='image_0/%06i.png', 
                  right_template='image_1/%06i.png', 
-                 start_idx=0, max_files=10000, scale=1.0): 
+                 start_idx=0, max_files=10000, scale=1.0, grayscale=False): 
         self.left = ImageDatasetReader(template=os.path.join(os.path.expanduser(directory),left_template), 
-                                       start_idx=start_idx, max_files=max_files, scale=scale)
+                                       start_idx=start_idx, max_files=max_files, scale=scale, grayscale=grayscale)
         self.right = ImageDatasetReader(template=os.path.join(os.path.expanduser(directory),right_template), 
-                                        start_idx=start_idx, max_files=max_files, scale=scale)
+                                        start_idx=start_idx, max_files=max_files, scale=scale, grayscale=grayscale)
 
     @classmethod 
     def from_filenames(cls, left_files, right_files, **kwargs): 

@@ -1,8 +1,8 @@
 from itertools import *
 
-def take(n, iterable):
+def take(iterable, n):
     "Return first n items of the iterable as a list"
-    return list(islice(iterable, n))
+    return islice(iterable, n)
 
 def tabulate(function, start=0):
     "Return function(0), function(1), ..."
