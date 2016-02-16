@@ -83,11 +83,14 @@ class KITTIDatasetReader(object):
         except Exception as e:
             self.poses = repeat(None)
 
-        # Read velodyne
-        self.velodyne = VelodyneDatasetReader(
-            template=os.path.join(seq_directory,velodyne_template), 
-            start_idx=start_idx, max_files=max_files
-        )
+        try: 
+            # Read velodyne
+            self.velodyne = VelodyneDatasetReader(
+                template=os.path.join(seq_directory,velodyne_template), 
+                start_idx=start_idx, max_files=max_files
+            )
+        except Exception as e: 
+            self.velodyne = repeat(None)
 
         print 'Initialized stereo dataset reader with %f scale' % scale
 
