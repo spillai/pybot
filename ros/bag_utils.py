@@ -166,9 +166,9 @@ class ROSBagReader(LogReader):
             
         print('Finished publishing gazebo states {:}'.format(len(self.gt_poses)))
         
-        import bot_externals.draw_utils as draw_utils
-        draw_utils.publish_pose_list('robot_poses', 
-                                     self.gt_poses[::10], frame_id='origin', reset=True)
+        # import bot_externals.draw_utils as draw_utils
+        # draw_utils.publish_pose_list('robot_poses', 
+        #                              self.gt_poses[::10], frame_id='origin', reset=True)
 
 
     def load_log(self, filename): 
@@ -241,8 +241,10 @@ class ROSBagReader(LogReader):
         print('Checking tf relations in ROSBag')
         checked = set()
         relations_lut = dict((k,v) for (k,v) in relations)
-        for self.idx, (channel, msg, t) in enumerate(self.log.read_messages(topics=self.decoder.keys())): 
-            print('\tChecking {:} => {:}'.format(channel, msg.header.frame_id))
+
+        # Decoders are non-gazebo sensors
+        decoders = [dec for dec in self.decoder.keys() if 'gazebo' not in dec ]
+        for self.idx, (channel, msg, t) in enumerate(self.log.read_messages(topics=decoders)):
             try: 
                 if relations_lut[channel] == msg.header.frame_id: 
                     checked.add(channel)
