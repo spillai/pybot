@@ -561,9 +561,9 @@ class DepthCamera(CameraIntrinsic):
         assert(depth.shape == self.xs.shape)
         return np.dstack([self.xs * depth, self.ys * depth, depth])
 
-    def reconstruct_points(self, pts, depth): 
-        return np.vstack([self.xs[pts[:,1], pts[:,0]] * depth,
-                          self.ys[pts[:,1], pts[:,0]] * depth,
+    def reconstruct_sparse(self, pts, depth): 
+        return np.vstack([(pts[:,0] - self.cx) * 1.0 / self.fx * depth,
+                          (pts[:,1] - self.cy) * 1.0 / self.fx * depth, 
                           depth]).T
 
     def save(self, filename): 
