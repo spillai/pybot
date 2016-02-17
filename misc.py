@@ -77,7 +77,19 @@ class PoseAccumulator(Accumulator):
         """ pose of [t] wrt [0]:  p_0t = p_w0.inverse() * p_wt """  
         return (self.init_.inverse()).oplus(pose_wt)
 
+class PoseInterpolator(PoseAccumulator): 
+    def __init__(self, maxlen=100, relative=False): 
+        PoseAccumulator.__init__(self, maxlen=maxlen, relative=relative)
+
+        self.relative_ = relative
+        self.init_ = None
         
+    def add(self, pose): 
+        super(PoseAccumulator, self).accumulate(pose)
+
+    def query(self, pose): 
+        raise NotImplementedError()
+
 class CounterWithPeriodicCallback(Counter): 
     """
     robot_poses = PoseAccumulator(maxlen=1000, relative=True)
