@@ -204,8 +204,8 @@ class ROSBagReader(LogReader):
                 try:
                     (trans,rot) = tf_listener.lookupTransform(from_tf, to_tf, t)
                     self.relations_map[(from_tf,to_tf)] = RigidTransform(tvec=trans, xyzw=rot)
-                    print('\tSuccessfully received transform: {:} => {:} {:}'
-                          .format(from_tf, to_tf, self.relations_map[(from_tf,to_tf)]))
+                    # print('\tSuccessfully received transform: {:} => {:} {:}'
+                    #       .format(from_tf, to_tf, self.relations_map[(from_tf,to_tf)]))
                 except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
                     pass
 
@@ -215,6 +215,10 @@ class ROSBagReader(LogReader):
 
         try: 
             tfs = [self.relations_map[(from_tf,to_tf)] for (from_tf, to_tf) in relations] 
+            for (from_tf, to_tf) in relations: 
+                print('\tSuccessfully received transform: {:} => {:} {:}'
+                      .format(from_tf, to_tf, self.relations_map[(from_tf,to_tf)]))
+
         except: 
             raise RuntimeError('Error concerning tf lookup')
         print('Established {:} relations\n'.format(len(tfs)))
