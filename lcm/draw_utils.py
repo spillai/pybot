@@ -36,7 +36,7 @@ class VisualizationMsgsPub:
         camera_pose = RigidTransform.from_roll_pitch_yaw_x_y_z(-np.pi/2, 0, -np.pi/2, 
                                                                0, 0, 1, axes='sxyz')
 
-        self.reset_visualization()
+        # self.reset_visualization()
         self.publish_sensor_frame('camera', pose=camera_pose)
         self.publish_sensor_frame('origin', pose=RigidTransform.identity())
         
@@ -136,6 +136,9 @@ def publish_image_t(pub_channel, im, jpeg=False, flip_rb=True):
 
     # Pub
     g_viz_pub.lc.publish(pub_channel, out.encode())
+
+def publish_botviewer_image_t(im, jpeg=False, flip_rb=True): 
+    publish_image_t('CAMERA_IMAGE', im, jpeg=jpeg, flip_rb=flip_rb)
 
 def draw_tag(pose=None, size=0.1): 
     corners = np.float32([[size, size, 0], [-size, size, 0], 
