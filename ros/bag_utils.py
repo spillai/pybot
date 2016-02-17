@@ -115,6 +115,41 @@ class ROSBagReader(LogReader):
 
         # TF relations
         self.relations_map = {}
+        
+        # Gazebo states (if available)
+        self._publish_gazebo_states()
+
+    def _publish_gazebo_states(self): 
+        """
+        Perform a one-time publish of all the gazebo states
+         (available via /gazebo/link_states, /gazebo/model_states)
+        """
+
+        from gazebo_msgs.msg import LinkStates
+        from gazebo_msgs.msg import ModelStates
+
+        self.gt_poses = []
+
+        # Assuming the index of the model state does not change
+        ind = None
+
+        print('Publish Gazebo states')
+        for self.idx, (channel, msg, t) in enumerate(self.log.read_messages(topics='/gazebo/model_states')): 
+            if ind is None: 
+                for j, name in enumerate(msg.name): 
+                    if name == 'mobile_base': 
+                        ind = j
+                        break
+            pose = msg.pose[ind]
+            tvec, ori = pose.position, pose.orientation
+            self.gt_poses.append(RigidTransform(xyzw=[ori.x,ori.y,ori.z,ori.w], tvec=[tvec.x,tvec.y,tvec.z]))
+            
+        print('Finished publishing gazebo states {:}'.format(len(self.gt_poses)))
+        
+        import bot_externals.draw_utils as draw_utils
+        draw_utils.publish_pose_list('robot_poses', 
+                                     self.gt_poses[::10], frame_id='origin', reset=True)
+
 
     def load_log(self, filename): 
         return rosbag.Bag(filename, 'r', chunk_threshold=100 * 1024 * 1024)
@@ -190,8 +225,8 @@ class ROSBagReader(LogReader):
                 else: 
                     raise RuntimeError('TF Check failed {:} mapped to {:} instead of {:}'
                                        .format(channel, msg.header.frame_id, relations_lut[channel]))
-            except: 
-                raise ValueError('Wrongly defined relations_lut')
+            except Exception as e: 
+                raise ValueError('Wrongly defined relations_lut {:}'.format(e))
             
                 # Finish up
             if len(checked) == len(relations_lut):
