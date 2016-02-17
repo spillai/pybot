@@ -21,6 +21,25 @@ from bot_externals.log_utils import Decoder, LogReader
 from bot_vision.image_utils import im_resize
 from bot_vision.imshow_utils import imshow_cv
 from bot_geometry.rigid_transform import RigidTransform
+
+class GazeboDecoder(Decoder): 
+    """
+    Model state decoder for gazebo
+    """
+    def __init__(self, every_k_frames=1): 
+        Decoder.__init__(self, channel='/gazebo/model_states', every_k_frames=every_k_frames)
+        self.index = None
+
+    def decode(self, msg): 
+        if self.index is None: 
+            for j, name in enumerate(msg.name): 
+                if name == 'mobile_base': 
+                    self.index = j
+                    break
+
+        pose = msg.pose[self.index]
+        tvec, ori = pose.position, pose.orientation
+        return RigidTransform(xyzw=[ori.x,ori.y,ori.z,ori.w], tvec=[tvec.x,tvec.y,tvec.z])
         
 class ImageDecoder(Decoder): 
     """
@@ -107,8 +126,9 @@ def NavMsgDecoder(channel, every_k_frames=1):
     return Decoder(channel=channel, every_k_frames=every_k_frames, decode_cb=lambda data: odom_decode(data))
 
 class ROSBagReader(LogReader): 
-    def __init__(self, *args, **kwargs): 
-        super(ROSBagReader, self).__init__(*args, **kwargs)
+    def __init__(self, filename, decoder=None, start_idx=0, every_k_frames=1, max_length=None, index=False):
+        super(ROSBagReader, self).__init__(filename, decoder=decoder, start_idx=start_idx, 
+                                           every_k_frames=every_k_frames, max_length=max_length, index=index)
 
         if self.start_idx < 0 or self.start_idx > 100: 
             raise ValueError('start_idx in ROSBagReader expects a percentage [0,100], provided {:}'.format(self.start_idx))
@@ -276,7 +296,6 @@ class ROSBagReader(LogReader):
             # and only then check if decode necessary  
             dec = self.decoder[channel]
             if dec.should_decode():
-                # print channel, data.header.frame_id
                 return True, (t, channel, dec.decode(data))
         except Exception as e:
             print e
