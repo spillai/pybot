@@ -117,24 +117,31 @@ class BaseSLAMMixin(object):
         
         return self.pose_id_
 
-    # def on_landmarks(self, t, poses_w_ids): 
-    #     """
-    #     Add pose landmarks to factor graph 
-    #     Pose3-Pose3 costraint. 
+    def on_landmarks(self, t, poses_w_ids): 
+        """
+        Add pose landmarks to factor graph 
+        Pose3-Pose3 costraint. 
 
-    #     poses: Pose (with ID)
-    #     """
-    #     ids = [p.id for p in poses_w_ids]
-    #     poses = [p.to_homogeneous_matrix() for p in poses_w_ids]
-    #     self.pose_id_ = self.slam_.on_pose_ids(t, ids, poses)
+        poses: Pose (with ID)
+        """
+        if not self.poses_.length: 
+            import warnings 
+            warnings.warn('Failed to add landmark since pose has not been initialized')
+            return
 
-    #     # Visualize SLAM updates
-    #     self.vis_slam_updates()
+        ids = [p.id for p in poses_w_ids]
+        poses = [p.to_homogeneous_matrix() for p in poses_w_ids]
+        print ids, poses, self.poses_.latest, self.pose_id_
 
-    #     # Visualize tags/landmarks
-    #     self.vis_landmarks(self.pose_id_, self.poses_.latest, poses_w_ids)
+        self.pose_id_ = self.slam_.on_pose_ids(t, ids, poses)
+
+        # Visualize SLAM updates
+        self.vis_slam_updates()
+
+        # Visualize tags/landmarks
+        self.vis_landmarks(self.pose_id_, self.poses_.latest, poses_w_ids)
         
-    #     return self.pose_id_
+        return self.pose_id_
 
     def vis_slam_updates(self, frame_id='optcamera'): 
         """
@@ -172,11 +179,12 @@ class BaseSLAMMixin(object):
     def vis_odom(self, poses, frame_id='camera'): 
 
         # Set ids for accumulated poses
-        draw_utils.publish_pose_t('POSE', poses.latest, frame_id=frame_id)
+        # draw_utils.publish_pose_t('POSE', poses.latest, frame_id=frame_id)
+        draw_utils.publish_pose_t('CAMERA_POSE', poses.latest, frame_id=frame_id)
         draw_utils.publish_pose_list('CAMERA_LATEST', [poses.latest], texts=[],
                                      frame_id=frame_id) # TODO: reset?
-        draw_utils.publish_pose_list('CAMERA_POSES', [Pose.from_rigid_transform(poses.index, poses.latest)], 
-                                     frame_id=frame_id, reset=(poses.length <= 1))
+        # draw_utils.publish_pose_list('CAMERA_POSES', [Pose.from_rigid_transform(poses.index, poses.latest)], 
+        #                              frame_id=frame_id, reset=(poses.length <= 1))
 
         if poses.length < 2: 
             return
@@ -208,11 +216,11 @@ class BaseSLAMMixin(object):
         factor_ct_end = np.vstack([p.tvec for p in p_landmarks])
         factor_ct_st = np.zeros_like(factor_ct_end)
 
-        draw_utils.publish_line_segments('measured_factor_{:}'.format(landmark_name), factor_st, factor_end, c='b', 
-                                         frame_id=frame_id, reset=self.reset_required())
-        edges = np.vstack([draw_utils.draw_tag_edges(p) for p in p_Wt])
-        draw_utils.publish_line_segments('measured_node_{:}'.format(landmark_name), edges[:,:3], edges[:,3:6], c='b', 
-                                         frame_id=frame_id, reset=self.reset_required())
+        # draw_utils.publish_line_segments('measured_factor_{:}'.format(landmark_name), factor_st, factor_end, c='b', 
+        #                                  frame_id=frame_id, reset=self.reset_required())
+        # edges = np.vstack([draw_utils.draw_tag_edges(p) for p in p_Wt])
+        # draw_utils.publish_line_segments('measured_node_{:}'.format(landmark_name), edges[:,:3], edges[:,3:6], c='b', 
+        #                                  frame_id=frame_id, reset=self.reset_required())
 
         # Optionally plot as Tags
         # draw_utils.publish_pose_list('RAW_tags', p_Wt, texts=[], object_type='TAG', 
