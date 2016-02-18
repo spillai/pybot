@@ -10,7 +10,7 @@ def take(iterable, max_length=None):
     return iterable if max_length is None else islice(iterable, max_length)
 
 class Decoder(object): 
-    def __init__(self, channel='', every_k_frames=1, decode_cb=lambda data: None): 
+    def __init__(self, channel='', every_k_frames=1, decode_cb=lambda data: data): 
         self.channel = channel
         self.every_k_frames = every_k_frames
         self.decode_cb = decode_cb
@@ -19,7 +19,7 @@ class Decoder(object):
     def decode(self, data): 
         try: 
             return self.decode_cb(data)
-        except Exception as e:
+        except:
             print e
             raise RuntimeError('Error decoding channel: %s by %s' % (self.channel, self))
 
@@ -31,7 +31,7 @@ class Decoder(object):
         return self.idx % self.every_k_frames == 0 
 
 class LogReader(object): 
-    def __init__(self, filename, decoder=None, start_idx=0, every_k_frames=1, max_length=None, index=False):
+    def __init__(self, filename, decoder=None, start_idx=0, every_k_frames=1, max_length=None, index=False, verbose=False):
         filename = os.path.expanduser(filename)
 		
         if filename is None or not os.path.exists(os.path.expanduser(filename)):
@@ -46,6 +46,7 @@ class LogReader(object):
         self.every_k_frames = every_k_frames
         self.start_idx = start_idx
         self.max_length = max_length
+        self.verbose = verbose
 
         # Load the log
         self.log_ = self.load_log(self.filename)
@@ -90,8 +91,8 @@ class LogReader(object):
         for self.idx, (t, ch, data) in enumerate(iterator): 
             try: 
                 self.cb_[ch](t, data)
-            except KeyError: 
-                pass
+            except KeyError, e: 
+                print e
             except Exception, e: 
                 import traceback
                 traceback.print_exc()

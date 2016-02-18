@@ -3,6 +3,7 @@
 # Author: Sudeep Pillai <spillai@csail.mit.edu>
 # License: MIT
 
+import sys
 import numpy as np
 import cv2, os.path, lcm, zlib
 
@@ -11,6 +12,8 @@ import tf
 
 import rosbag
 import rospy
+
+from message_filters import ApproximateTimeSynchronizer
 
 from genpy.rostime import Time
 from sensor_msgs.msg import Image
@@ -65,6 +68,48 @@ class ImageDecoder(Decoder):
 
         return im_resize(im, scale=self.scale)
 
+
+class ApproximateTimeSynchronizerBag(ApproximateTimeSynchronizer): 
+    """
+    See reference implementation in message_filters.__init__.py 
+    for ApproximateTimeSynchronizer
+    """
+
+    def __init__(self, topics, queue_size, slop): 
+        ApproximateTimeSynchronizer.__init__(self, [], queue_size, slop)
+        self.queues = [{} for f in topics]
+        self.topic_queue = {topic: self.queues[ind] for ind, topic in enumerate(topics)}
+
+    def add_topic(self, topic, msg):
+        self.add(msg, self.topic_queue[topic])
+
+class StereoSynchronizer(object): 
+    """
+    Time-synchronized stereo image decoder
+    """
+    def __init__(self, left_channel, right_channel, on_stereo_cb, 
+                 every_k_frames=1, scale=1., encoding='bgr8', compressed=False): 
+
+        self.left_channel = left_channel
+        self.right_channel = right_channel
+
+        self.decoder = ImageDecoder(every_k_frames=every_k_frames, 
+                                    scale=scale, encoding=encoding, compressed=compressed)
+
+        slop_seconds = 0.02
+        queue_len = 10 
+        self.synch = ApproximateTimeSynchronizerBag([left_channel, right_channel], queue_len, slop_seconds)
+        self.synch.registerCallback(self.on_stereo_sync)
+        self.on_stereo_cb = on_stereo_cb
+
+        self.on_left = lambda t, msg: self.synch.add_topic(left_channel, msg)
+        self.on_right = lambda t, msg: self.synch.add_topic(right_channel, msg)
+        
+    def on_stereo_sync(self, lmsg, rmsg): 
+        limg = self.decoder.decode(lmsg)
+        rimg = self.decoder.decode(rmsg)
+        return self.on_stereo_cb(limg, rimg)
+        
 class LaserScanDecoder(Decoder): 
     """
     Mostly stripped from 
@@ -126,9 +171,9 @@ def NavMsgDecoder(channel, every_k_frames=1):
     return Decoder(channel=channel, every_k_frames=every_k_frames, decode_cb=lambda data: odom_decode(data))
 
 class ROSBagReader(LogReader): 
-    def __init__(self, filename, decoder=None, start_idx=0, every_k_frames=1, max_length=None, index=False):
+    def __init__(self, filename, decoder=None, start_idx=0, every_k_frames=1, max_length=None, index=False, verbose=False):
         super(ROSBagReader, self).__init__(filename, decoder=decoder, start_idx=start_idx, 
-                                           every_k_frames=every_k_frames, max_length=max_length, index=index)
+                                           every_k_frames=every_k_frames, max_length=max_length, index=index, verbose=verbose)
 
         if self.start_idx < 0 or self.start_idx > 100: 
             raise ValueError('start_idx in ROSBagReader expects a percentage [0,100], provided {:}'.format(self.start_idx))
@@ -136,39 +181,39 @@ class ROSBagReader(LogReader):
         # TF relations
         self.relations_map = {}
         
-        # Gazebo states (if available)
-        self._publish_gazebo_states()
+        # # Gazebo states (if available)
+        # self._publish_gazebo_states()
 
-    def _publish_gazebo_states(self): 
-        """
-        Perform a one-time publish of all the gazebo states
-         (available via /gazebo/link_states, /gazebo/model_states)
-        """
+    # def _publish_gazebo_states(self): 
+    #     """
+    #     Perform a one-time publish of all the gazebo states
+    #      (available via /gazebo/link_states, /gazebo/model_states)
+    #     """
 
-        from gazebo_msgs.msg import LinkStates
-        from gazebo_msgs.msg import ModelStates
+    #     from gazebo_msgs.msg import LinkStates
+    #     from gazebo_msgs.msg import ModelStates
 
-        self.gt_poses = []
+    #     self.gt_poses = []
 
-        # Assuming the index of the model state does not change
-        ind = None
+    #     # Assuming the index of the model state does not change
+    #     ind = None
 
-        print('Publish Gazebo states')
-        for self.idx, (channel, msg, t) in enumerate(self.log.read_messages(topics='/gazebo/model_states')): 
-            if ind is None: 
-                for j, name in enumerate(msg.name): 
-                    if name == 'mobile_base': 
-                        ind = j
-                        break
-            pose = msg.pose[ind]
-            tvec, ori = pose.position, pose.orientation
-            self.gt_poses.append(RigidTransform(xyzw=[ori.x,ori.y,ori.z,ori.w], tvec=[tvec.x,tvec.y,tvec.z]))
+    #     print('Publish Gazebo states')
+    #     for self.idx, (channel, msg, t) in enumerate(self.log.read_messages(topics='/gazebo/model_states')): 
+    #         if ind is None: 
+    #             for j, name in enumerate(msg.name): 
+    #                 if name == 'mobile_base': 
+    #                     ind = j
+    #                     break
+    #         pose = msg.pose[ind]
+    #         tvec, ori = pose.position, pose.orientation
+    #         self.gt_poses.append(RigidTransform(xyzw=[ori.x,ori.y,ori.z,ori.w], tvec=[tvec.x,tvec.y,tvec.z]))
             
-        print('Finished publishing gazebo states {:}'.format(len(self.gt_poses)))
+    #     print('Finished publishing gazebo states {:}'.format(len(self.gt_poses)))
         
-        # import bot_externals.draw_utils as draw_utils
-        # draw_utils.publish_pose_list('robot_poses', 
-        #                              self.gt_poses[::10], frame_id='origin', reset=True)
+    #     # import bot_externals.draw_utils as draw_utils
+    #     # draw_utils.publish_pose_list('robot_poses', 
+    #     #                              self.gt_poses[::10], frame_id='origin', reset=True)
 
 
     def load_log(self, filename): 
@@ -292,6 +337,8 @@ class ROSBagReader(LogReader):
                     )
             ):
 
+                if self.verbose: 
+                    print('Channel: {:}, t: {:}'.format(channel, t))
                 res, msg = self.decode_msg(channel, msg, t)
                 if res: 
                     yield msg
@@ -303,14 +350,16 @@ class ROSBagReader(LogReader):
             dec = self.decoder[channel]
             if dec.should_decode():
                 return True, (t, channel, dec.decode(data))
-        except Exception as e:
-            print e
-            # raise RuntimeError('Failed to decode data from channel: %s, mis-specified decoder?' % channel)
-        
+        except: 
+            import traceback
+            traceback.print_exc()
+                    
         return False, (None, None)
 
     def iter_frames(self):
         return self.iteritems()
+
+
 
 
 class ROSBagController(object): 
@@ -337,13 +386,35 @@ class ROSBagController(object):
             raise RuntimeError('No callbacks registered yet, subscribe to channels first!')
 
         for self.idx, (t, ch, data) in enumerate(self.dataset_.iter_frames()): 
-            try: 
+            if ch in self.cb_: 
                 self.cb_[ch](t, data)
-            except Exception, e: 
-                import traceback
-                traceback.print_exc()
-                raise RuntimeError()
+                
+            # try: 
+            #     self.cb_[ch](t, data)
+            # except:
+            #     pass
+
+                # import traceback
+                # traceback.print_exc()
             
     @property
     def filename(self): 
         return self.dataset_.filename
+
+
+# def myCallback(posemsg):
+#    print posemsg
+
+# sub = message_filters.Subscriber("pose_topic", robot_msgs.msg.Pose)
+# cache = message_filters.Cache(sub, 10)
+# cache.registerCallback(myCallback)
+
+# from message_filters import TimeSynchronizer, Subscriber
+
+# def gotimage(image, camerainfo):
+#     assert image.header.stamp == camerainfo.header.stamp
+#     print "got an Image and CameraInfo"
+
+# tss = TimeSynchronizer(Subscriber("/wide_stereo/left/image_rect_color", sensor_msgs.msg.Image),
+#                        Subscriber("/wide_stereo/left/camera_info", sensor_msgs.msg.CameraInfo))
+# tss.registerCallback(gotimage)
