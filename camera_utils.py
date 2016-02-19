@@ -379,6 +379,9 @@ class Camera(CameraIntrinsic, CameraExtrinsic):
 
 class StereoCamera(Camera): 
     def __init__(self, lcamera, rcamera, baseline): 
+        if not isinstance(lcamera, Camera) or not isinstance(rcamera, Camera): 
+            raise TypeError('lcamera, rcamera are not Camera type')
+
         Camera.__init__(self, lcamera.K, lcamera.R, lcamera.t, D=lcamera.D, shape=lcamera.shape) 
 
         # CameraIntrinsic.__init__(self, K, D, shape=shape)
