@@ -46,13 +46,16 @@ class GazeboDecoder(Decoder):
         return RigidTransform(xyzw=[ori.x,ori.y,ori.z,ori.w], tvec=[tvec.x,tvec.y,tvec.z])
 
 class CameraInfoDecoder(Decoder): 
+    """
+    Basic CameraIntrinsic deocder for ROSBags (from CameraInfo)
+    """
     def __init__(self, channel='/camera/rgb/camera_info'): 
         Decoder.__init__(self, channel=channel)
 
     def decode(self, msg): 
+        print dir(msg), self.channel
         return CameraIntrinsic(K=np.float64(msg.K).reshape(3,3), D=np.float64(msg.D).ravel(), 
                                shape=[msg.height, msg.width])
-
         
 class ImageDecoder(Decoder): 
     """
@@ -235,7 +238,7 @@ class ROSBagReader(LogReader):
         except: 
             raise KeyError('Relations map does not contain {:}=>{:} tranformation'.format(from_tf, to_tf))
 
-    def rosbag_establish_tfs(self, relations):
+    def establish_tfs(self, relations):
         """
         Perform a one-time look up of all the requested
         *static* relations between frames (available via /tf)
@@ -280,7 +283,7 @@ class ROSBagReader(LogReader):
         
         return tfs 
 
-    def rosbag_check_tf_relations(self, relations): 
+    def retrieve_tf_relations(self, relations): 
         """
         Perform a one-time look up of all the 
         *static* relations between frames (available via /tf)
@@ -315,17 +318,14 @@ class ROSBagReader(LogReader):
         print('Checked {:} relations\n'.format(len(checked)))
         return  
 
-    def rosbag_retrieve_camera_calibration(self, topic):
+    def retrieve_camera_calibration(self, topic):
         # Retrieve camera calibration
-        dec = CameraInfoDecoder(channel='/tf')
+        dec = CameraInfoDecoder(channel=topic)
 
         print('Retrieve camera calibration')
         for self.idx, (channel, msg, t) in enumerate(self.log.read_messages(topics=topic)): 
-            print dec.decode(msg)
-
-            return 
-        print('Retrieved camera calibration\n')
-            
+            return dec.decode(msg) 
+                    
     def _index(self): 
         raise NotImplementedError()
 
