@@ -24,6 +24,7 @@ from bot_externals.log_utils import Decoder, LogReader
 from bot_vision.image_utils import im_resize
 from bot_vision.imshow_utils import imshow_cv
 from bot_geometry.rigid_transform import RigidTransform
+from bot_vision.camera_utils import CameraIntrinsic
 
 class GazeboDecoder(Decoder): 
     """
@@ -43,6 +44,15 @@ class GazeboDecoder(Decoder):
         pose = msg.pose[self.index]
         tvec, ori = pose.position, pose.orientation
         return RigidTransform(xyzw=[ori.x,ori.y,ori.z,ori.w], tvec=[tvec.x,tvec.y,tvec.z])
+
+class CameraInfoDecoder(Decoder): 
+    def __init__(self, channel='/camera/rgb/camera_info'): 
+        Decoder.__init__(self, channel=channel)
+
+    def decode(self, msg): 
+        return CameraIntrinsic(K=np.float64(msg.K).reshape(3,3), D=np.float64(msg.D).ravel(), 
+                               shape=[msg.height, msg.width])
+
         
 class ImageDecoder(Decoder): 
     """
@@ -225,7 +235,7 @@ class ROSBagReader(LogReader):
         except: 
             raise KeyError('Relations map does not contain {:}=>{:} tranformation'.format(from_tf, to_tf))
 
-    def establish_tfs(self, relations):
+    def rosbag_establish_tfs(self, relations):
         """
         Perform a one-time look up of all the requested
         *static* relations between frames (available via /tf)
@@ -270,7 +280,7 @@ class ROSBagReader(LogReader):
         
         return tfs 
 
-    def check_tf_relations(self, relations): 
+    def rosbag_check_tf_relations(self, relations): 
         """
         Perform a one-time look up of all the 
         *static* relations between frames (available via /tf)
@@ -304,6 +314,17 @@ class ROSBagReader(LogReader):
                 break
         print('Checked {:} relations\n'.format(len(checked)))
         return  
+
+    def rosbag_retrieve_camera_calibration(self, topic):
+        # Retrieve camera calibration
+        dec = CameraInfoDecoder(channel='/tf')
+
+        print('Retrieve camera calibration')
+        for self.idx, (channel, msg, t) in enumerate(self.log.read_messages(topics=topic)): 
+            print dec.decode(msg)
+
+            return 
+        print('Retrieved camera calibration\n')
             
     def _index(self): 
         raise NotImplementedError()
@@ -359,9 +380,6 @@ class ROSBagReader(LogReader):
     def iter_frames(self):
         return self.iteritems()
 
-
-
-
 class ROSBagController(object): 
     def __init__(self, dataset): 
         """
@@ -369,37 +387,35 @@ class ROSBagController(object):
         with appropriate decoded data and timestamp
         """
         self.dataset_ = dataset
-        self.cb_ = {}
-        self.idx = 0
+        self.ctrl_cb_ = {}
+        self.ctrl_idx_ = 0
 
     def subscribe(self, channel, callback): 
-        self.cb_[channel] = callback
-
-    def check_tf_relations(self, relations): 
-        return self.dataset_.check_tf_relations(relations)
-
-    def establish_tfs(self, relations): 
-        return self.dataset_.establish_tfs(relations)
+        self.ctrl_cb_[channel] = callback
 
     def run(self):
-        if not len(self.cb_): 
+        if not len(self.ctrl_cb_): 
             raise RuntimeError('No callbacks registered yet, subscribe to channels first!')
 
-        for self.idx, (t, ch, data) in enumerate(self.dataset_.iter_frames()): 
-            if ch in self.cb_: 
-                self.cb_[ch](t, data)
-                
-            # try: 
-            #     self.cb_[ch](t, data)
-            # except:
-            #     pass
+        for self.ctrl_idx_, (t, ch, data) in enumerate(self.dataset_.iter_frames()): 
+            if ch in self.ctrl_cb_: 
+                self.ctrl_cb_[ch](t, data)
 
-                # import traceback
-                # traceback.print_exc()
-            
+    @property
+    def index(self): 
+        return self.ctrl_idx_
+
     @property
     def filename(self): 
         return self.dataset_.filename
+
+    @property
+    def controller(self): 
+        """
+        Should return the dataset (for offline bag-based callbacks), and 
+        should return the rosnode (for online/live callbacks)
+        """
+        return self.dataset_
 
 
 # def myCallback(posemsg):
