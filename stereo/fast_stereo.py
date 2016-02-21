@@ -17,13 +17,15 @@ class FastStereo(object):
         return self.stereo.process(to_gray(left_im), to_gray(right_im))
 
 class FastStereoViz(FastStereo): 
-    def __init__(self, calib, threshold=10, scale=1.0, iterations=1): 
+    def __init__(self, calib, threshold=10, scale=1.0, iterations=1, cost_threshold=0.1): 
         FastStereo.__init__(self, calib, threshold=threshold, scale=scale, iterations=iterations)
+        self.stereo.cost_threshold = cost_threshold
+
         print calib
         self.scale = scale
 
         # Trackbar
-        trackbar_create('cost_threshold', 'disparity', 40, 100, scale=0.01)
+        trackbar_create('cost_threshold', 'disparity', int(cost_threshold * 100), 100, scale=0.01)
         trackbar_create('fast_threshold', 'disparity', 20, 50, scale=1)
         trackbar_create('iterations', 'disparity', iterations, 10, scale=1)
 
