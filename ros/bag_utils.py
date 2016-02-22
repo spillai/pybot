@@ -417,20 +417,3 @@ class ROSBagController(object):
         """
         return self.dataset_
 
-
-# def myCallback(posemsg):
-#    print posemsg
-
-# sub = message_filters.Subscriber("pose_topic", robot_msgs.msg.Pose)
-# cache = message_filters.Cache(sub, 10)
-# cache.registerCallback(myCallback)
-
-# from message_filters import TimeSynchronizer, Subscriber
-
-# def gotimage(image, camerainfo):
-#     assert image.header.stamp == camerainfo.header.stamp
-#     print "got an Image and CameraInfo"
-
-# tss = TimeSynchronizer(Subscriber("/wide_stereo/left/image_rect_color", sensor_msgs.msg.Image),
-#                        Subscriber("/wide_stereo/left/camera_info", sensor_msgs.msg.CameraInfo))
-# tss.registerCallback(gotimage)
