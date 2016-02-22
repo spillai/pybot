@@ -46,6 +46,7 @@ def kitti_poses_to_mat(poses):
 class KITTIDatasetReader(object): 
     """
     KITTIDatasetReader: ImageDatasetReader + VelodyneDatasetReader + Calib
+    http://www.cvlibs.net/datasets/kitti/setup.php
     """
     kitti_00_02 = StereoCamera.from_calib_params(718.86, 718.86, 607.19, 185.22, 
                                                  baseline_px=386.1448, shape=np.int32([376, 1241]))
@@ -54,6 +55,7 @@ class KITTIDatasetReader(object):
     kitti_04_12 = StereoCamera.from_calib_params(707.0912, 707.0912, 601.8873, 183.1104, 
                                                     baseline_px=379.8145, shape=np.int32([376, 1241]))
     baseline = 0.5371 # baseline_px / fx
+    velo2cam = 0.27 # Velodyne is 27 cm behind cam_0 (x-forward, y-left, z-up)
 
     def __init__(self, directory='', 
                  sequence='', 
