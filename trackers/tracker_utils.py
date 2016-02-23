@@ -57,7 +57,6 @@ class TrackManager(object):
 
     def reset(self): 
         self.index_ = 0
-        self.ids_, self.pts_ = np.array([]), np.array([])
         self.tracks_ = defaultdict(lambda: IndexedDeque(maxlen=self.maxlen_))
 
     def add(self, pts, ids=None, prune=True): 
@@ -70,7 +69,7 @@ class TrackManager(object):
         pts = pts[valid]
 
         # ID valid points
-        max_id = np.max(self.ids_) + 1 if len(self.ids_) else 0
+        max_id = np.max(self.ids) + 1 if len(self.ids) else 0
         tids = np.arange(len(pts), dtype=np.int64) + max_id if ids is None else ids[valid]
         
         # Add pts to track
@@ -80,13 +79,6 @@ class TrackManager(object):
         # If features are propagated
         if prune: 
             self.prune()
-
-        # Keep pts and ids up to date
-        self.ids_ = np.array(self.tracks_.keys())
-        try: 
-            self.pts_ = np.vstack([ track.latest_item for track in self.tracks_.itervalues() ])
-        except: 
-            self.pts_ = np.array([])
 
         # Frame counter
         self.index_ += 1
@@ -104,11 +96,14 @@ class TrackManager(object):
 
     @property
     def pts(self): 
-        return self.pts_
+        try: 
+            return np.vstack([ track.latest_item for track in self.tracks_.itervalues() ])
+        except: 
+            return np.array([])
         
     @property
     def ids(self): 
-        return self.ids_
+        return np.array(self.tracks_.keys())
 
     def index(self): 
         return self.index_
