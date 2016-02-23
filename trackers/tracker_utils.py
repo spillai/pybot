@@ -23,16 +23,42 @@ def to_kpts(pts, size=1):
 def to_pts(kpts): 
     return np.float32([ kp.pt for kp in kpts ]).reshape(-1,2)
 
+class IndexedDeque(object): 
+    def __init__(self, maxlen=100): 
+        self.items_ = deque(maxlen=maxlen)
+        self.indices_ = deque(maxlen=maxlen)
+        self.length_ = 0
+
+    def append(self, index, item): 
+        self.indices_.append(index)
+        self.items_.append(item)
+        self.length_ += 1
+
+    @property
+    def latest_item(self):
+        return self.items_[-1]
+
+    @property
+    def latest_index(self): 
+        return self.indices_[-1]
+
+    @property
+    def items(self): 
+        return self.items_
+
+    @property
+    def length(self): 
+        return self.length_
+
 class TrackManager(object): 
     def __init__(self, maxlen=20): 
-        self.maxlen = maxlen
+        self.maxlen_ = maxlen
         self.reset()
 
     def reset(self): 
-        self.idx = 0
-        self._ids, self._pts = np.array([]), np.array([])
-        self.tracks_ts = dict()
-        self.tracks = defaultdict(lambda: deque(maxlen=self.maxlen))
+        self.index_ = 0
+        self.ids_, self.pts_ = np.array([]), np.array([])
+        self.tracks_ = defaultdict(lambda: IndexedDeque(maxlen=self.maxlen_))
 
     def add(self, pts, ids=None, prune=True): 
         # Add only if valid and non-zero
@@ -44,43 +70,48 @@ class TrackManager(object):
         pts = pts[valid]
 
         # ID valid points
-        max_id = np.max(self._ids) + 1 if len(self._ids) else 0
+        max_id = np.max(self.ids_) + 1 if len(self.ids_) else 0
         tids = np.arange(len(pts), dtype=np.int64) + max_id if ids is None else ids[valid]
         
         # Add pts to track
         for tid, pt in zip(tids, pts): 
-            self.tracks[tid].append(pt)
-            self.tracks_ts[tid] = self.idx
+            self.tracks_[tid].append(self.index_, pt)
 
         # If features are propagated
         if prune: 
             self.prune()
-            self.idx += 1
 
         # Keep pts and ids up to date
-        self._ids = np.array(self.tracks.keys())
+        self.ids_ = np.array(self.tracks_.keys())
         try: 
-            self._pts = np.vstack([ track[-1] for track in self.tracks.itervalues() ])
+            self.pts_ = np.vstack([ track.latest_item for track in self.tracks_.itervalues() ])
         except: 
-            self._pts = np.array([])
+            self.pts_ = np.array([])
+
+        # Frame counter
+        self.index_ += 1
+
 
     def prune(self): 
         # Remove tracks that are not most recent
-        # count = 0
-        for tid, val in self.tracks_ts.items(): 
-            if val < self.idx: 
+        for tid, track in self.tracks_.items(): 
+            if track.latest_index < self.index_: 
                 del self.tracks[tid]
-                del self.tracks_ts[tid]
-                # count += 1
-        # print 'Total pruned: ', count
+
+    @property
+    def tracks(self): 
+        return self.tracks_
 
     @property
     def pts(self): 
-        return self._pts
+        return self.pts_
         
     @property
     def ids(self): 
-        return self._ids
+        return self.ids_
+
+    def index(self): 
+        return self.index_
 
 
 # class BaseFeatureDetector(object): 

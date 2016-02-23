@@ -592,6 +592,9 @@ def compute_fundamental(x1, x2, method=cv2.FM_RANSAC):
     CV_FM_LMEDS for the LMedS algorithm.  N >= 8"
     """
     assert(x1.shape == x2.shape)
+    if len(x1) < 8:
+        raise RuntimeError('Fundamental matrix requires N >= 8 pts')
+
     F, mask = cv2.findFundamentalMat(x1, x2, method)
     return F, mask
 
