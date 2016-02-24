@@ -6,6 +6,7 @@
 import numpy as np
 import cv2
 import os.path
+from heapq import heappush, heappop
 
 from collections import Counter
 from bot_externals.log_utils import Decoder, LogReader
@@ -74,12 +75,25 @@ class TangoLog(object):
         return self.length_
 
     def read_messages(self, topics=None, start_time=0): 
+
+        N = 100
+        heap = []
+
         for l in self.meta_:
             try: 
                 t, ch, data = l.replace('\n', '').split('\t')
             except: 
                 continue
-            yield ch, data, t
+
+            if len(heap) == N: 
+                c_t, c_ch, c_data = heappop(heap)
+                yield c_ch, c_data, c_t
+            else:
+                heappush(heap, (t, ch, data))
+        
+        for j in range(len(heap)): 
+            c_t, c_ch, c_data = heappop(heap)
+            yield c_ch, c_data, c_t
 
 
 class TangoLogReader(LogReader): 
