@@ -298,37 +298,37 @@ class UWRGBDSceneDataset(UWRGBDDataset):
             # Version 2 only supported! Version 1 support for rgbd scene (unclear)
             self.poses = UWRGBDSceneDataset._reader.load_poses(aligned_file.pose, version) \
                          if aligned_file is not None and version == 'v2' else [None] * len(rgb_files)
-            # print 'Aligned: ', aligned_file
-            # print len(self.poses), len(rgb_files)
+            print 'Aligned: ', aligned_file
+            print len(self.poses), len(rgb_files)
             assert(len(self.poses) == len(rgb_files))
 
-            # # Aligned point cloud
-            # if aligned_file is not None: 
-            #     if version != 'v2': 
-            #         raise RuntimeError('Version v2 is only supported')
+            # Aligned point cloud
+            if aligned_file is not None: 
+                if version != 'v2': 
+                    raise RuntimeError('Version v2 is only supported')
 
-            #     ply_xyz, ply_rgb = UWRGBDSceneDataset._reader.load_ply(aligned_file.ply, version)
-            #     ply_label = UWRGBDSceneDataset._reader.load_plylabel(aligned_file.label, version)
+                ply_xyz, ply_rgb = UWRGBDSceneDataset._reader.load_ply(aligned_file.ply, version)
+                ply_label = UWRGBDSceneDataset._reader.load_plylabel(aligned_file.label, version)
 
-            #     # Remapping to v1 index
-            #     ply_label = np.array([UWRGBDSceneDataset.v2_to_v1[l] for l in ply_label], dtype=np.int32)
+                # Remapping to v1 index
+                ply_label = np.array([UWRGBDSceneDataset.v2_to_v1[l] for l in ply_label], dtype=np.int32)
 
-            #     # Get object info
-            #     object_info = UWRGBDSceneDataset._reader.cluster_ply_labels(ply_xyz[::30], ply_rgb[::30], ply_label[::30])
+                # Get object info
+                object_info = UWRGBDSceneDataset._reader.cluster_ply_labels(ply_xyz[::30], ply_rgb[::30], ply_label[::30])
 
-            #     # Add camera info
-            #     intrinsic = CameraIntrinsic(K=UWRGBDSceneDataset.camera_params.K_rgb, shape=UWRGBDDataset.default_rgb_shape)
-            #     camera = Camera.from_intrinsics_extrinsics(intrinsic, CameraExtrinsic.identity())
-            #     self.map_info = AttrDict(camera=camera, objects=object_info)
+                # Add camera info
+                intrinsic = CameraIntrinsic(K=UWRGBDSceneDataset.camera_params.K_rgb, shape=UWRGBDDataset.default_rgb_shape)
+                camera = Camera.from_intrinsics_extrinsics(intrinsic, CameraExtrinsic.identity())
+                self.map_info = AttrDict(camera=camera, objects=object_info)
 
-            #     # # 1c. Determine centroid of each cluster
-            #     # unique_centers = np.vstack([np.mean(ply_xyz[ply_label == l], axis=0) for l in unique_labels])
+                # # 1c. Determine centroid of each cluster
+                # unique_centers = np.vstack([np.mean(ply_xyz[ply_label == l], axis=0) for l in unique_labels])
 
-            #     # self.map_info = AttrDict(
-            #     #     points=ply_xyz, color=ply_rgb, labels=ply_label, 
-            #     #     unique_labels=unique_labels, unique_centers=unique_centers, camera=camera
-            #     # ) 
-            #     assert(len(ply_xyz) == len(ply_rgb))
+                # self.map_info = AttrDict(
+                #     points=ply_xyz, color=ply_rgb, labels=ply_label, 
+                #     unique_labels=unique_labels, unique_centers=unique_centers, camera=camera
+                # ) 
+                assert(len(ply_xyz) == len(ply_rgb))
 
         @property
         def scene_name(self): 
@@ -488,7 +488,7 @@ class UWRGBDSceneDataset(UWRGBDDataset):
                     aligned[pretty_name(fn, '.label')].label = fn
                 for fn in ply_files: 
                     aligned[pretty_name(fn, '.ply')].ply = fn
-
+                
                 return aligned
                 # return dict(('scene_' + (fn.split('/')[-1]).replace('.pose',''), fn) 
                 #             for fn in pose_files)
@@ -654,7 +654,7 @@ class UWRGBDSceneDataset(UWRGBDDataset):
         meta_file = self.meta_.get(key, None)
         aligned_file = self.aligned_.get(key, None) if (self.aligned_ and with_ground_truth) else None
 
-        return UWRGBDSceneDataset._reader(files, meta_file, aligned_file, self.version, key)
+        return UWRGBDSceneDataset._reader(files, meta_file, aligned_file, self.version, key) 
 
     def scenes(self): 
         return self.dataset_.keys()
@@ -687,13 +687,14 @@ class UWRGBDSceneDataset(UWRGBDDataset):
     def annotate(f): 
         # TODO: Standardize
         vis = f.img.copy()
-        for bbox in f.bbox: 
-            cv2.rectangle(vis, (bbox.coords[0], bbox.coords[1]), (bbox.coords[2], bbox.coords[3]), 
+        for bbox in f.bbox:
+            coords = np.int32(bbox.coords)
+            cv2.rectangle(vis, (coords[0], coords[1]), (coords[2], coords[3]), 
                           (50, 50, 50), 2)
             category_name = str(bbox.category)
             cv2.putText(vis, '[Category: [%i] %s]' % 
                         (UWRGBDDataset.get_category_id(category_name), category_name), 
-                        (bbox.coords[0], bbox.coords[1]-5), 
+                        (coords[0], coords[1]-5), 
                         cv2.FONT_HERSHEY_SIMPLEX, 0.4, (240, 240, 240), thickness = 1)
         return vis
 
@@ -730,12 +731,12 @@ def test_uw_rgbd_scene(version='v1'):
         raise RuntimeError('''Version %s not supported. '''
                            '''Check dataset and choose v1/v2 scene dataset''' % version)
 
-    return rgbd_data_uw
+    for f in rgbd_data_uw.iteritems(every_k_frames=5, with_ground_truth=True): 
+        vis = rgbd_data_uw.annotate(f)
+        imshow_cv('frame', np.hstack([f.img, vis]), text='Image')
+        imshow_cv('depth', (f.depth / 16).astype(np.uint8), text='Depth')
+        cv2.waitKey(100)
 
-    # for f in rgbd_data_uw.iteritems(every_k_frames=5): 
-    #     vis = rgbd_data_uw.annotate(f)
-    #     imshow_cv('frame', np.hstack([f.img, vis]), text='Image')
-    #     imshow_cv('depth', (f.depth / 16).astype(np.uint8), text='Depth')
-    #     cv2.waitKey(100)
+    return rgbd_data_uw
 
 
