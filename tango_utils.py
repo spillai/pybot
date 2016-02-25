@@ -76,7 +76,7 @@ class TangoLog(object):
 
     def read_messages(self, topics=None, start_time=0): 
 
-        N = 100
+        N = 10000
         heap = []
 
         for l in self.meta_:
@@ -88,11 +88,12 @@ class TangoLog(object):
             if len(heap) == N: 
                 c_t, c_ch, c_data = heappop(heap)
                 yield c_ch, c_data, c_t
-            else:
-                heappush(heap, (t, ch, data))
+            
+            heappush(heap, (t, ch, data))
         
         for j in range(len(heap)): 
             c_t, c_ch, c_data = heappop(heap)
+            print c_t, c_ch
             yield c_ch, c_data, c_t
 
 
