@@ -2,8 +2,12 @@
 Lucas-Kanade tracker
 
 Author: Sudeep Pillai 
-  (First implementation: 07 May 2014)
-  (Modified: 17 Oct 2014)
+
+    07 May 2014: First implementation
+    17 Oct 2014: Minor modifications to tracker params
+    28 Feb 2016: Added better support for feature addition, and re-factored
+                 trackmanager with simpler/improved indexing and queuing.
+
 ====================
 
 Lucas-Kanade sparse optical flow demo. Uses goodFeaturesToTrack
@@ -57,7 +61,7 @@ class BaseKLT(object):
         self.tracker = OpticalFlowTracker(params=self.params.tracker)
 
         # Track Manager
-        self.tm = TrackManager(maxlen=10)
+        self.tm = TrackManager(maxlen=20)
 
     def draw_tracks(self, out, colored=False, color_type='unique'):
         """
@@ -103,9 +107,6 @@ class BaseKLT(object):
             if len(pts) > 2: 
                 p1.append(pts[-2,:])
                 p2.append(pts[-1,:])
-
-
-
 
 
 class OpenCVKLT(BaseKLT): 
