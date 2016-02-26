@@ -223,7 +223,7 @@ class CameraExtrinsic(RigidTransform):
 
     @property
     def Rt(self): 
-        return self.quat.to_homogeneous_matrix()[:3]
+        return self.to_homogeneous_matrix()[:3]
 
     @property
     def t(self): 
@@ -364,7 +364,9 @@ class Camera(CameraIntrinsic, CameraExtrinsic):
         Y1 = other.P[[1,2],:]
         Y2 = other.P[[2,0],:]
         Y3 = other.P[[0,1],:]
-        
+
+        print self.P, other.P
+
         return np.float64([[det(np.vstack([X1, Y1])), det(np.vstack([X2, Y1])), det(np.vstack([X3, Y1]))],
                         [det(np.vstack([X1, Y2])), det(np.vstack([X2, Y2])), det(np.vstack([X3, Y2]))],
                         [det(np.vstack([X1, Y3])), det(np.vstack([X2, Y3])), det(np.vstack([X3, Y3]))]])
@@ -733,10 +735,11 @@ def plot_epipolar_line(im_1, F_10, x_0, im_0=None):
             pass
             # raise RuntimeWarning('Failed to estimate epipolar line {:s}'.format(l1))
 
-    if vis_0 is not None: 
-        for x in x_0: 
-            cv2.circle(vis_0, tuple(x), 5, col, -1)
-        return np.hstack([vis_0, vis_1])
+    # print lines_1
+    # if vis_0 is not None: 
+    #     for x in x_0: 
+    #         cv2.circle(vis_0, tuple(x), 5, col, -1)
+    #     return np.hstack([vis_0, vis_1])
     
     return vis_1
 
