@@ -5,6 +5,7 @@ from numpy.linalg import det, norm
 import numpy.matlib as npm
 from scipy import linalg
 
+from bot_vision.color_utils import get_color_by_label
 from bot_vision.image_utils import to_color
 from bot_utils.db_utils import AttrDict
 from bot_geometry.rigid_transform import Quaternion, RigidTransform
@@ -365,8 +366,6 @@ class Camera(CameraIntrinsic, CameraExtrinsic):
         Y2 = other.P[[2,0],:]
         Y3 = other.P[[0,1],:]
 
-        print self.P, other.P
-
         return np.float64([[det(np.vstack([X1, Y1])), det(np.vstack([X2, Y1])), det(np.vstack([X3, Y1]))],
                         [det(np.vstack([X1, Y2])), det(np.vstack([X2, Y2])), det(np.vstack([X3, Y2]))],
                         [det(np.vstack([X1, Y3])), det(np.vstack([X2, Y3])), det(np.vstack([X3, Y3]))]])
@@ -725,21 +724,28 @@ def plot_epipolar_line(im_1, F_10, x_0, im_0=None):
     vis_1 = to_color(im_1)
     vis_0 = to_color(im_0) if im_0 is not None else None
     
-    col = (0,255,0)
-    for l1 in lines_1:
+    N = 20
+    cols = get_color_by_label(np.arange(len(x_0)) % N) * 255
+    # for tid, pt in zip(ids, pts): 
+    #     cv2.circle(vis, tuple(map(int, pt)), 2, 
+    #                tuple(map(int, cols[tid % N])) if colored else (0,240,0),
+    #                -1, lineType=cv2.CV_AA)
+
+
+    # col = (0,255,0)
+    for col, l1 in zip(cols, lines_1):
         try: 
             x0, y0 = map(int, [0, -l1[2] / l1[1] ])
             x1, y1 = map(int, [W, -(l1[2] + l1[0] * W) / l1[1] ])
-            cv2.line(vis_1, (x0,y0), (x1,y1), col, 1)
+            cv2.line(vis_1, (x0,y0), (x1,y1), col, 2)
         except: 
             pass
             # raise RuntimeWarning('Failed to estimate epipolar line {:s}'.format(l1))
 
-    # print lines_1
-    # if vis_0 is not None: 
-    #     for x in x_0: 
-    #         cv2.circle(vis_0, tuple(x), 5, col, -1)
-    #     return np.hstack([vis_0, vis_1])
+    if vis_0 is not None: 
+        for col, x in zip(cols, x_0): 
+            cv2.circle(vis_0, tuple(x), 5, col, -1)
+        return np.hstack([vis_0, vis_1])
     
     return vis_1
 
