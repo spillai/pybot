@@ -92,7 +92,7 @@ class CameraIntrinsic(object):
         """
         self.K = npm.mat(K)
         self.D = D
-        self.shape = shape
+        self.shape = np.int32(shape) if shape is not None else None
 
     def __repr__(self): 
         return 'CameraIntrinsic =======>\n K = {:}\n D = {:}\n fx={:}, fy={:}, '\
