@@ -101,7 +101,7 @@ class TangoLogReader(LogReader):
 
     H, W = 720, 1280
     K = np.float64([1043.75, 0, 638.797, 0, 1043.75, 357.991, 0, 0, 1]).reshape(3,3)
-    D = np.float64([0.234583, -0.689864, 0.679871, 0, 0])
+    D = np.float64([0.234583, -0.689864, 0, 0, 0.679871])
     cam = CameraIntrinsic(K=K, D=D, shape=(H,W))
 
     def __init__(self, directory, scale=1., start_idx=0): 
