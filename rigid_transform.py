@@ -75,8 +75,9 @@ class RigidTransform(object):
         self.tvec = np.array(tvec)
 
     def __repr__(self):
-        return 'rpy: %s tvec: %s' % (np.array_str(self.quat.to_roll_pitch_yaw(), precision=2, suppress_small=True), 
-                                     np.array_str(self.tvec, precision=2, suppress_small=True))
+        return 'rpy: %s tvec: %s' % \
+            (np.array_str(self.quat.to_roll_pitch_yaw(), precision=2, suppress_small=True), 
+             np.array_str(self.tvec, precision=2, suppress_small=True))
         # return 'quat: %s, tvec: %s' % (self.quat, self.tvec)
 
     def inverse(self):
@@ -183,7 +184,154 @@ class RigidTransform(object):
     #     oinv = other.inverse()
     #     return oinv.oplus(self)
 
+###############################################################################
+class DualQuaternion(object):
+    """
+    SE(3) rigid transform class that allows compounding of 6-DOF poses
+    and provides common transformations that are commonly seen in geometric problems.
+        
+    """
+    def __init__(self, xyzw=[0.,0.,0.,1.], tvec=[0.,0.,0.]):
+        """ Initialize a RigidTransform with Quaternion and 3D Position """
+        self.real = Quaternion(xyzw)
+        self.dual = ( Quaternion(xyzw=[tvec[0], tvec[1], tvec[2], 0.]) * self.real ) * 0.5
 
+    def __repr__(self):
+        return 'real: %s dual: %s' % \
+            (np.array_str(self.real, precision=2, suppress_small=True), 
+             np.array_str(self.dual, precision=2, suppress_small=True))
+
+    def normalize(self): 
+        """ Check validity of unit-quaternion norm """
+        self.real.normalize()
+        self.dual.noramlize()
+
+    def dot(self, other): 
+        return self.real.dot(other.real)
+
+    def inverse(self):
+        """ Returns a new RigidTransform that corresponds to the inverse of this one """
+        qinv = self.dual.inverse()
+        return DualQuaternion.from_dq(qinv.q, qinv.rotate(- self.tvec))
+
+    def to_homogeneous_matrix(self):
+        """ Returns a 4x4 homogenous matrix of the form [R t; 0 1] """
+        result = self.rotation.to_homogeneous_matrix()
+        result[:3, 3] = self.translation
+        return result
+
+    def to_Rt(self):
+        """ Returns rotation R, and translational vector t """
+        T = self.to_homogeneous_matrix()
+        return T[:3,:3].copy(), T[:3,3].copy()
+
+    def conjugate(self): 
+        return DualQuaternion.from_dq(self.real.conjugate(), self.dual.conjugate())
+
+    def rotation(self): 
+        return self.real
+
+    def translation(self): 
+        t = self.dual.q * self.real.conjugate()
+        return np.array([t.x, t.y, t.z]) * 2.0
+
+    def __add__(self, other): 
+        return DualQuaternion.from_dq(self.real + other.real, self.dual + other.dual)
+
+    def __mul__(self, other):
+        """ 
+        Left-multiply RigidTransform with another rigid transform
+        
+        Two variants: 
+           RigidTransform: Identical to oplus operation
+           ndarray: transform [N x 3] point set (X_2 = p_21 * X_1)
+
+        """
+        if isinstance(other, DualQuaternion):
+            return DualQuaternion.from_dq(other.real * self.real, 
+                                          other.dual * self.real + other.real * self.dual)
+        elif isinstance(other, float):
+            return DualQuaternion.from_dq(self.real * other, self.dual * other)
+        # elif isinstance(other, nd.array): 
+        #     X = np.hstack([other, np.ones((len(other),1))]).T
+        #     return (np.dot(self.to_homogeneous_matrix(), X).T)[:,:3]
+        else: 
+            raise TypeError('__mul__ typeerror {:}'.format(type(other)))
+            
+    def __rmul__(self, other): 
+        raise NotImplementedError('Right multiply not implemented yet!')                    
+
+    # def oplus(self, other): 
+    #     if isinstance(other, RigidTransform): 
+    #         t = self.quat.rotate(other.tvec) + self.tvec
+    #         r = self.quat * other.quat
+    #         return RigidTransform(r, t)
+    #     elif isinstance(other, list): 
+    #         return map(lambda o: self.oplus(o), other)
+    #     else: 
+    #         raise TypeError("Type inconsistent", type(other), other.__class__)
+
+    # def to_roll_pitch_yaw_x_y_z(self, axes='rxyz'):
+    #     r, p, y = self.quat.to_roll_pitch_yaw(axes=axes)
+    #     return np.array((r, p, y, self.tvec[0], self.tvec[1], self.tvec[2]))
+
+    # def rotate_vec(self, v): 
+    #     if v.ndim == 2 and v.shape[0] > 1: 
+    #         return np.vstack(map(lambda v_: self.quat.rotate(v_), v))
+    #     else: 
+    #         assert(v.ndim == 1 or (v.ndim == 2 and v.shape[0] == 1))
+    #         return self.quat.rotate(v)
+
+    @classmethod
+    def from_dq(cls, r, d):
+        if not isinstance(r, DualQuaternion): 
+            raise TypeError('r is not DualQuaternion')
+        if not not isinstance(d, DualQuaternion): 
+            raise TypeError('d is not DualQuaternion')
+
+        a = cls()
+        a.real = r
+        a.dual = d
+        return a
+
+    # @classmethod
+    # def from_roll_pitch_yaw_x_y_z(cls, r, p, yaw, x, y, z, axes='rxyz'):
+    #     q = Quaternion.from_roll_pitch_yaw(r, p, yaw, axes=axes)
+    #     return cls(q, (x, y, z))
+
+    # @classmethod
+    # def from_Rt(cls, R, t):
+    #     T = np.eye(4)
+    #     T[:3,:3] = R.copy();
+    #     return cls(Quaternion.from_homogenous_matrix(T), t)
+
+    # @classmethod
+    # def from_homogenous_matrix(cls, T):
+    #     return cls(Quaternion.from_homogenous_matrix(T), T[:3,3])
+
+    # @classmethod
+    # def from_triad(cls, pos, v1, v2):
+    #     # print v1, v2, type(v1)
+    #     return RigidTransform.from_homogenous_matrix(tf_compose(tf_construct(v1, v2), pos))
+
+    # @classmethod
+    # def from_angle_axis(cls, angle, axis, tvec): 
+    #     return cls(Quaternion.from_angle_axis(angle, axis), tvec)
+
+    def wxyz(self):
+        return self.rotation.to_wxyz()
+
+    def xyzw(self):
+        return self.rotation.to_xyzw()
+
+    # def translation(self):
+    #     return self.tvec
+
+    @classmethod
+    def identity(cls):
+        return cls()
+
+###############################################################################
 class Sim3(RigidTransform): 
     def __init__(self, xyzw=[0.,0.,0.,1.], tvec=[0.,0.,0.], scale=1.0):    
         RigidTransform.__init__(self, xyzw=xyzw, tvec=tvec)

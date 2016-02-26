@@ -18,18 +18,26 @@ class Quaternion(object):
     def __init__ (self, q=[0,0,0,1]):
         if isinstance(q, Quaternion): 
             self.q = q.q.copy()
-        else: 
+        elif isinstance(q, np.ndarray): 
             try: 
                 self.q = np.array(q, np.float64)
             except:
                 raise Exception("TypeError: cannot be converted to np.array")
+        else: 
+            raise TypeError("Quaternion can not be initialized")
+        
+        self.normalize()
 
-        # Check validity of unit-quaternion norm
+    def normalize(self): 
+        """ Check validity of unit-quaternion norm """
         norm = np.linalg.norm(self.q)
         if abs(norm-1) > 1e-2: 
             raise RuntimeError('Norm computed is %5.3f' % norm)
         if abs(norm - 1) > 1e-2:
             self.q /= norm
+
+    def dot(self, other): 
+        return self.q.dot(other.q)
 
     @classmethod
     def identity(cls):
@@ -43,6 +51,22 @@ class Quaternion(object):
     def from_xyzw(cls, q): 
         return cls(q)
 
+    @property
+    def x(self): 
+        return self.q[0]
+
+    @property
+    def y(self): 
+        return self.q[1]
+
+    @property
+    def z(self): 
+        return self.q[2]
+
+    @property
+    def w(self): 
+        return self.q[3]
+
     def to_wxyz(self): 
         q = np.roll(self.q, shift=1)
         return q
@@ -53,7 +77,12 @@ class Quaternion(object):
     
     def __mul__(self, other):
         """ Multiply quaternion with another """
-        return tf.quaternion_multiply(self.q, other.q)
+        if isinstance(other, float): 
+            return Quaternion(self.q * other)
+        elif isinstance(other, Quaternion): 
+            return tf.quaternion_multiply(self.q, other.q)
+        else: 
+            raise TypeError('Quaternion multiply error')
 
     def __getitem__ (self, i):
         return self.q[i]
@@ -96,6 +125,10 @@ class Quaternion(object):
     def inverse(self):
         """ Invert rotation """
         return Quaternion(tf.quaternion_inverse(self.q))
+
+    def conjugate(self):
+        """ Quaternion conjugate """
+        return Quaternion(tf.quaternion_conjugate(self.q))
 
     @classmethod
     def from_roll_pitch_yaw (cls, roll, pitch, yaw, axes='rxyz'):
