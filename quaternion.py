@@ -18,13 +18,12 @@ class Quaternion(object):
     def __init__ (self, q=[0,0,0,1]):
         if isinstance(q, Quaternion): 
             self.q = q.q.copy()
-        elif isinstance(q, np.ndarray): 
+        else:
             try: 
                 self.q = np.array(q, np.float64)
             except:
-                raise Exception("TypeError: cannot be converted to np.array")
-        else: 
-            raise TypeError("Quaternion can not be initialized")
+                raise TypeError("Quaternion can not be initialized from {:}".format(type(q)))
+                            
         
         self.normalize()
 
