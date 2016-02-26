@@ -48,13 +48,15 @@ def construct_D(k1=0, k2=0, k3=0, p1=0, p2=0):
     """
     Create camera distortion params
     """
-    return np.float64([k1,k2,k3,p1,p2])
+    return np.float64([k1,k2,p1,p2,k3])
 
 def undistort_image(im, K, D): 
     """
     Optionally: 
         newcamera, roi = cv2.getOptimalNewCameraMatrix(self.K, self.D, (W,H), 0) 
     """
+    H,W = im.shape[:2]
+    Kprime, roi = cv2.getOptimalNewCameraMatrix(K, D, (W,H), 1, (W,H))
     return cv2.undistort(im, K, D, None, K)
 
 def get_calib_params(fx, fy, cx, cy, baseline=None, baseline_px=None): 
@@ -144,15 +146,15 @@ class CameraIntrinsic(object):
 
     @property
     def k3(self): 
-        return self.D[2]
+        return self.D[4]
 
     @property
     def p1(self): 
-        return self.D[3]
+        return self.D[2]
 
     @property
     def p2(self): 
-        return self.D[4]
+        return self.D[3]
 
     @property
     def fov(self): 
@@ -191,7 +193,7 @@ class CameraIntrinsic(object):
         AttrDict(
             fx=float(self.fx), fy=float(self.fy), 
             cx=float(self.cx), cy=float(self.cy), 
-            k1=float(self.D[0]), k2=float(self.D[1]), k3=float(self.D[2]), p1=float(self.D[3]), p2=float(self.D[4]),
+            k1=float(self.D[0]), k2=float(self.D[1]), k3=float(self.D[4]), p1=float(self.D[2]), p2=float(self.D[3]),
             width=int(width), height=int(height)
         ).save_yaml(filename)
         
