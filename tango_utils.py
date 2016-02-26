@@ -98,6 +98,12 @@ class TangoLog(object):
 
 
 class TangoLogReader(LogReader): 
+
+    H, W = 720, 1280
+    K = np.float64([1043.75, 0, 638.797, 0, 1043.75, 357.991, 0, 0, 1]).reshape(3,3)
+    D = np.float64([0.234583, -0.689864, 0.679871, 0, 0])
+    cam = CameraIntrinsic(K=K, D=D, shape=(H,W))
+
     def __init__(self, directory, scale=1., start_idx=0): 
         
         # Set directory and filename for time synchronized log reads 
@@ -125,14 +131,7 @@ class TangoLogReader(LogReader):
         See /sdcard/config/calibration.xml
         1043.75;   1043.69;   638.797;   357.991;   0.234583;   -0.689864;   0.679871
         """
-        f = 1043.75 * self.scale_
-        cx, cy = 638.797 * self.scale_, 357.991 * self.scale_
-        H, W = int(720 * self.scale_), int(1280 * self.scale_)
-        K = np.float64([f, 0, W/2-0.5, 0, f, H/2-0.5, 0, 0, 1]).reshape(3,3)
-        # K = np.float64([f, 0, cx, 0, f, cy, 0, 0, 1]).reshape(3,3)
-        # D = np.float64([0, 0, 0, 0, 0])
-        D = np.float64([0.234583, -0.689864, 0.679871, 0, 0])
-        return CameraIntrinsic(K=K, D=D, shape=(H,W))
+        return TangoLogReader.cam.scaled(self.scale_)
 
     def load_log(self, filename): 
         return TangoLog(filename)
