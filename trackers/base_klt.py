@@ -28,7 +28,7 @@ from bot_vision.image_utils import to_color, to_gray, gaussian_blur
 from .tracker_utils import finite_and_within_bounds, \
     TrackManager, FeatureDetector, OpticalFlowTracker
 
-def draw_tracks(im, pts): 
+def draw_features(im, pts): 
     out = to_color(im)
     for pt in pts: 
         cv2.circle(out, tuple(map(int, pt)), 3, (0,255,0), -1, lineType=cv2.CV_AA)
