@@ -11,7 +11,6 @@ from heapq import heappush, heappop
 from collections import Counter
 from bot_externals.log_utils import Decoder, LogReader
 from bot_vision.image_utils import im_resize
-from bot_vision.imshow_utils import imshow_cv
 from bot_geometry.rigid_transform import RigidTransform
 from bot_vision.camera_utils import CameraIntrinsic
 
@@ -38,16 +37,16 @@ def TangoOdomDecoder(channel, every_k_frames=1):
 class TangoImageDecoder(Decoder): 
     """
     """
-    def __init__(self, directory, channel='RGB', every_k_frames=1, scale=1.): 
+    def __init__(self, directory, channel='RGB', every_k_frames=1, shape=(720,1280)): 
         Decoder.__init__(self, channel=channel, every_k_frames=every_k_frames)
-        self.scale = scale * 2 # HARD-CODED to compensate for scaling the logger
+        self.shape = shape 
         self.directory = directory
 
     def decode(self, msg): 
         fn = os.path.join(self.directory, msg)
         if os.path.exists(fn): 
             im = cv2.imread(fn, cv2.CV_LOAD_IMAGE_COLOR)
-            return im_resize(im, scale=self.scale)
+            return im_resize(im, shape=self.shape)
         else: 
             raise Exception('File does not exist')
 
@@ -79,6 +78,7 @@ class TangoLog(object):
         N = 10000
         heap = []
 
+        p_t = 0
         for l in self.meta_:
             try: 
                 t, ch, data = l.replace('\n', '').split('\t')
@@ -87,13 +87,19 @@ class TangoLog(object):
 
             if len(heap) == N: 
                 c_t, c_ch, c_data = heappop(heap)
+                assert(c_t >= p_t)
+                p_t = c_t
                 yield c_ch, c_data, c_t
             
             heappush(heap, (t, ch, data))
         
         for j in range(len(heap)): 
             c_t, c_ch, c_data = heappop(heap)
-            print c_t, c_ch
+            # print c_t, c_ch
+            
+            assert(c_t >= p_t)
+            p_t = c_t
+            
             yield c_ch, c_data, c_t
 
 
@@ -110,13 +116,18 @@ class TangoLogReader(LogReader):
         self.directory_ = os.path.expanduser(directory)
         self.filename_ = os.path.join(self.directory_, 'tango_data.txt')
         self.scale_ = scale
+        self.shape_ = (int(1280 * scale), int(720 * scale))
+        assert(self.shape_[0] % 2 == 0 and self.shape_[1] % 2 == 0)
+
         self.start_idx_ = start_idx
+
+        # HARD-CODED to compensate for scaling the logger
 
         # Initialize TangoLogReader with appropriate decoders
         super(TangoLogReader, self).__init__(self.filename_, 
                                              decoder=[
                                                  TangoOdomDecoder(channel='RGB_VIO'), 
-                                                 TangoImageDecoder(self.directory_, channel='RGB', scale=scale)
+                                                 TangoImageDecoder(self.directory_, channel='RGB', shape=self.shape_)
                                              ])
         
         if self.start_idx_ < 0 or self.start_idx_ > 100: 
