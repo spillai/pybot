@@ -22,6 +22,14 @@ kinect_v1_params = AttrDict(
     projector_depth_baseline = 0.07214
 )
 
+def unproject(a):
+  """ Homogenize vector """
+  return np.append(a, 1)
+
+def project(a):
+  """ De-homogenize vector """
+  return a[:-1]/float(a[-1])
+
 def get_baseline(fx, baseline=None, baseline_px=None): 
     """
     Retrieve baseline / baseline(in pixels) using the focal length
@@ -100,7 +108,7 @@ class CameraIntrinsic(object):
     def __repr__(self): 
         return 'CameraIntrinsic =======>\n K = {:}\n D = {:}\n fx={:}, fy={:}, '\
             'cx={:}, cy={:}, shape={:}'.format(
-                np.array_str(np.array(self.K), precision=2), 
+                np.array_str(np.array(self.K), precision=2, suppress_small=True), 
                 np.array_str(self.D, precision=2),
                 self.fx, self.fy, self.cx, self.cy, self.shape) 
 

@@ -25,8 +25,10 @@ class EpipolarViz(object):
     def __init__(self, max_views=10): 
         self.frames_ = deque(maxlen=max_views)
 
-        params = FeatureDetector.fast_detector_params
-        params.params.threshold = 80
+        # params = FeatureDetector.fast_detector_params
+        # params.params.threshold = 80
+
+        params = FeatureDetector.apriltag_detector_params
 
         self.fdet_ = FeatureDetector(params)
  
