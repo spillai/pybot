@@ -13,6 +13,30 @@ def normalize_vec(v):
     """ Normalizes a vector with its L2 norm """
     return v * 1.0 / np.linalg.norm(v)
 
+def skew(v, return_dv=False):
+  """ 
+  Returns the skew-symmetric matrix of a vector
+  Ref: https://github.com/dreamdragon/Solve3Plus1/blob/master/skew3.m
+  """
+  sk = np.float32([[0, -v[2], v[1]],
+                   [v[2], 0, -v[0]],
+                   [-v[1], v[0], 0]])
+    
+  if return_dv: 
+      dV = np.float32([[0, 0, 0], 
+                       [0, 0, -1], 
+                       [0, 1, 0], 
+                       [0, 0, 1], 
+                       [0, 0, 0], 
+                       [-1, 0, 0], 
+                       [0, -1, 0], 
+                       [1, 0, 0], 
+                       [0, 0, 0]])
+      return sk, dV
+  else: 
+      return sk
+        
+
 def tf_construct(vec1,vec2): 
     """
     Construct a reference frame with two vectors
