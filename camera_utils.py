@@ -363,12 +363,16 @@ class Camera(CameraIntrinsic, CameraExtrinsic):
         """
         Compute the fundamental matrix with respect to other camera 
         http://www.robots.ox.ac.uk/~vgg/hzbook/code/vgg_multiview/vgg_F_from_P.m
+
+        The computed fundamental matrix, given by the formula 17.3 (p. 412) in
+        Hartley & Zisserman book (2nd ed.).
         
         Use as: 
            F_10 = poses[1].F(poses[0])
            l_1 = F_10 * x_0
 
         """
+
         X1 = self.P[[1,2],:]
         X2 = self.P[[2,0],:]
         X3 = self.P[[0,1],:]
@@ -376,10 +380,13 @@ class Camera(CameraIntrinsic, CameraExtrinsic):
         Y2 = other.P[[2,0],:]
         Y3 = other.P[[0,1],:]
 
-        return np.float64([[det(np.vstack([X1, Y1])), det(np.vstack([X2, Y1])), det(np.vstack([X3, Y1]))],
-                        [det(np.vstack([X1, Y2])), det(np.vstack([X2, Y2])), det(np.vstack([X3, Y2]))],
-                        [det(np.vstack([X1, Y3])), det(np.vstack([X2, Y3])), det(np.vstack([X3, Y3]))]])
+        F = np.float64([
+            [det(np.vstack([X1, Y1])), det(np.vstack([X2, Y1])), det(np.vstack([X3, Y1]))],
+            [det(np.vstack([X1, Y2])), det(np.vstack([X2, Y2])), det(np.vstack([X3, Y2]))],
+            [det(np.vstack([X1, Y3])), det(np.vstack([X2, Y3])), det(np.vstack([X3, Y3]))] 
+        ])
 
+        return F #  / F[2,2]
 
     def save(self, filename): 
         raise NotImplementedError()

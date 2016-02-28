@@ -22,27 +22,39 @@ class Frame(object):
         return self.camera_
 
 class EpipolarViz(object): 
-    def __init__(self, max_views=10): 
+    def __init__(self, max_views=10, fixed_reference=False): 
         self.frames_ = deque(maxlen=max_views)
+        self.fixed_reference_ = fixed_reference
 
-        # params = FeatureDetector.fast_detector_params
-        # params.params.threshold = 80
+        params = FeatureDetector.fast_detector_params
+        params.params.threshold = 80
 
-        params = FeatureDetector.apriltag_detector_params
+        # params = FeatureDetector.apriltag_detector_params
 
         self.fdet_ = FeatureDetector(params)
  
     def add(self, im, camera): 
+        if self.fixed_reference_ and not len(self.frames_): 
+            self.ref_frame_ = Frame(im, camera)
+            print('Reference frame {:}'.format(camera))
+
         self.frames_.append(Frame(im, camera))
 
-    def visualize(self, root=-1): 
-        assert(root < 0 and root >= -len(self.frames_))
+    def visualize(self, root=0): 
+        if len(self.frames_) < 2: 
+            return
 
-        try: 
-            ref_im = self.frames_[root].im
-            ref_camera = self.frames_[root].camera
-        except: 
-            raise RuntimeError("Unable to index to root")
+        if self.fixed_reference_: 
+            ref_im = self.ref_frame_.im
+            ref_camera = self.ref_frame_.camera
+            root = -1
+        else: 
+            assert(root >= 0 and root < len(self.frames_))
+            try: 
+                ref_im = self.frames_[root].im
+                ref_camera = self.frames_[root].camera
+            except: 
+                raise RuntimeError("Unable to index to root")
 
         vis = {}
 
@@ -52,11 +64,10 @@ class EpipolarViz(object):
 
         # Draw epipoles across all other images/poses
         for idx, f in enumerate(self.frames_): 
-            if idx == len(self.frames_) + root: 
-                continue
-
             F_10 = f.camera.F(ref_camera)
-            vis[idx] = plot_epipolar_line(f.im, F_10, pts, im_0=ref_im)
+            vis[idx] = plot_epipolar_line(f.im, F_10, pts, im_0=ref_im if idx == 0 else None)
+
+            print 'F b/w ref and idx={:}, \ncurr={:}\n\nF={:}\n'.format(idx, f.camera, F_10)
 
         if len(vis): 
-            imshow_cv('epi_out', im_resize(np.vstack(vis.values()), scale=0.5))
+            imshow_cv('epi_out', im_resize(np.hstack(vis.values()), scale=0.5))
