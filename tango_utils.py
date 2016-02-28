@@ -130,8 +130,8 @@ class TangoLogReader(LogReader):
                                                  TangoImageDecoder(self.directory_, channel='RGB', shape=self.shape_)
                                              ])
         
-        if self.start_idx_ < 0 or self.start_idx_ > 100: 
-            raise ValueError('start_idx in TangoReader expects a percentage [0,100], provided {:}'.format(self.start_idx))
+        if isinstance(self.start_idx_, float):
+            raise ValueError('start_idx in TangoReader expects an integer, provided {:}'.format(self.start_idx_))
 
     @property
     def calib(self): 
@@ -159,7 +159,7 @@ class TangoLogReader(LogReader):
             # st, end = self.log.get_start_time(), self.log.get_end_time()
             # start_t = Time(st + (end-st) * self.start_idx / 100.0)
              
-            print('Reading TangoLog from {:3.2f}% onwards'.format(self.start_idx_))
+            print('Reading TangoLog from index={:} onwards'.format(self.start_idx_))
             for self.idx, (channel, msg, t) in enumerate(self.log.read_messages()):
                 if self.idx < self.start_idx_: 
                     continue
