@@ -368,8 +368,8 @@ class Camera(CameraIntrinsic, CameraExtrinsic):
         Hartley & Zisserman book (2nd ed.).
         
         Use as: 
-           F_10 = poses[1].F(poses[0])
-           l_1 = F_10 * x_0
+            F_10 = poses[0].F(poses[1])
+            l_1 = F_10 * x_0
 
         """
 
@@ -762,7 +762,7 @@ def plot_epipolar_line(im_1, F_10, x_0, im_0=None):
     if vis_0 is not None: 
         for col, x in zip(cols, x_0): 
             cv2.circle(vis_0, tuple(x), 5, col, -1)
-        return np.hstack([vis_0, vis_1])
+        return np.vstack([vis_0, vis_1])
     
     return vis_1
 
