@@ -713,9 +713,29 @@ def draw_camera(pose, zmin=0.0, zmax=0.1, fov=np.deg2rad(60)):
     
     return (faces, np.hstack([pts[:-1], pts[1:]]).reshape((-1,3)))
 
+def draw_laser_frustum(pose, zmin=0.0, zmax=10, fov=np.deg2rad(60)): 
+
+    N = 30
+    curve = np.vstack([(RigidTransform.from_roll_pitch_yaw_x_y_z(0, 0, rad, 0, 0, 0) * np.array([[zmax, 0, 0]])) 
+             for rad in np.linspace(-fov/2, fov/2, N)])
+    
+    curve_w = pose * curve
+
+    faces, edges = [], []
+    for cpt1, cpt2 in zip(curve_w[:-1], curve_w[1:]): 
+        faces.extend([pose.translation, cpt1, cpt2])
+        edges.extend([cpt1, cpt2])
+    edges.extend([edges[-1], pose.translation])
+    edges.extend([edges[0], pose.translation])
+
+    faces = np.vstack(faces)
+    edges = np.vstack(edges)
+    return (faces, edges)
+
+
 def publish_quads(pub_channel, quads, frame_id='camera', reset=True):
     publish_point_type(pub_channel, quads, point_type='QUADS', frame_id=frame_id, reset=reset)
-
+    
 def publish_cameras(pub_channel, poses, c='y', texts=[], frame_id='camera', 
                     draw_faces=False, draw_edges=True, size=1, zmin=0.01, zmax=0.1, reset=True):
     cam_feats = [draw_camera(pose, zmax=zmax * size) for pose in poses]
@@ -737,11 +757,37 @@ def publish_cameras(pub_channel, poses, c='y', texts=[], frame_id='camera',
         publish_point_type(pub_channel+'-faces', cam_faces, point_type='TRIANGLES', c=carr, frame_id=frame_id, reset=reset)
 
 
-    # # Publish corresponding text
-    # if len(texts): 
-    #     assert(len(poses) == len(texts))
-    #     arr = np.vstack([pose.tvec for pose in poses])
-    #     publish_text_lcmgl(pub_channel+'-text', arr, texts=texts, sensor_tf=sensor_tf)
+    # Publish corresponding text
+    if len(texts): 
+        assert(len(poses) == len(texts))
+        arr = np.vstack([pose.tvec for pose in poses])
+        publish_text_lcmgl(pub_channel+'-text', arr, texts=texts, sensor_tf=sensor_tf)
+
+def publish_laser_frustums(pub_channel, poses, c='y', texts=[], frame_id='camera', 
+                    draw_faces=True, draw_edges=True, size=1, zmin=0.01, zmax=5, reset=True):
+    cam_feats = [draw_laser_frustum(pose, zmax=zmax * size, fov=np.deg2rad(80)) for pose in poses]
+    cam_faces = map(lambda x: x[0], cam_feats)
+    cam_edges = map(lambda x: x[1], cam_feats)
+
+    # Publish pose
+    publish_pose_list(pub_channel, poses, texts=texts, frame_id=frame_id, reset=reset)
+
+    # Darker yellow edge
+    if draw_edges: 
+        carr = ['r'] * len(cam_edges)
+        publish_point_type(pub_channel+'-edges', cam_edges, point_type='LINES', c=carr, 
+                           frame_id=frame_id, reset=reset)
+
+    # Light faces
+    if draw_faces: 
+        carr = [c] * len(cam_faces)
+        publish_point_type(pub_channel+'-faces', cam_faces, point_type='TRIANGLES', c=carr, frame_id=frame_id, reset=reset)
+
+    # Publish corresponding text
+    if len(texts): 
+        assert(len(poses) == len(texts))
+        arr = np.vstack([pose.tvec for pose in poses])
+        publish_text_lcmgl(pub_channel+'-text', arr, texts=texts, sensor_tf=sensor_tf)
 
 
 
