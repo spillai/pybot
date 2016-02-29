@@ -15,22 +15,24 @@ from bot_geometry.rigid_transform import RigidTransform
 from bot_vision.camera_utils import CameraIntrinsic
 
 def TangoOdomDecoder(channel, every_k_frames=1): 
+
+    # Rotate camera reference with a rotation about x axis (+ve)
+    p_roll = RigidTransform.from_roll_pitch_yaw_x_y_z(np.pi/2, 0, 0, 0, 0, 0)
+
+    # Rotation now defined wrt camera (originally device)
+    pose_CD = RigidTransform.from_roll_pitch_yaw_x_y_z(np.pi, 0, 0, 0, 0, 0) 
+
     def odom_decode(data): 
         """ x, y, z, qx, qy, qz, qw, status_code, confidence, accuracy """
         p = np.float64(data.split(','))
-        if not p[7]: 
+        if p[7] == 0: 
             raise Warning('Pose initializing.., status_code: 0')
 
         tvec, ori = p[:3], p[3:7]
         pose = RigidTransform(xyzw=ori, tvec=tvec)
         
-        # Rotate camera reference with a rotation about x axis (+ve)
-        p_roll = RigidTransform.from_roll_pitch_yaw_x_y_z(np.pi/2, 0, 0, 0, 0, 0)
-
-        # Rotation now defined wrt camera (originally device)
-        pose_CD = RigidTransform.from_roll_pitch_yaw_x_y_z(np.pi, 0, 0, 0, 0, 0) 
-        
         return p_roll * pose * pose_CD
+        # return pose * pose_CD * p_roll
             
     return Decoder(channel=channel, every_k_frames=every_k_frames, decode_cb=lambda data: odom_decode(data))
 

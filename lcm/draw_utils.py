@@ -725,6 +725,9 @@ def draw_laser_frustum(pose, zmin=0.0, zmax=10, fov=np.deg2rad(60)):
     for cpt1, cpt2 in zip(curve_w[:-1], curve_w[1:]): 
         faces.extend([pose.translation, cpt1, cpt2])
         edges.extend([cpt1, cpt2])
+
+    # Connect the last pt in the curve w/ the current pose, 
+    # then connect the the first pt in the curve w/ the curr. pose
     edges.extend([edges[-1], pose.translation])
     edges.extend([edges[0], pose.translation])
 
