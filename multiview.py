@@ -22,14 +22,17 @@ class Frame(object):
         return self.camera_
 
 class EpipolarViz(object): 
-    def __init__(self, max_views=10, fixed_reference=False): 
+    def __init__(self, detector='apriltag', max_views=10, fixed_reference=False): 
         self.frames_ = deque(maxlen=max_views)
         self.fixed_reference_ = fixed_reference
 
-        # params = FeatureDetector.fast_detector_params
-        # params.params.threshold = 80
-
-        params = FeatureDetector.apriltag_detector_params
+        if detector == 'apriltag': 
+            params = FeatureDetector.apriltag_detector_params
+        elif detector == 'fast': 
+            params = FeatureDetector.fast_detector_params
+            params.params.threshold = 80
+        else: 
+            raise ValueError('Unknown detector type {:}'.format(detector))
 
         self.fdet_ = FeatureDetector(params)
  
@@ -61,7 +64,7 @@ class EpipolarViz(object):
         # Detect features in the reference image
         try: 
             pts = self.fdet_.process(to_gray(ref_im))
-            pts = pts.reshape(len(pts)/4,-1,2).mean(axis=1)
+            # pts = pts.reshape(len(pts)/4,-1,2).mean(axis=1)
         except: 
             return
 
