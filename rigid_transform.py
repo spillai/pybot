@@ -189,6 +189,7 @@ class RigidTransform(object):
     def xyzw(self):
         return self.quat.to_xyzw()
 
+    @property
     def translation(self):
         return self.tvec
 
