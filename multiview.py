@@ -26,10 +26,10 @@ class EpipolarViz(object):
         self.frames_ = deque(maxlen=max_views)
         self.fixed_reference_ = fixed_reference
 
-        params = FeatureDetector.fast_detector_params
-        params.params.threshold = 80
+        # params = FeatureDetector.fast_detector_params
+        # params.params.threshold = 80
 
-        # params = FeatureDetector.apriltag_detector_params
+        params = FeatureDetector.apriltag_detector_params
 
         self.fdet_ = FeatureDetector(params)
  
@@ -59,15 +59,21 @@ class EpipolarViz(object):
         vis = {}
 
         # Detect features in the reference image
-        pts = self.fdet_.process(to_gray(ref_im))
-        # vis[len(self.frames_) + root] = draw_features(to_color(ref_im), pts)
+        try: 
+            pts = self.fdet_.process(to_gray(ref_im))
+            pts = pts.reshape(len(pts)/4,-1,2).mean(axis=1)
+        except: 
+            return
+
+        if not len(pts):
+            return
 
         # Draw epipoles across all other images/poses
         for idx, f in enumerate(self.frames_): 
-            F_10 = f.camera.F(ref_camera)
+            F_10 = ref_camera.F(f.camera)
             vis[idx] = plot_epipolar_line(f.im, F_10, pts, im_0=ref_im if idx == 0 else None)
 
             print 'F b/w ref and idx={:}, \ncurr={:}\n\nF={:}\n'.format(idx, f.camera, F_10)
 
         if len(vis): 
-            imshow_cv('epi_out', im_resize(np.hstack(vis.values()), scale=0.5))
+            imshow_cv('epi_out', im_resize(np.vstack(vis.values()), scale=0.5))
