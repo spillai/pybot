@@ -14,14 +14,36 @@ from bot_vision.image_utils import im_resize
 from bot_geometry.rigid_transform import RigidTransform
 from bot_vision.camera_utils import CameraIntrinsic
 
+# base: COORDINATE_FRAME_START_OF_SERVICE, target: COORDINATE_FRAME_DEVICE	
+# reported measurements
+
+# base: IMU, target: CAMERA
+# t: 0.000339, 0.061691, 0.002792 q: (w) 0.000585, (x)0.707940, (y)0.706271, (z)0.001000
+
+# base: IMU, target: DEVICE
+# t: 0.000000, 0.000000, 0.000000 q: (w) 0.702596, (x) -0.079740, (y) -0.079740, (z) 0.702596
+
+# base: IMU, target: DEPTH
+# t: 0.000339, 0.061691, 0.002792 q: (w) 0.000585, 0.707940, 0.706271, 0.001000
+
+# base: IMU, target: FISHEYE
+# t: 0.000663, 0.011257, 0.004177 q: (w) 0.002592, 0.704923, 0.709254, -0.005954
+
 def TangoOdomDecoder(channel, every_k_frames=1): 
+
+    
+    p_DI = RigidTransform(tvec=[0,0,0], xyzw=[-0.079740, -0.079740, 0.706271, 0.706271])
+    p_CI = RigidTransform(tvec=[0.000339, 0.061691, 0.002792], xyzw=[0.707940, 0.706271, 0.001000, 0.000585])
+    p_CD = p_CI * p_DI.inverse()
+    print 'p_DI: %s, \np_CI: %s, \np_CD: %s' % (p_DI, p_CI, p_CD)
 
     # Rotate camera reference with a rotation about x axis (+ve)
     p_roll = RigidTransform.from_roll_pitch_yaw_x_y_z(np.pi/2, 0, 0, 0, 0, 0)
+    # print p_roll.to_homogeneous_matrix()
 
     # Rotation now defined wrt camera (originally device)
-    pose_CD = RigidTransform.from_roll_pitch_yaw_x_y_z(np.pi, 0, 0, 0, 0, 0) 
-
+    # p_CD = RigidTransform.from_roll_pitch_yaw_x_y_z(np.pi, -0.22, 0, 0, 0.06, 0) 
+    
     def odom_decode(data): 
         """ x, y, z, qx, qy, qz, qw, status_code, confidence, accuracy """
         p = np.float64(data.split(','))
@@ -29,9 +51,13 @@ def TangoOdomDecoder(channel, every_k_frames=1):
             raise Warning('Pose initializing.., status_code: 0')
 
         tvec, ori = p[:3], p[3:7]
-        pose = RigidTransform(xyzw=ori, tvec=tvec)
-        
-        return p_roll * pose * pose_CD
+        pose_DS = RigidTransform(xyzw=ori, tvec=tvec)
+     
+        p_CS = pose_DS * p_CD
+        # print 'p1: ', p_roll * pose_DS * p_CD, '\np2: ', p_roll * p_CS
+        # raise RuntimeError()
+
+        return p_roll * pose_CS * p_CD
         # return pose * pose_CD * p_roll
             
     return Decoder(channel=channel, every_k_frames=every_k_frames, decode_cb=lambda data: odom_decode(data))
