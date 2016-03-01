@@ -76,7 +76,7 @@ class EpipolarViz(object):
             F_10 = ref_camera.F(f.camera)
             vis[idx] = plot_epipolar_line(f.im, F_10, pts, im_0=ref_im if idx == 0 else None)
 
-            print 'F b/w ref and idx={:}, \ncurr={:}\n\nF={:}\n'.format(idx, f.camera, F_10)
+            # print 'F b/w ref and idx={:}, \ncurr={:}\n\nF={:}\n'.format(idx, f.camera, F_10)
 
         if len(vis): 
             imshow_cv('epi_out', im_resize(np.vstack(vis.values()), scale=0.5))
