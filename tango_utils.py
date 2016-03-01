@@ -14,36 +14,48 @@ from bot_vision.image_utils import im_resize
 from bot_geometry.rigid_transform import RigidTransform
 from bot_vision.camera_utils import CameraIntrinsic
 
-# base: COORDINATE_FRAME_START_OF_SERVICE, target: COORDINATE_FRAME_DEVICE	
-# reported measurements
-
-# base: IMU, target: CAMERA
-# t: 0.000339, 0.061691, 0.002792 q: (w) 0.000585, (x)0.707940, (y)0.706271, (z)0.001000
-
-# base: IMU, target: DEVICE
-# t: 0.000000, 0.000000, 0.000000 q: (w) 0.702596, (x) -0.079740, (y) -0.079740, (z) 0.702596
-
-# base: IMU, target: DEPTH
-# t: 0.000339, 0.061691, 0.002792 q: (w) 0.000585, 0.707940, 0.706271, 0.001000
-
-# base: IMU, target: FISHEYE
-# t: 0.000663, 0.011257, 0.004177 q: (w) 0.002592, 0.704923, 0.709254, -0.005954
 
 def TangoOdomDecoder(channel, every_k_frames=1): 
+    """
+    https://developers.google.com/project-tango/overview/coordinate-systems
 
-    
+    DYNAMIC base: COORDINATE_FRAME_START_OF_SERVICE (SS), target: COORDINATE_FRAME_DEVICE (D)	
+    Reported measurements
+
+    STATIC base: IMU (I), target: CAMERA (C)
+    t: 0.000339, 0.061691, 0.002792 q: (w) 0.000585, (x)0.707940, (y)0.706271, (z)0.001000
+
+    STATIC base: IMU (I), target: DEVICE (D)
+    t: 0.000000, 0.000000, 0.000000 q: (w) 0.702596, (x) -0.079740, (y) -0.079740, (z) 0.702596
+
+    STATIC base: IMU (I), target: DEPTH (P)
+    t: 0.000339, 0.061691, 0.002792 q: (w) 0.000585, 0.707940, 0.706271, 0.001000
+
+    STATIC base: IMU (I), target: FISHEYE (F)
+    t: 0.000663, 0.011257, 0.004177 q: (w) 0.002592, 0.704923, 0.709254, -0.005954
+
+    BOT: FWD  (X), LEFT (Y), UP  (Z)
+    SS:  LEFT (X), FWD  (Y), UP  (Z)
+    CAM: LEFT (X), DOWN (Y), FWD (Z)
+ 
+    BOT->CAM: 
+    a) (0, 0, -90)   => LEFT (X), FWD  (Y), UP   (Z)
+    b) (-90, 0, -90) => LEFT (X), DOWN (Y), FWD (Z) => CAM
+
+    SS->CAM: 
+    a) (-90, 0, 0)   => LEFT (X), DOWN (Y), FWD (Z) => CAM
+
+    """
+
     p_ID = RigidTransform(tvec=[0,0,0], xyzw=[-0.079740, -0.079740, 0.706271, 0.706271])
     p_IC = RigidTransform(tvec=[0.000339, 0.061691, 0.002792], xyzw=[0.707940, 0.706271, 0.001000, 0.000585])
     p_DC = p_ID.inverse() * p_IC
     print 'p_ID: %s, \np_IC: %s, \np_DC: %s' % (p_ID, p_IC, p_DC)
 
-    # Rotate camera reference with a rotation about x axis (+ve)
-    # p_roll = RigidTransform.from_roll_pitch_yaw_x_y_z(np.pi/2, 0, 0, 0, 0, 0)
-    # print p_roll.to_homogeneous_matrix()
-
-    # Rotation now defined wrt camera (originally device)
-    # p_CD = RigidTransform.from_roll_pitch_yaw_x_y_z(np.pi, -0.22, 0, 0, 0.06, 0) 
-    # print p_CD
+    # SS->CAM
+    p_S_CAM = RigidTransform.from_roll_pitch_yaw_x_y_z(-np.pi/2, 0, 0, 
+                                                    0, 0, 0, axes='sxyz')
+    p_CAM_S = p_S_CAM.inverse()
 
     def odom_decode(data): 
         """ x, y, z, qx, qy, qz, qw, status_code, confidence, accuracy """
@@ -55,12 +67,7 @@ def TangoOdomDecoder(channel, every_k_frames=1):
         p_SD = RigidTransform(xyzw=ori, tvec=tvec)
         p_SC = p_SD * p_DC
 
-        # p_CS = pose_DS * p_CD
-        # print 'p1: ', p_roll * pose_DS * p_CD, '\np2: ', p_roll * p_CS
-        # raise RuntimeError()
-
-        return p_SC # p_roll * p_CS
-        # return pose * pose_CD * p_roll
+        return p_CAM_S * p_SC
             
     return Decoder(channel=channel, every_k_frames=every_k_frames, decode_cb=lambda data: odom_decode(data))
 
