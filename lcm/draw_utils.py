@@ -262,18 +262,18 @@ def arr_msg(arr, carr, frame_uid, element_id):
     msg.element_id = element_id
 
     npoints = len(arr)
-    msg.points = [vs.point3d_t() for j in range(0,npoints)]
+    msg.points = [vs.point3d_t() for _ in xrange(0,npoints)]
     msg.npoints = len(msg.points)             
     inds = np.arange(0,npoints)
 
-    for j in range(npoints):
+    for j in xrange(npoints):
         msg.points[j].x = arr[j,0]
         msg.points[j].y = arr[j,1]
         msg.points[j].z = arr[j,2]
 
-    msg.colors = [vs.color_t() for j in range(0,npoints)]
+    msg.colors = [vs.color_t() for _ in xrange(0,npoints)]
     msg.ncolors = len(msg.colors)
-    for j in range(npoints):
+    for j in xrange(npoints):
         msg.colors[j].r = carr[j,0]
         msg.colors[j].g = carr[j,1]
         msg.colors[j].b = carr[j,2]    
