@@ -105,6 +105,10 @@ class CounterWithPeriodicCallback(Counter):
         self.every_k_ = every_k
         self.process_cb_ = process_cb
 
+    @property
+    def every_k(self): 
+        return self.every_k_
+
     def poll(self): 
         self.count()
         if self.check_divisibility(self.every_k_):
