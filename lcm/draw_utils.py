@@ -17,7 +17,7 @@ from bot_core import image_t, pose_t
 
 # Utility imports
 from bot_vision.image_utils import to_color
-from bot_vision.draw_utils import reshape_arr, get_color_arr, height_map, \
+from bot_externals.draw_helpers import reshape_arr, get_color_arr, height_map, \
     color_by_height_axis, copy_pointcloud_data
 from bot_utils.async_utils import run_async
 from bot_geometry.rigid_transform import RigidTransform
@@ -70,7 +70,7 @@ class VisualizationMsgsPub:
         msg.id = self.channel_uid(channel)
         msg.name = 'BOTFRAME_' + channel
         msg.type = vs.obj_collection_t.AXIS3D
-        msg.reset = True;
+        msg.reset = True
         
         # Send sensor pose
         pose_msg = vs.obj_t()
@@ -82,8 +82,8 @@ class VisualizationMsgsPub:
         # Save pose
         self.set_sensor_pose(channel, pose)
 
-        msg.objs = [pose_msg];
-        msg.nobjs = len(msg.objs);
+        msg.objs = [pose_msg]
+        msg.nobjs = len(msg.objs)
         self.lc.publish("OBJ_COLLECTION", msg.encode())
 
 global g_viz_pub
@@ -175,7 +175,7 @@ def polygons_to_edges(polygons):
 #     """
 #     arr, carr = deepcopy(_arr), deepcopy(_carr)
 #     N, D = arr.shape
-#     carr = get_color_arr(carr, N, flip_rb=flip_rb);
+#     carr = get_color_arr(carr, N, flip_rb=flip_rb)
 
 #     # pc = xyzrgb_array_to_pointcloud2(arr, carr, stamp=stamp, frame_id=frame_id, seq=seq)
 #     # _publish_pc(pub_ns, pc)
@@ -207,7 +207,7 @@ def polygons_to_edges(polygons):
 # def convert_image_to_carr(img):
 #     r,g,b = np.split(img.astype(float)*1.0/255.0, 3, axis=2)
 #     carr = np.hstack((np.reshape(r, (-1,1)), np.reshape(g ,(-1,1)), np.reshape(b, (-1,1))))
-#     return carr;
+#     return carr
 
 # # ===== Color utils ====
 # def get_color_arr(c, n, color_func=plt.cm.gist_rainbow, 
@@ -215,7 +215,7 @@ def polygons_to_edges(polygons):
 #     """ 
 #     Convert string c to carr array (N x 3) format
 #     """
-#     carr = None;
+#     carr = None
 
 #     if color_by == 'value': 
 #         if isinstance(c, str): # single color
@@ -251,32 +251,32 @@ def polygons_to_edges(polygons):
 def arr_msg(arr, carr, frame_uid, element_id): 
     # point3d collection msg
     msg = vs.point3d_list_t()
-    msg.nnormals = 0;
-    msg.normals = [];
-    msg.npointids = 0;
-    msg.pointids = [];
-    msg.id = int(time.time() * 1e6);
+    msg.nnormals = 0
+    msg.normals = []
+    msg.npointids = 0
+    msg.pointids = []
+    msg.id = int(time.time() * 1e6)
     
     # comes from the sensor_frames_msg published earlier
-    msg.collection = frame_uid; 
-    msg.element_id = element_id;
+    msg.collection = frame_uid 
+    msg.element_id = element_id
 
-    npoints = len(arr);
-    msg.points = [vs.point3d_t() for j in range(0,npoints)];
-    msg.npoints = len(msg.points);             
-    inds = np.arange(0,npoints);
+    npoints = len(arr)
+    msg.points = [vs.point3d_t() for j in range(0,npoints)]
+    msg.npoints = len(msg.points)             
+    inds = np.arange(0,npoints)
 
     for j in range(npoints):
         msg.points[j].x = arr[j,0]
         msg.points[j].y = arr[j,1]
-        msg.points[j].z = arr[j,2];
+        msg.points[j].z = arr[j,2]
 
-    msg.colors = [vs.color_t() for j in range(0,npoints)];
-    msg.ncolors = len(msg.colors);
+    msg.colors = [vs.color_t() for j in range(0,npoints)]
+    msg.ncolors = len(msg.colors)
     for j in range(npoints):
         msg.colors[j].r = carr[j,0]
         msg.colors[j].g = carr[j,1]
-        msg.colors[j].b = carr[j,2];    
+        msg.colors[j].b = carr[j,2]    
 
     return msg
 
@@ -297,16 +297,16 @@ def _publish_point_type(pub_channel, _arr, c='r', point_type='POINT', flip_rb=Fa
     
     POINT=1, LINE_STRIP=2, LINE_LOOP=3, LINES=4,
     TRIANGLE_STRIP=5, TRIANGLE_FAN=6, TRIANGLES=7,
-    QUAD_STRIP=8, QUADS=9, POLYGON=10;
+    QUAD_STRIP=8, QUADS=9, POLYGON=10
 
     """
     global g_viz_pub
 
     # point3d list collection msg
-    pc_list_msg = vs.point3d_list_collection_t();
+    pc_list_msg = vs.point3d_list_collection_t()
     pc_list_msg.id = g_viz_pub.channel_uid(pub_channel)
-    pc_list_msg.name = pub_channel;
-    pc_list_msg.type = getattr(vs.point3d_list_collection_t, point_type);
+    pc_list_msg.name = pub_channel
+    pc_list_msg.type = getattr(vs.point3d_list_collection_t, point_type)
     pc_list_msg.reset = reset
     pc_list_msg.point_lists = []
     

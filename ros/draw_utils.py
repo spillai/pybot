@@ -16,7 +16,7 @@ import sensor_msgs.msg as sensor_msg
 from copy import deepcopy
 
 # Utility imports
-from bot_vision.draw_utils import reshape_arr, get_color_arr, \
+from bot_externals.draw_helpers import reshape_arr, get_color_arr, \
     height_map, color_by_height_axis, copy_pointcloud_data
 from bot_geometry.rigid_transform import RigidTransform
 from .pointclouds import xyz_array_to_pointcloud2, xyzrgb_array_to_pointcloud2
