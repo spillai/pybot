@@ -27,6 +27,7 @@ from bot_vision.draw_utils import draw_features
 from bot_vision.camera_utils import Camera, CameraIntrinsic, CameraExtrinsic
 
 import bot_externals.draw_utils as draw_utils
+from pybot_vision import scaled_color_disp
 
 class KeyFrame(object): 
     """
@@ -133,7 +134,9 @@ class KeyFrame(object):
                                                 CameraExtrinsic.identity())
 
         pts, depths = cam.project(self.points_, check_bounds=True, return_depth=True)
-        return draw_features(vis, pts, size=4)
+
+        colors = np.int64(scaled_color_disp(depths.astype(np.float32), 32).reshape(-1,3))        
+        return draw_features(vis, pts, colors=colors, size=6)
 
 class Mapper(object): 
     """ 
