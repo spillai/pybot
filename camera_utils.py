@@ -314,6 +314,9 @@ class Camera(CameraIntrinsic, CameraExtrinsic):
         x = proj.reshape(-1,2)
         
         if check_bounds: 
+            if self.shape is None: 
+                raise ValueError('check_bounds cannot proceed. Camera.shape is not set')
+        
             # Only return points within-image bounds
             valid = np.bitwise_and(np.bitwise_and(x[:,0] >= 0, x[:,0] < self.shape[1]), \
                                    np.bitwise_and(x[:,1] >= 0, x[:,1] < self.shape[0]))

@@ -18,10 +18,13 @@ import numpy as np
 from abc import ABCMeta, abstractmethod
 from collections import OrderedDict
 
+from bot_geometry.rigid_transform import Pose, RigidTransform, Sim3
 from bot_utils.db_utils import AttrDict
 from bot_utils.misc import CounterWithPeriodicCallback
 from bot_vision.imshow_utils import imshow_cv
-from bot_geometry.rigid_transform import Pose, RigidTransform, Sim3
+from bot_vision.image_utils import to_color, im_mosaic_list
+from bot_vision.draw_utils import draw_features
+from bot_vision.camera_utils import Camera, CameraIntrinsic, CameraExtrinsic
 
 import bot_externals.draw_utils as draw_utils
 
@@ -30,7 +33,7 @@ class KeyFrame(object):
     Basic interface for keyframes
 
     Most variables are persistent except for {dirty_}.
-    Only pose, points, colors and dirty should be allowed to
+    Only pose, points, colors should be allowed to
     be modified. 
     """
     def __init__(self, kf_id, frame_id, pose, points=None, colors=None, img=None): 
@@ -40,7 +43,6 @@ class KeyFrame(object):
         self.points_ = points
         self.colors_ = colors
         self.img_ = img
-        self.dirty_ = True
 
     @property
     def id(self): 
@@ -66,10 +68,6 @@ class KeyFrame(object):
     def img(self): 
         return self.img_
 
-    @property
-    def dirty(self): 
-        return self.dirty_
-
     @pose.setter
     def pose(self, pose): 
         self.pose_ = pose
@@ -81,10 +79,6 @@ class KeyFrame(object):
     @colors.setter
     def colors(self, colors): 
         self.colors_ = colors
-
-    @dirty.setter
-    def dirty(self, dirty): 
-        self.dirty_ = dirty
 
     @classmethod
     def from_dict(self, d): 
@@ -122,8 +116,25 @@ class KeyFrame(object):
         # # cloud_c = pose_cw * cloud_w
         # colors = (np.tile([0,0,1.0], [len(cloud_w),1])).astype(np.float32)
         # print k_id, len(cloud_w), len(cloud_c)
+    
+    def on_changed(self):
+        """
+        Define callbacks on new updates to keyframe 
+        via (property setters)
+        """
+        raise NotImplementedError()
 
-        
+    def visualize(self, camera_intrinsic): 
+        if self.img_ is None: 
+            raise RuntimeError('Keyframe image is not available to visualize')
+
+        vis = to_color(self.img_)
+        cam = Camera.from_intrinsics_extrinsics(camera_intrinsic, 
+                                                CameraExtrinsic.identity())
+
+        pts, depths = cam.project(self.points_, check_bounds=True, return_depth=True)
+        return draw_features(vis, pts, size=4)
+
 class Mapper(object): 
     """ 
     
@@ -133,7 +144,8 @@ class Mapper(object):
     Database to store map-related data. 
     
     Stored values: 
-       poses, keyframes, points (for each keyframe), colors (for each point)
+       poses, keyframes, points (for each keyframe), colors (for each
+       point)
     
         Parameters
         ----------
@@ -166,6 +178,8 @@ class Mapper(object):
 
         # Keyframe lookup  (map frame index to keyframe)
         self.keyframes_ = keyframes
+        self.keyframes_dirty_ = { kf.id: True 
+                                  for kf in self.keyframes_.itervalues() }
         self.keyframes_lut_ = { kf.frame_id: kf.id 
                                 for kf in self.keyframes_.itervalues() }
         self.poses_ = poses
@@ -219,19 +233,19 @@ class Mapper(object):
     def update_keyframe(self, kf): 
         # Add keyframe and set dirty (for publishing)
         self.keyframes_[kf.id] = kf
-        self.keyframes_[kf.id].dirty = True
+        self.keyframes_dirty_[kf.id] = True
         
     @abstractmethod
     def update_keyframes(self):
         """ 
-        Update the map with keyframe data 
+        Abstract method to update the map with keyframe data
 
         keyframes_ need to be
         updated based on new information, call
         update_kf on a per-keyframe basis        
         
         """
-        pass
+        raise NotImplementedError()
         
     def fetch_keyframe(self, frame_id): 
         return self.keyframes_[self.keyframes_lut_[frame_id]]
@@ -268,7 +282,7 @@ class Mapper(object):
 
             # Finish up and clean out all the keyframes (lut)
             for kf_id in self.keyframes_.iterkeys(): 
-                self.keyframes_[kf_id].dirty = False
+                self.keyframes_dirty_[kf_id] = False
 
         else: 
             # Draw all poses (should be unique frame ids)
@@ -316,19 +330,19 @@ class Mapper(object):
 
     @property
     def dirty_points(self): 
-        return [kf.points for kf in self.keyframes_.itervalues() if kf.points is not None and kf.dirty]
+        return [kf.points for kf in self.keyframes_.itervalues() if kf.points is not None and self.keyframes_dirty_[kf.id]]
 
     @property
     def dirty_colors(self): 
-        return [kf.colors for kf in self.keyframes_.itervalues() if kf.colors is not None and kf.dirty ]
+        return [kf.colors for kf in self.keyframes_.itervalues() if kf.colors is not None and self.keyframes_dirty_[kf.id] ]
 
     @property
     def dirty_keyframe_ids(self): 
-        return [kf.id for kf in self.keyframes_.itervalues() if kf.dirty]
+        return [kf.id for kf in self.keyframes_.itervalues() if self.keyframes_dirty_[kf.id]]
 
     @property
     def dirty_keyframe_poses(self): 
-        return [kf.pose for kf in self.keyframes_.itervalues() if kf.dirty]
+        return [kf.pose for kf in self.keyframes_.itervalues() if self.keyframes_dirty_[kf.id]]
 
     @property
     def publish_rate(self): 
@@ -378,6 +392,11 @@ class MultiViewMapper(Mapper):
         from pybot_externals import SVO_DepthFilter
         self.depth_filter = SVO_DepthFilter(np.float64(K), int(W), int(H), 
                                             gridSize=gridSize, nPyrLevels=nPyrLevels, max_n_kfs=max_n_kfs)
+        self.cam_intrinsic_ = CameraIntrinsic(K, shape=(int(H), int(W)))
+
+        
+        self.mosaics_ = {}
+
         self.kf_every = kf_every
         self.idx = 0
 
@@ -396,8 +415,14 @@ class MultiViewMapper(Mapper):
         """ Process/Update Keyframe data """
 
         kf_data = self.depth_filter.getKeyframeGraph()
-        for kf in kf_data:
-            self.update_keyframe(KeyFrame.from_KeyframeData(kf))
+        for kfj in kf_data:
+            kf = KeyFrame.from_KeyframeData(kfj)
+            self.update_keyframe(kf)
+
+            self.mosaics_[kf.id] = kf.visualize(self.cam_intrinsic_)
+
+        if len(self.mosaics_): 
+            imshow_cv('kfs', im_mosaic_list(self.mosaics_.values(), scale=0.5))        
 
         # print 'Updated IDS: ', [kf.getId() for kf in kf_data]
         # print 'Dirty IDS: ', [(kf.id, kf.dirty) for kf in self.keyframes.itervalues()]

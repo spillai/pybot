@@ -24,15 +24,9 @@ from bot_utils.db_utils import AttrDict
 from bot_utils.plot_utils import colormap
 from bot_vision.imshow_utils import imshow_cv
 from bot_vision.image_utils import to_color, to_gray, gaussian_blur
-
+from bot_vision.draw_utils import draw_features
 from .tracker_utils import finite_and_within_bounds, \
     TrackManager, FeatureDetector, OpticalFlowTracker
-
-def draw_features(im, pts): 
-    out = to_color(im)
-    for pt in pts: 
-        cv2.circle(out, tuple(map(int, pt)), 3, (0,255,0), -1, lineType=cv2.CV_AA)
-    return out
 
 def kpts_to_array(kpts): 
     return np.float32([ kp.pt for kp in kpts ]).reshape(-1,2)
