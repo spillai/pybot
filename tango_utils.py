@@ -203,17 +203,17 @@ class TangoLogReader(LogReader):
                 if self.idx < self.start_idx_: 
                     continue
                 # self.idx % self.every_k_frames == 0:
-                res, msg = self.decode_msg(channel, msg, t)
+                res, (t, ch, data) = self.decode_msg(channel, msg, t)
                 if res: 
-                    yield msg
+                    yield (t, ch, data)
                 
-    def decode_msg(self, channel, data, t): 
+    def decode_msg(self, channel, msg, t): 
         try: 
             # Check if log index has reached desired start index, 
             # and only then check if decode necessary  
             dec = self.decoder[channel]
             if dec.should_decode():
-                return True, (t, channel, dec.decode(data))
+                return True, (t, channel, dec.decode(msg))
         except Exception as e:
             pass
             # raise RuntimeError('Failed to decode data from channel: %s, mis-specified decoder?' % channel)

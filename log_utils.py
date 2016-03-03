@@ -19,7 +19,7 @@ class Decoder(object):
     def decode(self, data): 
         try: 
             return self.decode_cb(data)
-        except:
+        except Exception, e:
             print e
             raise RuntimeError('Error decoding channel: %s by %s' % (self.channel, self))
 
@@ -97,3 +97,41 @@ class LogReader(object):
                 import traceback
                 traceback.print_exc()
                 raise RuntimeError()
+
+# class LogController(object): 
+#     def __init__(self, dataset): 
+#         """
+#         Setup channel => callbacks so that they are automatically called 
+#         with appropriate decoded data and timestamp
+#         """
+#         self.dataset_ = dataset
+#         self.ctrl_cb_ = {}
+#         self.ctrl_idx_ = 0
+
+#     def subscribe(self, channel, callback): 
+#         self.ctrl_cb_[channel] = callback
+
+#     def run(self):
+#         if not len(self.ctrl_cb_): 
+#             raise RuntimeError('No callbacks registered yet, subscribe to channels first!')
+
+#         for self.ctrl_idx_, (t, ch, data) in enumerate(self.dataset_.iter_frames()): 
+#             if ch in self.ctrl_cb_: 
+#                 self.ctrl_cb_[ch](t, data)
+
+#     @property
+#     def index(self): 
+#         return self.ctrl_idx_
+
+#     @property
+#     def filename(self): 
+#         return self.dataset_.filename
+
+#     @property
+#     def controller(self): 
+#         """
+#         Should return the dataset (for offline bag-based callbacks), and 
+#         should return the rosnode (for online/live callbacks)
+#         """
+#         return self.dataset_
+

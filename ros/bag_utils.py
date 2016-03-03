@@ -76,7 +76,7 @@ class ImageDecoder(Decoder):
             try: 
                 im = self.bridge.imgmsg_to_cv2(msg, self.encoding)
                 # print("%.6f" % msg.header.stamp.to_sec())
-            except CvBridgeError, e:
+            except CvBridgeError as e:
                 print e
 
         return im_resize(im, scale=self.scale)
@@ -180,6 +180,12 @@ class TfDecoderAndPublisher(Decoder):
 def NavMsgDecoder(channel, every_k_frames=1): 
     def odom_decode(data): 
         tvec, ori = data.pose.pose.position, data.pose.pose.orientation
+        return RigidTransform(xyzw=[ori.x,ori.y,ori.z,ori.w], tvec=[tvec.x,tvec.y,tvec.z])
+    return Decoder(channel=channel, every_k_frames=every_k_frames, decode_cb=lambda data: odom_decode(data))
+
+def PoseStampedMsgDecoder(channel, every_k_frames=1): 
+    def odom_decode(data): 
+        tvec, ori = data.pose.position, data.pose.orientation
         return RigidTransform(xyzw=[ori.x,ori.y,ori.z,ori.w], tvec=[tvec.x,tvec.y,tvec.z])
     return Decoder(channel=channel, every_k_frames=every_k_frames, decode_cb=lambda data: odom_decode(data))
 
