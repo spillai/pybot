@@ -92,7 +92,7 @@ class StereoBM:
         self.params = params
 
         # Initilize stereo block matching
-        self.bm = cv2.StereoBM(cv2.STEREO_BM_NARROW_PRESET, 128, 9)
+        self.bm = cv2.StereoBM(cv2.STEREO_BM_BASIC_PRESET, 128, 9)
 
         self.process = self.compute
 
