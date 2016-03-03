@@ -138,6 +138,8 @@ def publish_image_t(pub_channel, im, jpeg=False, flip_rb=True):
     g_viz_pub.lc.publish(pub_channel, out.encode())
 
 def publish_botviewer_image_t(im, jpeg=False, flip_rb=True): 
+    if not isinstance(im, np.ndarray): 
+        raise TypeError('publish_botviewer_image_t type is not np.ndarray')
     publish_image_t('CAMERA_IMAGE', im, jpeg=jpeg, flip_rb=flip_rb)
 
 def draw_tag(pose=None, size=0.1): 

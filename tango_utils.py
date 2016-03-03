@@ -47,10 +47,12 @@ def TangoOdomDecoder(channel, every_k_frames=1):
 
     """
 
+    p_IF = RigidTransform(tvec=[0.000663, 0.011257, 0.004177], xyzw=[0.704923, 0.709254, -0.005954, 0.002592])
     p_ID = RigidTransform(tvec=[0,0,0], xyzw=[-0.079740, -0.079740, 0.706271, 0.706271])
     p_IC = RigidTransform(tvec=[0.000339, 0.061691, 0.002792], xyzw=[0.707940, 0.706271, 0.001000, 0.000585])
     p_DC = p_ID.inverse() * p_IC
-    print 'p_ID: %s, \np_IC: %s, \np_DC: %s' % (p_ID, p_IC, p_DC)
+    p_DF = p_ID.inverse() * p_IF
+    print 'p_ID: %s, \np_IC: %s, \np_DC: %s, \np_DF: %s' % (p_ID, p_IC, p_DC, p_DF)
 
     # SS->CAM
     p_S_CAM = RigidTransform.from_roll_pitch_yaw_x_y_z(-np.pi/2, 0, 0, 
