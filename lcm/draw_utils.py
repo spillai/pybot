@@ -2,26 +2,23 @@
 
 # Author: Sudeep Pillai <spillai@csail.mit.edu>
 # License: MIT
+# Dependencies: LCM, OpenCV, vs (Visualization renderer)
+# botcore (libbot), and bot_geometry (pybot_geometry)
 
-import time, logging
-import numpy as np
-
+import time
 from itertools import izip
 from copy import deepcopy
 from collections import deque
+import numpy as np
 
-# LCM libs
 import cv2
-import lcm, vs
+import lcm
+import vs
 from bot_core import image_t, pose_t
 
-# Utility imports
-from bot_vision.image_utils import to_color
-from bot_externals.draw_helpers import reshape_arr, get_color_arr, height_map, \
-    color_by_height_axis, copy_pointcloud_data
-from bot_utils.async_utils import run_async
+from .draw_helpers import reshape_arr, get_color_arr, height_map, \
+    color_by_height_axis, copy_pointcloud_data, Frustum
 from bot_geometry.rigid_transform import RigidTransform
-from bot_vision.camera_utils import Frustum
 
 class VisualizationMsgsPub: 
     """
@@ -32,7 +29,6 @@ class VisualizationMsgsPub:
         self._sensor_pose = dict()
 
         self.lc = lcm.LCM()
-        self.log = logging.getLogger(__name__)
         camera_pose = RigidTransform.from_roll_pitch_yaw_x_y_z(-np.pi/2, 0, -np.pi/2, 
                                                                0, 0, 1, axes='sxyz')
 
@@ -119,7 +115,7 @@ def publish_image_t(pub_channel, im, jpeg=False, flip_rb=True):
     out.utime = 1
         
     # Propagate encoded/raw data, 
-    image = to_color(im) if im.ndim == 2 else im
+    image = cv2.cvtColor(im, cv2.COLOR_GRAY2BGR) if im.ndim == 2 else im
     if flip_rb and im.ndim == 3: 
         rarr, barr = image[:,:,2].copy(), image[:,:,0].copy()
         image[:,:,0], image[:,:,2] = rarr, barr
@@ -700,7 +696,10 @@ def draw_camera(pose, zmin=0.0, zmax=0.1, fov=np.deg2rad(60)):
     faces.extend([flr, ful, fll])
 
     # Triangles: Four walls 
-    left, top, right, bottom = [fll, frustum.p0, ful], [ful, frustum.p0, fur], [fur, frustum.p0, flr], [flr, frustum.p0, fll]
+    left, top, right, bottom = [fll, frustum.p0, ful], \
+                               [ful, frustum.p0, fur], \
+                               [fur, frustum.p0, flr], \
+                               [flr, frustum.p0, fll]
     faces.extend([left, top, right, bottom]) # left, top, right, bottom wall
     faces = np.vstack(faces)
 
@@ -718,7 +717,8 @@ def draw_camera(pose, zmin=0.0, zmax=0.1, fov=np.deg2rad(60)):
 def draw_laser_frustum(pose, zmin=0.0, zmax=10, fov=np.deg2rad(60)): 
 
     N = 30
-    curve = np.vstack([(RigidTransform.from_roll_pitch_yaw_x_y_z(0, 0, rad, 0, 0, 0) * np.array([[zmax, 0, 0]])) 
+    curve = np.vstack([(
+        RigidTransform.from_roll_pitch_yaw_x_y_z(0, 0, rad, 0, 0, 0) * np.array([[zmax, 0, 0]])) 
              for rad in np.linspace(-fov/2, fov/2, N)])
     
     curve_w = pose * curve

@@ -50,3 +50,32 @@ def copy_pointcloud_data(_arr, _carr, flip_rb=False):
     N, D = arr.shape[:2]
     carr = get_color_arr(carr, N, flip_rb=flip_rb);
     return arr, carr
+
+
+class Frustum(object): 
+    def __init__(self, pose, zmin=0.0, zmax=0.1, fov=np.deg2rad(60)): 
+    
+        self.p0 = np.array([0,0,0])
+        self.near, self.far = np.array([0,0,zmin]), np.array([0,0,zmax])
+        self.near_off, self.far_off = np.tan(fov / 2) * zmin, np.tan(fov / 2) * zmax
+        self.zmin = zmin
+        self.zmax = zmax
+        self.fov = fov
+
+        self.pose = pose
+        self.p0 = pose.tvec
+
+    def get_vertices(self): 
+        arr = [self.near + np.array([-1, -1, 0]) * self.near_off, 
+               self.near + np.array([1, -1, 0]) * self.near_off, 
+               self.near + np.array([1, 1, 0]) * self.near_off, 
+               self.near + np.array([-1, 1, 0]) * self.near_off, 
+               
+               self.far + np.array([-1, -1, 0]) * self.far_off, 
+               self.far + np.array([1, -1, 0]) * self.far_off, 
+               self.far + np.array([1, 1, 0]) * self.far_off, 
+               self.far + np.array([-1, 1, 0]) * self.far_off]
+        
+        nll, nlr, nur, nul, fll, flr, fur, ful = self.pose * np.vstack(arr)
+        return nll, nlr, nur, nul, fll, flr, fur, ful
+
