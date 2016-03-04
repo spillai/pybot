@@ -5,6 +5,7 @@
 
 import os.path
 from itertools import islice
+from abc import ABCMeta, abstractmethod
 
 def take(iterable, max_length=None): 
     return iterable if max_length is None else islice(iterable, max_length)
@@ -98,40 +99,51 @@ class LogReader(object):
                 traceback.print_exc()
                 raise RuntimeError()
 
-# class LogController(object): 
-#     def __init__(self, dataset): 
-#         """
-#         Setup channel => callbacks so that they are automatically called 
-#         with appropriate decoded data and timestamp
-#         """
-#         self.dataset_ = dataset
-#         self.ctrl_cb_ = {}
-#         self.ctrl_idx_ = 0
+class LogController(object): 
+    __metaclass__ = ABCMeta
 
-#     def subscribe(self, channel, callback): 
-#         self.ctrl_cb_[channel] = callback
+    """
+    Abstract log controller class 
 
-#     def run(self):
-#         if not len(self.ctrl_cb_): 
-#             raise RuntimeError('No callbacks registered yet, subscribe to channels first!')
+    Registers callbacks based on channel names, 
+    and runs the dataset via run()
+    """
 
-#         for self.ctrl_idx_, (t, ch, data) in enumerate(self.dataset_.iter_frames()): 
-#             if ch in self.ctrl_cb_: 
-#                 self.ctrl_cb_[ch](t, data)
+    @abstractmethod    
+    def __init__(self, dataset): 
+        """
+        Setup channel => callbacks so that they are automatically called 
+        with appropriate decoded data and timestamp
+        """
+        self.dataset_ = dataset
+        self.ctrl_cb_ = {}
+        self.ctrl_idx_ = 0
 
-#     @property
-#     def index(self): 
-#         return self.ctrl_idx_
+    def subscribe(self, channel, callback): 
+        print('Subscribing to {:} with callback {:}'.format(channel, callback))
+        self.ctrl_cb_[channel] = callback
 
-#     @property
-#     def filename(self): 
-#         return self.dataset_.filename
+    def run(self):
+        if not len(self.ctrl_cb_): 
+            raise RuntimeError('No callbacks registered yet, subscribe to channels first!')
 
-#     @property
-#     def controller(self): 
-#         """
-#         Should return the dataset (for offline bag-based callbacks), and 
-#         should return the rosnode (for online/live callbacks)
-#         """
-#         return self.dataset_
+        for self.ctrl_idx_, (t, ch, data) in enumerate(self.dataset_.iter_frames()): 
+            if ch in self.ctrl_cb_: 
+                self.ctrl_cb_[ch](t, data)
+
+    @property
+    def index(self): 
+        return self.ctrl_idx_
+
+    @property
+    def filename(self): 
+        return self.dataset_.filename
+
+    @property
+    def controller(self): 
+        """
+        Should return the dataset (for offline bag-based callbacks), and 
+        should return the rosnode (for online/live callbacks)
+        """
+        return self.dataset_
 
