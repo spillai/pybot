@@ -149,7 +149,7 @@ class FeatureDetector(object):
                                                                   minDistance = 5, blockSize = 5 ))
     apriltag_detector_params = AttrDict(subpixel=False, type='apriltag', 
                                         params=AprilTagFeatureDetector.default_detector_params)
-    def __init__(self, params=default_detector_params): 
+    def __init__(self, params=fast_detector_params): 
         # FeatureDetector params
         self.params = params
 
@@ -223,6 +223,8 @@ class OpticalFlowTracker(object):
         self.timer = SimpleTimer(name='optical-flow', iterations=100)
 
     def dense_track(self, im0, im1, p0): 
+        self.timer.start()
+
         if p0 is None or not len(p0): 
             return np.array([])
 
@@ -267,6 +269,8 @@ class OpticalFlowTracker(object):
             # Set only good flow 
             flow_p0[~fb_good] = np.nan
             p1 = p0 + flow_p0
+
+        self.timer.stop()
 
         return p1
 
