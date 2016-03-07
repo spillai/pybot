@@ -60,10 +60,12 @@ def TangoOdomDecoder(channel, every_k_frames=1):
     p_CAM_S = p_S_CAM.inverse()
 
     def odom_decode(data): 
-        """ x, y, z, qx, qy, qz, qw, status_code, confidence, accuracy """
+        """ x, y, z, qx, qy, qz, qw, status_code, confidence """
         p = np.float64(data.split(','))
+        if len(p) < 8:
+            raise Exception('TangoOdomDecoder.odom_decode :: Failed to retreive pose')
         if p[7] == 0: 
-            raise Warning('Pose initializing.., status_code: 0')
+            raise Warning('TangoOdomDecoder.odom_decode :: Pose initializing.., status_code: 0')
 
         tvec, ori = p[:3], p[3:7]
         p_SD = RigidTransform(xyzw=ori, tvec=tvec)
@@ -134,8 +136,6 @@ class TangoLog(object):
         
         for j in range(len(heap)): 
             c_t, c_ch, c_data = heappop(heap)
-            # print c_t, c_ch
-            
             assert(c_t >= p_t)
             p_t = c_t
             
@@ -203,9 +203,13 @@ class TangoLogReader(LogReader):
                 if self.idx < self.start_idx_: 
                     continue
                 # self.idx % self.every_k_frames == 0:
-                res, (t, ch, data) = self.decode_msg(channel, msg, t)
-                if res: 
-                    yield (t, ch, data)
+                try: 
+                    res, (t, ch, data) = self.decode_msg(channel, msg, t)
+                    if res: 
+                        yield (t, ch, data)
+                except Exception, e: 
+                    print('TangLog.iteritems() :: {:}'.format(e))
+                    pass
                 
     def decode_msg(self, channel, msg, t): 
         try: 
