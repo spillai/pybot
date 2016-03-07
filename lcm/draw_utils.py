@@ -16,7 +16,7 @@ import lcm
 import vs
 from bot_core import image_t, pose_t
 
-from .draw_helpers import reshape_arr, get_color_arr, height_map, \
+from bot_externals.draw_helpers import reshape_arr, get_color_arr, height_map, \
     color_by_height_axis, copy_pointcloud_data, Frustum
 from bot_geometry.rigid_transform import RigidTransform
 
