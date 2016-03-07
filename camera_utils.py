@@ -43,6 +43,15 @@ def get_baseline(fx, baseline=None, baseline_px=None):
         raise AssertionError('Ambiguous baseline and baseline_px values. Provide either, not both')
     return baseline, baseline_px
 
+def triangulate_points(cam1, pts1, cam2, pts2): 
+    """
+    Triangulate 2D corresponding points using 2-views 
+    """
+    assert(isinstance(cam1, Camera) and isinstance(cam2, Camera))
+    assert(isinstance(pts1, np.ndarray) and isinstance(pts2, np.ndarray))
+    X = cv2.triangulatePoints(cam1.P, cam2.P, pts1.reshape(-1,1,2), pts2.reshape(-1,1,2)).T 
+    return X[:,:3] / X[:,3].reshape(-1,1)  
+    
 def construct_K(fx=500.0, fy=500.0, cx=319.5, cy=239.5): 
     """
     Create camera intrinsics from focal lengths and focal centers
@@ -187,7 +196,8 @@ class CameraIntrinsic(object):
         return undistort_image(im, self.K, self.D)
 
     def undistort_points(self, pts): 
-        return cv2.undistortPoints(pts, self.K, self.D, )undistort_image(im, self.K, self.D)
+        out = cv2.undistortPoints(pts.reshape(-1,1,2), self.K, self.D)
+        return out.reshape(-1,2) 
         
     def undistort_debug(self, im=None): 
         if im is None: 
