@@ -29,7 +29,7 @@ from bot_vision.camera_utils import Camera, CameraIntrinsic, CameraExtrinsic
 import bot_externals.draw_utils as draw_utils
 from pybot_vision import scaled_color_disp
 
-class KeyFrame(object): 
+class Keyframe(object): 
     """
     Basic interface for keyframes
 
@@ -419,7 +419,7 @@ class MultiViewMapper(Mapper):
 
         kf_data = self.depth_filter.getKeyframeGraph()
         for kfj in kf_data:
-            kf = KeyFrame.from_KeyframeData(kfj)
+            kf = Keyframe.from_KeyframeData(kfj)
             self.update_keyframe(kf)
 
             self.mosaics_[kf.id] = kf.visualize(self.cam_intrinsic_)

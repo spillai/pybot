@@ -1,1 +1,1 @@
-from .mapper import Mapper, MultiViewMapper
+from .mapper import Keyframe, Mapper, MultiViewMapper
