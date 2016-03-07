@@ -185,6 +185,9 @@ class CameraIntrinsic(object):
 
     def undistort(self, im): 
         return undistort_image(im, self.K, self.D)
+
+    def undistort_points(self, pts): 
+        return cv2.undistortPoints(pts, self.K, self.D, )undistort_image(im, self.K, self.D)
         
     def undistort_debug(self, im=None): 
         if im is None: 
