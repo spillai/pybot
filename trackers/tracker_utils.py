@@ -34,6 +34,15 @@ class IndexedDeque(object):
         self.items_.append(item)
         self.length_ += 1
 
+    def item(self, index): 
+        return self.items_[index]
+
+    def index(self, index): 
+        return self.indices_[index]
+
+    def __len__(self): 
+        return len(self.items_)
+
     @property
     def latest_item(self):
         return self.items_[-1]
@@ -141,8 +150,8 @@ class FeatureDetector(object):
     and perform subpixel on the detected keypoints
     """
 
-    default_detector_params = AttrDict(levels=4, subpixel=False)
-    fast_detector_params = AttrDict(default_detector_params, type='fast', 
+    default_detector_params = AttrDict(grid=(12,10), max_corners=1200, pyramid=False, max_levels=4, subpixel=False)
+    fast_detector_params = AttrDict(default_detector_params, type='fast',  
                                     params=AttrDict( threshold=10, nonmaxSuppression=True ))
     gftt_detector_params = AttrDict(default_detector_params, type='gftt', 
                                     params=AttrDict( maxCorners = 800, qualityLevel = 0.04, 
@@ -155,20 +164,25 @@ class FeatureDetector(object):
 
         # Feature Detector, Descriptor setup
         if self.params.type == 'gftt': 
-            self.detector = cv2.PyramidAdaptedFeatureDetector(
-                detector=cv2.GFTTDetector(**self.params.params),  
-                maxLevel=self.params.levels
-            )
+            self.detector = cv2.GFTTDetector(**self.params.params)
         elif self.params.type == 'fast': 
-            
-            self.detector = cv2.PyramidAdaptedFeatureDetector(
-                detector=cv2.FastFeatureDetector(**self.params.params),  
-                maxLevel=self.params.levels
-            )
+            self.detector = cv2.FastFeatureDetector(**self.params.params)
         elif self.params.type == 'apriltag': 
             self.detector = AprilTagFeatureDetector(**self.params.params)
         else: 
             raise RuntimeError('Unknown detector_type: %s! Use fast or gftt' % self.params.type)
+
+        if self.params.grid is not None and self.params.max_corners: 
+            self.detector = cv2.GridAdaptedFeatureDetector(
+                self.detector, self.params.max_corners, self.params.grid[0], self.params.grid[1]
+            )
+            
+        # if self.params.pyramid and self.params.max_levels: 
+        #     self.detector = cv2.PyramidAdaptedFeatureDetector(
+        #         detector=self.detector, 
+        #         maxLevel=self.params.max_levels
+        #     )
+
 
     def process(self, im, mask=None, return_keypoints=False): 
         if im.ndim != 2: 
