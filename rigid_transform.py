@@ -168,7 +168,7 @@ class RigidTransform(object):
     def from_Rt(cls, R, t):
         T = np.eye(4)
         T[:3,:3] = R.copy();
-        return cls(Quaternion.from_homogenous_matrix(T), t)
+        return cls(Quaternion.from_matrix(T), t)
 
     @classmethod
     def from_matrix(cls, T):
@@ -201,9 +201,9 @@ class RigidTransform(object):
     def matrix(self): 
         return self.to_matrix()
 
-    def interpolate(self, other, w, method='bspline'): 
+    def interpolate(self, other, w): 
         assert(w >= 0 and w <= 1.0)
-        self.matrix * expm(w * logm((self.inverse() * other).matrix))
+        return self.from_matrix(self.matrix * expm(w * logm((self.inverse() * other).matrix)))
 
     # def interpolate(self, other_transform, this_weight):
     #     assert this_weight >= 0 and this_weight <= 1
