@@ -749,6 +749,10 @@ def epipolar_line(F_10, x_1):
 def plot_epipolar_line(im_1, F_10, x_0, im_0=None): 
     """
     Plot the epipole and epipolar line F * x = 0.
+
+    l[0] * x + l[1] * y + l[2] = 0
+    @ x=0: y = -l[2] / l[1]
+    @ x=W: y = (-l[2] -l[0]*W) / l[1]
     """
     
     H,W = im_1.shape[:2]

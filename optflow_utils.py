@@ -2,23 +2,33 @@ import cv2
 import numpy as np
 from bot_vision.image_utils import to_gray, to_color
 
-def dense_optical_flow(im1, im2, pyr_scale=0.5, levels=3, winsize=15, 
-                       iterations=5, poly_n=1.2, poly_sigma=0, fb_check=False): 
+def dense_optical_flow(im1, im2, pyr_scale=0.5, levels=3, winsize=5, 
+                       iterations=3, poly_n=5, poly_sigma=1.2, fb_threshold=-1, 
+                       mask1=None, mask2=None, 
+                       flow1=None, flow2=None): 
 
-    fflow = cv2.calcOpticalFlowFarneback(to_gray(im1), to_gray(im2), pyr_scale, levels, winsize, 3, 
-                                        iterations, poly_n, poly_sigma)
+    if flow1 is None: 
+        fflow = cv2.calcOpticalFlowFarneback(to_gray(im1), to_gray(im2), pyr_scale, levels, winsize, 
+                                             iterations, poly_n, poly_sigma, 0)
+    else: 
+        fflow = cv2.calcOpticalFlowFarneback(to_gray(im1), to_gray(im2), pyr_scale, levels, winsize, 
+                                             iterations, poly_n, poly_sigma, 0, flow1.copy())
 
-    if fb_check: 
+    if mask1 is not None: 
+        fflow[~mask1.astype(np.bool)] = np.nan
+
+    if fb_threshold > 0: 
         H, W = im1.shape[:2]
         xs, ys = np.meshgrid(np.arange(W), np.arange(H))
         xys1 = np.dstack([xs, ys])
         xys2 = xys1 + fflow
-
         rflow = dense_optical_flow(im2, im1, pyr_scale=pyr_scale, levels=levels, 
                                    winsize=winsize, iterations=iterations, poly_n=poly_n, 
-                                   poly_sigma=poly_sigma, fb_check=False)
+                                   poly_sigma=poly_sigma, fb_threshold=-1)
+        rflow[~mask2.astype(np.bool)] = np.nan
+
         xys1r = xys2 + rflow
-        fb_bad = (np.fabs(xys1r - xys1) > 1).all(axis=2)
+        fb_bad = (np.fabs(xys1r - xys1) > fb_threshold).all(axis=2)
         fflow[fb_bad] = np.nan
 
     return fflow
@@ -28,7 +38,7 @@ def dense_optical_flow_sf(im1, im2, layers=3, averaging_block_size=2, max_flow=4
     cv2.calcOpticalFlowSF(im1, im2, flow, layers, averaging_block_size, max_flow)
     return flow
 
-def sparse_optical_flow(im1, im2, pts, fb_threshold=0, 
+def sparse_optical_flow(im1, im2, pts, fb_threshold=-1, 
                         window_size=15, max_level=2, 
                         criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.03)): 
     p1, st, err = cv2.calcOpticalFlowPyrLK(im1, im2, pts, None, 
