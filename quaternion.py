@@ -166,17 +166,22 @@ class Quaternion(object):
 
     @classmethod
     def from_matrix(cls, matrix):
+        """ From 4x4 transformation matrix """ 
         return tf.quaternion_from_matrix(matrix)
 
-    @classmethod
-    def from_homogenous_matrix(cls, matrix):
-        return cls.from_matrix(matrix)
-
     def to_matrix(self):
-        return tf.quaternion_matrix(self.q)[:3,:3]
-
-    def to_homogeneous_matrix(self):
+        """ Returns 4x4 transformation matrix """ 
         return tf.quaternion_matrix(self.q)
+
+    @property
+    def R(self): 
+        """ Returns 3x3 transformation matrix """ 
+        return self.to_matrix()[:3,:3]
+
+    @property
+    def matrix(self): 
+        """ Returns 4x4 transformation matrix """ 
+        return self.to_matrix()
 
     def interpolate(self, other, this_weight):
         q0, q1 = np.roll(self.q, shift=1), np.roll(other.q, shift=1)
@@ -213,7 +218,7 @@ if __name__ == "__main__":
     v = [ 1, 0, 0 ]
     print 'init: ', v
     for i in range (16):
-        t = np.dot(q.to_matrix(), v)
+        t = np.dot(q.R, v)
         v = q.rotate (v)
 
         # Check whether quats, and rotation matrix mult returns same result
@@ -274,14 +279,14 @@ if __name__ == "__main__":
     print 'rotate by random matrix'
     for _ in range(100): 
         q = make_random_quaternion()
-        t = np.dot(q.to_matrix(), v)
+        t = np.dot(q.R, v)
         v = q.rotate (v)    
         assert(np.all(v - t < 1e-12))
 
     print 'Check inverse'
     for _ in range(100): 
         q = make_random_quaternion()
-        t = q.to_homogeneous_matrix()
-        assert(tf.is_same_transform(q.inverse().to_homogeneous_matrix(), t.T))
+        t = q.to_matrix()
+        assert(tf.is_same_transform(q.inverse().to_matrix(), t.T))
 
     print "OK"
