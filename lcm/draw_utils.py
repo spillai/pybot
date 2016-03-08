@@ -612,7 +612,7 @@ def publish_pose_list(pub_channel, poses, texts=[], frame_id='camera', reset=Tru
 #     text_list_msg.texts = [vs.text_t() for j in range(0,nposes)]
 #     text_list_msg.n = nposes
 
-#     # sensorT = frame_pose.to_homogeneous_matrix()
+#     # sensorT = frame_pose.matrix
 #     # print sensorT
 
 #     for j in range(nposes):

@@ -225,7 +225,7 @@ def publish_pose_list(pub_ns, _poses, texts=[], stamp=None, size=0.05, frame_id=
     """
     poses = deepcopy(_poses)
     if not len(poses): return 
-    arrs = np.vstack([pose.to_homogeneous_matrix()[:3,:3].T.reshape((1,9)) for pose in poses]) * size
+    arrs = np.vstack([pose.matrix[:3,:3].T.reshape((1,9)) for pose in poses]) * size
     arrX = np.vstack([pose.tvec.reshape((1,3)) for pose in poses])
     arrx, arry, arrz = arrs[:,0:3], arrs[:,3:6], arrs[:,6:9]
 
