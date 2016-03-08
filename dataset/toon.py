@@ -18,7 +18,7 @@ def load_poses(fn):
 
 def save_poses(fn, poses): 
     """ Save poses in toon format """ 
-    Rts = [pose.to_homogeneous_matrix()[:3,:] for pose in poses]
+    Rts = [pose.matrix[:3,:] for pose in poses]
     with file(fn, 'w') as outfile:
         for Rt in Rts:
             for row in Rt:

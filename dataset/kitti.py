@@ -37,10 +37,10 @@ def kitti_load_poses(fn):
 
 def kitti_poses_to_str(poses): 
     return "\r\n".join(map(lambda x: " ".join(map(str, 
-                                                  (x.to_homogeneous_matrix()[:3,:4]).flatten())), poses))
+                                                  (x.matrix[:3,:4]).flatten())), poses))
 
 def kitti_poses_to_mat(poses): 
-    return np.vstack(map(lambda x: (x.to_homogeneous_matrix()[:3,:4]).flatten(), poses)).astype(np.float64)
+    return np.vstack(map(lambda x: (x.matrix[:3,:4]).flatten(), poses)).astype(np.float64)
 
 
 class KITTIDatasetReader(object): 
