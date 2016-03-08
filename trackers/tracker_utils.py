@@ -92,7 +92,6 @@ class TrackManager(object):
         # Frame counter
         self.index_ += 1
 
-
     def prune(self): 
         # Remove tracks that are not most recent
         for tid, track in self.tracks_.items(): 

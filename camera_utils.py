@@ -243,11 +243,11 @@ class CameraExtrinsic(RigidTransform):
     
     @property
     def R(self): 
-        return self.quat.to_homogeneous_matrix()[:3,:3]
+        return self.quat.R
 
     @property
     def Rt(self): 
-        return self.to_homogeneous_matrix()[:3]
+        return self.matrix[:3]
 
     @property
     def t(self): 

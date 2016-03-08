@@ -57,9 +57,9 @@ class FreeSpaceDetection:
 
         if isinstance(X, list) and isinstance(poses, list): 
             for pj, Xj in zip(poses, X): 
-                self.octmap.updateNodesIncremental(pj.to_homogeneous_matrix(), Xj)
+                self.octmap.updateNodesIncremental(pj.matrix, Xj)
         elif isinstance(X, np.ndarray) and isinstance(poses, RigidTransform): 
-            # self.octmap.updateNodes(poses.to_homogeneous_matrix(), X)
+            # self.octmap.updateNodes(poses.matrix, X)
             self.octmap.updateNodes(X)
         else: 
             raise TypeError('Unknown X point cloud, and poses for voxelization')
@@ -78,8 +78,8 @@ class FreeSpaceDetection:
         st = time.time()
 
         # Update octomap
-        self.octmap.updateNodesIncremental(pose_mc.to_homogeneous_matrix(), pose_mc * X)
-        # print 'Sensor to world ', pose_mc.to_homogeneous_matrix()
+        self.octmap.updateNodesIncremental(pose_mc.matrix, pose_mc * X)
+        # print 'Sensor to world ', pose_mc.matrix
 
         # Plot occupied octomap
         onode = self.octmap.getFreeAndOccupiedNodes()

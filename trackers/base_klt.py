@@ -55,7 +55,7 @@ class BaseKLT(object):
         self.tracker = OpticalFlowTracker(params=self.params.tracker)
 
         # Track Manager
-        self.tm = TrackManager(maxlen=10)
+        self.tm = TrackManager(maxlen=20)
 
         # Max features
         self.max_tracks_ = 1200
@@ -94,25 +94,17 @@ class BaseKLT(object):
                        tuple(map(int, cols[tid % N])) if colored else (0,240,0),
                        -1, lineType=cv2.CV_AA)
 
-    def matches(self): 
-        p1, p2 = [], []
-
-        # for tid, idx in zip(self.tm.tracks.itervalues(), self.tm.tracks_ts.itervalues()): 
-        #     if val < self.idx: 
-        #         del self.tracks[tid]
-        #         del self.tracks_ts[tid]
-
+    def matches(self, index1=-2, index2=-1): 
+        tids, p1, p2 = [], [], []
         for tid, pts in self.tm.tracks.iteritems(): 
-            if len(pts) > 2: 
-                p1.append(pts.items[-2])
-                p2.append(pts.items[-1]) 
-                # p1.append(pts[-2,:])
-                # p2.append(pts[-1,:])
-
+            if len(pts) > abs(index1) and len(pts) > abs(index2): 
+                tids.append(tid)
+                p1.append(pts.items[index1])
+                p2.append(pts.items[index2]) 
         try: 
-            return np.vstack(p1), np.vstack(p2)
+            return tids, np.vstack(p1), np.vstack(p2)
         except: 
-            return np.array([]), np.array([])
+            return np.array([]), np.array([]), np.array([])
 
 class OpenCVKLT(BaseKLT): 
     """

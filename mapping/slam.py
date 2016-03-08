@@ -14,8 +14,6 @@ from pybot_gtsam import GTSAMTags
 from pybot_slam import ISAMTags, draw_tags
 from pybot_apriltags import AprilTag, AprilTagsWrapper
 
-
-
 class BaseSLAMMixin(object):
     """
     Basic Mixin SLAM
@@ -73,7 +71,7 @@ class BaseSLAMMixin(object):
             return 
             
         p_odom = (self.poses_.items[-2].inverse()).oplus(self.poses_.items[-1])
-        self.pose_id_ = self.slam_.on_odom(t, p_odom.to_homogeneous_matrix())
+        self.pose_id_ = self.slam_.on_odom(t, p_odom.matrix)
 
         self.vis_odom(self.poses_)        
         self.vis_slam_updates()
@@ -89,7 +87,7 @@ class BaseSLAMMixin(object):
             self.poses_.accumulate(self.poses_.latest.oplus(p))
         else: 
             self.poses_.accumulate(RigidTransform.identity())
-        self.pose_id_ = self.slam_.on_odom(t, p.to_homogeneous_matrix())
+        self.pose_id_ = self.slam_.on_odom(t, p.matrix)
 
         self.vis_odom(self.poses_)        
         self.vis_slam_updates()
@@ -130,7 +128,7 @@ class BaseSLAMMixin(object):
             return
 
         ids = [p.id for p in poses_w_ids]
-        poses = [p.to_homogeneous_matrix() for p in poses_w_ids]
+        poses = [p.matrix for p in poses_w_ids]
         print ids, poses, self.poses_.latest, self.pose_id_
 
         self.pose_id_ = self.slam_.on_pose_ids(t, ids, poses)

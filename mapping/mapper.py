@@ -436,7 +436,7 @@ class MultiViewMapper(Mapper):
         poses and the corresponding image
         """
         # Only process once for semi-dense depth estimation
-        self.depth_filter.process(img, (pose_wc.to_homogeneous_matrix()).astype(np.float64), 
+        self.depth_filter.process(img, (pose_wc.matrix).astype(np.float64), 
                                   self.idx % self.kf_every == 0)
         imshow_cv('kf_img', img)
 

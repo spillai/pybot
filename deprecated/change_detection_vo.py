@@ -137,8 +137,8 @@ class ChangeDetectionVO:
 
 
     def compute_epipole(self, p): 
-        rvec,_ = cv2.Rodrigues(p.quat.to_homogeneous_matrix())
-        print rvec, p.quat.to_homogeneous_matrix()
+        rvec,_ = cv2.Rodrigues(p.quat.matrix)
+        print rvec, p.quat.matrix
         proj,_ = cv2.projectPoints(np.array([[0.,0.,1000.]]), rvec, p.tvec,
                                 self.calib_params.P0[:3,:3], np.zeros(4))
         print proj.flatten()
