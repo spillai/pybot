@@ -5,7 +5,7 @@ from .imshow_utils import imshow_cv
 from .camera_utils import Camera, CameraIntrinsic, CameraExtrinsic, plot_epipolar_line
 from .image_utils import to_gray, to_color, im_resize
 
-from .trackers.base_klt import draw_features
+from bot_vision.draw_utils import draw_features
 from .trackers.tracker_utils import FeatureDetector
 
 class Frame(object): 
