@@ -38,6 +38,12 @@ class Accumulator(Counter):
         for item in items: 
             self.accumulate(item)
 
+    def __getitem__(self, index):
+        return self.items_[index]
+
+    def __setitem__(self, index, value):
+        self.items_[index] = value
+
     @property
     def latest(self): 
         return self.items_[-1]
