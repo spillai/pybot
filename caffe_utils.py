@@ -31,8 +31,13 @@ class FastRCNNDescription(object):
         cfg.TEST.BBOX_REG = False
 
     def describe(self, img, bboxes):
+        self.rcnn_.hypercolumn_bboxes(img, bboxes)
         return self.rcnn_.detect_bboxes(img, bboxes)
 
+
+    def hypercolumn(self, img, bboxes):
+        return self.rcnn_.hypercolumn_bboxes(img, bboxes)
+        
 
 class HistogramClassifier(BOWClassifier): 
     """
