@@ -23,17 +23,19 @@ class Quaternion(object):
                 self.q = np.array(q, np.float64)
             except:
                 raise TypeError("Quaternion can not be initialized from {:}".format(type(q)))
-                            
         
         self.normalize()
 
     def normalize(self): 
         """ Check validity of unit-quaternion norm """
-        norm = np.linalg.norm(self.q)
-        if abs(norm-1) > 1e-2: 
-            raise RuntimeError('Norm computed is %5.3f' % norm)
+        norm = self.norm()
         if abs(norm - 1) > 1e-2:
             self.q /= norm
+        if abs(self.norm()-1) > 1e-2: 
+            raise RuntimeError('Norm computed is %5.3f' % norm)
+
+    def norm(self): 
+        return np.linalg.norm(self.q)
 
     def dot(self, other): 
         return self.q.dot(other.q)

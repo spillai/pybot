@@ -190,6 +190,18 @@ class RigidTransform(object):
         return self.quat.to_xyzw()
 
     @property
+    def R(self): 
+        return self.quat.R
+
+    @property
+    def t(self): 
+        return self.tvec
+
+    @property
+    def rotation(self): 
+        return self.quat
+
+    @property
     def translation(self):
         return self.tvec
 
@@ -202,8 +214,16 @@ class RigidTransform(object):
         return self.to_matrix()
 
     def interpolate(self, other, w): 
+        """
+        LERP interpolation on rotation, and linear interpolation on position 
+        Other approaches: 
+        https://www.cvl.isy.liu.se/education/graduate/geometry-for-computer-vision-2014/geometry2014/lecture7.pdf
+        """
         assert(w >= 0 and w <= 1.0)
-        return self.from_matrix(self.matrix * expm(w * logm((self.inverse() * other).matrix)))
+        return self.from_Rt(self.rotation.interpolate(other.rotation, w).R, self.t + w * (other.t - self.t))
+
+        # return self.from_Rt(self.R * expm3(w * logm(self.R.T * other.R)), self.t + w * (other.t - self.t))
+        # return self.from_matrix(self.matrix * expm(w * logm((self.inverse() * other).matrix)))
 
     # def interpolate(self, other_transform, this_weight):
     #     assert this_weight >= 0 and this_weight <= 1
