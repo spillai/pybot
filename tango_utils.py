@@ -7,9 +7,10 @@ import numpy as np
 import cv2
 import os.path
 from heapq import heappush, heappop
+from abc import ABCMeta, abstractmethod
 
 from collections import Counter
-from bot_externals.log_utils import Decoder, LogReader
+from bot_externals.log_utils import Decoder, LogReader, LogController
 from bot_vision.image_utils import im_resize
 from bot_geometry.rigid_transform import RigidTransform
 from bot_vision.camera_utils import CameraIntrinsic
@@ -227,3 +228,18 @@ class TangoLogReader(LogReader):
     def iter_frames(self):
         return self.iteritems()
 
+class TangoLogController(LogController): 
+    __metaclass__ = ABCMeta
+    def __init__(self, dataset): 
+        super(TangoLogController, self).__init__(dataset)
+
+        self.subscribe('RGB', self.on_rgb)
+        self.subscribe('RGB_VIO', self.on_pose)
+        
+    @abstractmethod
+    def on_rgb(self, t, img): 
+        raise NotImplementedError()
+
+    @abstractmethod
+    def on_pose(self, t, pose): 
+        raise NotImplementedError()
