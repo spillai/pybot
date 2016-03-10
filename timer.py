@@ -15,7 +15,7 @@ class SimpleTimer:
 
         if dt > 1000: 
             self.period_ = dt / self.counter_
-            print('%s: %4.3f ms (avg over %i iterations)' % (self.name, self.period_, self.counter_))
+            print('%s: %4.3f ms (avg over %i iterations)' % (self.name_, self.period_, self.counter_))
             self.last_ = now
             self.counter_ = 0
 
