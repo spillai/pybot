@@ -150,7 +150,7 @@ class TangoLogReader(LogReader):
     D = np.float64([0.234583, -0.689864, 0, 0, 0.679871])
     cam = CameraIntrinsic(K=K, D=D, shape=(H,W))
 
-    def __init__(self, directory, scale=1., start_idx=0): 
+    def __init__(self, directory, scale=1., start_idx=0, every_k_frames=1): 
         
         # Set directory and filename for time synchronized log reads 
         self.directory_ = os.path.expanduser(directory)
@@ -166,8 +166,9 @@ class TangoLogReader(LogReader):
         # Initialize TangoLogReader with appropriate decoders
         super(TangoLogReader, self).__init__(self.filename_, 
                                              decoder=[
-                                                 TangoOdomDecoder(channel='RGB_VIO'), 
-                                                 TangoImageDecoder(self.directory_, channel='RGB', shape=self.shape_)
+                                                 TangoOdomDecoder(channel='RGB_VIO', every_k_frames=every_k_frames), 
+                                                 TangoImageDecoder(self.directory_, channel='RGB', 
+                                                                   shape=self.shape_, every_k_frames=every_k_frames)
                                              ])
         
         if isinstance(self.start_idx_, float):
@@ -220,10 +221,9 @@ class TangoLogReader(LogReader):
             if dec.should_decode():
                 return True, (t, channel, dec.decode(msg))
         except Exception as e:
-            pass
             # raise RuntimeError('Failed to decode data from channel: %s, mis-specified decoder?' % channel)
         
-        return False, (None, None)
+        return False, (None, None, None)
 
     def iter_frames(self):
         return self.iteritems()

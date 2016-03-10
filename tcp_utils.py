@@ -13,7 +13,7 @@ class TCPPub:
         self.server_uid_ = dict()
         self.get_uid = lambda ip, port: '{}:{}'.format(ip,port)
 
-    def publish_image(self, im, ip='mrg-liljon.csail.mit.edu', port=12347): 
+    def publish_image(self, im, ip='mrg-liljon.csail.mit.edu', port=12347, scale=0.5): 
         s = None
         suid = self.get_uid(ip,port)
         if suid not in self.server_uid_: 
@@ -26,7 +26,9 @@ class TCPPub:
         else: 
             s = self.server_uid_[suid]
 
-        im = cv2.resize(im, None, fx=0.5, fy=0.5)
+        # Will not upsample image for bandwidth reasons
+        if scale < 1: 
+            im = cv2.resize(im, None, fx=scale, fy=scale)
         result, imgencode = cv2.imencode('.jpg', im, TCPPub.encode_param)
         data = np.array(imgencode)
         stringData = data.tostring()
@@ -44,4 +46,4 @@ def publish_image(im, ip='mrg-liljon.csail.mit.edu', port=12347, flip_rb=True):
     global g_tcp_pub
     g_tcp_pub.publish_image(cv2.cvtColor(im, cv2.COLOR_BGR2RGB) 
                             if flip_rb else im)
-
+    time.sleep(0.1)
