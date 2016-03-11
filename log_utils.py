@@ -88,6 +88,10 @@ class LogReader(object):
         if not len(self.cb_): 
             raise RuntimeError('No callbacks registered yet, subscribe to channels first!')
 
+        # Initialize
+        self.init()
+
+        # Run
         iterator = take(self.iter_frames(), max_length=self.max_length)
         for self.idx, (t, ch, data) in enumerate(iterator): 
             try: 
@@ -98,6 +102,15 @@ class LogReader(object):
                 import traceback
                 traceback.print_exc()
                 raise RuntimeError()
+
+        # Finish up
+        self.finish()
+
+    def init(self): 
+        pass
+
+    def finish(self): 
+        pass
 
 class LogController(object): 
     __metaclass__ = ABCMeta

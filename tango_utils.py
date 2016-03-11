@@ -175,6 +175,10 @@ class TangoLogReader(LogReader):
             raise ValueError('start_idx in TangoReader expects an integer, provided {:}'.format(self.start_idx_))
 
     @property
+    def directory(self): 
+        return self.directory_
+
+    @property
     def calib(self): 
         """
         https://developers.google.com/project-tango/apis/c/
@@ -221,6 +225,7 @@ class TangoLogReader(LogReader):
             if dec.should_decode():
                 return True, (t, channel, dec.decode(msg))
         except Exception as e:
+            pass
             # raise RuntimeError('Failed to decode data from channel: %s, mis-specified decoder?' % channel)
         
         return False, (None, None, None)
