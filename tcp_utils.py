@@ -45,5 +45,5 @@ g_tcp_pub = TCPPub()
 def publish_image(im, ip='mrg-liljon.csail.mit.edu', port=12347, flip_rb=True): 
     global g_tcp_pub
     g_tcp_pub.publish_image(cv2.cvtColor(im, cv2.COLOR_BGR2RGB) 
-                            if flip_rb else im)
+                            if flip_rb else np.copy(im))
     time.sleep(0.1)
