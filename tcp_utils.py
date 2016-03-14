@@ -3,7 +3,96 @@ import socket
 import time
 import cv2
 import numpy as np
+from bot_externals.print_utils import print_green
 
+class TCPServer(object):
+    def __init__(self, ip='', port=12347):
+        self.ip_, self.port_ = ip, port
+        self.init(self.ip_, self.port_)
+        
+    def init(self, ip, port): 
+        self.s_ = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.s_.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        print_green('Hostname: {:} READY'.format(socket.gethostname()))
+        
+        self.s_.bind((self.ip_, self.port_))
+        self.s_.listen(1)
+        self.conn_, self.addr_ = self.s_.accept()
+
+    def _read(self):
+        try: 
+            length = int(self.recvall(self.conn_,16))
+        except:
+            import sys
+            print "Unexpected error:", sys.exc_info()[0]
+            return False, None
+
+        stringData = self.recvall(self.conn_, length)
+        data = np.fromstring(stringData, dtype='uint8')
+        decimg = cv2.imdecode(data, 1)
+        print 'Image received ', decimg.shape
+        return True, decimg
+
+    def read(self):
+        rval, im = self._read()
+        if not rval:
+            self.release()
+            print_green('Waiting for new connection')
+            self.init(self.ip, self.port)
+            rval, im = self._read()
+        return im
+
+    def recvall(self, sock, count):
+        buf = b''
+        while count:
+            newbuf = sock.recv(count)
+            if not newbuf: return None
+            buf += newbuf
+            count -= len(newbuf)
+        return buf
+
+    def on_image(self, im):
+        raise NotImplementedError()
+
+    def run(self):
+        rval = True
+
+        while rval:
+            start = time.time()
+            rval, im = cap._read()
+            end = time.time()
+
+            if not rval:
+                self.release()
+                print_green('Waiting for new connection')
+                self.init(self.ip_, self.port_)
+                rval = True
+                continue
+
+            self.on_image(self, im)
+    
+    def release(self):
+        self.s_.close()
+
+    @property
+    def ip(self):
+        return self.ip_
+
+    @property
+    def port(self):
+        return self.port_
+        
+class TCPControl(object):
+    def __init__(self, ip='', port=12347):
+        self.server_ = TCPServer(ip=ip, port=port)
+        
+    def __enter__(self):
+        return self.server_
+    
+    def __exit__(self, type, value, traceback):
+        self.server_.release()
+                                                              
+        
 class TCPPub: 
     encode_param = [int(cv2.IMWRITE_JPEG_QUALITY),90]        
     """
