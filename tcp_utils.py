@@ -5,6 +5,41 @@ import cv2
 import numpy as np
 from bot_externals.print_utils import print_green
 
+def recvall(conn, count):
+    buf = b''
+    while count:
+        newbuf = conn.recv(count)
+        if not newbuf: return None
+        buf += newbuf
+        count -= len(newbuf)
+    return buf
+
+def read_image(conn): 
+    try: 
+        length = int(recvall(conn, 16))
+    except:
+        import sys
+        print "Unexpected error:", sys.exc_info()[0]
+        return False, None
+
+    stringData = recvall(conn, length)
+    data = np.fromstring(stringData, dtype='uint8')
+    decimg = cv2.imdecode(data, 1)
+    print 'Image received ', decimg.shape
+    return True, decimg
+
+
+def send_image(s, im, scale=1.0, encode_param=[int(cv2.IMWRITE_JPEG_QUALITY),90]):
+    # Will not upsample image for bandwidth reasons
+    if scale < 1: 
+        im = cv2.resize(im, None, fx=scale, fy=scale)
+    result, imgencode = cv2.imencode('.jpg', im, encode_param)
+    data = np.array(imgencode)
+    stringData = data.tostring()
+    s.send( str(len(stringData)).ljust(16))
+    s.send( stringData )
+
+
 class TCPServer(object):
     def __init__(self, ip='', port=12347):
         self.ip_, self.port_ = ip, port
@@ -20,18 +55,7 @@ class TCPServer(object):
         self.conn_, self.addr_ = self.s_.accept()
 
     def _read(self):
-        try: 
-            length = int(self.recvall(self.conn_,16))
-        except:
-            import sys
-            print "Unexpected error:", sys.exc_info()[0]
-            return False, None
-
-        stringData = self.recvall(self.conn_, length)
-        data = np.fromstring(stringData, dtype='uint8')
-        decimg = cv2.imdecode(data, 1)
-        print 'Image received ', decimg.shape
-        return True, decimg
+        return read_image(self.conn_)
 
     def read(self):
         rval, im = self._read()
@@ -41,15 +65,6 @@ class TCPServer(object):
             self.init(self.ip, self.port)
             rval, im = self._read()
         return im
-
-    def recvall(self, sock, count):
-        buf = b''
-        while count:
-            newbuf = sock.recv(count)
-            if not newbuf: return None
-            buf += newbuf
-            count -= len(newbuf)
-        return buf
 
     def on_image(self, im):
         raise NotImplementedError()
@@ -91,10 +106,9 @@ class TCPControl(object):
     
     def __exit__(self, type, value, traceback):
         self.server_.release()
-                                                              
-        
+
 class TCPPub: 
-    encode_param = [int(cv2.IMWRITE_JPEG_QUALITY),90]        
+
     """
     TCP publisher class
     """
@@ -115,14 +129,7 @@ class TCPPub:
         else: 
             s = self.server_uid_[suid]
 
-        # Will not upsample image for bandwidth reasons
-        if scale < 1: 
-            im = cv2.resize(im, None, fx=scale, fy=scale)
-        result, imgencode = cv2.imencode('.jpg', im, TCPPub.encode_param)
-        data = np.array(imgencode)
-        stringData = data.tostring()
-        s.send( str(len(stringData)).ljust(16))
-        s.send( stringData )
+        send_image(s, im, scale=scale)
 
     def __del__(self): 
         for s in self.server_uid_.itervalues(): 
