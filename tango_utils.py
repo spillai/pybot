@@ -142,7 +142,6 @@ class TangoLog(object):
             
             yield c_ch, c_data, c_t
 
-
 class TangoLogReader(LogReader): 
 
     H, W = 720, 1280
@@ -232,6 +231,14 @@ class TangoLogReader(LogReader):
 
     def iter_frames(self):
         return self.iteritems()
+
+def iter_tango_logs(directory, logs):
+    for log in logs: 
+        directory = os.path.expanduser(os.path.join(args.directory, log))
+        print('Accessing Tango directory {:}'.format(directory))
+        dataset = TangoLogReader(directory=directory, scale=im_scale) 
+        for item in dataset.iter_frames(): 
+            yield item
 
 class TangoLogController(LogController): 
     __metaclass__ = ABCMeta
