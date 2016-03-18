@@ -171,7 +171,8 @@ class FeatureDetector(object):
         else: 
             raise RuntimeError('Unknown detector_type: %s! Use fast or gftt' % self.params.type)
 
-        if self.params.grid is not None and self.params.max_corners: 
+        if (self.params.type == 'gftt' or self.params.type == 'fast') and \
+           (self.params.grid is not None and self.params.max_corners): 
             self.detector = cv2.GridAdaptedFeatureDetector(
                 self.detector, self.params.max_corners, self.params.grid[0], self.params.grid[1]
             )
