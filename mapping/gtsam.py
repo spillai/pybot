@@ -601,9 +601,8 @@ def test_SFMExample_SmartFactor():
     landmark_result = Values()
     for j, pointj in enumerate(points): 
 
-        # # The output of point() is in boost::optional<gtsam::Point3>, as sometimes
-        # # the triangulation operation inside smart factor will encounter degeneracy.
-        # boost::optional<Point3> point;
+        # The output of point() is in boost::optional<gtsam::Point3>, as sometimes
+        # the triangulation operation inside smart factor will encounter degeneracy.
 
         # The graph stores Factor shared_ptrs, so we cast back to a SmartFactor first
         # c++ -> py: smart.point -> smart.point_compute
