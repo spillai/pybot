@@ -47,6 +47,15 @@ class Accumulator(Counter):
         for item in items: 
             self.accumulate(item)
 
+    def append(self, item): 
+        self.accumulate(item)
+
+    def extend(self, items): 
+        self.accumulate_list(items)
+
+    def __len__(self): 
+        return len(self.items_)
+
     def __getitem__(self, index):
         return self.items_[index]
 
