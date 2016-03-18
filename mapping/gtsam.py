@@ -5,19 +5,21 @@ from itertools import izip
 
 from bot_js.force import nx_force_draw
 
-from pygtsam import extractPose3
+from pygtsam import extractPose2, extractPose3
 from pygtsam import symbol as _symbol
 from pygtsam import Point2, Rot2, Pose2, \
     PriorFactorPose2, BetweenFactorPose2, \
     BearingRangeFactorPose2Point2
 from pygtsam import Point3, Rot3, Pose3, \
     PriorFactorPose3, BetweenFactorPose3
+from pygtsam import SmartFactor
+from pygtsam import Cal3_S2, SimpleCamera, simpleCamera
 from pygtsam import StereoPoint2, Cal3_S2Stereo, GenericStereoFactor3D
 from pygtsam import NonlinearEqualityPose3
 from pygtsam import Isotropic
 from pygtsam import Diagonal, Values, Marginals
 from pygtsam import ISAM2, NonlinearOptimizer, \
-    NonlinearFactorGraph, LevenbergMarquardtOptimizer
+    NonlinearFactorGraph, LevenbergMarquardtOptimizer, DoglegOptimizer
 
 np.set_printoptions(precision=2, suppress=True)
 
@@ -34,16 +36,18 @@ def vec(*args):
     return vector(list(args)) 
 
 def plot2DTrajectory(values, linespec, marginals=[]): 
-    poses = extractPose2(values)
-    X = poses[:,1]
-    Y = poses[:,2]
-    theta = poses[:,3]
+    pass
 
-    # if len(marginals): 
-    #     C = np.cos(theta)
-    #     S = np.sin(theta)
+    # poses = extractPose2(values)
+    # X = poses[:,1]
+    # Y = poses[:,2]
+    # theta = poses[:,3]
 
-    print values, marginals
+    # # if len(marginals): 
+    # #     C = np.cos(theta)
+    # #     S = np.sin(theta)
+
+    # print values, marginals
 
 class BaseSLAM(object): 
     """
@@ -313,8 +317,35 @@ class SLAM3D(BaseSLAM):
 # #         camera = SimpleCamera(self.prev_pose_)
 # #         pass
 
-        
+def createPoints(): 
+    # Create the set of ground-truth landmarks
+    points = [Point3(10.0,10.0,10.0), 
+              Point3(-10.0,10.0,10.0), 
+              Point3(-10.0,-10.0,10.0), 
+              Point3(10.0,-10.0,10.0), 
+              Point3(10.0,10.0,-10.0), 
+              Point3(-10.0,10.0,-10.0), 
+              Point3(-10.0,-10.0,-10.0), 
+              Point3(10.0,-10.0,-10.0)]
+    return points
+
+def createPoses(): 
+    radius = 30.0
+    theta = 0.0
+    up, target = Point3(0,0,1), Point3(0,0,0)
+
+    poses = []
+    for i in range(8): 
+        position = Point3(radius * np.cos(theta), radius * np.sin(theta), 0.0)
+        camera = SimpleCamera.Lookat(eye=position, target=target, upVector=up)
+        pose = camera.pose()
+        poses.append(camera.pose())
+
+    return poses
+
 def test_odometryExample(): 
+    print("test_odmetryExample\n")
+    print("=================================")
 
     # Add a prior on the first pose, setting it to the origin A prior factor
     # consists of a mean and a noise model (covariance matrix)
@@ -360,6 +391,9 @@ def test_odometryExample():
 
 
 def test_PlanarSLAMExample(): 
+    print("test_PlanarSLAMExample\n")
+    print("=================================")
+
     # Create a factor graph
     graph = NonlinearFactorGraph()
 
@@ -435,6 +469,8 @@ def test_PlanarSLAMExample():
     print(marginals.marginalCovariance(l2), "l2 covariance") 
 
 def test_StereoVOExample():
+    print("test_StereoVOExample\n")
+    print("=================================")
 
     # Assumptions
     #  - For simplicity this example is in the camera's coordinate frame
@@ -504,8 +540,90 @@ def test_StereoVOExample():
     # CHECK('point_1.equals(expected_l1,1e-4)',
     #       point_l1.equals(expected_l1,1e-4))
 
+def test_SFMExample_SmartFactor(): 
+    print("test_SFMExample_SmartFactor\n")
+    print("=================================")
+
+    # Define the camera calibration parameters
+    # format: fx fy skew cx cy
+    K = Cal3_S2(50.0, 50.0, 0.0, 50.0, 50.0)
+
+    # Define the camera observation noise model
+    measurement_noise = Isotropic.Sigma(2, 1.0)
+
+    # Create the set of ground-truth landmarks and poses
+    points = createPoints()
+    poses = createPoses()
+
+    # Create a factor graph
+    graph = NonlinearFactorGraph()
+
+    # Simulated measurements from each camera pose, adding them to the factor graph
+    for j, pointj in enumerate(points): 
+
+        # every landmark represent a single landmark, we use shared pointer to init the factor, and then insert measurements.
+        smartfactor = SmartFactor()
+
+        for i, posei in enumerate(poses): 
+
+            # generate the 2D measurement
+            camera = SimpleCamera(posei, K)
+            measurement = camera.project(pointj)
+
+            # call add() function to add measurement into a single factor, here we need to add:
+            #    1. the 2D measurement
+            #    2. the corresponding camera's key
+            #    3. camera noise model
+            #    4. camera calibration
+            smartfactor.add_single(measurement, i, measurement_noise, K);
+
+        # insert the smart factor in the graph
+        graph.add(smartfactor)
+
+    # graph.printf("Factor Graph:\n")
+
+    # Create the initial estimate to the solution
+    # Intentionally initialize the variables off from the ground truth
+    initialEstimate = Values()
+    delta = Pose3(Rot3.rodriguez(-0.1, 0.2, 0.25), Point3(0.05, -0.10, 0.20))
+
+    for i, posei in enumerate(poses): 
+        initialEstimate.insert(i, posei.compose(delta))
+        initialEstimate.printf("Initial Estimates:\n")
+
+    # Optimize the graph and print results
+    result = DoglegOptimizer(graph, initialEstimate).optimize()
+    result.printf("Final results:\n")
+
+    # A smart factor represent the 3D point inside the factor, not as a variable.
+    # The 3D position of the landmark is not explicitly calculated by the optimizer.
+    # To obtain the landmark's 3D position, we use the "point" method of the smart factor.
+    landmark_result = Values()
+    for j, pointj in enumerate(points): 
+
+        # # The output of point() is in boost::optional<gtsam::Point3>, as sometimes
+        # # the triangulation operation inside smart factor will encounter degeneracy.
+        # boost::optional<Point3> point;
+
+        # The graph stores Factor shared_ptrs, so we cast back to a SmartFactor first
+        # c++ -> py: smart.point -> smart.point_compute
+        smart = graph[j]
+        if smart: 
+            point = smart.point_compute(result)
+
+         # ignore if boost::optional return NULL
+        if point:
+            landmark_result.insert(j, point)
+    
+    landmark_result.printf("Landmark results:\n")
+
+        
+            
+
+            
 if __name__ == "__main__": 
     test_odometryExample()
     test_PlanarSLAMExample()
     test_StereoVOExample()
+    test_SFMExample_SmartFactor()
     
