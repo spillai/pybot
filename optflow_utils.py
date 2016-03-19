@@ -25,7 +25,8 @@ def dense_optical_flow(im1, im2, pyr_scale=0.5, levels=3, winsize=5,
         rflow = dense_optical_flow(im2, im1, pyr_scale=pyr_scale, levels=levels, 
                                    winsize=winsize, iterations=iterations, poly_n=poly_n, 
                                    poly_sigma=poly_sigma, fb_threshold=-1)
-        rflow[~mask2.astype(np.bool)] = np.nan
+        if mask2 is not None: 
+            rflow[~mask2.astype(np.bool)] = np.nan
 
         xys1r = xys2 + rflow
         fb_bad = (np.fabs(xys1r - xys1) > fb_threshold).all(axis=2)
