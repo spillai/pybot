@@ -140,9 +140,28 @@ class LogController(object):
         if not len(self.ctrl_cb_): 
             raise RuntimeError('No callbacks registered yet, subscribe to channels first!')
 
+        # Initialize
+        self.init()
+
+        # Run
         for self.ctrl_idx_, (t, ch, data) in enumerate(self.dataset_.iter_frames()): 
             if ch in self.ctrl_cb_: 
                 self.ctrl_cb_[ch](t, data)
+
+        # Finish up
+        self.finish()
+
+    def init(self): 
+        """
+        Pre-processing for inherited controllers
+        """
+        pass
+
+    def finish(self): 
+        """
+        Post-processing for inherited controllers
+        """
+        pass
 
     @property
     def index(self): 
