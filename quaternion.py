@@ -219,6 +219,14 @@ class Quaternion(object):
     def w(self): 
         return self.q[3]
 
+    @property
+    def wxyz(self):
+        return self.to_wxyz()
+
+    @property
+    def xyzw(self):
+        return self.to_xyzw()
+
 
 
 ###############################################################################

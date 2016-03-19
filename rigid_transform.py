@@ -219,11 +219,11 @@ class RigidTransform(object):
     # Properties
     @property
     def wxyz(self):
-        return self.quat.to_wxyz()
+        return self.quat.wxyz
 
     @property
     def xyzw(self):
-        return self.quat.to_xyzw()
+        return self.quat.xyzw
 
     @property
     def R(self): 
