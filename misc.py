@@ -1,7 +1,7 @@
 from collections import deque
 import progressbar as pb
 
-def print_red(print_t): print("\033[91m {}\033[00m" .format(prt))
+def print_red(prt): print("\033[91m {}\033[00m" .format(prt))
 def print_green(prt): print("\033[92m {}\033[00m" .format(prt))
 def print_yellow(prt): print("\033[93m {}\033[00m" .format(prt))
 def print_lightpurple(prt): print("\033[94m {}\033[00m" .format(prt))
@@ -153,8 +153,8 @@ class CounterWithPeriodicCallback(Counter):
         try:
             orig_func = getattr(cls_instance, function_name)
             function_cb = setattr(cls_instance, function_name, polled_function_cb(orig_func))
-        except: 
-            raise AttributeError('function %s has not been defined in instance' % function_name)
+        except Exception, e:
+            raise AttributeError('function %s has not been defined in instance {:}'.format(function_name, e))
         
         print('Setting new polled callback for %s.%s' % (type(cls_instance).__name__, function_name))
         
