@@ -138,11 +138,12 @@ def publish_botviewer_image_t(im, jpeg=False, flip_rb=True):
         raise TypeError('publish_botviewer_image_t type is not np.ndarray')
     publish_image_t('CAMERA_IMAGE', im, jpeg=jpeg, flip_rb=flip_rb)
 
-def draw_tag(pose=None, size=0.1): 
-    corners = np.float32([[size, size, 0], [-size, size, 0], 
-                          [-size, -size, 0], [size, -size, 0], 
-                          [size, size, 0], [-size, -size, 0], 
-                          [-size, size, 0], [size, -size, 0]])
+def draw_tag(pose=None, size=0.1):
+    sz = size / 2.0
+    corners = np.float32([[sz, sz, 0], [-sz, sz, 0], 
+                          [-sz, -sz, 0], [sz, -sz, 0], 
+                          [sz, sz, 0], [-sz, -sz, 0], 
+                          [-sz, sz, 0], [sz, -sz, 0]])
     return pose * corners if pose is not None else corners
 
 def draw_tag_edges(pose=None, size=0.1):
@@ -279,8 +280,8 @@ def arr_msg(arr, carr, frame_uid, element_id):
     return msg
 
 
-def _publish_point_type(pub_channel, _arr, c='r', point_type='POINT', flip_rb=False, 
-                        frame_id='camera', element_id=0, reset=True):
+def publish_point_type(pub_channel, _arr, c='r', point_type='POINT', 
+                       flip_rb=False, frame_id='camera', element_id=0, reset=True):
     """
     Publish point cloud on:
     pub_channel: Channel on which the cloud will be published
@@ -330,24 +331,18 @@ def _publish_point_type(pub_channel, _arr, c='r', point_type='POINT', flip_rb=Fa
     g_viz_pub.lc.publish("POINTS_COLLECTION", pc_list_msg.encode())
 
 # @run_async
-def publish_point_type(pub_channel, arr, c='r', point_type='POINT', 
-                       flip_rb=False, frame_id='camera', element_id=0, reset=True):
-    _publish_point_type(pub_channel, deepcopy(arr), c=deepcopy(c), point_type=point_type, 
-                        flip_rb=flip_rb, frame_id=frame_id, element_id=element_id, reset=reset)
-
-# @run_async
 def publish_cloud(pub_channel, arr, c='r', flip_rb=False, frame_id='camera', element_id=0, reset=True):
-    _publish_point_type(pub_channel, deepcopy(arr), c=deepcopy(c), point_type='POINT', 
-                        flip_rb=flip_rb, frame_id=frame_id, element_id=element_id, reset=reset)
+    publish_point_type(pub_channel, arr, c=c, point_type='POINT', 
+                       flip_rb=flip_rb, frame_id=frame_id, element_id=element_id, reset=reset)
 
-def _publish_pose_list(pub_channel, _poses, texts=[], frame_id='camera', reset=True, object_type='AXIS3D'):
+def publish_pose_list(pub_channel, poses, texts=[], covars=[], frame_id='camera', reset=True, object_type='AXIS3D'):
     """
     Publish Pose List on:
     pub_channel: Channel on which the cloud will be published
     element_id: None (defaults to np.arange(len(poses)), otherwise provide list of ids
     """
     global g_viz_pub
-    poses = deepcopy(_poses)
+    # poses = deepcopy(_poses)
     frame_pose = g_viz_pub.get_sensor_pose(frame_id)
     
     # pose list collection msg
@@ -379,7 +374,6 @@ def _publish_pose_list(pub_channel, _poses, texts=[], frame_id='camera', reset=T
         # for plotting clouds with corresponding pose
         # Note: defaults to index of pose
         pose_list_msg.objs[j].id = getattr(pose, 'id', j) 
-        
         pose_list_msg.objs[j].x = x
         pose_list_msg.objs[j].y = y
         pose_list_msg.objs[j].z = z
@@ -389,18 +383,21 @@ def _publish_pose_list(pub_channel, _poses, texts=[], frame_id='camera', reset=T
         pose_list_msg.objs[j].yaw = yaw
         
     g_viz_pub.lc.publish("OBJ_COLLECTION", pose_list_msg.encode())
-    # g_log.debug('Published %i poses' % (nposes))
 
     # Publish corresponding text
     if len(texts): 
-        publish_text_list(pub_channel, arr, texts, frame_id=frame_id)
+        publish_text_list(pub_channel, poses, texts, frame_id=frame_id, reset=reset)
 
-def publish_text_list(pub_channel, poses, texts=[], frame_id='camera'):
+    # Publish corresponding covariances
+    if len(covars): 
+        publish_covar_list(pub_channel, poses, covars, frame_id=frame_id, reset=reset)
+
+def publish_text_list(pub_channel, poses, texts=[], frame_id='camera', reset=True):
     text_list_msg = vs.text_collection_t()
     text_list_msg.name = pub_channel+'-text'
     text_list_msg.id = g_viz_pub.channel_uid(text_list_msg.name)
     text_list_msg.type = 1 # doesn't matter
-    text_list_msg.reset = True
+    text_list_msg.reset = reset
 
     assert(len(poses) == len(texts))
     nposes = len(texts)
@@ -414,16 +411,46 @@ def publish_text_list(pub_channel, poses, texts=[], frame_id='camera'):
         text_list_msg.texts[j].text = texts[j]
        
     g_viz_pub.lc.publish("TEXT_COLLECTION", text_list_msg.encode())
-    # g_log.debug('Published %i poses' % (nposes))
+
+def publish_covar_list(pub_channel, poses, covars=[], frame_id='camera', reset=True):
+    covar_list_msg = vs.cov_collection_t()
+    covar_list_msg.name = pub_channel+'-covars'
+    covar_list_msg.id = g_viz_pub.channel_uid(covar_list_msg.name)
+    covar_list_msg.type = vs.cov_collection_t.ELLIPSOID
+    covar_list_msg.reset = reset
+
+    assert(len(poses) == len(covars))
+    nposes = len(covars)
+    covar_list_msg.covs = [vs.cov_t() for j in range(0,nposes)]
+    covar_list_msg.ncovs = nposes
+
+    assert(covars.ndim == 2 and covars.shape[1] == 6)
+    for j,pose in enumerate(poses):
+        covar_list_msg.covs[j].id = getattr(pose, 'id', j) 
+        covar_list_msg.covs[j].collection = g_viz_pub.channel_uid(pub_channel)
+        covar_list_msg.covs[j].element_id = getattr(pose, 'id', j) 
+        covar_list_msg.covs[j].entries = covars[j]
+        covar_list_msg.covs[j].n = len(covars[j])
+        print 'covar_list', nposes, covar_list_msg.covs[j].id
+
+    g_viz_pub.lc.publish("COV_COLLECTION", covar_list_msg.encode())
 
 
 def publish_line_segments(pub_channel, _arr1, _arr2, c='r', flip_rb=False, frame_id='camera', element_id=0, reset=True):
     publish_point_type(pub_channel, np.hstack([_arr1, _arr2]), c=c, point_type='LINES', 
                        flip_rb=flip_rb, frame_id=frame_id, element_id=element_id, reset=reset)
 
-# @run_async
-def publish_pose_list(pub_channel, poses, texts=[], frame_id='camera', reset=True, object_type='AXIS3D'):
-    _publish_pose_list(pub_channel, deepcopy(poses), texts=texts, frame_id=frame_id, reset=reset, object_type=object_type)
+
+# # @run_async
+# def publish_point_type(pub_channel, arr, c='r', point_type='POINT', 
+#                        flip_rb=False, frame_id='camera', element_id=0, reset=True):
+#     _publish_point_type(pub_channel, arr, c=c, point_type=point_type, 
+#                         flip_rb=flip_rb, frame_id=frame_id, element_id=element_id, reset=reset)
+
+# # @run_async
+# def publish_pose_list(pub_channel, poses, texts=[], covars=[], frame_id='camera', reset=True, object_type='AXIS3D'):
+#     _publish_pose_list(pub_channel, deepcopy(poses), texts=texts, covars=covars, 
+#                        frame_id=frame_id, reset=reset, object_type=object_type)
 
 # # ===== Tangents drawing ====
 # def _publish_line_segments(pub_channel, _arr1, _arr2, c='r', flip_rb=False, frame_id='camera', element_id=0):
