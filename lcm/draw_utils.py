@@ -774,7 +774,7 @@ def publish_cameras(pub_channel, poses, c='y', texts=[], frame_id='camera',
     cam_faces = map(lambda x: x[0], cam_feats)
     cam_edges = map(lambda x: x[1], cam_feats)
 
-    # Publish pose
+    # Publish pose, and corresponding texts
     publish_pose_list(pub_channel, poses, texts=texts, frame_id=frame_id, reset=reset)
     
     # Draw blue node at camera pose translation
@@ -793,19 +793,13 @@ def publish_cameras(pub_channel, poses, c='y', texts=[], frame_id='camera',
         publish_point_type(pub_channel+'-faces', cam_faces, point_type='TRIANGLES', c=carr, frame_id=frame_id, reset=reset)
 
 
-    # Publish corresponding text
-    if len(texts): 
-        assert(len(poses) == len(texts))
-        arr = np.vstack([pose.tvec for pose in poses])
-        publish_text_lcmgl(pub_channel+'-text', arr, texts=texts, sensor_tf=sensor_tf)
-
 def publish_laser_frustums(pub_channel, poses, c='y', texts=[], frame_id='camera', 
                     draw_faces=True, draw_edges=True, size=1, zmin=0.01, zmax=5, reset=True):
     cam_feats = [draw_laser_frustum(pose, zmax=zmax * size, fov=np.deg2rad(80)) for pose in poses]
     cam_faces = map(lambda x: x[0], cam_feats)
     cam_edges = map(lambda x: x[1], cam_feats)
 
-    # Publish pose
+    # Publish pose, and corresponding texts
     publish_pose_list(pub_channel, poses, texts=texts, frame_id=frame_id, reset=reset)
 
     # Darker yellow edge
@@ -818,12 +812,6 @@ def publish_laser_frustums(pub_channel, poses, c='y', texts=[], frame_id='camera
     if draw_faces: 
         carr = [c] * len(cam_faces)
         publish_point_type(pub_channel+'-faces', cam_faces, point_type='TRIANGLES', c=carr, frame_id=frame_id, reset=reset)
-
-    # Publish corresponding text
-    if len(texts): 
-        assert(len(poses) == len(texts))
-        arr = np.vstack([pose.tvec for pose in poses])
-        publish_text_lcmgl(pub_channel+'-text', arr, texts=texts, sensor_tf=sensor_tf)
 
 
 
