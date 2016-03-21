@@ -22,6 +22,14 @@ kinect_v1_params = AttrDict(
     projector_depth_baseline = 0.07214
 )
 
+def colvec(vec): 
+    """ Convert to column vector """
+    return vec.reshape(-1,1)
+
+def rowvec(vec): 
+    """ Convert to row vector """
+    return vec.reshape(1,-1)
+
 def unproject(a):
   """ Homogenize vector """
   return np.append(a, 1)
@@ -30,6 +38,15 @@ def project(a):
   """ De-homogenize vector """
   return a[:-1]/float(a[-1])
 
+def unproject_points(pts): 
+    print pts.ndim, pts.shape
+    assert(pts.ndim == 2 and pts.shape[1] == 2)
+    return np.hstack([pts, colvec(np.ones(len(pts)))])
+
+def project_points(pts): 
+    z = colvec(pts[:,2])
+    return pts[:,:2] / z
+    
 def get_baseline(fx, baseline=None, baseline_px=None): 
     """
     Retrieve baseline / baseline(in pixels) using the focal length
@@ -50,7 +67,7 @@ def triangulate_points(cam1, pts1, cam2, pts2):
     assert(isinstance(cam1, Camera) and isinstance(cam2, Camera))
     assert(isinstance(pts1, np.ndarray) and isinstance(pts2, np.ndarray))
     X = cv2.triangulatePoints(cam1.P, cam2.P, pts1.reshape(-1,1,2), pts2.reshape(-1,1,2)).T 
-    return X[:,:3] / X[:,3].reshape(-1,1)  
+    return X[:,:3] / colvec(X[:,3])
     
 def construct_K(fx=500.0, fy=500.0, cx=319.5, cy=239.5): 
     """
@@ -110,7 +127,7 @@ class CameraIntrinsic(object):
         D: Distortion
         shape: Image Size (H,W,C): (480,640,3)
         """
-        self.K = npm.mat(K)
+        self.K = K
         self.D = D
         self.shape = np.int32(shape) if shape is not None else None
 
@@ -192,11 +209,18 @@ class CameraIntrinsic(object):
                                                  p1=self.p1, p2=self.p2, 
                                                  shape=shape)
 
+    def ray(self, pts, undistort=True): 
+        upts = self.undistort_points(pts) if undistort else pts
+        ret = unproject_points(
+            np.hstack([ (colvec(upts[:,0])-self.cx) / self.fx, (colvec(upts[:,1])-self.cy) / self.fy ])
+        )
+        return ret
+
     def undistort(self, im): 
         return undistort_image(im, self.K, self.D)
 
     def undistort_points(self, pts): 
-        out = cv2.undistortPoints(pts.reshape(-1,1,2), self.K, self.D)
+        out = cv2.undistortPoints(pts.reshape(-1,1,2).astype(np.float32), self.K, self.D, P=self.K)
         return out.reshape(-1,2) 
         
     def undistort_debug(self, im=None): 
