@@ -1,10 +1,11 @@
 import numpy as np
 import cv2, time, os.path, logging
+from abc import ABCMeta, abstractmethod
 
 from collections import defaultdict, deque
 from bot_vision.color_utils import colormap
 from bot_utils.db_utils import AttrDict
-
+from bot_utils.timer import SimpleTimer
 from pybot_apriltags import AprilTag, AprilTagsWrapper
 
 def finite_and_within_bounds(xys, shape): 
@@ -117,24 +118,16 @@ class TrackManager(object):
         return self.index_
 
 
-# class BaseFeatureDetector(object): 
-#     def __init__(self): 
-#         pass
-
-#     def detect(self, im, mask=None): 
-#         raise NotImplementedError()
-
 class AprilTagFeatureDetector(object): 
     """
     AprilTag Feature Detector (only detect 4 corner points)
     """
-    default_detector_params = AttrDict(tag_size=0.1, fx=576.09, fy=576.09, cx=319.5, cy=239.5)
+    default_params = AttrDict(tag_size=0.1, fx=576.09, fy=576.09, cx=319.5, cy=239.5)
     def __init__(self, tag_size=0.1, fx=576.09, fy=576.09, cx=319.5, cy=239.5): 
-        self.detector = AprilTagsWrapper()
-        self.detector.set_calib(tag_size=tag_size, fx=fx, fy=fy, cx=cx, cy=cy)
+        self.detector_ = AprilTagsWrapper(tag_size=tag_size, fx=fx, fy=fy, cx=cx, cy=cy)
     
     def detect(self, im, mask=None): 
-        tags = self.detector.process(im, return_poses=False)
+        tags = self.detector_.process(im, return_poses=False)
         kpts = []
         for tag in tags: 
             kpts.extend([cv2.KeyPoint(pt[0], pt[1], 1) for pt in tag.getFeatures()])
@@ -149,51 +142,65 @@ class FeatureDetector(object):
     and perform subpixel on the detected keypoints
     """
 
-    default_detector_params = AttrDict(grid=(12,10), max_corners=1200, pyramid=False, max_levels=4, subpixel=False)
-    fast_detector_params = AttrDict(default_detector_params, type='fast',  
-                                    params=AttrDict( threshold=10, nonmaxSuppression=True ))
-    gftt_detector_params = AttrDict(default_detector_params, type='gftt', 
-                                    params=AttrDict( maxCorners = 800, qualityLevel = 0.04, 
-                                                                  minDistance = 5, blockSize = 5 ))
-    apriltag_detector_params = AttrDict(subpixel=False, type='apriltag', 
-                                        params=AprilTagFeatureDetector.default_detector_params)
-    def __init__(self, params=fast_detector_params): 
-        # FeatureDetector params
-        self.params = params
+    default_params = AttrDict(grid=(12,10), max_corners=1200, 
+                              max_levels=4, subpixel=False)
+    fast_params = AttrDict(threshold=10, nonmaxSuppression=True)
+    gftt_params = AttrDict(maxCorners=800, qualityLevel=0.04, 
+                           minDistance=5, blockSize=5)
+    apriltag_params = AprilTagFeatureDetector.default_params
 
-        # Feature Detector, Descriptor setup
-        if self.params.type == 'gftt': 
-            self.detector = cv2.GFTTDetector(**self.params.params)
-        elif self.params.type == 'fast': 
-            self.detector = cv2.FastFeatureDetector(**self.params.params)
-        elif self.params.type == 'apriltag': 
-            self.detector = AprilTagFeatureDetector(**self.params.params)
-        else: 
-            raise RuntimeError('Unknown detector_type: %s! Use fast or gftt' % self.params.type)
+    detectors = { 'gftt': cv2.GFTTDetector, 
+                  'fast': cv2.FastFeatureDetector, 
+                  'apriltag': AprilTagFeatureDetector }
 
-        if (self.params.type == 'gftt' or self.params.type == 'fast') and \
-           (self.params.grid is not None and self.params.max_corners): 
-            self.detector = cv2.GridAdaptedFeatureDetector(
-                self.detector, self.params.max_corners, self.params.grid[0], self.params.grid[1]
-            )
+    def __init__(self, method='fast', grid=(12,10), max_corners=1200, 
+                 max_levels=4, subpixel=False, params=fast_params):
+
+        # Determine detector type that implements detect
+        try: 
+            self.detector_ = FeatureDetector.detectors[method](**params)
+        except: 
+            raise RuntimeError('Unknown detector type: %s! Use from {:}'.format(FeatureDetector.detectors.keys()))
+        
+        # Establish pyramid
+        if max_levels > 0: 
+            self.detector_ = cv2.PyramidAdaptedFeatureDetector(
+                detector=self.detector_, maxLevel=max_levels)
             
-        # if self.params.pyramid and self.params.max_levels: 
-        #     self.detector = cv2.PyramidAdaptedFeatureDetector(
-        #         detector=self.detector, 
-        #         maxLevel=self.params.max_levels
-        #     )
+        # Establish grid
+        if (method == 'gftt' or method == 'fast') and (grid is not None and max_corners): 
+            try: 
+                self.detector_ = cv2.GridAdaptedFeatureDetector(
+                    self.detector_, max_corners, grid[0], grid[1])
+                print 'corners', max_corners
+            except: 
+                raise ValueError('FeatureDetector grid is not compatible {:}'.format(grid))
 
+        # Check detector 
+        self.check_detector()
+
+        self.params_ = params
+        self.max_levels_ = max_levels
+        self.max_corners_ = max_corners
+        self.grid_ = grid
+        self.subpixel_ = subpixel
+
+    def check_detector(self): 
+        # Check detector
+        if not hasattr(self.detector_, 'detect'): 
+            raise AttributeError('Detector does not implement detect method {:}'.format(dir(self.detector_)))
+
+    @property
+    def detector(self): 
+        return self.detector_
 
     def process(self, im, mask=None, return_keypoints=False): 
-        if im.ndim != 2: 
-            raise RuntimeError('Cannot process color image')
-
         # Detect features 
         kpts = self.detector.detect(im, mask=mask)
         pts = to_pts(kpts)
         
         # Perform sub-pixel if necessary
-        if self.params.subpixel: self.subpixel_pts(im, pts)
+        if self.subpixel_: self.subpixel_pts(im, pts)
 
         # Return keypoints, if necessary
         if return_keypoints: 
@@ -216,33 +223,83 @@ class OpticalFlowTracker(object):
     and perform subpixel on the tracked keypoints
     """
 
-    default_flow_params = AttrDict(levels=4, fb_check=True)
-    klt_flow_params = AttrDict( default_flow_params, type='lk', 
-                                params=AttrDict(winSize=(5,5), maxLevel=default_flow_params.levels ))
-    farneback_flow_params = AttrDict( default_flow_params, type='dense', 
-                                      params=AttrDict( pyr_scale=0.5, levels=default_flow_params.levels, winsize=15, 
-                                                       iterations=3, poly_n=7, poly_sigma=1.5, flags=0 ))
+    # __metaclass__ = ABCMeta
+    
+    lk_params = AttrDict(winSize=(5,5), maxLevel=4)
+    farneback_params = AttrDict(pyr_scale=0.5, levels=3, winsize=15, 
+                                iterations=3, poly_n=7, poly_sigma=1.5, flags=0)
 
-    def __init__(self, params=klt_flow_params): 
-        # FeatureDetector params
-        self.params = AttrDict(params)
-        
-        if self.params.type == 'lk': 
-            self.track = self.sparse_track
-        elif self.params.type == 'dense': 
-            self.track = self.dense_track
-        else: 
-            raise RuntimeError('Unknown tracking type: %s! Use lk or dense' % self.params.type)
-        from bot_utils.timer import SimpleTimer
-        self.timer = SimpleTimer(name='optical-flow', iterations=100)
+    def __init__(self, fb_check=True): 
+        self.fb_check_ = fb_check
+        self.timer_ = SimpleTimer(name='optical-flow', iterations=100)
 
-    def dense_track(self, im0, im1, p0): 
-        self.timer.start()
+    @staticmethod
+    def create(method='lk', fb_check=True, params=lk_params): 
+        trackers = { 'lk': LKTracker, 'dense': FarnebackTracker }
+        try: 
+            # Determine tracker type that implements track
+            tracker = trackers[method](**params)
+        except: 
+            raise RuntimeError('Unknown detector type: %s! Use from {:}'.format(FeatureDetector.detectors.keys()))
+        return tracker
+
+    # @abstractmethod
+    # def track(self, im0, im1, p0):
+    #     raise NotImplementedError()
+
+class LKTracker(OpticalFlowTracker): 
+    """
+    OpenCV's LK Tracker (with modifications for forward backward flow check)
+    """
+
+    default_params = OpticalFlowTracker.lk_params
+    def __init__(self, fb_check=True, winSize=(5,5), maxLevel=4):
+        OpticalFlowTracker.__init__(self, fb_check=fb_check)
+        self.lk_params_ = AttrDict(winSize=winSize, maxLevel=maxLevel)
+
+    def track(self, im0, im1, p0): 
+        """
+        Main tracking method using sparse optical flow (LK)
+        """
+        self.timer_.start()
+        if p0 is None or not len(p0): 
+            return np.array([])
+
+        # Forward flow
+        p1, st1, err1 = cv2.calcOpticalFlowPyrLK(im0, im1, p0, None, **self.lk_params_)
+        p1[st1 == 0] = np.nan
+
+        if self.fb_check_: 
+            # Backward flow
+            p0r, st0, err0 = cv2.calcOpticalFlowPyrLK(im1, im0, p1, None, **self.lk_params_)
+            p0r[st0 == 0] = np.nan
+            
+            # Set only good
+            fb_good = (np.fabs(p0r-p0) < 2).all(axis=1)
+            p1[~fb_good] = np.nan
+
+        self.timer_.stop()
+        return p1
+
+class FarnebackTracker(OpticalFlowTracker): 
+    """
+    OpenCV's Dense farneback Tracker (with modifications for forward backward flow check)
+    """
+
+    default_params = OpticalFlowTracker.farneback_params
+    def __init__(self, fb_check=True, pyr_scale=0.5, levels=3, winsize=15, 
+                 iterations=3, poly_n=7, poly_sigma=1.5, flags=0):
+        OpticalFlowTracker.__init__(self, fb_check=fb_check)
+        self.farneback_params_ = AttrDict(pyr_scale=pyr_scale, levels=levels, winsize=winsize, 
+                                          iterations=iterations, poly_n=poly_n, poly_sigma=poly_sigma, flags=flags)
+
+    def track(self, im0, im1, p0): 
+        self.timer_.start()
 
         if p0 is None or not len(p0): 
             return np.array([])
 
-        fflow = cv2.calcOpticalFlowFarneback(im0, im1, **self.params.params)
+        fflow = cv2.calcOpticalFlowFarneback(im0, im1, **self.farneback_params_)
         fflow = cv2.medianBlur(fflow, 5)
 
         # Initialize forward flow and propagated points
@@ -261,12 +318,12 @@ class OpticalFlowTracker(object):
         p1 = p0 + flow_p0
 
         # FWD-BWD check
-        if self.params.fb_check: 
+        if self.fb_check_: 
             # Initialize reverse flow and propagated points
             p0r = np.ones(shape=p0.shape) * np.nan
             flow_p1 = np.ones(shape=p0.shape) * np.nan
 
-            rflow = cv2.calcOpticalFlowFarneback(im1, im0, **self.params.params)
+            rflow = cv2.calcOpticalFlowFarneback(im1, im0, **self.farneback_params_)
             rflow = cv2.medianBlur(rflow, 5)
 
             # Check finite value for pts, and within image bounds
@@ -284,31 +341,6 @@ class OpticalFlowTracker(object):
             flow_p0[~fb_good] = np.nan
             p1 = p0 + flow_p0
 
-        self.timer.stop()
+        self.timer_.stop()
 
         return p1
-
-    def sparse_track(self, im0, im1, p0): 
-        """
-        Main tracking method using either sparse/dense optical flow
-        """
-        self.timer.start()
-        if p0 is None or not len(p0): 
-            return np.array([])
-
-        # Forward flow
-        p1, st1, err1 = cv2.calcOpticalFlowPyrLK(im0, im1, p0, None, **self.params.params)
-        p1[st1 == 0] = np.nan
-
-        if self.params.fb_check: 
-            # Backward flow
-            p0r, st0, err0 = cv2.calcOpticalFlowPyrLK(im1, im0, p1, None, **self.params.params)
-            p0r[st0 == 0] = np.nan
-            
-            # Set only good
-            fb_good = (np.fabs(p0r-p0) < 2).all(axis=1)
-            p1[~fb_good] = np.nan
-
-        self.timer.stop()
-        return p1
-

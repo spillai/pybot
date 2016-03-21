@@ -15,8 +15,8 @@ for track initialization and back-tracking for match verification
 between frames.
 '''
 
+import cv2
 import numpy as np
-import cv2, time, os.path, logging
 
 from collections import namedtuple, deque
 from bot_utils.db_utils import AttrDict
@@ -25,8 +25,8 @@ from bot_utils.plot_utils import colormap
 from bot_vision.imshow_utils import imshow_cv
 from bot_vision.image_utils import to_color, to_gray, gaussian_blur
 from bot_vision.draw_utils import draw_features
-from .tracker_utils import finite_and_within_bounds, \
-    TrackManager, FeatureDetector, OpticalFlowTracker
+from bot_vision.trackers.tracker_utils import finite_and_within_bounds, \
+    TrackManager, FeatureDetector, OpticalFlowTracker, LKTracker
 
 def kpts_to_array(kpts): 
     return np.float32([ kp.pt for kp in kpts ]).reshape(-1,2)
@@ -36,29 +36,37 @@ class BaseKLT(object):
     General-purpose KLT tracker that combines the use of FeatureDetector and 
     OpticalFlowTracker class. 
     """
+    default_detector_params = AttrDict(method='fast', grid=(12,10), max_corners=1200, 
+                                       max_levels=4, subpixel=False, params=FeatureDetector.fast_params)
+    default_tracker_params = AttrDict(method='lk', fb_check=True, 
+                                      params=OpticalFlowTracker.lk_params)
 
-    default_params = AttrDict(
-        detector=FeatureDetector.fast_detector_params, 
-        tracker=OpticalFlowTracker.klt_flow_params
-    )
-    def __init__(self, params=default_params): 
+    default_detector = FeatureDetector(**default_detector_params)
+    default_tracker = OpticalFlowTracker.create(**default_tracker_params)
 
-        self.log = logging.getLogger(self.__class__.__name__)
+    def __init__(self, 
+                 detector=default_detector, 
+                 tracker=default_tracker,  
+                 max_track_length=20, min_tracks=1200): 
 
         # BaseKLT Params
-        self.params = params
-
-        # Setup Detector
-        self.detector = FeatureDetector(params=self.params.detector)
-
-        # Setup Tracker
-        self.tracker = OpticalFlowTracker(params=self.params.tracker)
+        self.detector_ = detector
+        self.tracker_ = tracker
 
         # Track Manager
-        self.tm = TrackManager(maxlen=20)
+        self.tm_ = TrackManager(maxlen=max_track_length)
+        self.min_tracks_ = min_tracks
 
-        # Max features
-        self.max_tracks_ = 1200
+    @classmethod
+    def from_params(cls, detector_params=default_detector_params, 
+                    tracker_params=default_tracker_params,
+                    max_track_length=20, min_tracks=1200): 
+
+        # Setup detector and tracker
+        detector = FeatureDetector(**detector_params)
+        tracker = OpticalFlowTracker.create(**tracker_params)
+        return cls(detector, tracker, 
+                   max_track_length=max_track_length, min_tracks=min_tracks)
 
     def draw_tracks(self, out, colored=False, color_type='unique'):
         """
@@ -69,13 +77,13 @@ class BaseKLT(object):
         
         if color_type == 'age': 
             cwheel = colormap(np.linspace(0, 1, N))
-            cols = np.vstack([cwheel[tid % N] for idx, (tid, pts) in enumerate(self.tm.tracks.iteritems())])            
+            cols = np.vstack([cwheel[tid % N] for idx, (tid, pts) in enumerate(self.tm_.tracks.iteritems())])            
         elif color_type == 'unique': 
-            cols = colormap(np.int32([pts.length for pts in self.tm.tracks.itervalues()]))            
+            cols = colormap(np.int32([pts.length for pts in self.tm_.tracks.itervalues()]))            
         else: 
             raise ValueError('Color type {:} undefined, use age or unique'.format(color_type))
 
-        for col, pts in zip(cols, self.tm.tracks.values()): 
+        for col, pts in zip(cols, self.tm_.tracks.values()): 
             cv2.polylines(out, [np.vstack(pts.items).astype(np.int32)], False, 
                           tuple(map(int, col)) if colored else (0,255,0), thickness=1)
             
@@ -83,20 +91,20 @@ class BaseKLT(object):
             cv2.rectangle(out, (tl[0], tl[1]), (br[0], br[1]), (0,255,0), -1)
 
     def viz(self, out, colored=False): 
-        if not len(self.tm.pts): 
+        if not len(self.tm_.pts): 
             return
 
         N = 20
         cols = colormap(np.linspace(0, 1, N))
-        valid = finite_and_within_bounds(self.tm.pts, out.shape)
-        for tid, pt in zip(self.tm.ids[valid], self.tm.pts[valid]): 
+        valid = finite_and_within_bounds(self.tm_.pts, out.shape)
+        for tid, pt in zip(self.tm_.ids[valid], self.tm_.pts[valid]): 
             cv2.circle(out, tuple(map(int, pt)), 2, 
                        tuple(map(int, cols[tid % N])) if colored else (0,240,0),
                        -1, lineType=cv2.CV_AA)
 
     def matches(self, index1=-2, index2=-1): 
         tids, p1, p2 = [], [], []
-        for tid, pts in self.tm.tracks.iteritems(): 
+        for tid, pts in self.tm_.tracks.iteritems(): 
             if len(pts) > abs(index1) and len(pts) > abs(index2): 
                 tids.append(tid)
                 p1.append(pts.items[index1])
@@ -105,6 +113,9 @@ class BaseKLT(object):
             return tids, np.vstack(p1), np.vstack(p2)
         except: 
             return np.array([]), np.array([]), np.array([])
+
+    def process(self, im, detected_pts=None):
+        raise NotImplementedError()
 
 class OpenCVKLT(BaseKLT): 
     """
@@ -115,11 +126,11 @@ class OpenCVKLT(BaseKLT):
         BaseKLT.__init__(self, *args, **kwargs)
 
         # OpenCV KLT
-        self.ims = deque(maxlen=2)
-        self.add_features = True
+        self.ims_ = deque(maxlen=2)
+        self.add_features_ = True
 
     def reset(self): 
-        self.add_features = True
+        self.add_features_ = True
 
     def create_mask(self, shape, pts): 
         mask = np.ones(shape=shape, dtype=np.uint8) * 255
@@ -132,29 +143,31 @@ class OpenCVKLT(BaseKLT):
 
     def process(self, im, detected_pts=None):
         # Preprocess
-        self.ims.append(gaussian_blur(im))
+        self.ims_.append(gaussian_blur(to_gray(im)))
 
         # Track object
-        pids, ppts = self.tm.ids, self.tm.pts
-        if ppts is not None and len(ppts) and len(self.ims) == 2: 
-            pts = self.tracker.track(self.ims[-2], self.ims[-1], ppts)
-            self.tm.add(pts, ids=pids, prune=True)
+        pids, ppts = self.tm_.ids, self.tm_.pts
+        if ppts is not None and len(ppts) and len(self.ims_) == 2: 
+            pts = self.tracker_.track(self.ims_[-2], self.ims_[-1], ppts)
+            self.tm_.add(pts, ids=pids, prune=True)
 
         # Check if more features required
-        self.add_features = self.add_features or ppts is None or (ppts is not None and len(ppts) < self.max_tracks_)
+        self.add_features_ = self.add_features_ or ppts is None or (ppts is not None and len(ppts) < self.min_tracks_)
         
         # Initialize or add more features
-        if self.add_features: 
+        if self.add_features_: 
             # Extract features
             mask = self.create_mask(im.shape, ppts)            
             imshow_cv('mask', mask)
 
             if detected_pts is None: 
-                new_pts = self.detector.process(self.ims[-1], mask=mask)
+                new_pts = self.detector_.process(self.ims_[-1], mask=mask)
             else: 
                 xy = detected_pts.astype(np.int32)
                 valid = mask[xy[:,1], xy[:,0]] > 0
                 new_pts = detected_pts[valid]
 
-            self.tm.add(new_pts, ids=None, prune=False)
-            self.add_features = False
+            self.tm_.add(new_pts, ids=None, prune=False)
+            self.add_features_ = False
+
+        return self.tm_.ids, self.tm_.pts
