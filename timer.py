@@ -40,6 +40,6 @@ class SimpleTimer:
     @property
     def fps(self): 
         try: 
-            return 1e3 / self.period_ 
+            return 1.0 / self.period_ 
         except: 
             return 0.0
