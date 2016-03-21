@@ -95,12 +95,14 @@ class TangoImageDecoder(Decoder):
 
 class TangoLog(object): 
     def __init__(self, filename): 
-        self.meta_ =  open(filename, 'r')
-        topics = map(lambda (t,ch,data): ch, 
-                     filter(lambda ch: len(ch) == 3, 
-                            map(lambda l: l.replace('\n','').split('\t'), 
-                                filter(lambda l: '\n' in l, self.meta_.readlines()))))
+        with open(filename, 'r') as f: 
+            data = filter(lambda ch: len(ch) == 3, 
+                          map(lambda l: l.replace('\n','').split('\t'), 
+                              filter(lambda l: '\n' in l, f.readlines())))
 
+            ts = map(lambda (t,ch, data): float(t) * 1e-9, data)
+            topics = map(lambda (t,ch,data): ch, data)
+            
         # Save topics and counts
         c = Counter(topics)
         self.topics_ = list(set(topics))
@@ -108,8 +110,13 @@ class TangoLog(object):
         self.length_ = sum(self.topic_lengths_.values())
 
         messages_str = ', '.join(['{:} ({:})'.format(k,v) for k,v in c.iteritems()])
-        print('\nTangoLog\n========\n\tTopics: {:}\n\tMessages: {:}\n'.format(self.topics_, messages_str))
-        self.meta_.seek(0)
+        print('\nTangoLog\n========\n'
+              '\tTopics: {:}\n'
+              '\tMessages: {:}\n'
+              '\tDuration: {:}\n'.format(self.topics_, messages_str, np.max(ts)-np.min(ts)))
+        
+        self.meta_ =  open(filename, 'r')
+        
 
     @property
     def length(self): 
@@ -155,7 +162,7 @@ class TangoLogReader(LogReader):
         self.directory_ = os.path.expanduser(directory)
         self.filename_ = os.path.join(self.directory_, 'tango_data.txt')
         self.scale_ = scale
-        self.shape_ = (int(1280 * scale), int(720 * scale))
+        self.shape_ = (int(TangoLogReader.W * scale), int(TangoLogReader.H * scale))
         assert(self.shape_[0] % 2 == 0 and self.shape_[1] % 2 == 0)
 
         self.start_idx_ = start_idx
