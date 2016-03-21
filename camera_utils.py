@@ -216,6 +216,13 @@ class CameraIntrinsic(object):
         )
         return ret
 
+    def reconstruct(self, xyZ, undistort=True): 
+        """
+        Reproject to 3D with calib params
+        """
+        Z = colvec(xyZ[:,2])
+        return self.ray(xyZ[:,:2], undistort=undistort) * Z
+        
     def undistort(self, im): 
         return undistort_image(im, self.K, self.D)
 
