@@ -27,7 +27,7 @@ from bot_vision.image_utils import to_color, to_gray, gaussian_blur
 from bot_vision.draw_utils import draw_features
 
 from bot_vision.trackers import FeatureDetector, OpticalFlowTracker, LKTracker
-from bot_vision.trackers import finite_and_within_bounds, \
+from bot_vision.trackers import finite_and_within_bounds, to_pts, \
     TrackManager, FeatureDetector, OpticalFlowTracker, LKTracker
 
 class BaseKLT(object): 
@@ -46,7 +46,7 @@ class BaseKLT(object):
     def __init__(self, 
                  detector=default_detector, 
                  tracker=default_tracker,  
-                 max_track_length=20, min_tracks=1200): 
+                 max_track_length=20, min_tracks=1200, mask_size=9): 
 
         # BaseKLT Params
         self.detector_ = detector
@@ -55,17 +55,27 @@ class BaseKLT(object):
         # Track Manager
         self.tm_ = TrackManager(maxlen=max_track_length)
         self.min_tracks_ = min_tracks
+        self.mask_size_ = mask_size
 
     @classmethod
     def from_params(cls, detector_params=default_detector_params, 
                     tracker_params=default_tracker_params,
-                    max_track_length=20, min_tracks=1200): 
+                    max_track_length=20, min_tracks=1200, mask_size=9): 
 
         # Setup detector and tracker
         detector = FeatureDetector(**detector_params)
         tracker = OpticalFlowTracker.create(**tracker_params)
         return cls(detector, tracker, 
-                   max_track_length=max_track_length, min_tracks=min_tracks)
+                   max_track_length=max_track_length, min_tracks=min_tracks, mask_size=mask_size)
+
+    def create_mask(self, shape, pts): 
+        mask = np.ones(shape=shape, dtype=np.uint8) * 255
+        try: 
+            for pt in pts: 
+                cv2.circle(mask, tuple(map(int, pt)), self.mask_size_, 0, -1, lineType=cv2.CV_AA)
+        except:
+            pass
+        return mask
 
     def draw_tracks(self, out, colored=False, color_type='unique'):
         """
@@ -131,15 +141,6 @@ class OpenCVKLT(BaseKLT):
     def reset(self): 
         self.add_features_ = True
 
-    def create_mask(self, shape, pts): 
-        mask = np.ones(shape=shape, dtype=np.uint8) * 255
-        try: 
-            for pt in pts: 
-                cv2.circle(mask, tuple(map(int, pt)), 9, 0, -1, lineType=cv2.CV_AA)
-        except:
-            pass
-        return mask
-
     def process(self, im, detected_pts=None):
         # Preprocess
         self.ims_.append(gaussian_blur(to_gray(im)))
@@ -157,10 +158,12 @@ class OpenCVKLT(BaseKLT):
         if self.add_features_: 
             # Extract features
             mask = self.create_mask(im.shape, ppts)            
-            imshow_cv('mask', mask)
+            # imshow_cv('mask', mask)
 
             if detected_pts is None: 
-                new_pts = self.detector_.process(self.ims_[-1], mask=mask)
+                new_kpts = self.detector_.process(self.ims_[-1], mask=mask, return_keypoints=True)
+                newlen = max(0, self.min_tracks_ - len(ppts))
+                new_pts = to_pts(sorted(new_kpts, key=lambda kpt: kpt.response, reverse=True)[:newlen])
             else: 
                 xy = detected_pts.astype(np.int32)
                 valid = mask[xy[:,1], xy[:,0]] > 0
@@ -184,9 +187,12 @@ class MeshKLT(OpenCVKLT):
 
     def process(self, im, detected_pts=None): 
         ids, pts = OpenCVKLT.process(self, im, detected_pts=detected_pts)
-        self.dt_.batch_triangulate(pts)
+        
+        if len(pts) > 3: 
+            self.dt_.batch_triangulate(pts)
 
-        vis = to_color(im)
-        dt_vis = self.dt_.visualize(vis, pts)
-        imshow_cv('dt_vis', dt_vis)
+            vis = to_color(im)
+            dt_vis = self.dt_.visualize(vis, pts)
+            imshow_cv('dt_vis', dt_vis)
+
         return ids, pts
