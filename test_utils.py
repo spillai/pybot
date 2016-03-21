@@ -23,11 +23,12 @@ def test_color_dataset(*args, **kwargs):
     return KITTIDatasetReader(directory='~/data/dataset/', sequence='08', 
                               left_template='image_2/%06i.png', right_template='image_3/%06i.png', 
                               start_idx=0, **kwargs)
+
 def test_dataset(*args, **kwargs): 
     return KITTIDatasetReader(directory='~/data/dataset/', sequence='08', **kwargs)
 
 def test_image(color=True, scale=1.0, stereo=False): 
-    for l,r in test_dataset(color=True).iter_stereo_frames(): 
+    for l,r in test_dataset().iter_stereo_frames(): 
         l = to_color(l) if color else to_gray(l)
         if not stereo: 
             return l
@@ -36,7 +37,7 @@ def test_image(color=True, scale=1.0, stereo=False):
             return l,r
 
 def test_video(color=True, stereo=False, **kwargs): 
-    for l,r in test_dataset(color=True, **kwargs).iter_stereo_frames(): 
+    for l,r in test_dataset(**kwargs).iter_stereo_frames(): 
         l = to_color(l) if color else to_gray(l)
         if not stereo: 
             yield l
