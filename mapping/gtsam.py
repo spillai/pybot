@@ -198,11 +198,13 @@ class BaseSLAM(object):
         Add landmark measurement from the latest robot pose to the
         specified landmark id
         """
-        self.add_landmark(self.latest(), lid, delta)
+        self.add_landmark(self.latest, lid, delta)
 
+    @property
     def latest(self): 
         return self.idx_
-        
+
+    @property
     def index(self): 
         return self.idx_
 
@@ -235,46 +237,27 @@ class BaseSLAM(object):
         self.graph_.resize(0)
         self.initial_.clear()
 
-        if self.index() % 50 == 0 and self.index() > 0: 
+        if self.index % 50 == 0 and self.index > 0: 
             self.save_graph("slam_fg.dot")
             self.save_dot_graph("slam_graph.dot")
-
-# class SLAM2D(BaseSLAM): 
-#     def __init__(self): 
-#         BaseSLAM.__init__(self)
-
-#     def on_odom(self, p): 
-#         pass
-
-#     def on_landmark(self, p): 
-#         pass
-
-# class PlanarSLAM(object): 
-#     def __init__(self): 
-#         pass
-
-#     def on_odom(self): 
-#         pass
-
-#     def on_landmark(self): 
-#         pass
         
 class SLAM3D(BaseSLAM): 
-    def __init__(self): 
+    def __init__(self, update_on_odom=False): 
         BaseSLAM.__init__(self)
+        self.update_on_odom_ = update_on_odom
 
     def on_odom(self, t, odom): 
         print('\ton_odom')
         self.add_odom_incremental(odom)
-        self.update()
-        return self.latest()
+        if self.update_on_odom_: self.update()
+        return self.latest
 
     def on_pose_ids(self, t, ids, poses): 
         print('\ton_pose_ids')
         for (pid, pose) in izip(ids, poses): 
             self.add_landmark_incremental(pid, pose)
         self.update()
-        return self.latest()
+        return self.latest
 
     def on_landmark(self, p): 
         pass
@@ -298,7 +281,7 @@ class SLAM3D(BaseSLAM):
 #     def on_odom(self, t, odom): 
 #         self.add_odom_incremental(odom)
 #         self.update()
-#         return self.latest()
+#         return self.latest
 
 #     def on_tags(self, t, tags, use_corners=False): 
 #         """
@@ -554,6 +537,7 @@ def test_SFMExample_SmartFactor():
     # Create the set of ground-truth landmarks and poses
     points = createPoints()
     poses = createPoses()
+    print poses
 
     # Create a factor graph
     graph = NonlinearFactorGraph()
@@ -575,7 +559,7 @@ def test_SFMExample_SmartFactor():
             #    2. the corresponding camera's key
             #    3. camera noise model
             #    4. camera calibration
-            smartfactor.add_single(measurement, i, measurement_noise, K);
+            smartfactor.add_single(measurement, i, measurement_noise, K)
 
         # insert the smart factor in the graph
         graph.add(smartfactor)
@@ -607,22 +591,20 @@ def test_SFMExample_SmartFactor():
         # The graph stores Factor shared_ptrs, so we cast back to a SmartFactor first
         # c++ -> py: smart.point -> smart.point_compute
         smart = graph[j]
-        if smart: 
+        if smart is not None: 
             point = smart.point_compute(result)
-
+        
          # ignore if boost::optional return NULL
-        if point:
+        if point is not None:
             landmark_result.insert(j, point)
+
+        print point
     
     landmark_result.printf("Landmark results:\n")
-
-        
-            
-
             
 if __name__ == "__main__": 
-    test_odometryExample()
-    test_PlanarSLAMExample()
-    test_StereoVOExample()
+    # test_odometryExample()
+    # test_PlanarSLAMExample()
+    # test_StereoVOExample()
     test_SFMExample_SmartFactor()
     
