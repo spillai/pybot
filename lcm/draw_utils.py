@@ -749,6 +749,7 @@ def publish_cameras(pub_channel, poses, c='y', texts=[], frame_id='camera',
 
     # Publish pose
     publish_pose_list(pub_channel, poses, texts=texts, frame_id=frame_id, reset=reset)
+    publish_pose_list(pub_channel + '-nodes', poses, texts=texts, frame_id=frame_id, reset=reset, object_type='HEXAGON')
 
     # Darker yellow edge
     if draw_edges: 
