@@ -742,14 +742,17 @@ def publish_quads(pub_channel, quads, frame_id='camera', reset=True):
     publish_point_type(pub_channel, quads, point_type='QUADS', frame_id=frame_id, reset=reset)
     
 def publish_cameras(pub_channel, poses, c='y', texts=[], frame_id='camera', 
-                    draw_faces=False, draw_edges=True, size=1, zmin=0.01, zmax=0.1, reset=True):
+                    draw_faces=False, draw_edges=True, draw_nodes=False, size=1, zmin=0.01, zmax=0.1, reset=True):
     cam_feats = [draw_camera(pose, zmax=zmax * size) for pose in poses]
     cam_faces = map(lambda x: x[0], cam_feats)
     cam_edges = map(lambda x: x[1], cam_feats)
 
     # Publish pose
     publish_pose_list(pub_channel, poses, texts=texts, frame_id=frame_id, reset=reset)
-    publish_pose_list(pub_channel + '-nodes', poses, texts=texts, frame_id=frame_id, reset=reset, object_type='HEXAGON')
+    
+    # Draw blue node at camera pose translation
+    if draw_nodes: 
+        publish_pose_list(pub_channel + '-nodes', poses, texts=texts, frame_id=frame_id, reset=reset, object_type='HEXAGON')
 
     # Darker yellow edge
     if draw_edges: 
