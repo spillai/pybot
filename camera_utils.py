@@ -220,6 +220,12 @@ class CameraIntrinsic(object):
         return undistort_image(im, self.K, self.D)
 
     def undistort_points(self, pts): 
+        """
+        Undistort image points using camera matrix, and distortion coeffs
+ 
+        Have to provide P matrix for appropriate scaling
+        http://code.opencv.org/issues/1964#note-2
+        """
         out = cv2.undistortPoints(pts.reshape(-1,1,2).astype(np.float32), self.K, self.D, P=self.K)
         return out.reshape(-1,2) 
         
