@@ -170,3 +170,23 @@ class OpenCVKLT(BaseKLT):
             self.add_features_ = False
 
         return self.tm_.ids, self.tm_.pts
+
+class MeshKLT(OpenCVKLT): 
+    """
+    KLT Tracker as implemented in OpenCV 2.4.9
+    with basic meshing support 
+    """
+    def __init__(self, *args, **kwargs):
+        OpenCVKLT.__init__(self, *args, **kwargs)
+
+        from pybot_vision import DelaunayTriangulation
+        self.dt_ = DelaunayTriangulation()
+
+    def process(self, im, detected_pts=None): 
+        ids, pts = OpenCVKLT.process(self, im, detected_pts=detected_pts)
+        self.dt_.batch_triangulate(pts)
+
+        vis = to_color(im)
+        dt_vis = self.dt_.visualize(vis, pts)
+        imshow_cv('dt_vis', dt_vis)
+        return ids, pts
