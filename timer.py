@@ -11,22 +11,22 @@ class SimpleTimer:
     def poll(self): 
         self.counter_ += 1
         now = time.time()
-        dt = (now - self.last_) * 1e3
+        dt = (now - self.last_)
 
-        if dt > 1000: 
+        if dt > 0.1: 
             self.period_ = dt / self.counter_
-            print('%s: %4.3f ms (avg over %i iterations)' % (self.name_, self.period_, self.counter_))
+            print('%s: %4.3f ms (avg over %i iterations)' % (self.name_, self.period_ * 1e3, self.counter_))
             self.last_ = now
             self.counter_ = 0
 
     def poll_piecemeal(self): 
         self.counter_ += 1
         now = time.time()
-        dt = (now - self.last_) * 1e3
+        dt = (now - self.last_)
         self.period_ += dt
 
-        if self.period_ > 100:
-            print('%s: %4.3f ms (avg over %i iterations)' % (self.name_, self.period_ / self.counter_, self.counter_))
+        if self.period_ > 0.1:
+            print('%s: %4.3f ms (avg over %i iterations)' % (self.name_, self.period_ * 1e3 / self.counter_, self.counter_))
             self.last_ = now
             self.counter_ = 0
             self.period_ = 0
