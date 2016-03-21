@@ -25,11 +25,10 @@ from bot_utils.plot_utils import colormap
 from bot_vision.imshow_utils import imshow_cv
 from bot_vision.image_utils import to_color, to_gray, gaussian_blur
 from bot_vision.draw_utils import draw_features
-from bot_vision.trackers.tracker_utils import finite_and_within_bounds, \
-    TrackManager, FeatureDetector, OpticalFlowTracker, LKTracker
 
-def kpts_to_array(kpts): 
-    return np.float32([ kp.pt for kp in kpts ]).reshape(-1,2)
+from bot_vision.trackers import FeatureDetector, OpticalFlowTracker, LKTracker
+from bot_vision.trackers import finite_and_within_bounds, \
+    TrackManager, FeatureDetector, OpticalFlowTracker, LKTracker
 
 class BaseKLT(object): 
     """

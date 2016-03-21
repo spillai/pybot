@@ -6,7 +6,7 @@ from .camera_utils import Camera, CameraIntrinsic, CameraExtrinsic, plot_epipola
 from .image_utils import to_gray, to_color, im_resize
 
 from bot_vision.draw_utils import draw_features
-from .trackers.tracker_utils import FeatureDetector
+from bot_vision.feature_detection import FeatureDetector
 
 class Frame(object): 
     def __init__(self, im, camera): 
