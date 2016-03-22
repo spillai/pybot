@@ -1,6 +1,7 @@
 from collections import deque
 import progressbar as pb
 
+
 def print_red(prt): print("\033[91m {}\033[00m" .format(prt))
 def print_green(prt): print("\033[92m {}\033[00m" .format(prt))
 def print_yellow(prt): print("\033[93m {}\033[00m" .format(prt))
@@ -9,6 +10,15 @@ def print_purple(prt): print("\033[95m {}\033[00m" .format(prt))
 def print_cyan(prt): print("\033[96m {}\033[00m" .format(prt))
 def print_lightgray(prt): print("\033[97m {}\033[00m" .format(prt))
 def print_black(prt): print("\033[98m {}\033[00m" .format(prt))
+
+cols_lut = { 'red': print_red, 'green': print_green, 'yellow': print_yellow, 
+             'lightpurple': print_lightpurple, 'purple': print_purple, 
+             'cyan': print_cyan, 'lightgray': print_lightgray, 'black': print_black }
+def print_color(prt, color='green'): 
+    try: 
+        cols_lut[color](prt)
+    except: 
+        raise KeyError('print_color lookup failed, use from {:}'.format(cols_lut.keys()))
 
 def setup_pbar(maxval): 
     widgets = ['Progress: ', pb.Percentage(), ' ', pb.Bar(), ' ', pb.ETA()]
