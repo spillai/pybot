@@ -538,7 +538,7 @@ def test_SFMExample_SmartFactor():
     # Create the set of ground-truth landmarks and poses
     points = createPoints()
     poses = createPoses()
-    print poses, points
+    # print poses, points
 
     # Create a factor graph
     graph = NonlinearFactorGraph()
@@ -610,7 +610,7 @@ def test_SFMExample_SmartFactor():
         if point is not None:
             landmark_result.insert(j, point)
 
-        print point
+        # print point
     
     landmark_result.printf("Landmark results:\n")
             
