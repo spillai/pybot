@@ -117,7 +117,7 @@ class OpticalFlowTracker(object):
 
     def __init__(self, fb_check=True): 
         self.fb_check_ = fb_check
-        self.timer_ = SimpleTimer(name='optical-flow', iterations=100)
+        self.timer_ = SimpleTimer(name='optical-flow')
 
     @staticmethod
     def create(method='lk', fb_check=True, params=lk_params): 
