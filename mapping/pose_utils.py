@@ -16,9 +16,13 @@ class Sampler(object):
     __metaclass__ = ABCMeta
 
     def __init__(self, lookup_history=10, 
-                 on_sampled_cb=lambda x: None, verbose=False): 
+                 on_sampled_cb=lambda index, item: None, verbose=False): 
         self.q_ = deque(maxlen=lookup_history)
         self.on_sampled_cb_ = on_sampled_cb
+
+        # Maintain total items pushed and sampled
+        self.all_items_ = Counter()
+        self.sampled_items_ = Counter()
 
         self.verbose_ = verbose
         if verbose: 
@@ -26,19 +30,17 @@ class Sampler(object):
                                                                 process_cb=self.print_stats)
             self.verbose_printer_.register_callback(self, 'on_sampled_cb_')
 
-            self.verbose_all_items_ = Counter()
-            self.verbose_sampled_items_ = Counter()
 
-            self.all_ = deque()
-            self.index_ = deque()
+            self.verbose_all_ = deque()
+            self.verbose_index_ = deque()
 
     def get_item(self, item): 
         return item
 
     def print_stats(self, finish=False): 
         print_green('Sampler: Total: {:}, Samples: {:}, Ratio: {:3.2f} %'
-                    .format(self.verbose_all_items_.index, self.verbose_sampled_items_.index, 
-                            self.verbose_sampled_items_.index * 100.0 / self.verbose_all_items_.index))
+                    .format(self.all_items_.index, self.sampled_items_.index, 
+                            self.sampled_items_.index * 100.0 / self.all_items_.index))
         # self.visualize(finish=finish)
 
     def visualize(self, finish=False): 
@@ -48,8 +50,8 @@ class Sampler(object):
         # trans = rpyxyz[:,3:6]
 
         # Quaternion
-        rpyxyz = np.hstack([np.vstack(self.get_item(item).rotation.wxyz for item in self.all_), 
-                            np.vstack(self.get_item(item).translation for item in self.all_)])
+        rpyxyz = np.hstack([np.vstack(self.get_item(item).rotation.wxyz for item in self.verbose_all_), 
+                            np.vstack(self.get_item(item).translation for item in self.verbose_all_)])
         rot = rpyxyz[:,:4]
         trans = rpyxyz[:,4:7]
 
@@ -73,12 +75,12 @@ class Sampler(object):
         
         ax1 = plt.subplot(2,1,1)
         plt.plot(ts, rot)
-        plt.vlines(np.int32(self.index_), ymin=-1, ymax=1, color='k')
+        plt.vlines(np.int32(self.verbose_index_), ymin=-1, ymax=1, color='k')
         ax1.set_xlim([max(0, np.max(ts)-400), np.max(ts)])
 
         ax2 = plt.subplot(2,1,2)
         plt.plot(ts, trans)
-        plt.vlines(np.int32(self.index_), ymin=-100, ymax=100, color='k')
+        plt.vlines(np.int32(self.verbose_index_), ymin=-100, ymax=100, color='k')
         ax2.set_xlim([max(0, np.max(ts)-400), np.max(ts)])
 
         plt.show(block=finish)
@@ -88,23 +90,30 @@ class Sampler(object):
         raise NotImplementedError()
     
     def append(self, item): 
+        """
+        Add item to the sampler, returns the 
+        index of the sampled item and the 
+        corresponding item.
+        """
         if self.verbose_: 
-            self.all_.append(item)
-            self.verbose_all_items_.count()        
-            
+            self.verbose_all_.append(item)
+
+        self.all_items_.count()                    
         ret = self.check_sample(item) 
+
         if ret: 
             self.q_.append(item)
-            self.on_sampled_cb_(item)
-            if self.verbose_: 
-                self.verbose_sampled_items_.count()            
-                self.index_.append(self.verbose_all_items_.index)
+            self.on_sampled_cb_(self.all_items_.index, item)
+            self.sampled_items_.count()            
 
-        return ret
+            if self.verbose_: 
+                self.verbose_index_.append(self.all_items_.index)
+
+        return self.all_items_.index, ret
 
 class PoseSampler(Sampler): 
     def __init__(self, theta=20, displacement=0.25, lookup_history=10, 
-                 on_sampled_cb=lambda x: None, verbose=False): 
+                 on_sampled_cb=lambda index, item: None, verbose=False): 
         Sampler.__init__(self, lookup_history=lookup_history, 
                          on_sampled_cb=on_sampled_cb, verbose=verbose)
 
@@ -129,7 +138,7 @@ Keyframe = namedtuple('Keyframe', ['img', 'pose'], verbose=False)
 
 class KeyframeSampler(PoseSampler): 
     def __init__(self, theta=20, displacement=0.25, lookup_history=10, 
-                 on_sampled_cb=lambda x: None, verbose=False): 
+                 on_sampled_cb=lambda index, item: None, verbose=False): 
         PoseSampler.__init__(self, displacement=displacement, theta=theta, 
                              lookup_history=lookup_history, 
                              on_sampled_cb=on_sampled_cb, verbose=verbose)

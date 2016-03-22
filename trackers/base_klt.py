@@ -18,6 +18,7 @@ between frames.
 import cv2
 import numpy as np
 
+from itertools import izip
 from collections import namedtuple, deque
 from bot_utils.db_utils import AttrDict
 
@@ -29,6 +30,8 @@ from bot_vision.draw_utils import draw_features
 from bot_vision.trackers import FeatureDetector, OpticalFlowTracker, LKTracker
 from bot_vision.trackers import finite_and_within_bounds, to_pts, \
     TrackManager, FeatureDetector, OpticalFlowTracker, LKTracker
+
+import time
 
 class BaseKLT(object): 
     """
@@ -92,10 +95,12 @@ class BaseKLT(object):
         else: 
             raise ValueError('Color type {:} undefined, use age or unique'.format(color_type))
 
-        for col, pts in zip(cols, self.tm_.tracks.values()): 
+        if not colored: 
+            cols = np.tile([0,240,0], [len(self.tm_.tracks), 1])
+
+        for col, pts in izip(cols.astype(np.int64), self.tm_.tracks.itervalues()): 
             cv2.polylines(out, [np.vstack(pts.items).astype(np.int32)], False, 
-                          tuple(map(int, col)) if colored else (0,255,0), thickness=1)
-            
+                          tuple(col), thickness=1)
             tl, br = pts.latest_item-2, pts.latest_item+2
             cv2.rectangle(out, (tl[0], tl[1]), (br[0], br[1]), (0,255,0), -1)
 
@@ -106,7 +111,8 @@ class BaseKLT(object):
         N = 20
         cols = colormap(np.linspace(0, 1, N))
         valid = finite_and_within_bounds(self.tm_.pts, out.shape)
-        for tid, pt in zip(self.tm_.ids[valid], self.tm_.pts[valid]): 
+
+        for tid, pt in izip(self.tm_.ids[valid], self.tm_.pts[valid]): 
             cv2.rectangle(out, tuple(map(int, pt-2)), tuple(map(int, pt+2)), 
                           tuple(map(int, cols[tid % N])) if colored else (0,240,0), -1)
 
@@ -193,7 +199,7 @@ class MeshKLT(OpenCVKLT):
             vis = to_color(im)
             dt_vis = self.dt_.visualize(vis, pts)
             # OpenCVKLT.viz(self, dt_vis, colored=True)
-            OpenCVKLT.draw_tracks(self, dt_vis, colored=True, color_type='unique')
-            imshow_cv('dt_vis', dt_vis)
+            OpenCVKLT.draw_tracks(self, vis, colored=True, color_type='unique')
+            imshow_cv('dt_vis', np.vstack([vis, dt_vis]), wait=1)
 
         return ids, pts
