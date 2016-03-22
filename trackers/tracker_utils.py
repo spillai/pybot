@@ -1,5 +1,6 @@
 import numpy as np
 import cv2, time, os.path, logging
+from copy import deepcopy
 
 from collections import defaultdict, deque
 from bot_utils.db_utils import AttrDict
@@ -27,6 +28,7 @@ class IndexedDeque(object):
         return self.indices_[index]
 
     def __len__(self): 
+        """ Returns the length of the deque """
         return len(self.items_)
 
     @property
@@ -43,6 +45,11 @@ class IndexedDeque(object):
 
     @property
     def length(self): 
+        """ 
+        Returns the length of the track
+        including deleted/popped items
+        from the queue
+        """
         return self.length_
 
 class TrackManager(object): 
@@ -74,7 +81,7 @@ class TrackManager(object):
 
         # ID valid points
         max_id = np.max(self.ids) + 1 if len(self.ids) else 0
-        tids = np.arange(len(pts), dtype=np.int64) + max_id if ids is None else ids[valid]
+        tids = np.arange(len(pts), dtype=np.int64) + max_id if ids is None else ids[valid].astype(np.int64)
         
         # Add pts to track
         for tid, pt in zip(tids, pts): 
@@ -89,10 +96,18 @@ class TrackManager(object):
 
     def prune(self): 
         # Remove tracks that are not most recent
+        deleted_tracks = {}
         for tid, track in self.tracks_.items(): 
             if track.latest_index < self.index_: 
-                self.on_delete_cb_(tid, self.tracks[tid])
+                deleted_tracks[tid] = deepcopy(self.tracks[tid])
                 del self.tracks[tid]
+
+        self.on_delete_cb_(deleted_tracks)
+                
+    def register_on_track_delete_callback(self, cb): 
+        print('{:}: Register callback for track deletion {:}'
+              .format(self.__class__.__name__, cb))
+        self.on_delete_cb_ = cb
 
     @property
     def tracks(self): 

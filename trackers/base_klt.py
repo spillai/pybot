@@ -7,6 +7,8 @@ Author: Sudeep Pillai
     17 Oct 2014: Minor modifications to tracker params
     28 Feb 2016: Added better support for feature addition, and re-factored
                  trackmanager with simpler/improved indexing and queuing.
+    20 Mar 2016: Refactored detector/tracker initialization with params 
+    21 Mar 2016: First pass at MeshKLT
 
 ====================
 
@@ -70,6 +72,9 @@ class BaseKLT(object):
         tracker = OpticalFlowTracker.create(**tracker_params)
         return cls(detector, tracker, 
                    max_track_length=max_track_length, min_tracks=min_tracks, mask_size=mask_size)
+
+    def register_on_track_delete_callback(self, cb): 
+        self.tm_.register_on_track_delete_callback(cb)
 
     def create_mask(self, shape, pts): 
         mask = np.ones(shape=shape, dtype=np.uint8) * 255
