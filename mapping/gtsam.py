@@ -319,6 +319,7 @@ def createPoses():
 
     poses = []
     for i in range(8): 
+        theta += 2 * np.pi / 8
         position = Point3(radius * np.cos(theta), radius * np.sin(theta), 0.0)
         camera = SimpleCamera.Lookat(eye=position, target=target, upVector=up)
         pose = camera.pose()
@@ -537,7 +538,7 @@ def test_SFMExample_SmartFactor():
     # Create the set of ground-truth landmarks and poses
     points = createPoints()
     poses = createPoses()
-    print poses
+    print poses, points
 
     # Create a factor graph
     graph = NonlinearFactorGraph()
@@ -563,8 +564,19 @@ def test_SFMExample_SmartFactor():
 
         # insert the smart factor in the graph
         graph.add(smartfactor)
+    
+    # Add a prior on pose x0. This indirectly specifies where the origin is.
+    # 30cm std on x,y,z 0.1 rad on roll,pitch,yaw
+    pose_noise = Diagonal.Sigmas(vec(0.3, 0.3, 0.3, 0.1, 0.1, 0.1))
+    graph.add(PriorFactorPose3(0, poses[0], pose_noise))
 
-    # graph.printf("Factor Graph:\n")
+    # Because the structure-from-motion problem has a scale ambiguity, the problem is
+    # still under-constrained. Here we add a prior on the second pose x1, so this will
+    # fix the scale by indicating the distance between x0 and x1.
+    # Because these two are fixed, the rest of the poses will be also be fixed.
+    graph.add(PriorFactorPose3(1, poses[1], pose_noise)) # add directly to graph
+
+    graph.printf("Factor Graph:\n")
 
     # Create the initial estimate to the solution
     # Intentionally initialize the variables off from the ground truth
@@ -573,7 +585,7 @@ def test_SFMExample_SmartFactor():
 
     for i, posei in enumerate(poses): 
         initialEstimate.insert(i, posei.compose(delta))
-        initialEstimate.printf("Initial Estimates:\n")
+    initialEstimate.printf("Initial Estimates:\n")
 
     # Optimize the graph and print results
     result = DoglegOptimizer(graph, initialEstimate).optimize()
