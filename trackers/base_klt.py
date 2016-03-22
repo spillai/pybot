@@ -85,7 +85,7 @@ class BaseKLT(object):
             pass
         return mask
 
-    def draw_tracks(self, out, colored=False, color_type='unique'):
+    def draw_tracks(self, out, colored=False, color_type='unique', max_track_length=4):
         """
         color_type: {age, unique}
         """
@@ -104,7 +104,7 @@ class BaseKLT(object):
             cols = np.tile([0,240,0], [len(self.tm_.tracks), 1])
 
         for col, pts in izip(cols.astype(np.int64), self.tm_.tracks.itervalues()): 
-            cv2.polylines(out, [np.vstack(pts.items).astype(np.int32)], False, 
+            cv2.polylines(out, [np.vstack(pts.items).astype(np.int32)[-max_track_length:]], False, 
                           tuple(col), thickness=1)
             tl, br = pts.latest_item-2, pts.latest_item+2
             cv2.rectangle(out, (tl[0], tl[1]), (br[0], br[1]), (0,255,0), -1)
@@ -224,7 +224,7 @@ class MeshKLT(OpenCVKLT):
         vis = to_color(im)
         dt_vis = self.dt_.visualize(vis, pts)
         # OpenCVKLT.viz(self, dt_vis, colored=True)
-        OpenCVKLT.draw_tracks(self, vis, colored=True, color_type='unique')
+        OpenCVKLT.draw_tracks(self, vis, colored=True, color_type='unique', max_track_length=2)
         imshow_cv('dt_vis', np.vstack([vis, dt_vis]), wait=1)
 
         return ids, pts

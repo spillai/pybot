@@ -53,7 +53,7 @@ class IndexedDeque(object):
         return self.length_
 
 class TrackManager(object): 
-    def __init__(self, maxlen=20, on_delete_cb=lambda tid, track: None): 
+    def __init__(self, maxlen=20, on_delete_cb=lambda tracks: None): 
         # Max track length 
         self.maxlen_ = maxlen
 

@@ -111,6 +111,10 @@ class Sampler(object):
 
         return ret
 
+    @property
+    def latest_sample(self): 
+        return self.q_[-1]
+
 class PoseSampler(Sampler): 
     def __init__(self, theta=20, displacement=0.25, lookup_history=10, 
                  on_sampled_cb=lambda index, item: None, verbose=False): 
