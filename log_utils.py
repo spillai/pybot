@@ -32,7 +32,8 @@ class Decoder(object):
         return self.idx % self.every_k_frames == 0 
 
 class LogReader(object): 
-    def __init__(self, filename, decoder=None, start_idx=0, every_k_frames=1, max_length=None, index=False, verbose=False):
+    def __init__(self, filename, decoder=None, start_idx=0, every_k_frames=1, 
+                 max_length=None, index=False, verbose=False):
         filename = os.path.expanduser(filename)
 		
         if filename is None or not os.path.exists(os.path.expanduser(filename)):

@@ -10,14 +10,13 @@ from collections import deque
 from heapq import heappush, heappop
 from abc import ABCMeta, abstractmethod
 
-from collections import Counter
+from collections import Counter, deque
 from bot_externals.log_utils import Decoder, LogReader, LogController
 from bot_vision.image_utils import im_resize
 from bot_geometry.rigid_transform import RigidTransform
 from bot_vision.camera_utils import CameraIntrinsic
 
-
-def TangoOdomDecoder(channel, every_k_frames=1): 
+def TangoOdomDecoder(channel, every_k_frames=1, noise=[0,0]): 
     """
     https://developers.google.com/project-tango/overview/coordinate-systems
 
@@ -61,6 +60,14 @@ def TangoOdomDecoder(channel, every_k_frames=1):
                                                     0, 0, 0, axes='sxyz')
     p_CAM_S = p_S_CAM.inverse()
 
+    # # Noise injection
+    # def get_p_noise(): 
+    #     xyz = np.random.normal(0, noise[0], size=3)
+    #     rpy = np.random.normal(0, noise[1], size=3)
+    #     return RigidTransform.from_roll_pitch_yaw_x_y_z(rpy[0], rpy[1], rpy[2], xyz[0], xyz[1], xyz[2])
+
+    # inject_noise = (noise[0] != 0 or noise[1] != 0)
+
     def odom_decode(data): 
         """ x, y, z, qx, qy, qz, qw, status_code, confidence """
         p = np.float64(data.split(','))
@@ -72,7 +79,6 @@ def TangoOdomDecoder(channel, every_k_frames=1):
         tvec, ori = p[:3], p[3:7]
         p_SD = RigidTransform(xyzw=ori, tvec=tvec)
         p_SC = p_SD * p_DC
-
         return p_CAM_S * p_SC
             
     return Decoder(channel=channel, every_k_frames=every_k_frames, decode_cb=lambda data: odom_decode(data))
@@ -157,7 +163,7 @@ class TangoLogReader(LogReader):
     D = np.float64([0.234583, -0.689864, 0, 0, 0.679871])
     cam = CameraIntrinsic(K=K, D=D, shape=(H,W))
 
-    def __init__(self, directory, scale=1., start_idx=0, every_k_frames=1): 
+    def __init__(self, directory, scale=1., start_idx=0, every_k_frames=1, noise=[0,0]): 
         
         # Set directory and filename for time synchronized log reads 
         self.directory_ = os.path.expanduser(directory)
@@ -165,15 +171,12 @@ class TangoLogReader(LogReader):
         self.scale_ = scale
         self.shape_ = (int(TangoLogReader.W * scale), int(TangoLogReader.H * scale))
         assert(self.shape_[0] % 2 == 0 and self.shape_[1] % 2 == 0)
-
         self.start_idx_ = start_idx
-
-        # HARD-CODED to compensate for scaling the logger
 
         # Initialize TangoLogReader with appropriate decoders
         super(TangoLogReader, self).__init__(self.filename_, 
                                              decoder=[
-                                                 TangoOdomDecoder(channel='RGB_VIO', every_k_frames=every_k_frames), 
+                                                 TangoOdomDecoder(channel='RGB_VIO', every_k_frames=every_k_frames, noise=noise), 
                                                  TangoImageDecoder(self.directory_, channel='RGB', 
                                                                    shape=self.shape_, every_k_frames=every_k_frames)
                                              ])
@@ -260,9 +263,11 @@ class TangoLogController(LogController):
         self.__pose_q = deque(maxlen=10)
 
     def on_rgb(self, t_img, img): 
-        if len(self.__pose_q): 
-            t_pose, pose = self.__pose_q[-1]
-            self.on_frame(t_pose, t_img, pose, img)
+        if not len(self.__pose_q):
+            return
+
+        t_pose, pose = self.__pose_q[-1]
+        self.on_frame(t_pose, t_img, pose, img)
 
     def on_pose(self, t, pose): 
         self.__pose_q.append((t,pose))
