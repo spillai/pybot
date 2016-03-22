@@ -84,10 +84,10 @@ class BaseKLT(object):
 
         N = 20
         
-        if color_type == 'age': 
+        if color_type == 'unique': 
             cwheel = colormap(np.linspace(0, 1, N))
             cols = np.vstack([cwheel[tid % N] for idx, (tid, pts) in enumerate(self.tm_.tracks.iteritems())])            
-        elif color_type == 'unique': 
+        elif color_type == 'age': 
             cols = colormap(np.int32([pts.length for pts in self.tm_.tracks.itervalues()]))            
         else: 
             raise ValueError('Color type {:} undefined, use age or unique'.format(color_type))
@@ -107,9 +107,8 @@ class BaseKLT(object):
         cols = colormap(np.linspace(0, 1, N))
         valid = finite_and_within_bounds(self.tm_.pts, out.shape)
         for tid, pt in zip(self.tm_.ids[valid], self.tm_.pts[valid]): 
-            cv2.circle(out, tuple(map(int, pt)), 2, 
-                       tuple(map(int, cols[tid % N])) if colored else (0,240,0),
-                       -1, lineType=cv2.CV_AA)
+            cv2.rectangle(out, tuple(map(int, pt-2)), tuple(map(int, pt+2)), 
+                          tuple(map(int, cols[tid % N])) if colored else (0,240,0), -1)
 
     def matches(self, index1=-2, index2=-1): 
         tids, p1, p2 = [], [], []
@@ -193,6 +192,8 @@ class MeshKLT(OpenCVKLT):
 
             vis = to_color(im)
             dt_vis = self.dt_.visualize(vis, pts)
+            # OpenCVKLT.viz(self, dt_vis, colored=True)
+            OpenCVKLT.draw_tracks(self, dt_vis, colored=True, color_type='unique')
             imshow_cv('dt_vis', dt_vis)
 
         return ids, pts
