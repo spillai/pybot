@@ -49,7 +49,7 @@ class BaseKLT(object):
     def __init__(self, 
                  detector=default_detector, 
                  tracker=default_tracker,  
-                 max_track_length=20, min_tracks=1200, mask_size=9): 
+                 max_track_length=4, min_tracks=1200, mask_size=9): 
 
         # BaseKLT Params
         self.detector_ = detector
@@ -131,6 +131,14 @@ class BaseKLT(object):
     def process(self, im, detected_pts=None):
         raise NotImplementedError()
 
+    @property
+    def latest_ids(self): 
+        return self.tm_.ids
+
+    @property
+    def latest_pts(self): 
+        return self.tm_.pts
+
 class OpenCVKLT(BaseKLT): 
     """
     KLT Tracker as implemented in OpenCV 2.4.9
@@ -154,7 +162,12 @@ class OpenCVKLT(BaseKLT):
         pids, ppts = self.tm_.ids, self.tm_.pts
         if ppts is not None and len(ppts) and len(self.ims_) == 2: 
             pts = self.tracker_.track(self.ims_[-2], self.ims_[-1], ppts)
-            self.tm_.add(pts, ids=pids, prune=True)
+
+            # Check bounds
+            valid = finite_and_within_bounds(pts, im.shape[:2])
+            
+            # Add pts and prune afterwards
+            self.tm_.add(pts[valid], ids=pids[valid], prune=True)
 
         # Check if more features required
         self.add_features_ = self.add_features_ or ppts is None or (ppts is not None and len(ppts) < self.min_tracks_)
@@ -166,6 +179,8 @@ class OpenCVKLT(BaseKLT):
             # imshow_cv('mask', mask)
 
             if detected_pts is None: 
+
+                # Detect features
                 new_kpts = self.detector_.process(self.ims_[-1], mask=mask, return_keypoints=True)
                 newlen = max(0, self.min_tracks_ - len(ppts))
                 new_pts = to_pts(sorted(new_kpts, key=lambda kpt: kpt.response, reverse=True)[:newlen])
@@ -174,6 +189,7 @@ class OpenCVKLT(BaseKLT):
                 valid = mask[xy[:,1], xy[:,0]] > 0
                 new_pts = detected_pts[valid]
 
+            # Add detected features with new ids, and prevent pruning 
             self.tm_.add(new_pts, ids=None, prune=False)
             self.add_features_ = False
 
@@ -188,18 +204,22 @@ class MeshKLT(OpenCVKLT):
         OpenCVKLT.__init__(self, *args, **kwargs)
 
         from pybot_vision import DelaunayTriangulation
+        from bot_utils.timer import SimpleTimer
+
         self.dt_ = DelaunayTriangulation()
+        self.timer_ = SimpleTimer('MeshKLT')
 
     def process(self, im, detected_pts=None): 
+        self.timer_.start()
         ids, pts = OpenCVKLT.process(self, im, detected_pts=detected_pts)
-        
         if len(pts) > 3: 
             self.dt_.batch_triangulate(pts)
+        self.timer_.stop()
 
-            vis = to_color(im)
-            dt_vis = self.dt_.visualize(vis, pts)
-            # OpenCVKLT.viz(self, dt_vis, colored=True)
-            OpenCVKLT.draw_tracks(self, vis, colored=True, color_type='unique')
-            imshow_cv('dt_vis', np.vstack([vis, dt_vis]), wait=1)
+        vis = to_color(im)
+        dt_vis = self.dt_.visualize(vis, pts)
+        # OpenCVKLT.viz(self, dt_vis, colored=True)
+        OpenCVKLT.draw_tracks(self, vis, colored=True, color_type='unique')
+        imshow_cv('dt_vis', np.vstack([vis, dt_vis]), wait=1)
 
         return ids, pts
