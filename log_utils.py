@@ -134,12 +134,13 @@ class LogController(object):
         self.ctrl_idx_ = 0
 
     def subscribe(self, channel, callback): 
-        print('Subscribing to {:} with callback {:}'.format(channel, callback))
+        print('{:}: Subscribing to {:} with callback {:}'.format(self.__class__.__name__, channel, callback))
         self.ctrl_cb_[channel] = callback
 
     def run(self):
         if not len(self.ctrl_cb_): 
-            raise RuntimeError('No callbacks registered yet, subscribe to channels first!')
+            raise RuntimeError('{:}: No callbacks registered yet, subscribe to channels first!'
+                               .format(self.__class__.__name__))
 
         # Initialize
         self.init()
@@ -156,13 +157,13 @@ class LogController(object):
         """
         Pre-processing for inherited controllers
         """
-        pass
-
+        print('{:}: Reading log {:}'.format(self.__class__.__name__, self.filename))
+       
     def finish(self): 
         """
         Post-processing for inherited controllers
         """
-        pass
+        print('{:}: Finished reading log {:}'.format(self.__class__.__name__, self.filename))
 
     @property
     def index(self): 
