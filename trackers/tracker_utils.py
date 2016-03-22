@@ -46,12 +46,21 @@ class IndexedDeque(object):
         return self.length_
 
 class TrackManager(object): 
-    def __init__(self, maxlen=20): 
+    def __init__(self, maxlen=20, on_delete_cb=lambda tid, track: None): 
+        # Max track length 
         self.maxlen_ = maxlen
+
+        # Register callbacks on track delete
+        self.on_delete_cb_ = on_delete_cb
+
+        # Reset tracks before start
         self.reset()
 
     def reset(self): 
         self.index_ = 0
+
+        # Tracks are a dictionary with {key: value, ... } as  
+        # {track_id : , IndexedDeque [(time_index, feature), ... ]
         self.tracks_ = defaultdict(lambda: IndexedDeque(maxlen=self.maxlen_))
 
     def add(self, pts, ids=None, prune=True): 
@@ -82,6 +91,7 @@ class TrackManager(object):
         # Remove tracks that are not most recent
         for tid, track in self.tracks_.items(): 
             if track.latest_index < self.index_: 
+                self.on_delete_cb_(tid, self.tracks[tid])
                 del self.tracks[tid]
 
     @property
@@ -99,6 +109,7 @@ class TrackManager(object):
     def ids(self): 
         return np.array(self.tracks_.keys())
 
+    @property
     def index(self): 
         return self.index_
 

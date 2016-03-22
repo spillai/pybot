@@ -81,7 +81,6 @@ class FeatureDetector(object):
                 try: 
                     self.detector_ = cv2.GridAdaptedFeatureDetector(
                         self.detector_, max_corners, grid[0], grid[1])
-                    print 'corners', max_corners
                 except: 
                     raise ValueError('FeatureDetector grid is not compatible {:}'.format(grid))
 
