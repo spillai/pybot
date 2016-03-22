@@ -109,7 +109,7 @@ class Sampler(object):
             if self.verbose_: 
                 self.verbose_index_.append(self.all_items_.index)
 
-        return self.all_items_.index, ret
+        return ret
 
 class PoseSampler(Sampler): 
     def __init__(self, theta=20, displacement=0.25, lookup_history=10, 

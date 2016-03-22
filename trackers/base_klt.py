@@ -63,7 +63,7 @@ class BaseKLT(object):
     @classmethod
     def from_params(cls, detector_params=default_detector_params, 
                     tracker_params=default_tracker_params,
-                    max_track_length=20, min_tracks=1200, mask_size=9): 
+                    max_track_length=4, min_tracks=1200, mask_size=9): 
 
         # Setup detector and tracker
         detector = FeatureDetector(**detector_params)
