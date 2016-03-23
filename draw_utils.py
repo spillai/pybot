@@ -26,3 +26,9 @@ def draw_lines(im, pts1, pts2, colors=None, thickness=1):
     for col, pt1, pt2 in zip(cols, pts1, pts2): 
         cv2.line(out, (pt1[0], pt1[1]), (pt2[0], pt2[1]), tuple(col), thickness)
     return out
+
+
+def draw_matches(out, pts1, pts2, colors=None, thickness=1, size=2): 
+    out = draw_features(out, pts2, colors=colors, size=size)
+    out = draw_lines(out, pts1, pts2, colors=colors, thickness=thickness)
+    return out

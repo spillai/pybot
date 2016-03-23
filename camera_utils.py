@@ -222,11 +222,18 @@ class CameraIntrinsic(object):
                                                  p1=self.p1, p2=self.p2, 
                                                  shape=shape)
 
-    def ray(self, pts, undistort=True): 
+    def ray(self, pts, undistort=True, rotate=False): 
+        """
+        Returns the ray corresponding to the points. 
+        Optionally undistort (defaults to true), and 
+        rotate ray to the camera's viewpoint 
+        """
         upts = self.undistort_points(pts) if undistort else pts
         ret = unproject_points(
             np.hstack([ (colvec(upts[:,0])-self.cx) / self.fx, (colvec(upts[:,1])-self.cy) / self.fy ])
         )
+        if rotate: 
+            ret = self.extrinsics.rotate_vec(ret)
         return ret
 
     def reconstruct(self, xyZ, undistort=True): 
@@ -461,6 +468,9 @@ class Camera(CameraIntrinsic, CameraExtrinsic):
         See HZ, Sec 9.6, p 257
         """
         return skew(self.t).dot(self.R)
+
+    def triangulate(self, pts, other_cam, other_pts): 
+        return triangulate_points(self, pts, other_cam, other_pts)
 
     def save(self, filename): 
         raise NotImplementedError()

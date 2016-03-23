@@ -27,7 +27,7 @@ from bot_utils.db_utils import AttrDict
 from bot_utils.plot_utils import colormap
 from bot_vision.imshow_utils import imshow_cv
 from bot_vision.image_utils import to_color, to_gray, gaussian_blur
-from bot_vision.draw_utils import draw_features
+from bot_vision.draw_utils import draw_features, draw_lines
 
 from bot_vision.trackers import FeatureDetector, OpticalFlowTracker, LKTracker
 from bot_vision.trackers import finite_and_within_bounds, to_pts, \
