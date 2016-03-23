@@ -1,9 +1,9 @@
 import numpy as np
 import networkx as nx
 
+from collections import deque, defaultdict
 from itertools import izip
-
-from bot_js.force import nx_force_draw
+from bot_utils.misc import print_red
 
 from pygtsam import extractPose2, extractPose3
 from pygtsam import symbol as _symbol
@@ -14,7 +14,8 @@ from pygtsam import Point3, Rot3, Pose3, \
     PriorFactorPose3, BetweenFactorPose3
 from pygtsam import SmartFactor
 from pygtsam import Cal3_S2, SimpleCamera, simpleCamera
-from pygtsam import StereoPoint2, Cal3_S2Stereo, GenericStereoFactor3D
+from pygtsam import StereoPoint2, Cal3_S2Stereo, \
+    GenericStereoFactor3D, GenericProjectionFactorPose3Point3Cal3_S2
 from pygtsam import NonlinearEqualityPose3
 from pygtsam import Isotropic
 from pygtsam import Diagonal, Values, Marginals
@@ -69,10 +70,22 @@ class BaseSLAM(object):
 
     """
 
-    def __init__(self): 
+    def __init__(self, calib=None): 
         # ISAM2 interface
         self.slam_ = ISAM2()
         self.idx_ = -1
+
+        # Define the camera calibration parameters
+        # format: fx fy skew cx cy
+        if calib is not None: 
+            self.K_ = Cal3_S2(calib.fx, calib.fy, 0.0, calib.cx, calib.cy)
+
+            # Mainly meant for synchronization of 
+            # ids across time frames for SFM/VSLAM 
+            # related tasks
+            self.lids_q_ = deque(maxlen=2)
+            self.pts_q_ = defaultdict(list)
+            self.pts3d_q_ = defaultdict(list)
 
         # Factor graph storage
         self.graph_ = NonlinearFactorGraph()
@@ -104,8 +117,9 @@ class BaseSLAM(object):
         return self.xls_
 
     def initialize(self, p_init=None): 
+        print_red('\t\t add_p0')
         x_id = symbol('x', 0)
-        pose0 = Pose3(p_init) if p_init else Pose3()
+        pose0 = Pose3(p_init) if p_init is not None else Pose3()
             
         self.graph_.add(
             PriorFactorPose3(x_id, pose0, self.prior_noise_)
@@ -132,15 +146,15 @@ class BaseSLAM(object):
         robot pose
         """
         # Add prior on first pose
-        if self.latest() < 0: 
+        if not self.is_initialized:
             self.initialize()
 
         # Add odometry factor
-        self.add_odom(self.latest(), self.latest()+1, delta)
+        self.add_odom(self.latest, self.latest+1, delta)
         self.idx_ += 1
 
     def add_odom(self, xid1, xid2, delta): 
-        print('\t\tadd_odom {:}->{:}'.format(xid1, xid2))
+        print_red('\t\tadd_odom {:}->{:}'.format(xid1, xid2))
 
         # Add odometry factor
         pdelta = Pose3(delta)
@@ -158,7 +172,7 @@ class BaseSLAM(object):
         self.gviz_.node[x_id2]['label'] = 'X ' + str(xid2)
 
     def add_landmark(self, xid, lid, delta): 
-        print('\t\tadd_landmark {:}->{:}'.format(xid, lid))
+        print_red('\t\tadd_landmark {:}->{:}'.format(xid, lid))
 
         # Add Pose-Pose landmark factor
         x_id = symbol('x', xid)
@@ -193,9 +207,74 @@ class BaseSLAM(object):
             
         return 
 
+    def add_landmark_points(self, xid, lids, pts, pts3d): 
+        print_red('\t\tadd_landmark_points xid:{:}-> lid count:{:}'.format(xid, len(lids)))
+        
+        # Add landmark-ids to ids queue in order to check
+        # consistency in matches between keyframes. This 
+        # allows an easier interface to check overlapping 
+        # ids across successive function calls.
+        self.lids_q_.append(lids)
+        self.xids_q_.append(xid)
+        for lid, pt, pt3 in izip(lids, pts, pts3d): 
+            self.pts_q_[lid].append(pt)
+            self.pts3d_q_[lid].append(pt3)
+
+        if len(ids_q_) < 2: 
+            return
+
+        # Add Pose-Pose landmark factor
+        x_id = symbol('x', xid)
+        l_ids = [symbol('l', lid) for lid in lids]
+        
+        # Measurement noise (1 px in u and v)
+        noise_model = Diagonal.Sigmas(vec(1.0, 1.0))
+
+        assert(len(l_ids) == len(pts) == len(pts3d))
+        for l_id, pt in izip(l_ids, pts):
+            self.graph_.add(
+                GenericProjectionFactorPose3Point3Cal3_S2(
+                    Point2(vec(*pt)), noise_model, x_id, l_id, self.K_))
+
+        # Add to landmark measurements
+        self.xls_.extend([(xid, lid) for lid in lids])
+
+        # # Add landmark edge to graphviz
+        # for l_id in l_ids: 
+        #     self.gviz_.add_edge(x_id, l_id)
+        
+        # Initialize new landmark pose node from the latest robot
+        # pose. This should be done just once
+        for (l_id, lid, pt3) in izip(l_ids, lids, pts3d): 
+            if lid not in self.ls_: 
+                try: 
+                    pred_pt3 = self.xs_[xid].transform_from(Point3(vec(*pt3)))
+                    self.initial_.insert(l_id, pred_pt3)
+                    self.ls_[lid] = pred_pt3
+                except Exception, e: 
+                    raise RuntimeError('Initialization failed ({:}). xid:{:}, lid:{:}, l_id: {:}'
+                                       .format(e, xid, lid, l_id))
+
+                # # Label landmark node
+                # self.gviz_.node[l_id]['label'] = 'L ' + str(lid)            
+                # self.gviz_.node[l_id]['color'] = 'red'
+                # self.gviz_.node[l_id]['style'] = 'filled'
+        
+        return 
+        
+
+    def add_landmark_points_incremental(self, lids, pts, pts3d): 
+        """
+        Add landmark measurement (image features)
+        from the latest robot pose to the
+        set of specified landmark ids
+        """
+        self.add_landmark_points(self.latest, lids, pts, pts3d)
+
     def add_landmark_incremental(self, lid, delta): 
         """
-        Add landmark measurement from the latest robot pose to the
+        Add landmark measurement (pose3d) 
+        from the latest robot pose to the
         specified landmark id
         """
         self.add_landmark(self.latest, lid, delta)
@@ -207,6 +286,10 @@ class BaseSLAM(object):
     @property
     def index(self): 
         return self.idx_
+
+    @property
+    def is_initialized(self): 
+        return self.latest >= 0
 
     def save_graph(self, filename): 
         self.slam_.saveGraph(filename)
