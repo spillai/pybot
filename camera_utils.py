@@ -39,13 +39,26 @@ def project(a):
   return a[:-1]/float(a[-1])
 
 def unproject_points(pts): 
-    print pts.ndim, pts.shape
     assert(pts.ndim == 2 and pts.shape[1] == 2)
     return np.hstack([pts, colvec(np.ones(len(pts)))])
 
 def project_points(pts): 
     z = colvec(pts[:,2])
     return pts[:,:2] / z
+
+def sampson_error(F, pts1, pts2): 
+    """
+    Computes the sampson error for F, and 
+    points pts1, pts2
+    """
+    
+    x1, x2 = unproject_points(pts1).T, unproject_points(pts2).T
+    Fx1 = np.dot(F, x1)
+    Fx2 = np.dot(F, x2)
+       
+    # Sampson distance as error measure
+    denom = Fx1[0]**2 + Fx1[1]**2 + Fx2[0]**2 + Fx2[1]**2
+    return ( np.diag(x1.T.dot(Fx2)) )**2 / denom 
     
 def get_baseline(fx, baseline=None, baseline_px=None): 
     """
@@ -441,6 +454,14 @@ class Camera(CameraIntrinsic, CameraExtrinsic):
 
         return F #  / F[2,2]
 
+    def E(self, other): 
+        """ 
+        Computes the essential matrix between this camera 
+        and the other, via E = [t]_x * R
+        See HZ, Sec 9.6, p 257
+        """
+        return skew(self.t).dot(self.R)
+
     def save(self, filename): 
         raise NotImplementedError()
 
@@ -776,12 +797,12 @@ def get_object_bbox(camera, pts, subsample=10, scale=1.0, min_height=10, min_wid
     else: 
         return [None] * 3
 
-def epipolar_line(F_10, x_1): 
+def epipolar_line(F_10, x_0): 
     """
-    l_1 = F_10 * x_1
+    l_1 = F_10 * x_0
     line = F.dot(np.hstack([x, np.ones(shape=(len(x),1))]).T)
     """
-    return cv2.computeCorrespondEpilines(x_1.reshape(-1,1,2), 1, F_10).reshape(-1,3)
+    return cv2.computeCorrespondEpilines(x_0.reshape(-1,1,2), 1, F_10).reshape(-1,3)
 
 def plot_epipolar_line(im_1, F_10, x_0, im_0=None): 
     """
