@@ -224,7 +224,7 @@ class MeshKLT(OpenCVKLT):
         vis = to_color(im)
         dt_vis = self.dt_.visualize(vis, pts)
         # OpenCVKLT.viz(self, dt_vis, colored=True)
-        OpenCVKLT.draw_tracks(self, vis, colored=True, color_type='unique', max_track_length=2)
+        OpenCVKLT.draw_tracks(self, vis, colored=False, max_track_length=2)
         imshow_cv('dt_vis', np.vstack([vis, dt_vis]), wait=1)
 
         return ids, pts

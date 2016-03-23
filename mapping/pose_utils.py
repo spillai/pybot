@@ -138,7 +138,7 @@ class PoseSampler(Sampler):
 
         return True
 
-Keyframe = namedtuple('Keyframe', ['img', 'pose'], verbose=False)
+Keyframe = namedtuple('Keyframe', ['img', 'pose', 'index'], verbose=False)
 
 class KeyframeSampler(PoseSampler): 
     def __init__(self, theta=20, displacement=0.25, lookup_history=10, 
