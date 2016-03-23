@@ -80,12 +80,13 @@ class BaseSLAM(object):
         if calib is not None: 
             self.K_ = Cal3_S2(calib.fx, calib.fy, 0.0, calib.cx, calib.cy)
 
-            # Mainly meant for synchronization of 
-            # ids across time frames for SFM/VSLAM 
-            # related tasks
-            self.lids_q_ = deque(maxlen=2)
-            self.pts_q_ = defaultdict(list)
-            self.pts3d_q_ = defaultdict(list)
+            # # Mainly meant for synchronization of 
+            # # ids across time frames for SFM/VSLAM 
+            # # related tasks
+            # self.lids_q_ = deque(maxlen=2)
+            # self.xid_q_ = deque(maxlen=2)
+            # self.pts_q_ = defaultdict(list)
+            # self.pts3d_q_ = defaultdict(list)
 
         # Factor graph storage
         self.graph_ = NonlinearFactorGraph()
@@ -210,18 +211,18 @@ class BaseSLAM(object):
     def add_landmark_points(self, xid, lids, pts, pts3d): 
         print_red('\t\tadd_landmark_points xid:{:}-> lid count:{:}'.format(xid, len(lids)))
         
-        # Add landmark-ids to ids queue in order to check
-        # consistency in matches between keyframes. This 
-        # allows an easier interface to check overlapping 
-        # ids across successive function calls.
-        self.lids_q_.append(lids)
-        self.xids_q_.append(xid)
-        for lid, pt, pt3 in izip(lids, pts, pts3d): 
-            self.pts_q_[lid].append(pt)
-            self.pts3d_q_[lid].append(pt3)
+        # # Add landmark-ids to ids queue in order to check
+        # # consistency in matches between keyframes. This 
+        # # allows an easier interface to check overlapping 
+        # # ids across successive function calls.
+        # self.lids_q_.append(lids)
+        # self.xids_q_.append(xid)
+        # for lid, pt, pt3 in izip(lids, pts, pts3d): 
+        #     self.pts_q_[lid].append(pt)
+        #     self.pts3d_q_[lid].append(pt3)
 
-        if len(ids_q_) < 2: 
-            return
+        # if len(ids_q_) < 2: 
+        #     return
 
         # Add Pose-Pose landmark factor
         x_id = symbol('x', xid)
