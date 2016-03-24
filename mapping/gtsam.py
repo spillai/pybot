@@ -78,8 +78,21 @@ class BaseSLAM(object):
         # Define the camera calibration parameters
         # format: fx fy skew cx cy
         if calib is not None: 
+            
+            # Calibration for specific instance
+            # that is maintained across the entire
+            # pose-graph optimization (assumed static)
             self.K_ = Cal3_S2(calib.fx, calib.fy, 0.0, calib.cx, calib.cy)
-            self.lid_counts_ = Counter()
+
+            # Counter for landmark observations
+            self.lid_count_ = Counter()
+            
+            # Dictionary pointing to smartfactor set
+            # for each landmark id
+            self.lid_factors_ = defaultdict(SmartFactor)
+             
+            # Measurement noise (1 px in u and v)
+            self.image_measurement_noise_ = Diagonal.Sigmas(vec(2.0, 2.0))
 
             # # Mainly meant for synchronization of 
             # # ids across time frames for SFM/VSLAM 
@@ -119,7 +132,7 @@ class BaseSLAM(object):
         return self.xls_
 
     def initialize(self, p_init=None): 
-        print_red('\t\t add_p0')
+        print_red('\t\t{:}::add_p0'.format(self.__class__.__name__))
         x_id = symbol('x', 0)
         pose0 = Pose3(p_init) if p_init is not None else Pose3()
             
@@ -156,7 +169,7 @@ class BaseSLAM(object):
         self.idx_ += 1
 
     def add_odom(self, xid1, xid2, delta): 
-        print_red('\t\tadd_odom {:}->{:}'.format(xid1, xid2))
+        print_red('\t\t{:}::add_odom {:}->{:}'.format(self.__class__.__name__, xid1, xid2))
 
         # Add odometry factor
         pdelta = Pose3(delta)
@@ -174,7 +187,7 @@ class BaseSLAM(object):
         self.gviz_.node[x_id2]['label'] = 'X ' + str(xid2)
 
     def add_landmark(self, xid, lid, delta): 
-        print_red('\t\tadd_landmark {:}->{:}'.format(xid, lid))
+        print_red('\t\t{:}::add_landmark {:}->{:}'.format(self.__class__.__name__, xid, lid))
 
         # Add Pose-Pose landmark factor
         x_id = symbol('x', xid)
@@ -209,6 +222,62 @@ class BaseSLAM(object):
             
         return 
 
+    def add_landmark_points_smart(self, xid, lids, pts): 
+        print_red('\t\t{:}::add_landmark_points_smart {:}->{:}'.format(self.__class__.__name__, xid, len(lids)))
+        
+        # Add landmark-ids to ids queue in order to check
+        # consistency in matches between keyframes. This 
+        # allows an easier interface to check overlapping 
+        # ids across successive function calls.
+        self.lid_count_ += Counter(lids)
+
+        # Add Pose-Pose landmark factor
+        x_id = symbol('x', xid)
+        l_ids = [symbol('l', lid) for lid in lids]
+        
+        assert(len(l_ids) == len(pts))
+        for (lid, l_id, pt) in izip(lids, l_ids, pts):
+            # Insert smart factor based on landmark id
+            self.lid_factors_[lid].add_single(Point2(vec(*pt)), x_id, self.image_measurement_noise_, self.K_)
+
+        # Add to landmark measurements
+        self.xls_.extend([(xid, lid) for lid in lids])
+
+        # Add smartfactors to the graph only if that 
+        # landmark ID is no longer visible. setdiff1d
+        # returns the set of IDs that are unique to 
+        # `smart_lids` (previously tracked) but not 
+        # in `lids` (current)
+        smart_lids = np.int64(self.lid_factors_.keys())
+        add_lids = np.setdiff1d(smart_lids, lids)
+        for lid in add_lids: 
+            self.graph_.add(self.lid_factors_[lid])
+        print 'Difference, to be added to graph', len(add_lids)
+        
+        # # Add landmark edge to graphviz
+        # for l_id in l_ids: 
+        #     self.gviz_.add_edge(x_id, l_id)
+        
+        # # Initialize new landmark pose node from the latest robot
+        # # pose. This should be done just once
+        # for (l_id, lid, pt3) in izip(l_ids, lids, pts3d): 
+        #     if lid not in self.ls_: 
+        #         try: 
+        #             pred_pt3 = self.xs_[xid].transform_from(Point3(vec(*pt3)))
+        #             self.initial_.insert(l_id, pred_pt3)
+        #             self.ls_[lid] = pred_pt3
+        #         except Exception, e: 
+        #             raise RuntimeError('Initialization failed ({:}). xid:{:}, lid:{:}, l_id: {:}'
+        #                                .format(e, xid, lid, l_id))
+
+        #         # # Label landmark node
+        #         # self.gviz_.node[l_id]['label'] = 'L ' + str(lid)            
+        #         # self.gviz_.node[l_id]['color'] = 'red'
+        #         # self.gviz_.node[l_id]['style'] = 'filled'
+        
+        return 
+
+
     def add_landmark_points(self, xid, lids, pts, pts3d): 
         print_red('\t\tadd_landmark_points xid:{:}-> lid count:{:}'.format(xid, len(lids)))
         
@@ -216,8 +285,7 @@ class BaseSLAM(object):
         # consistency in matches between keyframes. This 
         # allows an easier interface to check overlapping 
         # ids across successive function calls.
-        self.lids_count_ += Counter(lids)
-        print self.lids_count_
+        self.lid_count_ += Counter(lids)
 
         # if len(ids_q_) < 2: 
         #     return
@@ -225,15 +293,12 @@ class BaseSLAM(object):
         # Add Pose-Pose landmark factor
         x_id = symbol('x', xid)
         l_ids = [symbol('l', lid) for lid in lids]
-        
-        # Measurement noise (1 px in u and v)
-        noise_model = Diagonal.Sigmas(vec(1.0, 1.0))
 
         assert(len(l_ids) == len(pts) == len(pts3d))
         for l_id, pt in izip(l_ids, pts):
             self.graph_.add(
                 GenericProjectionFactorPose3Point3Cal3_S2(
-                    Point2(vec(*pt)), noise_model, x_id, l_id, self.K_))
+                    Point2(vec(*pt)), self.image_measurement_noise_, x_id, l_id, self.K_))
 
         # Add to landmark measurements
         self.xls_.extend([(xid, lid) for lid in lids])
@@ -260,7 +325,16 @@ class BaseSLAM(object):
                 # self.gviz_.node[l_id]['style'] = 'filled'
         
         return 
+
         
+
+    def add_landmark_points_incremental_smart(self, lids, pts): 
+        """
+        Add landmark measurement (image features)
+        from the latest robot pose to the
+        set of specified landmark ids
+        """
+        self.add_landmark_points_smart(self.latest, lids, pts)
 
     def add_landmark_points_incremental(self, lids, pts, pts3d): 
         """
