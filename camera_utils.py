@@ -836,20 +836,19 @@ def plot_epipolar_line(im_1, F_10, x_0, im_0=None):
     #                tuple(map(int, cols[tid % N])) if colored else (0,240,0),
     #                -1, lineType=cv2.CV_AA)
 
-
     # col = (0,255,0)
     for col, l1 in zip(cols, lines_1):
         try: 
             x0, y0 = map(int, [0, -l1[2] / l1[1] ])
             x1, y1 = map(int, [W, -(l1[2] + l1[0] * W) / l1[1] ])
-            cv2.line(vis_1, (x0,y0), (x1,y1), col, 2)
+            cv2.line(vis_1, (x0,y0), (x1,y1), col, 1)
         except: 
             pass
             # raise RuntimeWarning('Failed to estimate epipolar line {:s}'.format(l1))
 
     if vis_0 is not None: 
         for col, x in zip(cols, x_0): 
-            cv2.circle(vis_0, tuple(x), 5, col, -1)
+            cv2.circle(vis_0, tuple(x), 3, col, -1)
         return np.vstack([vis_0, vis_1])
     
     return vis_1
