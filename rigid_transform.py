@@ -147,7 +147,7 @@ class RigidTransform(object):
             raise TypeError("Type inconsistent", type(other), other.__class__)
 
     def rotate_vec(self, v): 
-        if v.ndim == 2 and v.shape[0] > 1: 
+        if v.ndim == 2: 
             return np.vstack(map(lambda v_: self.quat.rotate(v_), v))
         else: 
             assert(v.ndim == 1 or (v.ndim == 2 and v.shape[0] == 1))
