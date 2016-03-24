@@ -1,4 +1,41 @@
 import time
+from collections import OrderedDict
+from functools import wraps
+
+global g_timers
+g_timers = OrderedDict()
+
+def named_timer(name): 
+    global g_timers
+    if name not in g_timers: 
+        g_timers[name] = SimpleTimer(name)
+    try: 
+        return g_timers[name] 
+    except KeyError, e: 
+        raise RuntimeError('Failed to retrieve timer {:}'.format(e))
+
+def timeitmethod(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        try: 
+            name = ''.join([args[0].__class__.__name__, '::', func.__name__])
+        except: 
+            raise RuntimeError('timeitmethod requires first argument to be self')
+        named_timer(name).start()
+        r = func(*args, **kwargs)
+        named_timer(name).stop()
+        return r
+    return wrapper
+
+
+def timeit(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        named_timer(name).start()
+        r = func(*args, **kwargs)
+        named_timer(name).stop()
+        return r
+    return wrapper
 
 class SimpleTimer: 
     def __init__(self, name='', hz=1.0): 
