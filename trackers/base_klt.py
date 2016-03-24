@@ -29,11 +29,10 @@ from bot_vision.imshow_utils import imshow_cv
 from bot_vision.image_utils import to_color, to_gray, gaussian_blur
 from bot_vision.draw_utils import draw_features, draw_lines
 
+from bot_utils.timer import timeitmethod
 from bot_vision.trackers import FeatureDetector, OpticalFlowTracker, LKTracker
 from bot_vision.trackers import finite_and_within_bounds, to_pts, \
     TrackManager, FeatureDetector, OpticalFlowTracker, LKTracker
-
-import time
 
 class BaseKLT(object): 
     """
@@ -209,22 +208,18 @@ class MeshKLT(OpenCVKLT):
         OpenCVKLT.__init__(self, *args, **kwargs)
 
         from pybot_vision import DelaunayTriangulation
-        from bot_utils.timer import SimpleTimer
-
         self.dt_ = DelaunayTriangulation()
-        self.timer_ = SimpleTimer('MeshKLT')
 
+    @timeitmethod
     def process(self, im, detected_pts=None): 
-        self.timer_.start()
         ids, pts = OpenCVKLT.process(self, im, detected_pts=detected_pts)
         if len(pts) > 3: 
             self.dt_.batch_triangulate(pts)
-        self.timer_.stop()
+        return ids, pts
 
+    def visualize(self, im, ids, pts): 
         vis = to_color(im)
         dt_vis = self.dt_.visualize(vis, pts)
         # OpenCVKLT.viz(self, dt_vis, colored=True)
         OpenCVKLT.draw_tracks(self, vis, colored=False, max_track_length=2)
         imshow_cv('dt_vis', np.vstack([vis, dt_vis]), wait=1)
-
-        return ids, pts

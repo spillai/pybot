@@ -4,7 +4,7 @@ from copy import deepcopy
 
 from collections import defaultdict, deque
 from bot_utils.db_utils import AttrDict
-from bot_utils.timer import SimpleTimer
+from bot_utils.timer import timeitmethod
 
 from bot_vision.feature_detection import FeatureDetector
 from bot_vision.feature_detection import to_kpt, to_kpts, to_pts, \
@@ -143,7 +143,6 @@ class OpticalFlowTracker(object):
 
     def __init__(self, fb_check=True): 
         self.fb_check_ = fb_check
-        self.timer_ = SimpleTimer(name='optical-flow')
 
     @staticmethod
     def create(method='lk', fb_check=True, params=lk_params): 
@@ -168,11 +167,11 @@ class LKTracker(OpticalFlowTracker):
         OpticalFlowTracker.__init__(self, fb_check=fb_check)
         self.lk_params_ = AttrDict(winSize=winSize, maxLevel=maxLevel)
 
+    @timeitmethod
     def track(self, im0, im1, p0): 
         """
         Main tracking method using sparse optical flow (LK)
         """
-        self.timer_.start()
         if p0 is None or not len(p0): 
             return np.array([])
 
@@ -189,7 +188,6 @@ class LKTracker(OpticalFlowTracker):
             fb_good = (np.fabs(p0r-p0) < 2).all(axis=1)
             p1[~fb_good] = np.nan
 
-        self.timer_.stop()
         return p1
 
 class FarnebackTracker(OpticalFlowTracker): 
@@ -204,9 +202,8 @@ class FarnebackTracker(OpticalFlowTracker):
         self.farneback_params_ = AttrDict(pyr_scale=pyr_scale, levels=levels, winsize=winsize, 
                                           iterations=iterations, poly_n=poly_n, poly_sigma=poly_sigma, flags=flags)
 
+    @timeitmethod
     def track(self, im0, im1, p0): 
-        self.timer_.start()
-
         if p0 is None or not len(p0): 
             return np.array([])
 
@@ -251,7 +248,5 @@ class FarnebackTracker(OpticalFlowTracker):
             # Set only good flow 
             flow_p0[~fb_good] = np.nan
             p1 = p0 + flow_p0
-
-        self.timer_.stop()
 
         return p1
