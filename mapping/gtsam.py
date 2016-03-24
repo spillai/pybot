@@ -5,7 +5,7 @@ from collections import deque, defaultdict, Counter
 from itertools import izip
 from bot_utils.misc import print_red
 
-from pygtsam import extractPose2, extractPose3
+from pygtsam import extractPose2, extractPose3, extractKeys
 from pygtsam import symbol as _symbol
 from pygtsam import Point2, Rot2, Pose2, \
     PriorFactorPose2, BetweenFactorPose2, \
@@ -90,7 +90,8 @@ class BaseSLAM(object):
             # Dictionary pointing to smartfactor set
             # for each landmark id
             self.lid_factors_ = defaultdict(SmartFactor)
-             
+            self.lid_update_needed_ = np.int64([])
+
             # Measurement noise (1 px in u and v)
             self.image_measurement_noise_ = Diagonal.Sigmas(vec(2.0, 2.0))
 
@@ -121,11 +122,15 @@ class BaseSLAM(object):
 
     @property
     def poses(self): 
-        return {k: v.matrix() for k,v in self.xs_.iteritems()}
+        return {k: v.matrix for k,v in self.xs_.iteritems()}
         
     @property
     def targets(self): 
-        return {k: v.matrix() for k,v in self.ls_.iteritems()}
+        return {k: v.matrix for k,v in self.ls_.iteritems()}
+        
+    @property
+    def target_landmarks(self): 
+        return {k: v for k,v in self.ls_.iteritems()}
         
     @property
     def edges(self): 
@@ -249,9 +254,20 @@ class BaseSLAM(object):
         # `smart_lids` (previously tracked) but not 
         # in `lids` (current)
         smart_lids = np.int64(self.lid_factors_.keys())
-        add_lids = np.setdiff1d(smart_lids, lids)
-        for lid in add_lids: 
-            self.graph_.add(self.lid_factors_[lid])
+
+        # Determine old lids that are no longer tracked
+        # and add only the ones that have at least 3
+        # observations. Delete old factors that have 
+        # insufficient number of observations
+        add_lids = []
+        old_lids = np.setdiff1d(smart_lids, lids)
+        for lid in old_lids:
+            if self.lid_count_[lid] >= 3: 
+                self.graph_.add(self.lid_factors_[lid])
+                add_lids.append(lid)
+            else: 
+                del self.lid_factors_[lid]
+        self.lid_update_needed_ = np.union1d(self.lid_update_needed_, add_lids)
         print 'Difference, to be added to graph', len(add_lids)
         
         # # Add landmark edge to graphviz
@@ -393,10 +409,38 @@ class BaseSLAM(object):
         self.graph_.resize(0)
         self.initial_.clear()
 
-        if self.index % 50 == 0 and self.index > 0: 
+        if self.index % 10 == 0 and self.index > 0: 
             self.save_graph("slam_fg.dot")
             self.save_dot_graph("slam_graph.dot")
-        
+
+    def smart_update(self): 
+        """
+        Update the smart factors and add 
+        to the graph. Once the landmarks are 
+        extracted, remove them from the factor list
+        """
+        current = self.slam_.calculateEstimate()
+
+        ids, pts3 = [], []
+        for lid in self.lid_update_needed_: 
+            smart = self.lid_factors_[lid]
+            if not smart.isDegenerate(): 
+                ids.append(lid)
+                pts3.append(smart.point_compute(current).vector().ravel())
+            del self.lid_factors_[lid]
+            del self.lid_count_[lid]
+
+        # Reset lid updates for newer ids 
+        self.lid_update_needed_ = np.int64([])
+
+        try: 
+            ids, pts3 = np.int64(ids).ravel(), np.vstack(pts3)
+            assert(len(ids) == len(pts3))
+            return ids, pts3
+        except Exception, e:
+            print('Could not return pts3, {:}'.format(e))
+            return np.int64([]), np.array([])        
+
 class SLAM3D(BaseSLAM): 
     def __init__(self, update_on_odom=False): 
         BaseSLAM.__init__(self)
@@ -767,8 +811,11 @@ def test_SFMExample_SmartFactor():
             landmark_result.insert(j, point)
 
         # print point
-    
-    landmark_result.printf("Landmark results:\n")
+
+    keys = extractKeys(landmark_result)
+    # for key in keys: 
+    #     landmark_result.atPose3()
+    # landmark_result.printf("Landmark results:\n")
             
 if __name__ == "__main__": 
     # test_odometryExample()
