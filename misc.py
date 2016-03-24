@@ -1,7 +1,6 @@
 from collections import deque
 import progressbar as pb
 
-
 def print_red(prt): print("\033[91m {}\033[00m" .format(prt))
 def print_green(prt): print("\033[92m {}\033[00m" .format(prt))
 def print_yellow(prt): print("\033[93m {}\033[00m" .format(prt))

@@ -2,6 +2,8 @@ import time
 from collections import OrderedDict
 from functools import wraps
 
+def print_green(prt): print("\033[92m {}\033[00m" .format(prt))
+
 global g_timers
 g_timers = OrderedDict()
 
@@ -40,7 +42,8 @@ def timeit(func):
 class SimpleTimer: 
     def __init__(self, name='', hz=1.0): 
         self.name_ = name
-        
+        self.hz_ = hz
+
         self.counter_ = 0
         self.last_ = time.time()
         self.period_ = 0
@@ -53,9 +56,10 @@ class SimpleTimer:
         now = time.time()
         dt = (now - self.last_)
 
-        if (now-self.last_print_) > 1: 
+        if (now-self.last_print_) > 1.0 / self.hz_: 
             T = dt / self.counter_
-            print('%s: %4.3f ms (avg over %i iterations)' % (self.name_, T * 1e3, self.counter_))
+            fps = self.hz_ / T
+            print_green('\t[%5.1f ms, %3.1f Hz ]\t%s' % (T * 1e3, fps, self.name_, ))
             self.last_ = now
             self.last_print_ = now
             self.counter_ = 0
@@ -66,10 +70,10 @@ class SimpleTimer:
         dt = (now - self.last_)
         self.period_ += dt
 
-        if (now-self.last_print_) > 1:
+        if (now-self.last_print_) > 1.0 / self.hz_:
             T = self.period_ / self.counter_
-            fps = 1.0 / T
-            print('%s: %4.3f ms (avg over %i iterations)' % (self.name_, T * 1e3, self.counter_))
+            fps = self.hz_ / T
+            print_green('\t[%5.1f ms, %3.1f Hz ]\t%s' % (T * 1e3, fps, self.name_, ))
             self.last_ = now
             self.last_print_ = now
             self.last_fps_ = fps
