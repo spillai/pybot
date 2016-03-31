@@ -34,6 +34,10 @@ class Sampler(object):
             self.verbose_all_ = deque()
             self.verbose_index_ = deque()
 
+    def length(self, type='samples'): 
+        if type=='samples': 
+            return self.sampled_items_.length
+
     def get_item(self, item): 
         return item
 
