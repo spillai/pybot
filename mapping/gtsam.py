@@ -96,7 +96,7 @@ class BaseSLAM(object):
             self.lid_update_needed_ = np.int64([])
 
             # Measurement noise (1 px in u and v)
-            self.image_measurement_noise_ = Diagonal.Sigmas(vec(4.0, 4.0))
+            self.image_measurement_noise_ = Diagonal.Sigmas(vec(2.0, 2.0))
 
             # # Mainly meant for synchronization of 
             # # ids across time frames for SFM/VSLAM 
@@ -266,18 +266,17 @@ class BaseSLAM(object):
         add_lids = []
         old_lids = np.setdiff1d(smart_lids, lids)
         for lid in old_lids:
-            degenerate = self.lid_factors_[lid].isDegenerate()
             if self.lid_count_[lid] >= 3: 
                 self.graph_.add(self.lid_factors_[lid])
                 add_lids.append(lid)
-                assert(not degenerate)
-                # print_green('[{:}] Sufficient factors ({:}) : Adding lid {:} '.format(degenerate, self.lid_count_[lid], lid))
+                # print_green('Sufficient factors ({:}) : Adding lid {:} '.format(self.lid_count_[lid], lid))
             else: 
-                # print_red('[{:}] Insufficient factors ({:}) : Removing lid {:} '.format(degenerate, self.lid_count_[lid], lid))
+                # print_red('Insufficient factors ({:}) : Removing lid {:} '.format(self.lid_count_[lid], lid))
                 del self.lid_factors_[lid]
         self.lid_update_needed_ = np.union1d(self.lid_update_needed_, add_lids)
         print 'Difference, to be added to graph', len(add_lids)
-        
+
+
         # # Add landmark edge to graphviz
         # for l_id in l_ids: 
         #     self.gviz_.add_edge(x_id, l_id)
@@ -427,11 +426,22 @@ class BaseSLAM(object):
         """
         current = self.slam_.calculateEstimate()
 
+        px_error_threshold = 3        
+        # Remove smart factors whose reprojection errors are large
+        for lid in self.lid_factors_.keys(): 
+            smart = self.lid_factors_[lid]
+            if smart.error(current) > px_error_threshold: 
+                del self.lid_factors_[lid]
+                del self.lid_count_[lid]
+                del self.lid_to_xids_[lid]
+
         ids, pts3 = [], []
         for lid in self.lid_update_needed_: 
-            smart = self.lid_factors_[lid]
+            if lid not in self.lid_factors_: 
+                continue
 
             l_id = symbol('l', lid)
+            smart = self.lid_factors_[lid]
 
             # Add triangulated smart factors back into the graph
             # for complete point-pose optimization
@@ -441,18 +451,19 @@ class BaseSLAM(object):
             # only a few measurements from the set of original 
             # measurements
             if not smart.isDegenerate():
-                pts = smart.measured()
-                assert len(pts) == len(self.lid_to_xids_[lid])
+                # pts = smart.measured()
+                # print len(pts), len(self.lid_to_xids_[lid])
+                # assert len(pts) == len(self.lid_to_xids_[lid])
 
-                # Add each of the smart factor measurements to the 
-                # factor graph
-                for xid,pt in zip(self.lid_to_xids_[lid], pts): 
-                    self.graph_.add(GenericProjectionFactorPose3Point3Cal3_S2(
-                        pt, self.image_measurement_noise_, symbol('x', xid), l_id, self.K_))
+                # # Add each of the smart factor measurements to the 
+                # # factor graph
+                # for xid,pt in zip(self.lid_to_xids_[lid], pts): 
+                #     self.graph_.add(GenericProjectionFactorPose3Point3Cal3_S2(
+                #         pt, self.image_measurement_noise_, symbol('x', xid), l_id, self.K_))
                 
                 # Initialize the point value
                 pt3 = smart.point_compute(current)
-                self.initial_.insert(l_id, pt3)
+                # self.initial_.insert(l_id, pt3)
                 self.ls_[lid] = pt3
 
                 # Add the points for visualization 
@@ -461,6 +472,7 @@ class BaseSLAM(object):
 
             del self.lid_factors_[lid]
             del self.lid_count_[lid]
+            del self.lid_to_xids_[lid]
 
         # Reset lid updates for newer ids 
         self.lid_update_needed_ = np.int64([])

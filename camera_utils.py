@@ -51,7 +51,6 @@ def sampson_error(F, pts1, pts2):
     Computes the sampson error for F, and 
     points pts1, pts2
     """
-    
     x1, x2 = unproject_points(pts1).T, unproject_points(pts2).T
     Fx1 = np.dot(F, x1)
     Fx2 = np.dot(F, x2)
