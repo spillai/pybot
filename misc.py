@@ -43,6 +43,10 @@ class Counter(object):
     def index(self): 
         return self.idx_-1
 
+    @property
+    def length(self): 
+        return self.idx_
+
 class Accumulator(Counter): 
     def __init__(self, maxlen=100): 
         Counter.__init__(self)
@@ -83,9 +87,9 @@ class Accumulator(Counter):
     def items(self): 
         return self.items_
         
-    @property
-    def length(self): 
-        return len(self.items_)
+    # @property
+    # def length(self): 
+    #     return len(self.items_)
 
 
 class PoseAccumulator(Accumulator): 
