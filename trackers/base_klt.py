@@ -106,7 +106,7 @@ class BaseKLT(object):
             cv2.polylines(out, [np.vstack(pts.items).astype(np.int32)[-max_track_length:]], False, 
                           tuple(col), thickness=1)
             tl, br = pts.latest_item-2, pts.latest_item+2
-            cv2.rectangle(out, (tl[0], tl[1]), (br[0], br[1]), (0,255,0), -1)
+            cv2.rectangle(out, (tl[0], tl[1]), (br[0], br[1]), tuple(col), -1)
 
     def viz(self, out, colored=False): 
         if not len(self.tm_.pts): 
@@ -217,9 +217,13 @@ class MeshKLT(OpenCVKLT):
             self.dt_.batch_triangulate(pts)
         return ids, pts
 
-    def visualize(self, im, ids, pts): 
+    def visualize(self, im, ids, pts, colored=False): 
         vis = to_color(im)
         dt_vis = self.dt_.visualize(vis, pts)
-        # OpenCVKLT.viz(self, dt_vis, colored=True)
-        OpenCVKLT.draw_tracks(self, vis, colored=False, max_track_length=2)
-        imshow_cv('dt_vis', np.vstack([vis, dt_vis]), wait=1)
+        # OpenCVKLT.viz(self, dt_vis, colored=colored)
+        
+        OpenCVKLT.draw_tracks(self, vis, colored=colored, max_track_length=2)
+        out = np.vstack([vis, dt_vis])
+        imshow_cv('dt_vis', out, wait=1)
+
+        return out

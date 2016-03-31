@@ -168,40 +168,31 @@ class CameraIntrinsic(object):
         return cls(construct_K(cx / np.tan(fov), cy / np.tan(fov), cx, cy), D=D, shape=shape)
 
     @property
-    def fx(self): 
-        return self.K[0,0]
+    def fx(self): return self.K[0,0]
 
     @property
-    def fy(self): 
-        return self.K[1,1]
+    def fy(self): return self.K[1,1]
 
     @property
-    def cx(self): 
-        return self.K[0,2]
+    def cx(self): return self.K[0,2]
 
     @property
-    def cy(self): 
-        return self.K[1,2]
+    def cy(self): return self.K[1,2]
 
     @property
-    def k1(self): 
-        return self.D[0]
+    def k1(self): return self.D[0]
 
     @property
-    def k2(self): 
-        return self.D[1]
+    def k2(self): return self.D[1]
 
     @property
-    def k3(self): 
-        return self.D[4]
+    def k3(self): return self.D[4]
 
     @property
-    def p1(self): 
-        return self.D[2]
+    def p1(self): return self.D[2]
 
     @property
-    def p2(self): 
-        return self.D[3]
+    def p2(self): return self.D[3]
 
     @property
     def fov(self): 

@@ -3,7 +3,7 @@ import networkx as nx
 
 from collections import deque, defaultdict, Counter
 from itertools import izip
-from bot_utils.misc import print_red
+from bot_utils.misc import print_red, print_green
 
 from pygtsam import extractPose2, extractPose3, extractKeys
 from pygtsam import symbol as _symbol
@@ -90,10 +90,13 @@ class BaseSLAM(object):
             # Dictionary pointing to smartfactor set
             # for each landmark id
             self.lid_factors_ = defaultdict(SmartFactor)
+            # self.lid_factors_ = defaultdict(lambda: SmartFactor(rankTol=1, linThreshold=-1, manageDegeneracy=True))
+            self.lid_to_xids_ = defaultdict(list)
+
             self.lid_update_needed_ = np.int64([])
 
             # Measurement noise (1 px in u and v)
-            self.image_measurement_noise_ = Diagonal.Sigmas(vec(2.0, 2.0))
+            self.image_measurement_noise_ = Diagonal.Sigmas(vec(4.0, 4.0))
 
             # # Mainly meant for synchronization of 
             # # ids across time frames for SFM/VSLAM 
@@ -136,26 +139,26 @@ class BaseSLAM(object):
     def edges(self): 
         return self.xls_
 
-    def initialize(self, p_init=None): 
-        print_red('\t\t{:}::add_p0'.format(self.__class__.__name__))
-        x_id = symbol('x', 0)
+    def initialize(self, p_init=None, index=0): 
+        print_red('\t\t{:}::add_p0 index: {:}'.format(self.__class__.__name__, index))
+        x_id = symbol('x', index)
         pose0 = Pose3(p_init) if p_init is not None else Pose3()
             
         self.graph_.add(
             PriorFactorPose3(x_id, pose0, self.prior_noise_)
         )
         self.initial_.insert(x_id, pose0)
-        self.xs_[0] = pose0
-        self.idx_ = 0
+        self.xs_[index] = pose0
+        self.idx_ = index
 
         # Add node to graphviz
         self.gviz_.add_node(x_id) # , label='x0')
-        self.gviz_.node[x_id]['label'] = 'X 0'
+        self.gviz_.node[x_id]['label'] = 'X %i' % index
 
         # Add prior factor to graphviz
-        p_id = symbol('p', 0)
-        self.gviz_.add_edge(p_id, symbol('x', 0))
-        self.gviz_.node[p_id]['label'] = 'P 0'
+        p_id = symbol('p', index)
+        self.gviz_.add_edge(p_id, symbol('x', index))
+        self.gviz_.node[p_id]['label'] = 'P %i' % index
         self.gviz_.node[p_id]['color'] = 'blue'
         self.gviz_.node[p_id]['style'] = 'filled'
         self.gviz_.node[p_id]['shape'] = 'box'
@@ -244,6 +247,7 @@ class BaseSLAM(object):
         for (lid, l_id, pt) in izip(lids, l_ids, pts):
             # Insert smart factor based on landmark id
             self.lid_factors_[lid].add_single(Point2(vec(*pt)), x_id, self.image_measurement_noise_, self.K_)
+            self.lid_to_xids_[lid].append(xid)
 
         # Add to landmark measurements
         self.xls_.extend([(xid, lid) for lid in lids])
@@ -262,10 +266,14 @@ class BaseSLAM(object):
         add_lids = []
         old_lids = np.setdiff1d(smart_lids, lids)
         for lid in old_lids:
+            degenerate = self.lid_factors_[lid].isDegenerate()
             if self.lid_count_[lid] >= 3: 
                 self.graph_.add(self.lid_factors_[lid])
                 add_lids.append(lid)
+                assert(not degenerate)
+                # print_green('[{:}] Sufficient factors ({:}) : Adding lid {:} '.format(degenerate, self.lid_count_[lid], lid))
             else: 
+                # print_red('[{:}] Insufficient factors ({:}) : Removing lid {:} '.format(degenerate, self.lid_count_[lid], lid))
                 del self.lid_factors_[lid]
         self.lid_update_needed_ = np.union1d(self.lid_update_needed_, add_lids)
         print 'Difference, to be added to graph', len(add_lids)
@@ -341,8 +349,6 @@ class BaseSLAM(object):
                 # self.gviz_.node[l_id]['style'] = 'filled'
         
         return 
-
-        
 
     def add_landmark_points_incremental_smart(self, lids, pts): 
         """
@@ -424,9 +430,35 @@ class BaseSLAM(object):
         ids, pts3 = [], []
         for lid in self.lid_update_needed_: 
             smart = self.lid_factors_[lid]
-            if not smart.isDegenerate(): 
+
+            l_id = symbol('l', lid)
+
+            # Add triangulated smart factors back into the graph
+            # for complete point-pose optimization
+            # Each of the projection factors, including the
+            # points, and their initial values are added back to the 
+            # graph. Optionally, we can choose to subsample and add
+            # only a few measurements from the set of original 
+            # measurements
+            if not smart.isDegenerate():
+                pts = smart.measured()
+                assert len(pts) == len(self.lid_to_xids_[lid])
+
+                # Add each of the smart factor measurements to the 
+                # factor graph
+                for xid,pt in zip(self.lid_to_xids_[lid], pts): 
+                    self.graph_.add(GenericProjectionFactorPose3Point3Cal3_S2(
+                        pt, self.image_measurement_noise_, symbol('x', xid), l_id, self.K_))
+                
+                # Initialize the point value
+                pt3 = smart.point_compute(current)
+                self.initial_.insert(l_id, pt3)
+                self.ls_[lid] = pt3
+
+                # Add the points for visualization 
                 ids.append(lid)
-                pts3.append(smart.point_compute(current).vector().ravel())
+                pts3.append(pt3.vector().ravel())
+
             del self.lid_factors_[lid]
             del self.lid_count_[lid]
 
