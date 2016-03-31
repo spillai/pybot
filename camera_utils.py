@@ -283,6 +283,18 @@ class CameraExtrinsic(RigidTransform):
     def __repr__(self): 
         return 'CameraExtrinsic =======>\npose = {:}'.format(RigidTransform.__repr__(self))
 
+    def c2w(self, X): 
+        """
+        Transform points in camera coordinates to world
+        """
+        return self * X
+
+    def w2c(self, X): 
+        """
+        Transform points from world coordinates to camera
+        """
+        return self.inverse() * X
+        
     @classmethod
     def from_rigid_transform(cls, p): 
         R, t = p.to_Rt()
