@@ -66,7 +66,8 @@ class FeatureDetector(object):
         # Determine detector type that implements detect
         try: 
             self.detector_ = FeatureDetector.detectors[method](**params)
-        except: 
+        except Exception,e:
+            print e
             raise RuntimeError('Unknown detector type: %s! Use from {:}'.format(FeatureDetector.detectors.keys()))
 
         # Only support grid and pyramid with gftt and fast

@@ -27,14 +27,14 @@ class EpipolarViz(object):
         self.fixed_reference_ = fixed_reference
 
         if detector == 'apriltag': 
-            params = FeatureDetector.apriltag_detector_params
+            params = FeatureDetector.apriltag_params
         elif detector == 'fast': 
-            params = FeatureDetector.fast_detector_params
+            params = FeatureDetector.fast_params
             params.params.threshold = 80
         else: 
             raise ValueError('Unknown detector type {:}'.format(detector))
 
-        self.fdet_ = FeatureDetector(params)
+        self.fdet_ = FeatureDetector(method=detector, params=params)
  
     def add(self, im, camera): 
         if self.fixed_reference_ and not len(self.frames_): 
