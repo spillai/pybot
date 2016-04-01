@@ -46,7 +46,7 @@ class IndexedDeque(object):
     @property
     def length(self): 
         """ 
-        Returns the length of the track
+        Returns the entire length of the track
         including deleted/popped items
         from the queue
         """
@@ -123,6 +123,10 @@ class TrackManager(object):
     @property
     def ids(self): 
         return np.array(self.tracks_.keys())
+
+    @property
+    def lengths(self): 
+        return np.int32([ track.length for track in self.tracks_.itervalues() ])
 
     @property
     def index(self): 

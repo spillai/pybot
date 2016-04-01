@@ -38,6 +38,12 @@ class BaseKLT(object):
     """
     General-purpose KLT tracker that combines the use of FeatureDetector and 
     OpticalFlowTracker class. 
+
+        min_track_length:   Defines the minimum length of the track that returned. 
+                            Other shorter tracks are still considered while tracking
+        
+        max_track_length:   Maximum deque length for track history lookup
+
     """
     default_detector_params = AttrDict(method='fast', grid=(12,10), max_corners=1200, 
                                        max_levels=4, subpixel=False, params=FeatureDetector.fast_params)
@@ -50,39 +56,55 @@ class BaseKLT(object):
     def __init__(self, 
                  detector=default_detector, 
                  tracker=default_tracker,  
-                 max_track_length=4, min_tracks=1200, mask_size=9): 
-
+                 min_track_length=3, max_track_length=4, min_tracks=1200, mask_size=9): 
+        
         # BaseKLT Params
         self.detector_ = detector
         self.tracker_ = tracker
 
         # Track Manager
         self.tm_ = TrackManager(maxlen=max_track_length)
+        self.min_track_length_ = min_track_length
         self.min_tracks_ = min_tracks
         self.mask_size_ = mask_size
 
     @classmethod
     def from_params(cls, detector_params=default_detector_params, 
                     tracker_params=default_tracker_params,
-                    max_track_length=4, min_tracks=1200, mask_size=9): 
+                    min_track_length=3, max_track_length=4, min_tracks=1200, mask_size=9): 
 
         # Setup detector and tracker
         detector = FeatureDetector(**detector_params)
         tracker = OpticalFlowTracker.create(**tracker_params)
         return cls(detector, tracker, 
-                   max_track_length=max_track_length, min_tracks=min_tracks, mask_size=mask_size)
+                   min_track_length=min_track_length, max_track_length=max_track_length, 
+                   min_tracks=min_tracks, mask_size=mask_size)
 
     def register_on_track_delete_callback(self, cb): 
         self.tm_.register_on_track_delete_callback(cb)
 
     def create_mask(self, shape, pts): 
+        """
+        Create a mask image to prevent feature extraction around regions
+        that already have features detected. i.e prevent feature crowding
+        """
+
         mask = np.ones(shape=shape, dtype=np.uint8) * 255
+        all_pts = np.vstack([self.aug_pts_, pts]) if hasattr(self, 'aug_pts_') \
+                  else pts
         try: 
-            for pt in pts: 
+            for pt in all_pts: 
                 cv2.circle(mask, tuple(map(int, pt)), self.mask_size_, 0, -1, lineType=cv2.CV_AA)
         except:
             pass
         return mask
+
+    def augment_mask(self, pts): 
+        """
+        Augment the mask of tracked features with additional features. 
+        Usually, this is called when features are propagated from map points
+        """
+        self.aug_pts_ = pts
 
     def draw_tracks(self, out, colored=False, color_type='unique', max_track_length=4):
         """
@@ -109,14 +131,14 @@ class BaseKLT(object):
             cv2.rectangle(out, (tl[0], tl[1]), (br[0], br[1]), tuple(col), -1)
 
     def viz(self, out, colored=False): 
-        if not len(self.tm_.pts): 
+        if not len(self.latest_pts):
             return
 
         N = 20
         cols = colormap(np.linspace(0, 1, N))
-        valid = finite_and_within_bounds(self.tm_.pts, out.shape)
+        valid = finite_and_within_bounds(self.latest_pts, out.shape)
 
-        for tid, pt in izip(self.tm_.ids[valid], self.tm_.pts[valid]): 
+        for tid, pt in izip(self.tm_.ids[valid], self.latest_pts[valid]): 
             cv2.rectangle(out, tuple(map(int, pt-2)), tuple(map(int, pt+2)), 
                           tuple(map(int, cols[tid % N])) if colored else (0,240,0), -1)
 
@@ -139,9 +161,15 @@ class BaseKLT(object):
     def latest_ids(self): 
         return self.tm_.ids
 
+        # valid = self.tm_.lengths >= self.min_track_length_
+        # return self.tm_.ids[valid]
+
     @property
     def latest_pts(self): 
         return self.tm_.pts
+
+        # valid = self.tm_.lengths >= self.min_track_length_
+        # return self.tm_.pts[valid]
 
 class OpenCVKLT(BaseKLT): 
     """
@@ -180,7 +208,7 @@ class OpenCVKLT(BaseKLT):
         if self.add_features_: 
             # Extract features
             mask = self.create_mask(im.shape, ppts)            
-            # imshow_cv('mask', mask)
+            imshow_cv('mask', mask)
 
             if detected_pts is None: 
 
@@ -197,7 +225,9 @@ class OpenCVKLT(BaseKLT):
             self.tm_.add(new_pts, ids=None, prune=False)
             self.add_features_ = False
 
-        return self.tm_.ids, self.tm_.pts
+        # Returns only tracks that have a minimum trajectory length
+        # This is different from self.tm_.ids, self.tm_.pts
+        return self.latest_ids, self.latest_pts
 
 class MeshKLT(OpenCVKLT): 
     """

@@ -276,7 +276,6 @@ class BaseSLAM(object):
         self.lid_update_needed_ = np.union1d(self.lid_update_needed_, add_lids)
         print 'Difference, to be added to graph', len(add_lids)
 
-
         # # Add landmark edge to graphviz
         # for l_id in l_ids: 
         #     self.gviz_.add_edge(x_id, l_id)

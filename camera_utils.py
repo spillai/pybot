@@ -48,8 +48,15 @@ def project_points(pts):
 
 def sampson_error(F, pts1, pts2): 
     """
-    Computes the sampson error for F, and 
-    points pts1, pts2
+    Computes the sampson error for F, and points pts1, pts2. Sampson
+    error is the first order approximation to the geometric error.
+    Remember that this is a squared error.
+   
+    (x'^{T} * F * x)^2
+    -----------------
+    (F * x)_1^2 + (F * x)_2^2 + (F^T * x')_1^2 + (F^T * x')_2^2
+
+    where (F * x)_i^2 is the square of the i-th entry of the vector Fx
     """
     x1, x2 = unproject_points(pts1).T, unproject_points(pts2).T
     Fx1 = np.dot(F, x1)
@@ -325,6 +332,14 @@ class CameraExtrinsic(RigidTransform):
         Simulate a camera at identity
         """
         return cls.identity()
+
+    @property
+    def o2w(self): 
+        return self
+
+    @property
+    def w2o(self): 
+        return self.inverse()
 
     def save(self, filename): 
         R, t = p.to_Rt()
