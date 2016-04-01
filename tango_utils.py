@@ -134,6 +134,9 @@ class TangoLog(object):
         N = 10000
         heap = []
 
+        # Read messages in ascending order of timestamps
+        # Push messages onto the heap and pop such that 
+        # the order of timestamps is ensured to be increasing.
         p_t = 0
         for l in self.meta_:
             try: 
@@ -147,8 +150,9 @@ class TangoLog(object):
                 p_t = c_t
                 yield c_ch, c_data, c_t
             
-            heappush(heap, (t, ch, data))
-        
+            heappush(heap, (int(t), ch, data))
+
+        # Pop the rest of the heap
         for j in range(len(heap)): 
             c_t, c_ch, c_data = heappop(heap)
             assert(c_t >= p_t)
@@ -174,12 +178,13 @@ class TangoLogReader(LogReader):
         self.start_idx_ = start_idx
 
         # Initialize TangoLogReader with appropriate decoders
-        super(TangoLogReader, self).__init__(self.filename_, 
-                                             decoder=[
-                                                 TangoOdomDecoder(channel='RGB_VIO', every_k_frames=every_k_frames, noise=noise), 
-                                                 TangoImageDecoder(self.directory_, channel='RGB', 
-                                                                   shape=self.shape_, every_k_frames=every_k_frames)
-                                             ])
+        super(TangoLogReader, self).__init__(
+            self.filename_, 
+            decoder=[
+                TangoOdomDecoder(channel='RGB_VIO', every_k_frames=every_k_frames, noise=noise), 
+                TangoImageDecoder(self.directory_, channel='RGB', 
+                                  shape=self.shape_, every_k_frames=every_k_frames)
+            ])
         
         if isinstance(self.start_idx_, float):
             raise ValueError('start_idx in TangoReader expects an integer, provided {:}'.format(self.start_idx_))
@@ -261,8 +266,11 @@ class TangoLogController(LogController):
         # Keep a queue of finite lenght to ensure 
         # time-sync with RGB and IMU
         self.__pose_q = deque(maxlen=10)
+        # self.__item_q = deque(maxlen=3)
 
     def on_rgb(self, t_img, img): 
+        # self.__item_q.append((0, t_img, img))
+
         if not len(self.__pose_q):
             return
 
@@ -270,7 +278,21 @@ class TangoLogController(LogController):
         self.on_frame(t_pose, t_img, pose, img)
 
     def on_pose(self, t, pose): 
+        # self.__item_q.append((1, t, pose))
         self.__pose_q.append((t,pose))
+
+        # # If RGB_VIO, RGB, RGB_VIO in stream, then interpolate pose
+        # # b/w the 1st and 3rd timestamps to match RGB timestamps
+        # if len(self.__item_q) >= 3 and \
+        #    self.__item_q[-1][0] == self.__item_q[-3][0] == 1 and \
+        #    self.__item_q[-2][0] == 0: 
+        #     t1,t2,t3 = self.__item_q[-3][1], self.__item_q[-2][1], self.__item_q[-1][1]
+        #     w2, w1 = np.float32([t2-t1, t3-t2]) / (t3-t1)
+        #     p1,p3 = self.__item_q[-3][2], self.__item_q[-1][2]
+        #     p2 = p1.interpolate(p3, w1)
+        #     self.on_frame(t2, t2, p2, self.__item_q[-2][2])
+        #     print np.array_str(np.float64([t1, t2, t3]) * 1e-14, precision=6, suppress_small=True), \
+        #         (t2-t1) * 1e-6, (t3-t2) * 1e-6, w1, w2, p2
 
     def on_frame(self, t_pose, t_img, pose, img): 
         raise NotImplementedError()
