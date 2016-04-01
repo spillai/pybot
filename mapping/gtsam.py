@@ -91,7 +91,7 @@ class BaseSLAM(object):
             # for each landmark id
             self.lid_factors_ = defaultdict(SmartFactor)
             # self.lid_factors_ = defaultdict(lambda: SmartFactor(rankTol=1, linThreshold=-1, manageDegeneracy=True))
-            self.lid_to_xids_ = defaultdict(list)
+            # self.lid_to_xids_ = defaultdict(list)
 
             self.lid_update_needed_ = np.int64([])
 
@@ -247,7 +247,7 @@ class BaseSLAM(object):
         for (lid, l_id, pt) in izip(lids, l_ids, pts):
             # Insert smart factor based on landmark id
             self.lid_factors_[lid].add_single(Point2(vec(*pt)), x_id, self.image_measurement_noise_, self.K_)
-            self.lid_to_xids_[lid].append(xid)
+            # self.lid_to_xids_[lid].append(xid)
 
         # Add to landmark measurements
         self.xls_.extend([(xid, lid) for lid in lids])
@@ -432,7 +432,7 @@ class BaseSLAM(object):
             if smart.error(current) > px_error_threshold: 
                 del self.lid_factors_[lid]
                 del self.lid_count_[lid]
-                del self.lid_to_xids_[lid]
+                # del self.lid_to_xids_[lid]
 
         ids, pts3 = [], []
         for lid in self.lid_update_needed_: 
@@ -450,15 +450,15 @@ class BaseSLAM(object):
             # only a few measurements from the set of original 
             # measurements
             if not smart.isDegenerate():
+                # x_ids = smart.keys()
                 # pts = smart.measured()
-                # print len(pts), len(self.lid_to_xids_[lid])
-                # assert len(pts) == len(self.lid_to_xids_[lid])
+                # assert len(pts) == len(x_ids)
 
                 # # Add each of the smart factor measurements to the 
                 # # factor graph
-                # for xid,pt in zip(self.lid_to_xids_[lid], pts): 
+                # for x_id,pt in zip(x_ids, pts): 
                 #     self.graph_.add(GenericProjectionFactorPose3Point3Cal3_S2(
-                #         pt, self.image_measurement_noise_, symbol('x', xid), l_id, self.K_))
+                #         pt, self.image_measurement_noise_, x_id, l_id, self.K_))
                 
                 # Initialize the point value
                 pt3 = smart.point_compute(current)
@@ -471,7 +471,7 @@ class BaseSLAM(object):
 
             del self.lid_factors_[lid]
             del self.lid_count_[lid]
-            del self.lid_to_xids_[lid]
+            # del self.lid_to_xids_[lid]
 
         # Reset lid updates for newer ids 
         self.lid_update_needed_ = np.int64([])
