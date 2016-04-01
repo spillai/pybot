@@ -29,6 +29,6 @@ def draw_lines(im, pts1, pts2, colors=None, thickness=1):
 
 
 def draw_matches(out, pts1, pts2, colors=None, thickness=1, size=2): 
-    out = draw_features(out, pts2, colors=colors, size=size)
     out = draw_lines(out, pts1, pts2, colors=colors, thickness=thickness)
+    out = draw_features(out, pts2, colors=colors, size=size)
     return out

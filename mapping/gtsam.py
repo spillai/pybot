@@ -96,7 +96,7 @@ class BaseSLAM(object):
             self.lid_update_needed_ = np.int64([])
 
             # Measurement noise (1 px in u and v)
-            self.image_measurement_noise_ = Diagonal.Sigmas(vec(2.0, 2.0))
+            self.image_measurement_noise_ = Diagonal.Sigmas(vec(1.0, 1.0))
 
             # # Mainly meant for synchronization of 
             # # ids across time frames for SFM/VSLAM 
@@ -266,7 +266,7 @@ class BaseSLAM(object):
         add_lids = []
         old_lids = np.setdiff1d(smart_lids, lids)
         for lid in old_lids:
-            if self.lid_count_[lid] >= 3: 
+            if self.lid_count_[lid] >= 2: 
                 self.graph_.add(self.lid_factors_[lid])
                 add_lids.append(lid)
                 # print_green('Sufficient factors ({:}) : Adding lid {:} '.format(self.lid_count_[lid], lid))
@@ -274,7 +274,7 @@ class BaseSLAM(object):
                 # print_red('Insufficient factors ({:}) : Removing lid {:} '.format(self.lid_count_[lid], lid))
                 del self.lid_factors_[lid]
         self.lid_update_needed_ = np.union1d(self.lid_update_needed_, add_lids)
-        print 'Difference, to be added to graph', len(add_lids)
+        # print 'Difference, to be added to graph', len(add_lids)
 
         # # Add landmark edge to graphviz
         # for l_id in l_ids: 
@@ -425,7 +425,7 @@ class BaseSLAM(object):
         """
         current = self.slam_.calculateEstimate()
 
-        px_error_threshold = 3        
+        px_error_threshold = 4
         # Remove smart factors whose reprojection errors are large
         for lid in self.lid_factors_.keys(): 
             smart = self.lid_factors_[lid]
