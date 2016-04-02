@@ -4,6 +4,7 @@ import networkx as nx
 from collections import deque, defaultdict, Counter
 from itertools import izip
 from bot_utils.misc import print_red, print_green
+from bot_utils.db_utils import AttrDict
 
 from pygtsam import extractPose2, extractPose3, extractKeys
 from pygtsam import symbol as _symbol
@@ -89,14 +90,16 @@ class BaseSLAM(object):
             
             # Dictionary pointing to smartfactor set
             # for each landmark id
-            self.lid_factors_ = defaultdict(SmartFactor)
+            self.lid_factors_ = defaultdict(lambda : AttrDict(added=False, dirty=False, factor=SmartFactor()))
+
             # self.lid_factors_ = defaultdict(lambda: SmartFactor(rankTol=1, linThreshold=-1, manageDegeneracy=True))
-            # self.lid_to_xids_ = defaultdict(list)
 
-            self.lid_update_needed_ = np.int64([])
+            # self.lid_added_ = set()
 
+            # self.lid_update_needed_ = np.int64([])
+            
             # Measurement noise (1 px in u and v)
-            self.image_measurement_noise_ = Diagonal.Sigmas(vec(1.0, 1.0))
+            self.image_measurement_noise_ = Diagonal.Sigmas(vec(2.0, 2.0))
 
             # # Mainly meant for synchronization of 
             # # ids across time frames for SFM/VSLAM 
@@ -113,7 +116,7 @@ class BaseSLAM(object):
         # Pose3D measurement
         self.measurement_noise_ = Isotropic.Sigma(6, 0.4)
         self.prior_noise_ = Isotropic.Sigma(6, 0.01)
-        self.odo_noise_ = Isotropic.Sigma(6, 0.01)
+        self.odo_noise_ = Isotropic.Sigma(6, 0.005)
 
         # Optimized robot state
         self.xs_ = {}
@@ -233,10 +236,10 @@ class BaseSLAM(object):
     def add_landmark_points_smart(self, xid, lids, pts): 
         print_red('\t\t{:}::add_landmark_points_smart {:}->{:}'.format(self.__class__.__name__, xid, len(lids)))
         
-        # Add landmark-ids to ids queue in order to check
-        # consistency in matches between keyframes. This 
-        # allows an easier interface to check overlapping 
-        # ids across successive function calls.
+        # Add landmark-ids to ids queue in order to check consistency
+        # in matches between keyframes. This allows an easier
+        # interface to check overlapping ids across successive
+        # function calls.
         self.lid_count_ += Counter(lids)
 
         # Add Pose-Pose landmark factor
@@ -246,34 +249,42 @@ class BaseSLAM(object):
         assert(len(l_ids) == len(pts))
         for (lid, l_id, pt) in izip(lids, l_ids, pts):
             # Insert smart factor based on landmark id
-            self.lid_factors_[lid].add_single(Point2(vec(*pt)), x_id, self.image_measurement_noise_, self.K_)
-            # self.lid_to_xids_[lid].append(xid)
-
+            self.lid_factors_[lid].factor.add_single(
+                Point2(vec(*pt)), x_id, self.image_measurement_noise_, self.K_)
+            self.lid_factors_[lid].dirty = True
+            
         # Add to landmark measurements
         self.xls_.extend([(xid, lid) for lid in lids])
 
-        # Add smartfactors to the graph only if that 
-        # landmark ID is no longer visible. setdiff1d
-        # returns the set of IDs that are unique to 
-        # `smart_lids` (previously tracked) but not 
-        # in `lids` (current)
-        smart_lids = np.int64(self.lid_factors_.keys())
-
-        # Determine old lids that are no longer tracked
-        # and add only the ones that have at least 3
-        # observations. Delete old factors that have 
-        # insufficient number of observations
-        add_lids = []
-        old_lids = np.setdiff1d(smart_lids, lids)
-        for lid in old_lids:
-            if self.lid_count_[lid] >= 2: 
-                self.graph_.add(self.lid_factors_[lid])
-                add_lids.append(lid)
-                # print_green('Sufficient factors ({:}) : Adding lid {:} '.format(self.lid_count_[lid], lid))
-            else: 
-                # print_red('Insufficient factors ({:}) : Removing lid {:} '.format(self.lid_count_[lid], lid))
+        # Determine lids have at least 3 observations
+        curr_lids = set(lids)
+        smart_lids = self.lid_factors_.keys()
+        for lid in smart_lids:
+            item = self.lid_factors_[lid]
+            assert(item.dirty)
+            
+            # Delete old tracks
+            if lid not in curr_lids: 
                 del self.lid_factors_[lid]
-        self.lid_update_needed_ = np.union1d(self.lid_update_needed_, add_lids)
+                del self.lid_count_[lid]
+
+            # Check if lid has been added already
+            if item.added:
+                continue
+
+            # If no longer being tracked
+            if self.lid_count_[lid] >= 3: 
+                self.graph_.add(item.factor)
+                item.added = True
+
+            
+
+            #     # print_green('Sufficient factors ({:}) : Adding lid {:} '.format(self.lid_count_[lid], lid))
+            # else: 
+            #     # print_red('Insufficient factors ({:}) : Removing lid {:} '.format(self.lid_count_[lid], lid))
+            #     del self.lid_factors_[lid]
+            #     del self.lid_count_[lid]
+
         # print 'Difference, to be added to graph', len(add_lids)
 
         # # Add landmark edge to graphviz
@@ -425,57 +436,86 @@ class BaseSLAM(object):
         """
         current = self.slam_.calculateEstimate()
 
-        px_error_threshold = 4
         # Remove smart factors whose reprojection errors are large
-        for lid in self.lid_factors_.keys(): 
-            smart = self.lid_factors_[lid]
+        px_error_threshold = 2
+        for lid in self.lid_factors_.keys():
+            item = self.lid_factors_[lid]
+            
+            if not item.added or item.dirty: 
+                continue
+
+            smart = item.factor
             if smart.error(current) > px_error_threshold: 
                 del self.lid_factors_[lid]
                 del self.lid_count_[lid]
-                # del self.lid_to_xids_[lid]
 
+        # Compute the points for the rest of the smart factors
         ids, pts3 = [], []
-        for lid in self.lid_update_needed_: 
-            if lid not in self.lid_factors_: 
-                continue
+        smart_lids = self.lid_factors_.keys()
+        for lid in smart_lids: 
+            item = self.lid_factors_[lid]
 
+            # If the factor has not been updated, 
+            # no need to recompute
+            if not item.dirty or not item.added: 
+                continue
+            
             l_id = symbol('l', lid)
-            smart = self.lid_factors_[lid]
+            smart = self.lid_factors_[lid].factor
 
             # Add triangulated smart factors back into the graph
-            # for complete point-pose optimization
+            # for complete pose-graph optimization
+
             # Each of the projection factors, including the
             # points, and their initial values are added back to the 
             # graph. Optionally, we can choose to subsample and add
             # only a few measurements from the set of original 
             # measurements
-            if not smart.isDegenerate():
-                # x_ids = smart.keys()
-                # pts = smart.measured()
-                # assert len(pts) == len(x_ids)
 
-                # # Add each of the smart factor measurements to the 
-                # # factor graph
-                # for x_id,pt in zip(x_ids, pts): 
-                #     self.graph_.add(GenericProjectionFactorPose3Point3Cal3_S2(
-                #         pt, self.image_measurement_noise_, x_id, l_id, self.K_))
-                
+            # assert(lid not in self.ls_)
+            if not smart.isDegenerate():
                 # Initialize the point value
                 pt3 = smart.point_compute(current)
-                # self.initial_.insert(l_id, pt3)
                 self.ls_[lid] = pt3
 
                 # Add the points for visualization 
                 ids.append(lid)
                 pts3.append(pt3.vector().ravel())
 
-            del self.lid_factors_[lid]
-            del self.lid_count_[lid]
-            # del self.lid_to_xids_[lid]
 
-        # Reset lid updates for newer ids 
-        self.lid_update_needed_ = np.int64([])
+        # # If not dirty, it implies that the lids are no longer tracked
+        # smart_lids = self.lid_factors_.keys()
+        # for lid in smart_lids:
 
+        #     # If not dirty and has been added, now ready to be added
+        #     # to the pose-graph
+        #     if not item.dirty:
+        #         # if item.added: 
+        #         #     smart = item.factor
+        #         #     pt3 = smart.point_compute(current)
+
+        #         #     x_ids = smart.keys()
+        #         #     pts = smart.measured()
+        #         #     assert len(pts) == len(x_ids)
+
+        #         #     # Add each of the smart factor measurements to the 
+        #         #     # factor graph
+        #         #     for x_id,pt in zip(x_ids, pts): 
+        #         #         self.graph_.add(GenericProjectionFactorPose3Point3Cal3_S2(
+        #         #             pt, self.image_measurement_noise_, x_id, l_id, self.K_))
+
+        #         #     if lid not in self.ls_: 
+        #         #         self.initial_.insert(l_id, pt3)
+        #         #     self.ls_[lid] = pt3
+
+        #         # Finish up and delete the factor altogether
+        #         del self.lid_factors_[lid]
+
+        #     # Reset dirtyness
+        #     else: 
+        #         item.dirty = False
+
+        # Return the reconstructed points
         try: 
             ids, pts3 = np.int64(ids).ravel(), np.vstack(pts3)
             assert(len(ids) == len(pts3))

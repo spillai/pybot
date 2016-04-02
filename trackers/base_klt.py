@@ -208,7 +208,7 @@ class OpenCVKLT(BaseKLT):
         if self.add_features_: 
             # Extract features
             mask = self.create_mask(im.shape, ppts)            
-            imshow_cv('mask', mask)
+            # imshow_cv('mask', mask)
 
             if detected_pts is None: 
 
