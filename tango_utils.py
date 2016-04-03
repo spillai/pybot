@@ -86,19 +86,21 @@ def TangoOdomDecoder(channel, every_k_frames=1, noise=[0,0]):
 class TangoImageDecoder(Decoder): 
     """
     """
-    def __init__(self, directory, channel='RGB', every_k_frames=1, shape=(720,1280)): 
+    def __init__(self, directory, channel='RGB', color=True, every_k_frames=1, shape=(720,1280)): 
         Decoder.__init__(self, channel=channel, every_k_frames=every_k_frames)
-        self.shape = shape 
-        self.directory = directory
+        self.shape_ = shape 
+        self.directory_ = directory
+        self.color_ = color
 
     def decode(self, msg): 
-        fn = os.path.join(self.directory, msg)
+        fn = os.path.join(self.directory_, msg)
         if os.path.exists(fn): 
-            im = cv2.imread(fn, cv2.CV_LOAD_IMAGE_COLOR)
-            return im_resize(im, shape=self.shape)
+            im = cv2.imread(fn, 
+                            cv2.CV_LOAD_IMAGE_COLOR if self.color_ \
+                            else cv2.CV_LOAD_IMAGE_GRAYSCALE)
+            return im_resize(im, shape=self.shape_)
         else: 
             raise Exception('File does not exist')
-
 
 class TangoLog(object): 
     def __init__(self, filename): 
@@ -162,28 +164,45 @@ class TangoLog(object):
 
 class TangoLogReader(LogReader): 
 
-    H, W = 720, 1280
-    K = np.float64([1043.75, 0, 638.797, 0, 1043.75, 357.991, 0, 0, 1]).reshape(3,3)
-    D = np.float64([0.234583, -0.689864, 0, 0, 0.679871])
-    cam = CameraIntrinsic(K=K, D=D, shape=(H,W))
+    cam = CameraIntrinsic(
+        K=np.float64([1043.75, 0, 638.797, 0, 1043.75, 357.991, 0, 0, 1]).reshape(3,3), 
+        D=np.float64([0.234583, -0.689864, 0, 0, 0.679871]), 
+        shape=(720, 1280)
+    )
 
+    # fisheye_cam = CameraIntrinsic(
+    #     K=np.float64([256.207, 0, 326.606, 0, 256.279, 244.754, 0, 0, 1]).reshape(3,3), 
+    #     D=np.float64([0.234583, -0.689864, 0, 0, 0.679871]), 
+    #     0.925577
+    #     shape=(480, 640)
+    # )
+
+
+    # fisheye_cam = CameraIntrinsic(K=)
     def __init__(self, directory, scale=1., start_idx=0, every_k_frames=1, noise=[0,0]): 
         
         # Set directory and filename for time synchronized log reads 
         self.directory_ = os.path.expanduser(directory)
         self.filename_ = os.path.join(self.directory_, 'tango_data.txt')
+
         self.scale_ = scale
-        self.shape_ = (int(TangoLogReader.W * scale), int(TangoLogReader.H * scale))
+        self.calib_ = TangoLogReader.cam.scaled(self.scale_)
+        self.shape_ = self.calib_.shape
+
         assert(self.shape_[0] % 2 == 0 and self.shape_[1] % 2 == 0)
         self.start_idx_ = start_idx
 
         # Initialize TangoLogReader with appropriate decoders
+        H, W = self.shape_
+
         super(TangoLogReader, self).__init__(
             self.filename_, 
             decoder=[
                 TangoOdomDecoder(channel='RGB_VIO', every_k_frames=every_k_frames, noise=noise), 
-                TangoImageDecoder(self.directory_, channel='RGB', 
-                                  shape=self.shape_, every_k_frames=every_k_frames)
+                TangoImageDecoder(self.directory_, channel='RGB', color=True, 
+                                  shape=(W,H), every_k_frames=every_k_frames)
+                # TangoImageDecoder(self.directory_, channel='FISHEYE', color=False, 
+                #                   shape=self.shape_, every_k_frames=every_k_frames)
             ])
         
         if isinstance(self.start_idx_, float):
@@ -202,7 +221,7 @@ class TangoLogReader(LogReader):
         See /sdcard/config/calibration.xml
         1043.75;   1043.69;   638.797;   357.991;   0.234583;   -0.689864;   0.679871
         """
-        return TangoLogReader.cam.scaled(self.scale_)
+        return self.calib_ 
 
     def load_log(self, filename): 
         return TangoLog(filename)
