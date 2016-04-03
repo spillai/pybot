@@ -340,8 +340,8 @@ class VSLAM(BaseSLAM):
 
         self.lid_update_needed_ = np.int64([])
         
-        # Measurement noise (1 px in u and v)
-        self.image_measurement_noise_ = Diagonal.Sigmas(vec(4.0, 4.0))
+        # Measurement noise (2 px in u and v)
+        self.image_measurement_noise_ = Diagonal.Sigmas(vec(1.0, 1.0))
 
 
     def add_landmark_points_smart(self, xid, lids, pts): 
@@ -386,9 +386,6 @@ class VSLAM(BaseSLAM):
             else: 
                 del self.lid_factors_[lid]
         
-        # if xid % 30 == 0: 
-        #     self.slam_.printStats()
-
         return 
 
     def add_landmark_points_incremental_smart(self, lids, pts): 
@@ -432,9 +429,9 @@ class VSLAM(BaseSLAM):
             # only a few measurements from the set of original 
             # measurements
             if not smart.isDegenerate() and not smart.isPointBehindCamera():
-                # x_ids = smart.keys()
-                # pts = smart.measured()
-                # assert len(pts) == len(x_ids)
+                x_ids = smart.keys()
+                pts = smart.measured()
+                assert len(pts) == len(x_ids)
 
                 # # Add each of the smart factor measurements to the 
                 # # factor graph
@@ -444,7 +441,8 @@ class VSLAM(BaseSLAM):
                 
                 # Initialize the point value
                 pt3 = smart.point_compute(current)
-                # self.initial_.insert(l_id, pt3)
+                # if lid not in self.ls_: 
+                #     self.initial_.insert(l_id, pt3)
                 self.ls_[lid] = pt3
 
                 # Add the points for visualization 
