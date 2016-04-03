@@ -410,12 +410,18 @@ class Camera(CameraIntrinsic, CameraExtrinsic):
             x, X = x[valid], X[valid]
             
         if return_depth: 
-            # Transform points in camera frame, and check z-vector: 
-            # [p_c = T_cw * p_w]
-            depths = (self.extrinsics * X)[:,2]
+            depths = self.depth_from_projection(X)
             return x, depths
-	
         return x
+
+    def depth_from_projection(self, X): 
+        """
+        Determine the depth of the [Nx3] points given camera pose
+        
+        Transform points in camera frame, and check z-vector: 
+        [p_c = T_cw * p_w]
+        """
+        return (self.extrinsics * X)[:,2]
 
     def factor(self): 
         """
