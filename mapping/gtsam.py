@@ -156,7 +156,7 @@ class BaseSLAM(object):
         pdelta = Pose3(delta)
         x_id1, x_id2 = symbol('x', xid1), symbol('x', xid2)
         self.graph_.add(BetweenFactorPose3(x_id1, x_id2, 
-                                           pdelta, self.odo_noise_))
+                                               pdelta, self.odo_noise_))
         
         # Predict pose and add as initial estimate
         pred_pose = self.xs_[xid1].compose(pdelta)
@@ -341,7 +341,7 @@ class VSLAM(BaseSLAM):
         self.lid_update_needed_ = np.int64([])
         
         # Measurement noise (1 px in u and v)
-        self.image_measurement_noise_ = Diagonal.Sigmas(vec(1.0, 1.0))
+        self.image_measurement_noise_ = Diagonal.Sigmas(vec(4.0, 4.0))
 
 
     def add_landmark_points_smart(self, xid, lids, pts): 
@@ -381,11 +381,14 @@ class VSLAM(BaseSLAM):
         old_lids = np.setdiff1d(smart_lids, lids)
         for lid in old_lids:
             if self.lid_count_[lid] >= self.min_landmark_obs_: 
-                self.graph_.add(self.lid_factors_[lid])
+                # self.graph_.add(self.lid_factors_[lid])
                 self.lid_update_needed_.append(lid)
             else: 
                 del self.lid_factors_[lid]
         
+        # if xid % 30 == 0: 
+        #     self.slam_.printStats()
+
         return 
 
     def add_landmark_points_incremental_smart(self, lids, pts): 
@@ -428,7 +431,7 @@ class VSLAM(BaseSLAM):
             # graph. Optionally, we can choose to subsample and add
             # only a few measurements from the set of original 
             # measurements
-            if not smart.isDegenerate():
+            if not smart.isDegenerate() and not smart.isPointBehindCamera():
                 # x_ids = smart.keys()
                 # pts = smart.measured()
                 # assert len(pts) == len(x_ids)
