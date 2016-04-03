@@ -9,8 +9,9 @@ g_timers = OrderedDict()
 
 def named_timer(name): 
     global g_timers
+    header = '\n' if len(g_timers) == 0 else ''
     if name not in g_timers: 
-        g_timers[name] = SimpleTimer(name)
+        g_timers[name] = SimpleTimer(name, header=header)
     try: 
         return g_timers[name] 
     except KeyError, e: 
@@ -40,9 +41,10 @@ def timeit(func):
     return wrapper
 
 class SimpleTimer: 
-    def __init__(self, name='', hz=1.0): 
+    def __init__(self, name='', hz=1.0, header=''): 
         self.name_ = name
         self.hz_ = hz
+        self.header_ = header
 
         self.counter_ = 0
         self.last_ = time.time()
@@ -59,7 +61,7 @@ class SimpleTimer:
         if (now-self.last_print_) > 1.0 / self.hz_: 
             T = dt / self.counter_
             fps = self.hz_ / T
-            print_green('\t[%5.1f ms, %3.1f Hz ]\t%s' % (T * 1e3, fps, self.name_, ))
+            print_green('%s\t[%5.1f ms, %3.1f Hz ]\t%s' % (self.header_, T * 1e3, fps, self.name_, ))
             self.last_ = now
             self.last_print_ = now
             self.counter_ = 0
@@ -73,7 +75,7 @@ class SimpleTimer:
         if (now-self.last_print_) > 1.0 / self.hz_:
             T = self.period_ / self.counter_
             fps = self.hz_ / T
-            print_green('\t[%5.1f ms, %3.1f Hz ]\t%s' % (T * 1e3, fps, self.name_, ))
+            print_green('%s\t[%5.1f ms, %3.1f Hz ]\t%s' % (self.header_, T * 1e3, fps, self.name_, ))
             self.last_ = now
             self.last_print_ = now
             self.last_fps_ = fps
