@@ -24,6 +24,10 @@ from pygtsam import ISAM2, NonlinearOptimizer, \
 
 np.set_printoptions(precision=2, suppress=True)
 
+# REMOVE
+from bot_utils.timer import SimpleTimer, timeitmethod
+
+
 def symbol(ch, i): 
     return _symbol(ord(ch), i)
 
@@ -146,7 +150,7 @@ class BaseSLAM(object):
         self.idx_ += 1
 
     def add_odom(self, xid1, xid2, delta): 
-        print_red('\t\t{:}::add_odom {:}->{:}'.format(self.__class__.__name__, xid1, xid2))
+        # print_red('\t\t{:}::add_odom {:}->{:}'.format(self.__class__.__name__, xid1, xid2))
 
         # Add odometry factor
         pdelta = Pose3(delta)
@@ -164,7 +168,7 @@ class BaseSLAM(object):
         self.gviz_.node[x_id2]['label'] = 'X ' + str(xid2)
 
     def add_landmark(self, xid, lid, delta): 
-        print_red('\t\t{:}::add_landmark {:}->{:}'.format(self.__class__.__name__, xid, lid))
+        # print_red('\t\t{:}::add_landmark {:}->{:}'.format(self.__class__.__name__, xid, lid))
 
         # Add Pose-Pose landmark factor
         x_id = symbol('x', xid)
@@ -200,7 +204,7 @@ class BaseSLAM(object):
         return 
 
     def add_landmark_points(self, xid, lids, pts, pts3d): 
-        print_red('\t\tadd_landmark_points xid:{:}-> lid count:{:}'.format(xid, len(lids)))
+        # print_red('\t\tadd_landmark_points xid:{:}-> lid count:{:}'.format(xid, len(lids)))
         
         # Add landmark-ids to ids queue in order to check
         # consistency in matches between keyframes. This 
@@ -283,6 +287,7 @@ class BaseSLAM(object):
         # nx.draw_graphviz(self.gviz_, prog='neato')
         # nx_force_draw(self.gviz_)
 
+    @timeitmethod
     def update(self): 
         # Update ISAM with new nodes/factors and initial estimates
         self.slam_.update(self.graph_, self.initial_)
@@ -304,9 +309,9 @@ class BaseSLAM(object):
         self.graph_.resize(0)
         self.initial_.clear()
 
-        if self.index % 10 == 0 and self.index > 0: 
-            self.save_graph("slam_fg.dot")
-            self.save_dot_graph("slam_graph.dot")
+        # if self.index % 10 == 0 and self.index > 0: 
+        #     self.save_graph("slam_fg.dot")
+        #     self.save_dot_graph("slam_graph.dot")
 
 class VSLAM(BaseSLAM): 
     def __init__(self, calib, min_landmark_obs=3, px_error_threshold=4, update_on_odom=False): 
@@ -340,7 +345,7 @@ class VSLAM(BaseSLAM):
 
 
     def add_landmark_points_smart(self, xid, lids, pts): 
-        print_red('\t\t{:}::add_landmark_points_smart {:}->{:}'.format(self.__class__.__name__, xid, len(lids)))
+        # print_red('\t\t{:}::add_landmark_points_smart {:}->{:}'.format(self.__class__.__name__, xid, len(lids)))
         
         # Add landmark-ids to ids queue in order to check
         # consistency in matches between keyframes. This 
@@ -392,6 +397,7 @@ class VSLAM(BaseSLAM):
         self.add_landmark_points_smart(self.latest, lids, pts)
 
 
+    @timeitmethod
     def smart_update(self): 
         """
         Update the smart factors and add 
@@ -451,8 +457,8 @@ class VSLAM(BaseSLAM):
             ids, pts3 = np.int64(ids).ravel(), np.vstack(pts3)
             assert(len(ids) == len(pts3))
             return ids, pts3
-        except Exception, e:
-            print('Could not return pts3, {:}'.format(e))
+        except Exception:
+            # print('Could not return pts3, {:}'.format(e))
             return np.int64([]), np.array([])        
         
     # def on_odom(self, t, odom): 
