@@ -56,7 +56,7 @@ class BaseKLT(object):
     def __init__(self, 
                  detector=default_detector, 
                  tracker=default_tracker,  
-                 min_track_length=3, max_track_length=4, min_tracks=1200, mask_size=9): 
+                 min_track_length=2, max_track_length=4, min_tracks=1200, mask_size=9): 
         
         # BaseKLT Params
         self.detector_ = detector
