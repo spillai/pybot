@@ -71,10 +71,10 @@ def TangoOdomDecoder(channel, every_k_frames=1, noise=[0,0]):
     def odom_decode(data): 
         """ x, y, z, qx, qy, qz, qw, status_code, confidence """
         p = np.float64(data.split(','))
-        if len(p) < 8:
+
+        # If incomplete data or status code is 0
+        if len(p) < 8 or p[7] == 0:
             raise Exception('TangoOdomDecoder.odom_decode :: Failed to retreive pose')
-        if p[7] == 0: 
-            raise Warning('TangoOdomDecoder.odom_decode :: Pose initializing.., status_code: 0')
 
         tvec, ori = p[:3], p[3:7]
         p_SD = RigidTransform(xyzw=ori, tvec=tvec)
@@ -259,8 +259,10 @@ class TangoLogReader(LogReader):
             if dec.should_decode():
                 return True, (t, channel, dec.decode(msg))
         except Exception as e:
-            pass
-            # raise RuntimeError('Failed to decode data from channel: %s, mis-specified decoder?' % channel)
+            
+            # pass
+            print e
+            raise RuntimeError('Failed to decode data from channel: %s, mis-specified decoder?' % channel)
         
         return False, (None, None, None)
 
