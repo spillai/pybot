@@ -189,7 +189,7 @@ class LKTracker(OpticalFlowTracker):
             p0r[st0 == 0] = np.nan
             
             # Set only good
-            fb_good = (np.fabs(p0r-p0) < 2).all(axis=1)
+            fb_good = (np.fabs(p0r-p0) < 3).all(axis=1)
             p1[~fb_good] = np.nan
 
         return p1
@@ -247,7 +247,7 @@ class FarnebackTracker(OpticalFlowTracker):
             
             # Check diff
             p0r = p1 + flow_p1
-            fb_good = (np.fabs(p0r-p0) < 2).all(axis=1)
+            fb_good = (np.fabs(p0r-p0) < 3).all(axis=1)
 
             # Set only good flow 
             flow_p0[~fb_good] = np.nan
