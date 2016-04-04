@@ -6,7 +6,8 @@
 import numpy as np
 import cv2
 import os.path
-from collections import deque
+import json
+from collections import deque, namedtuple
 from heapq import heappush, heappop
 from abc import ABCMeta, abstractmethod
 
@@ -102,8 +103,81 @@ class TangoImageDecoder(Decoder):
         else: 
             raise Exception('File does not exist')
 
+
+# Basic type for image annotations
+AnnotatedImage = namedtuple('AnnotatedImage', ['im', 'bboxes'])
+
+class TangoGroundTruthImageDecoder(TangoImageDecoder):
+    def __init__(self, directory, filename, channel='RGB', color=True, every_k_frames=1, shape=(720,1280)): 
+        self.filename_ = os.path.join(directory, filename)
+        if not os.path.exists(self.filename_): 
+            raise IOError('Cannot load ground truth file {:}'.format(self.filename_))
+        
+        TangoImageDecoder.__init__(self, directory, channel=channel, color=color, 
+                                   every_k_frames=every_k_frames, shape=shape)
+
+        # Look up dictionary {fn -> annotations}
+        self.meta_ = {}
+
+        # Read annotations from index.json
+        with open(self.filename_) as f: 
+            data = json.loads(f.read())
+            meta = {fn: frame for (fn, frame) in zip(data['fileList'], data['frames'])}
+
+            target_hash = {label['name']: lid for (lid,label) in enumerate(data['objects'])}
+            target_unhash = {lid: label['name'] for (lid,label) in enumerate(data['objects'])}
+
+            # print meta
+
+            # Establish all annotations with appropriate class labels and instances
+            for fn, val in meta.iteritems(): 
+                try: 
+                    polygons = val['polygon']
+                except: 
+                    continue
+
+                print polygons
+                    
+                annotations = []
+                for poly in polygons:
+                    xy = np.vstack([np.float32(poly['x']), np.float32(poly['y'])]).T
+
+                    # Object label as described by target hash
+                    lid = poly['object']
+
+                    # Trailing number after hyphen is instance id
+                    label = ''.join(target_unhash[lid].split('-')[:-1])
+                    instance_id = int(target_unhash[lid].split('-')[-1])
+                    annotations.append(
+                        dict(polygon=xy, class_label=label, class_id=None, instance_id=instance_id)
+                    )
+                self.meta_[str(fn)] = annotations
+
+        # unique_objects = set()
+        # for k,v in self.meta_iteritems():
+
+        print('\nGround Truth\n========\n'
+              '\tAnnotations: {:}\n'.format(len(self.meta_)))
+        print self.meta_
+
+    def decode(self, msg): 
+        """
+        Look up annotations based on basename of image
+        """
+        im = TangoImageDecoder.decode(self, msg)
+        basename = os.path.basename(msg)
+        # print('Retrieving annotations for {:}'.format(basename))
+        try: 
+            bboxes = self.meta_[basename]
+        except: 
+            bboxes = []
+        return AnnotatedImage(im=im, bboxes=bboxes)
+
 class TangoLog(object): 
     def __init__(self, filename): 
+
+        # Determine topics that have at least 3 items (timestamp,
+        # channel, data) separated by tabs
         with open(filename, 'r') as f: 
             data = filter(lambda ch: len(ch) == 3, 
                           map(lambda l: l.replace('\n','').split('\t'), 
@@ -123,9 +197,9 @@ class TangoLog(object):
               '\tTopics: {:}\n'
               '\tMessages: {:}\n'
               '\tDuration: {:}\n'.format(self.topics_, messages_str, np.max(ts)-np.min(ts)))
-        
+
+        # Open the tango meta data file
         self.meta_ =  open(filename, 'r')
-        
 
     @property
     def length(self): 
@@ -179,12 +253,13 @@ class TangoLogReader(LogReader):
 
 
     # fisheye_cam = CameraIntrinsic(K=)
-    def __init__(self, directory, scale=1., start_idx=0, every_k_frames=1, noise=[0,0]): 
+    def __init__(self, directory, scale=1., start_idx=0, every_k_frames=1, 
+                 noise=[0,0], with_ground_truth=False): 
         
         # Set directory and filename for time synchronized log reads 
         self.directory_ = os.path.expanduser(directory)
         self.filename_ = os.path.join(self.directory_, 'tango_data.txt')
-
+            
         self.scale_ = scale
         self.calib_ = TangoLogReader.cam.scaled(self.scale_)
         self.shape_ = self.calib_.shape
@@ -195,14 +270,21 @@ class TangoLogReader(LogReader):
         # Initialize TangoLogReader with appropriate decoders
         H, W = self.shape_
 
+        # Load ground truth filename
+        if with_ground_truth: 
+            im_dec = TangoGroundTruthImageDecoder(self.directory_, filename='annotation/index.json', 
+                                                   channel='RGB', color=True, 
+                                                   shape=(W,H), every_k_frames=every_k_frames)
+        else: 
+            im_dec = TangoImageDecoder(self.directory_, channel='RGB', color=True, 
+                                       shape=(W,H), every_k_frames=every_k_frames)
+
+        # Setup log (calls load_log, and initializes decoders)
         super(TangoLogReader, self).__init__(
             self.filename_, 
             decoder=[
                 TangoOdomDecoder(channel='RGB_VIO', every_k_frames=every_k_frames, noise=noise), 
-                TangoImageDecoder(self.directory_, channel='RGB', color=True, 
-                                  shape=(W,H), every_k_frames=every_k_frames)
-                # TangoImageDecoder(self.directory_, channel='FISHEYE', color=False, 
-                #                   shape=self.shape_, every_k_frames=every_k_frames)
+                im_dec
             ])
         
         if isinstance(self.start_idx_, float):
@@ -229,27 +311,50 @@ class TangoLogReader(LogReader):
     def iteritems(self, reverse=False): 
         if self.index is not None: 
             raise NotImplementedError('Cannot provide items indexed')
-        else: 
-            if reverse: 
-                raise RuntimeError('Cannot provide items in reverse when file is not indexed')
+        
+        if reverse: 
+            raise RuntimeError('Cannot provide items in reverse when file is not indexed')
 
-            # # Decode only messages that are supposed to be decoded 
-            # # print self._log.get_message_count(topic_filters=self.decoder_keys())
-            # st, end = self.log.get_start_time(), self.log.get_end_time()
-            # start_t = Time(st + (end-st) * self.start_idx / 100.0)
-             
-            print('Reading TangoLog from index={:} onwards'.format(self.start_idx_))
-            for self.idx, (channel, msg, t) in enumerate(self.log.read_messages()):
-                if self.idx < self.start_idx_: 
-                    continue
-                # self.idx % self.every_k_frames == 0:
-                try: 
-                    res, (t, ch, data) = self.decode_msg(channel, msg, t)
-                    if res: 
-                        yield (t, ch, data)
-                except Exception, e: 
-                    print('TangLog.iteritems() :: {:}'.format(e))
-                    pass
+        # Decode only messages that are supposed to be decoded 
+        print('Reading TangoLog from index={:} onwards'.format(self.start_idx_))
+        for self.idx, (channel, msg, t) in enumerate(self.log.read_messages()):
+            if self.idx < self.start_idx_: 
+                continue
+            try: 
+                res, (t, ch, data) = self.decode_msg(channel, msg, t)
+                if res: 
+                    yield (t, ch, data)
+            except Exception, e: 
+                print('TangLog.iteritems() :: {:}'.format(e))
+                pass
+
+
+    def iterframes(self, reverse=False): 
+        """
+        Ground truth reader interface
+        Overload decode msg to lookup corresponding annotation
+        """
+        if self.index is not None: 
+            raise NotImplementedError('Cannot provide items indexed')
+
+        if reverse: 
+            raise RuntimeError('Cannot provide items in reverse when file is not indexed')
+
+        if not hasattr(self, 'gt_'): 
+            raise RuntimeError('Cannot iterate, ground truth dataset not loaded')
+
+        # Decode only messages that are supposed to be decoded 
+        print('Reading TangoLog from index={:} onwards'.format(self.start_idx_))
+        for self.idx, (channel, msg, t) in enumerate(self.log.read_messages()):
+            if self.idx < self.start_idx_: 
+                continue
+            try: 
+                res, (t, ch, data) = self.decode_msg(channel, msg, t)
+                if res: 
+                    yield (t, ch, data)
+            except Exception, e: 
+                print('TangLog.iteritems() :: {:}'.format(e))
+                pass
                 
     def decode_msg(self, channel, msg, t): 
         try: 
