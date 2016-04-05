@@ -247,6 +247,18 @@ class MeshKLT(OpenCVKLT):
             self.dt_.batch_triangulate(pts)
         return ids, pts
 
+    @property
+    def triangles(self): 
+        return np.hstack(self.dt_.getTriangles()).T
+
+    @property
+    def edges(self):
+        return np.hstack(self.dt_.getEdges()).T
+
+    @property
+    def neighbors(self): 
+        return np.hstack(self.dt_.getNeighbors()).T
+
     def visualize(self, im, ids, pts, colored=False): 
         vis = to_color(im)
         dt_vis = self.dt_.visualize(vis, pts)
