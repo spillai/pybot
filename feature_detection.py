@@ -21,6 +21,31 @@ def to_pts(kpts):
 def kpts_to_array(kpts): 
     return np.float32([ kp.pt for kp in kpts ]).reshape(-1,2)
 
+def get_dense_detector(step=4, levels=7, scale=np.sqrt(2)): 
+    """
+    Standalone dense detector instantiation
+    """
+    detector = cv2.FeatureDetector_create('Dense')
+    detector.setInt('initXyStep', step)
+    # detector.setDouble('initFeatureScale', 0.5)
+
+    detector.setDouble('featureScaleMul', scale)
+    detector.setInt('featureScaleLevels', levels)
+
+    detector.setBool('varyImgBoundWithScale', True)
+    detector.setBool('varyXyStepWithScale', False)
+
+    # detector = cv2.PyramidAdaptedFeatureDetector(detector, maxLevel=4)
+    return detector
+
+def get_detector(detector='dense', step=4, levels=7, scale=np.sqrt(2)): 
+    """ Get opencv dense-sampler or specific feature detector """
+    if detector == 'dense': 
+        return get_dense_detector(step=step, levels=levels, scale=scale)
+    else: 
+        detector = cv2.FeatureDetector_create(detector)
+        return cv2.PyramidAdaptedFeatureDetector(detector, maxLevel=levels)
+
 class AprilTagFeatureDetector(object): 
     """
     AprilTag Feature Detector (only detect 4 corner points)
@@ -40,6 +65,30 @@ class AprilTagFeatureDetector(object):
             kpts.extend([cv2.KeyPoint(pt[0], pt[1], 1) for pt in tag.getFeatures()])
         return kpts
 
+class SemiDenseFeatureDetector(object): 
+    """
+    Semi-Dense Feature Detector
+    """
+    default_params = AttrDict(step=10, threshold=20, max_corners=10000)
+    def __init__(self, grid=(20,20), threshold=20, max_corners=10000): 
+        try: 
+            from pybot_vision import fast_proposals
+            self.detector_ = cv2.GridAdaptedFeatureDetector(
+                get_dense_detector(step=2, levels=1), max_corners, grid[0], grid[1])
+            self.detect_edges_ = lambda im: fast_proposals(im, threshold)
+        except: 
+            raise ImportError('fast_proposals (pybot_vision) is not available')
+
+    def detect(self, im, mask=None): 
+        edges = self.detect_edges_(im)
+        # edges1 = edges.copy()
+        if mask is not None: 
+            edges = np.bitwise_and(edges, mask)
+        # cv2.imshow('mask', np.hstack([edges1, edges]))
+        kpts = self.detector_.detect(im, mask=edges)
+        return kpts
+
+
 class FeatureDetector(object): 
     """
     Feature Detector class that allows for fast switching between
@@ -58,7 +107,8 @@ class FeatureDetector(object):
 
     detectors = { 'gftt': cv2.GFTTDetector, 
                   'fast': cv2.FastFeatureDetector, 
-                  'apriltag': AprilTagFeatureDetector }
+                  'apriltag': AprilTagFeatureDetector, 
+                  'semi-dense': SemiDenseFeatureDetector }
 
     def __init__(self, method='fast', grid=(12,10), max_corners=1200, 
                  max_levels=4, subpixel=False, params=fast_params):
@@ -67,8 +117,7 @@ class FeatureDetector(object):
         try: 
             self.detector_ = FeatureDetector.detectors[method](**params)
         except Exception,e:
-            print e
-            raise RuntimeError('Unknown detector type: %s! Use from {:}'.format(FeatureDetector.detectors.keys()))
+            raise RuntimeError('Unknown detector type: %s! Use from {:}, {:}'.format(FeatureDetector.detectors.keys(), e))
 
         # Only support grid and pyramid with gftt and fast
         if (method == 'gftt' or method == 'fast'): 
