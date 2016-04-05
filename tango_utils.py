@@ -61,14 +61,7 @@ def TangoOdomDecoder(channel, every_k_frames=1, noise=[0,0]):
                                                     0, 0, 0, axes='sxyz')
     p_CAM_S = p_S_CAM.inverse()
 
-    # # Noise injection
-    # def get_p_noise(): 
-    #     xyz = np.random.normal(0, noise[0], size=3)
-    #     rpy = np.random.normal(0, noise[1], size=3)
-    #     return RigidTransform.from_roll_pitch_yaw_x_y_z(rpy[0], rpy[1], rpy[2], xyz[0], xyz[1], xyz[2])
-
-    # inject_noise = (noise[0] != 0 or noise[1] != 0)
-
+    # Decode odometry
     def odom_decode(data): 
         """ x, y, z, qx, qy, qz, qw, status_code, confidence """
         p = np.float64(data.split(','))
@@ -81,8 +74,33 @@ def TangoOdomDecoder(channel, every_k_frames=1, noise=[0,0]):
         p_SD = RigidTransform(xyzw=ori, tvec=tvec)
         p_SC = p_SD * p_DC
         return p_CAM_S * p_SC
-            
-    return Decoder(channel=channel, every_k_frames=every_k_frames, decode_cb=lambda data: odom_decode(data))
+    decode_cb = lambda data: odom_decode(data)
+
+    noise = np.float32(noise)
+    def get_noise(): 
+        xyz = np.random.normal(0, noise[0], size=3) if noise[0] > 0 else np.zeros(3)
+        rpy = np.random.normal(0, noise[1], size=3) if noise[1] > 0 else np.zeros(3)
+        return RigidTransform.from_roll_pitch_yaw_x_y_z(rpy[0], rpy[1], rpy[2], xyz[0], xyz[1], xyz[2])
+
+    # Noise injection
+    inject_noise = (noise[0] > 0 or noise[1] > 0)
+    if inject_noise: 
+        p_accumulator = deque(maxlen=2)
+        p_accumulator_noisy = deque(maxlen=2)
+        def odom_decode_with_noise(data): 
+            p_accumulator.append(data)
+            if len(p_accumulator) == 1:
+                p_accumulator_noisy.append(p_accumulator[-1])
+            else: 
+                p21 = get_noise() * (p_accumulator[-2].inverse() * p_accumulator[-1])
+                last = p_accumulator_noisy[-1]
+                p_accumulator_noisy.append(last * p21)
+
+            return p_accumulator_noisy[-1]
+
+        decode_cb = lambda data: odom_decode_with_noise(odom_decode(data))
+
+    return Decoder(channel=channel, every_k_frames=every_k_frames, decode_cb=decode_cb)
 
 class TangoImageDecoder(Decoder): 
     """
@@ -196,7 +214,7 @@ class TangoLog(object):
         print('\nTangoLog\n========\n'
               '\tTopics: {:}\n'
               '\tMessages: {:}\n'
-              '\tDuration: {:}\n'.format(self.topics_, messages_str, np.max(ts)-np.min(ts)))
+              '\tDuration: {:} s\n'.format(self.topics_, messages_str, np.max(ts)-np.min(ts)))
 
         # Open the tango meta data file
         self.meta_ =  open(filename, 'r')
@@ -364,7 +382,6 @@ class TangoLogReader(LogReader):
             if dec.should_decode():
                 return True, (t, channel, dec.decode(msg))
         except Exception as e:
-            
             # pass
             print e
             raise RuntimeError('Failed to decode data from channel: %s, mis-specified decoder?' % channel)
