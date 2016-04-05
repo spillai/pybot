@@ -76,6 +76,7 @@ def TangoOdomDecoder(channel, every_k_frames=1, noise=[0,0]):
         return p_CAM_S * p_SC
     decode_cb = lambda data: odom_decode(data)
 
+    np.random.seed(1)
     noise = np.float32(noise)
     def get_noise(): 
         xyz = np.random.normal(0, noise[0], size=3) if noise[0] > 0 else np.zeros(3)
@@ -94,7 +95,7 @@ def TangoOdomDecoder(channel, every_k_frames=1, noise=[0,0]):
             else: 
                 p21 = get_noise() * (p_accumulator[-2].inverse() * p_accumulator[-1])
                 last = p_accumulator_noisy[-1]
-                p_accumulator_noisy.append(last * p21)
+                p_accumulator_noisy.append(last.oplus(p21))
 
             return p_accumulator_noisy[-1]
 
