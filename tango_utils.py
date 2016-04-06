@@ -143,8 +143,16 @@ class TangoGroundTruthImageDecoder(TangoImageDecoder):
             data = json.loads(f.read())
             meta = {fn: frame for (fn, frame) in zip(data['fileList'], data['frames'])}
 
-            target_hash = {label['name']: lid for (lid,label) in enumerate(data['objects'])}
-            target_unhash = {lid: label['name'] for (lid,label) in enumerate(data['objects'])}
+            try: 
+                # Hard-coded scaling for image annotation
+                H,W = data['img_height'], data['img_width']
+                self.get_image_scale = lambda height: height * 1.0 / H
+            except Exception as e: 
+                print('Missing img_height, and img_width key, try re-saving annotation')
+
+            print data.keys(), data['objects']
+            target_hash = {label['name']: lid for (lid,label) in enumerate(data['objects'])  if label is not None}
+            target_unhash = {lid: label['name'] for (lid,label) in enumerate(data['objects']) if label is not None}
 
             # print meta
 
@@ -186,9 +194,16 @@ class TangoGroundTruthImageDecoder(TangoImageDecoder):
         im = TangoImageDecoder.decode(self, msg)
         basename = os.path.basename(msg)
         # print('Retrieving annotations for {:}'.format(basename))
+
+        H, W = im.shape[:2]
         try: 
+            # Scale up annotations based on input image 
+            # and original annotated image
             bboxes = self.meta_[basename]
-        except: 
+            for idx, bbox in enumerate(bboxes): 
+                bboxes[idx]['polygon'] = bbox['polygon'] * self.get_image_scale(H)
+
+        except Exception as e: 
             bboxes = []
         return AnnotatedImage(im=im, bboxes=bboxes)
 
