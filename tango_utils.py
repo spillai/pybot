@@ -147,8 +147,7 @@ class TangoGroundTruthImageDecoder(TangoImageDecoder):
                 # Hard-coded scaling for image annotation
                 H,W = data['img_height'], data['img_width']
                 self.get_image_scale = lambda height: height * 1.0 / H
-            except Exception as e: 
-                print('Missing img_height, and img_width key, try re-saving annotation')
+            except Exception as e:                raise RuntimeError('Missing img_height, and img_width key, try re-saving annotation')
 
             print data.keys(), data['objects']
             target_hash = {label['name']: lid for (lid,label) in enumerate(data['objects'])  if label is not None}
@@ -174,7 +173,7 @@ class TangoGroundTruthImageDecoder(TangoImageDecoder):
 
                     # Trailing number after hyphen is instance id
                     label = ''.join(target_unhash[lid].split('-')[:-1])
-                    instance_id = int(target_unhash[lid].split('-')[-1])
+                    instance_id = target_unhash[lid].split('-')[-1]
                     annotations.append(
                         dict(polygon=xy, class_label=label, class_id=None, instance_id=instance_id)
                     )
