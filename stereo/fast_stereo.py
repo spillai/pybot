@@ -12,6 +12,7 @@ class FastStereo(object):
         self.stereo.set_calibration(calib.left.K, calib.right.K, 
                                     calib.left.D, calib.right.D, calib.left.R, calib.right.R, 
                                     calib.left.P, calib.right.P, calib.Q, calib.right.t)
+        print calib.left.K, calib.right.K, calib.left.D, calib.right.D, calib.left.R, calib.right.R, calib.left.P, calib.right.P, calib.Q, calib.right.t
 
     def process(self, left_im, right_im): 
         return self.stereo.process(to_gray(left_im), to_gray(right_im))
