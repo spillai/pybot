@@ -13,6 +13,6 @@ All the dependencies need to be available in the `PYTHONPATH`.
 
 Examples
 ---
-All the 3D visualization demos for the works below were created using the above set of tools. 
+All the 3D visualization demos for the works below were created using the above set of tools. <br>
 [Monocular SLAM-Supported Object Recognition](https://www.youtube.com/watch?v=m6sStUk3UVk), 
 [High-speed Stereo Reconstruction](http://people.csail.mit.edu/spillai/projects/fast-stereo-reconstruction/pillai_fast_stereo16.mp4)
