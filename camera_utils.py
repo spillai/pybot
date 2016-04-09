@@ -876,6 +876,38 @@ def plot_epipolar_line(im_1, F_10, x_0, im_0=None):
     
     return vis_1
 
+class HalfPlane(object): 
+    """
+    Half plane class where the plane is defined as passing through
+    points (p,q,r) with points in ccw order
+
+    Implemented from reference implementation in OpenMVG (Pierre Moulon). 
+    
+    """
+    def __init__(self, hp): 
+        assert(hp.ndim == 1 and len(hp) == 4)
+        self.hp_ = hp
+
+    @classmethod
+    def from_points(cls, p, q, r): 
+        abc = (p-r).cross(q-r)
+        hp = np.r_[abc, -abc.dot(r)]
+        return cls(hp)
+
+    def intersect(self): 
+        """
+        [1] Paper: Finding the intersection of n half-spaces in time
+        O(n log n).  
+        Author: F.P. Preparata, D.E. Muller 
+        Published in:
+        Theoretical Computer Science, Volume 8, Issue 1, Pages 45-55
+        Year: 1979 More: ISSN 0304-3975,
+        http://dx.doi.org/10.1016/0304-3975(79)90055-0.  
+        """
+        pass
+
+def test_HalfPlane(): 
+    pass
 
 class Frustum(object): 
     def __init__(self, pose, zmin=0.0, zmax=0.1, fov=np.deg2rad(60)): 
@@ -904,11 +936,16 @@ class Frustum(object):
         nll, nlr, nur, nul, fll, flr, fur, ful = self.pose * np.vstack(arr)
         return nll, nlr, nur, nul, fll, flr, fur, ful
 
+def test_Frustum(): 
+    pass
+
 
 if __name__ == "__main__": 
     cam = CameraIntrinsic.from_calib_params(718.856, 718.856, 607.1928, 185.2157, shape=np.int32([1241,376]))
     print cam.shape
     cam.save('kitti00-02.yaml')
+
+    
 
 #   m, n = im.shape[:2]
 #   line = numpy.dot(F, x)

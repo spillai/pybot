@@ -150,9 +150,6 @@ class MosaicBuilder(object):
         self.filename_template_ = filename_template
         self.save_mosaic_ = len(self.filename_template_) > 0
         self.shape_ = shape
-        
-        # if '%i' not in self.filename_template_: 
-        #     raise RuntimeError('Failed to parse filename template, missing %%i')
             
         self.maxlen_ = maxlen
         self.ims_ = deque(maxlen=self.maxlen_)

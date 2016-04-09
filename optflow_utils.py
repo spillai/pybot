@@ -42,17 +42,26 @@ def dense_optical_flow_sf(im1, im2, layers=3, averaging_block_size=2, max_flow=4
 def sparse_optical_flow(im1, im2, pts, fb_threshold=-1, 
                         window_size=15, max_level=2, 
                         criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.03)): 
+
+    # Forward flow
     p1, st, err = cv2.calcOpticalFlowPyrLK(im1, im2, pts, None, 
                                            winSize=(window_size, window_size), 
                                            maxLevel=max_level, criteria=criteria )
 
-    # if fb_threshold > 0:     
-    #     p0r, st, err = cv2.calcOpticalFlowPyrLK(im2, im1, p1, None, 
-    #                                        winSize=(window_size, window_size), 
-    #                                        maxLevel=max_level, criteria=criteria)
-    #     d = abs(p0-p0r).reshape(-1, 2).max(-1)
-    #     good = d < fb_threshold
+    # Backward flow
+    if fb_threshold > 0:     
+        p0r, st0, err = cv2.calcOpticalFlowPyrLK(im2, im1, p1, None, 
+                                           winSize=(window_size, window_size), 
+                                           maxLevel=max_level, criteria=criteria)
+        p0r[st0 == 0] = np.nan
 
+        # Set only good
+        fb_good = (np.fabs(p0r-p0) < fb_threshold).all(axis=1)
+
+        p1[~fb_good] = np.nan
+        st = np.bitwise_and(st, st0)
+        err[~fb_good] = np.nan
+        
     return p1, st, err
 
 def draw_flow(img, flow, step=16):
