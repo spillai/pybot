@@ -16,66 +16,37 @@ from pybot_gtsam import GTSAMTags
 from pybot_slam import ISAMTags, draw_tags
 from pybot_apriltags import AprilTag, AprilTagsWrapper
 
-def vis_slam_updates(slam, landmark_type='pose', frame_id='optcamera'): 
-    """
-    Update SLAM visualizations with optimized factors
-    """
 
-    # Draw poses 
-    updated_poses = {pid : Pose.from_rigid_transform(
-        pid, RigidTransform.from_homogenous_matrix(p)) 
-                     for (pid,p) in slam.poses.iteritems()}
-    draw_utils.publish_pose_list('optimized_node_poses', updated_poses.values(), frame_id=frame_id, reset=False)
+def vis_slam_odom(poses, frame_id='camera'): 
+    assert(isinstance(poses, Accumulator))
 
-    if landmark_type == 'pose': 
-        # Draw targets (constantly updated, so draw with reset)
-        updated_targets = {pid : Pose.from_rigid_transform(pid, RigidTransform.from_homogenous_matrix(p)) 
-                           for (pid, p) in slam.target_poses.iteritems()}
-        if len(updated_targets): 
-            edges = np.vstack([draw_utils.draw_tag_edges(p) for p in updated_targets.itervalues()])
-            draw_utils.publish_line_segments('optimized_node_landmark', edges[:,:3], edges[:,3:6], c='r', 
-                                             frame_id=frame_id, reset=True)
+    # Draw robot poses
+    draw_utils.publish_pose_t('POSE', poses.latest, frame_id=frame_id)
+    draw_utils.publish_pose_list('CAMERA_POSES', [Pose.from_rigid_transform(poses.index, poses.latest)], 
+                                 frame_id=frame_id, reset=False)
 
-        # Draw edges (between landmarks and poses)
-        landmark_edges = slam.edges
-        if len(landmark_edges): 
-            factor_st = np.vstack([(updated_poses[xid].tvec).reshape(-1,3) for (xid, _) in landmark_edges])
-            factor_end = np.vstack([(updated_targets[lid].tvec).reshape(-1,3) for (_, lid) in landmark_edges])
+    # Draw odometry link
+    if poses.length >= 2:
 
-            draw_utils.publish_line_segments('optimized_factor_landmark', factor_st, factor_end, c='b', 
-                                             frame_id=frame_id, reset=True) 
+        p_odom = (poses.items[-2].inverse()).oplus(poses.items[-1])
 
-    elif landmark_type == 'point': 
+        factor_st = (poses.items[-2].tvec).reshape(-1,3)
+        factor_end = (poses.items[-1].tvec).reshape(-1,3)
+        draw_utils.publish_line_segments('measured_factor_odom', factor_st, factor_end, c='r', 
+                                         frame_id=frame_id, reset=False)
 
-        # Draw targets (constantly updated, so draw with reset)
-        updated_targets = {pid : pt3
-                           for (pid, pt3) in slam.target_landmarks.iteritems()}
-        if len(updated_targets): 
-            points3d = np.vstack(updated_targets.values())
-            draw_utils.publish_cloud('optimized_node_landmark', points3d, c='r', 
-                                     frame_id=frame_id, reset=True)
-
-        # Draw edges (between landmarks and poses)
-        landmark_edges = slam.edges
-        if len(landmark_edges): 
-            factor_st = np.vstack([(updated_poses[xid].tvec).reshape(-1,3) for (xid, _) in landmark_edges])
-            factor_end = np.vstack([(updated_targets[lid]).reshape(-1,3) for (_, lid) in landmark_edges])
-
-            draw_utils.publish_line_segments('optimized_factor_landmark', factor_st, factor_end, c='b', 
-                                             frame_id=frame_id, reset=True) 
-
-    else: 
-        raise ValueError('Unknown landmark_type {:}'.format(landmark_type))
-
-    # Maintain updated ids
-    return set(updated_poses.keys())
 
 class RobotSLAMMixin(object): 
-    def __init__(self, update_on_odom=False): 
+    def __init__(self, landmark_type='point', update_on_odom=False): 
         if not isinstance(self, (GTSAM_BaseSLAM, GTSAM_VisualSLAM)): 
             raise RuntimeError('Cannot mixin without mixing with one of the SLAM classes')
-
+        if not ((isinstance(self, GTSAM_BaseSLAM) and landmark_type == 'pose') or 
+                (isinstance(self, GTSAM_VisualSLAM) and landmark_type == 'point')): 
+            raise ValueError('Wrong expected landmark type for {}, provided {}'
+                             .format(type(self), landmark_type))
+            
         self.__poses = Accumulator(maxlen=2)
+        self.landmark_type_ = landmark_type
         self.update_on_odom_ = update_on_odom
 
     def on_odom_absolute(self, t, p): 
@@ -103,8 +74,9 @@ class RobotSLAMMixin(object):
         p_odom = (self.__poses.items[-2].inverse()).oplus(self.__poses.items[-1])
         self.add_odom_incremental(p_odom.matrix)
 
-        # self.vis_odom(self.__poses)        
-        # self.updated_ids_ = vis_slam_updates(self.slam_)
+        # 3. Visualize
+        # vis_slam_odom(self.__poses)        
+
 
         return self.latest
 
@@ -119,6 +91,10 @@ class RobotSLAMMixin(object):
         
         # 2. SLAM: Add relative pose measurements (odometry)
         self.add_odom_incremental(p.matrix)
+
+        # 3. Visualize
+        # vis_slam_odom(self.__poses)        
+
         return self.latest
 
     def on_point_landmarks_smart(self, t, ids, pts, keep_tracked=True): 
@@ -126,12 +102,122 @@ class RobotSLAMMixin(object):
         if self.__poses.length >= 2: 
             self.update()
             ids, pts3 = self.smart_update()
-            draw_utils.publish_cloud('gtsam-pc', pts3, c='b', frame_id='camera', reset=False)
+            # draw_utils.publish_cloud('gtsam-pc', pts3, c='b', frame_id='camera', reset=False)
+
+        self.vis_optimized()
 
         return self.latest
 
+    def finish(self): 
+        self.vis_optimized()
 
-class RobotVisualSLAM(GTSAM_VisualSLAM, RobotSLAMMixin): 
+    #################
+    # Visualization #
+    #################
+
+    def vis_optimized(self, frame_id='camera'): 
+        """
+        Update SLAM visualizations with optimized factors
+        """
+
+        # if not draw_utils.has_sensor_frame('optcamera'): 
+        #     draw_utils.publish_sensor_frame()
+
+        # Draw poses 
+        updated_poses = {pid : Pose.from_rigid_transform(
+            pid, RigidTransform.from_matrix(p)) 
+                         for (pid,p) in self.poses.iteritems()}
+        draw_utils.publish_pose_list('optimized_node_poses', updated_poses.values(), frame_id=frame_id, reset=False)
+
+        if self.landmark_type_ == 'pose': 
+            # Draw targets (constantly updated, so draw with reset)
+            updated_targets = {pid : Pose.from_rigid_transform(pid, RigidTransform.from_homogenous_matrix(p)) 
+                               for (pid, p) in self.target_poses.iteritems()}
+            if len(updated_targets): 
+                edges = np.vstack([draw_utils.draw_tag_edges(p) for p in updated_targets.itervalues()])
+                draw_utils.publish_line_segments('optimized_node_landmark', edges[:,:3], edges[:,3:6], c='r', 
+                                                 frame_id=frame_id, reset=True)
+
+            # Draw edges (between landmarks and poses)
+            landmark_edges = self.edges
+            if len(landmark_edges): 
+                factor_st = np.vstack([(updated_poses[xid].tvec).reshape(-1,3) for (xid, _) in landmark_edges])
+                factor_end = np.vstack([(updated_targets[lid].tvec).reshape(-1,3) for (_, lid) in landmark_edges])
+
+                draw_utils.publish_line_segments('optimized_factor_landmark', factor_st, factor_end, c='b', 
+                                                 frame_id=frame_id, reset=True) 
+
+        elif self.landmark_type_ == 'point': 
+
+            # Draw targets (constantly updated, so draw with reset)
+            updated_targets = {pid : pt3
+                               for (pid, pt3) in self.target_landmarks.iteritems()}
+            if len(updated_targets): 
+                points3d = np.vstack(updated_targets.values())
+                draw_utils.publish_cloud('optimized_node_landmark', points3d, c='r', 
+                                         frame_id=frame_id, reset=True)
+
+            # Draw edges (between landmarks and poses)
+            landmark_edges = self.edges
+            if len(landmark_edges): 
+                factor_st = np.vstack([(updated_poses[xid].tvec).reshape(-1,3) for (xid, _) in landmark_edges])
+                factor_end = np.vstack([(updated_targets[lid]).reshape(-1,3) for (_, lid) in landmark_edges])
+
+                draw_utils.publish_line_segments('optimized_factor_landmark', factor_st, factor_end, c='b', 
+                                                 frame_id=frame_id, reset=True) 
+
+        else: 
+            raise ValueError('Unknown landmark_type {:}'.format(self.landmark_type_))
+
+        # Maintain updated ids
+        return set(updated_poses.keys())
+
+
+    def vis_landmarks(self, pose_id, p_latest, p_landmarks, frame_id='camera', landmark_name='tag'): 
+        """
+        Visualize tags with respect to latest camera frame
+        """
+        if not len(p_landmarks): 
+            return
+
+        # Accumulate tag detections into global reference frame
+        p_Wc = p_latest
+        p_Wt = [Pose.from_rigid_transform(pose_id * 20 + p.id, p_Wc.oplus(p)) for p in p_landmarks]
+
+        # Plot RAW tag factors
+        factor_st = np.tile(p_latest.tvec, [len(p_Wt),1])
+        factor_end = np.vstack(map(lambda p: p.tvec, p_Wt))
+
+        factor_ct_end = np.vstack([p.tvec for p in p_landmarks])
+        factor_ct_st = np.zeros_like(factor_ct_end)
+
+        # draw_utils.publish_line_segments('measured_factor_{:}'.format(landmark_name), factor_st, factor_end, c='b', 
+        #                                  frame_id=frame_id, reset=self.reset_required())
+        # edges = np.vstack([draw_utils.draw_tag_edges(p) for p in p_Wt])
+        # draw_utils.publish_line_segments('measured_node_{:}'.format(landmark_name), edges[:,:3], edges[:,3:6], c='b', 
+        #                                  frame_id=frame_id, reset=self.reset_required())
+
+        # Optionally plot as Tags
+        # draw_utils.publish_pose_list('RAW_tags', p_Wt, texts=[], object_type='TAG', 
+        #                              frame_id=frame_id, reset=self.reset_required())
+
+        
+        # # Plot OPTIMIZED tag factors
+        # if pose_id in self.updated_ids_: 
+        #     draw_utils.publish_line_segments('OPT_factors_{:}'.format(landmark_name), factor_ct_st, factor_ct_end, c='r', 
+        #                                  frame_id='optimized_poses', element_id=pose_id, reset=self.reset_required())
+
+        #     edges = np.vstack([draw_utils.draw_tag_edges(p) for p in p_landmarks])
+        #     draw_utils.publish_line_segments('optimized_{:}'.format(landmark_name), edges[:,:3], edges[:,3:6], c='r', 
+        #                                      frame_id='optimized_poses', element_id=pose_id, reset=self.reset_required())
+
+# Right to left inheritance
+class RobotSLAM(RobotSLAMMixin, GTSAM_BaseSLAM): 
+    def __init__(self, update_on_odom=False): 
+        GTSAM_BaseSLAM.__init__(self)
+        RobotSLAMMixin.__init__(self, landmark_type='pose', update_on_odom=update_on_odom)
+
+class RobotVisualSLAM(RobotSLAMMixin, GTSAM_VisualSLAM): 
     def __init__(self, calib, 
                  min_landmark_obs=3, px_error_threshold=4, noise=[1.0, 1.0], 
                  update_on_odom=False):
@@ -139,8 +225,7 @@ class RobotVisualSLAM(GTSAM_VisualSLAM, RobotSLAMMixin):
                                   min_landmark_obs=min_landmark_obs, 
                                   px_error_threshold=px_error_threshold, 
                                   noise=noise)
-        RobotSLAMMixin.__init__(self, update_on_odom=update_on_odom)
-        
+        RobotSLAMMixin.__init__(self, landmark_type='point', update_on_odom=update_on_odom)
     
     # def on_pose_ids(self, t, ids, poses): 
     #     print('\ton_pose_ids')

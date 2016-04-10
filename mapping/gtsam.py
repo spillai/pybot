@@ -4,7 +4,7 @@ import networkx as nx
 from collections import deque, defaultdict, Counter
 from itertools import izip
 
-from pygtsam import extractPose2, extractPose3, extractPoint3, extractKeys
+from pygtsam import Symbol, extractPose2, extractPose3, extractPoint3, extractKeys
 from pygtsam import symbol as _symbol
 from pygtsam import Point2, Rot2, Pose2, \
     PriorFactorPose2, BetweenFactorPose2, \
@@ -74,7 +74,8 @@ class BaseSLAM(object):
 
     """
 
-    def __init__(self): 
+    def __init__(self):
+ 
         # ISAM2 interface
         self.slam_ = ISAM2()
         self.idx_ = -1
@@ -86,7 +87,7 @@ class BaseSLAM(object):
         # Pose3D measurement
         self.measurement_noise_ = Isotropic.Sigma(6, 0.4)
         self.prior_noise_ = Isotropic.Sigma(6, 0.01)
-        self.odo_noise_ = Isotropic.Sigma(6, 0.01)
+        self.odo_noise_ = Isotropic.Sigma(6, 0.1)
 
         # Optimized robot state
         self.xs_ = {}
@@ -316,7 +317,7 @@ class BaseSLAM(object):
         # Extract and update landmarks
         for k,v in landmarks.iteritems():
             if k.chr() == ord('l'): 
-                self.ls_[k.index()] = v.vector().ravel()
+                self.ls_[k.index()] = v
             else: 
                 raise RuntimeError('Unknown key chr {:}'.format(k.chr))
 
@@ -364,7 +365,7 @@ class VisualSLAM(BaseSLAM):
         # print_red('\t\t{:}::add_landmark_points_smart {:}->{:}'.format(self.__class__.__name__, xid, len(lids)))
         print_red('\t\t{:}::add_landmark_points_smart {:}->{:}'.format(self.__class__.__name__, xid, lids))
         
-        # Add landmark-ids to ids queue in order to check
+        # Add landmark-ids to ids queue in order to check 
         # consistency in matches between keyframes. This 
         # allows an easier interface to check overlapping 
         # ids across successive function calls.
@@ -381,9 +382,14 @@ class VisualSLAM(BaseSLAM):
             # then add to graph
             if self.lid_factors_[lid]['in_graph']:
                 print_yellow('Adding graph measurement: {:}'.format(lid))
+
+                # Add projection factors 
                 self.graph_.add(GenericProjectionFactorPose3Point3Cal3_S2(
                     Point2(vec(*pt)), self.image_measurement_noise_, x_id, l_id, self.K_))
                 self.lid_factors_[lid]['dirty'] = False
+
+                # Add to landmark measurements
+                self.xls_.append((xid, lid))
 
             # In case the landmarks have not been initialized, add 
             # as a smart factor and delay until multiple views have
@@ -393,9 +399,6 @@ class VisualSLAM(BaseSLAM):
                 # Insert smart factor based on landmark id
                 self.lid_factors_[lid]['factor'].add_single(Point2(vec(*pt)), x_id, self.image_measurement_noise_, self.K_)
                 self.lid_factors_[lid]['dirty'] = True
-
-        # Add to landmark measurements
-        self.xls_.extend([(xid, lid) for lid in lids])
 
         # Two Options: 
         # 1. Keep only successively tracked features
@@ -485,11 +488,14 @@ class VisualSLAM(BaseSLAM):
                 for x_id,pt in zip(x_ids, pts): 
                     self.graph_.add(GenericProjectionFactorPose3Point3Cal3_S2(
                         pt, self.image_measurement_noise_, x_id, l_id, self.K_))
+                    
+                    # Add to landmark measurements
+                    self.xls_.append((Symbol(x_id).index(), lid))
+
                 self.lid_factors_[lid]['in_graph'] = True
                 
                 # Initialize the point value
                 pt3 = smart.point_compute(current)
-                print 'pt3', type(pt3)
                 if lid not in self.ls_: 
                     self.initial_.insert(l_id, pt3)
                 self.ls_[lid] = pt3
