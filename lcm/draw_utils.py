@@ -30,7 +30,7 @@ class VisualizationMsgsPub:
 
         self.lc = lcm.LCM()
         camera_pose = RigidTransform.from_roll_pitch_yaw_x_y_z(-np.pi/2, 0, -np.pi/2, 
-                                                               0, 0, 1, axes='sxyz')
+                                                               0, 0, 2, axes='sxyz')
 
         self.reset_visualization()
         self.publish_sensor_frame('camera', pose=camera_pose)

@@ -3,15 +3,15 @@
 # Author: Sudeep Pillai <spillai@csail.mit.edu>
 # License: MIT
 
-import numpy as np
 import cv2
+import numpy as np
 import os.path
 import json
-from collections import deque, namedtuple
+
+from collections import deque, namedtuple, Counter
 from heapq import heappush, heappop
 from abc import ABCMeta, abstractmethod
 
-from collections import Counter, deque
 from bot_externals.log_utils import Decoder, LogReader, LogController
 from bot_vision.image_utils import im_resize
 from bot_geometry.rigid_transform import RigidTransform
