@@ -149,10 +149,10 @@ class BaseSLAM(object):
             self.initialize()
 
         # Add odometry factor
-        self.add_odom(self.latest, self.latest+1, delta)
+        self._add_odom(self.latest, self.latest+1, delta)
         self.idx_ += 1
 
-    def add_odom(self, xid1, xid2, delta): 
+    def _add_odom(self, xid1, xid2, delta): 
         # print_red('\t\t{:}::add_odom {:}->{:}'.format(self.__class__.__name__, xid1, xid2))
 
         # Add odometry factor
@@ -512,6 +512,7 @@ class VisualSLAM(BaseSLAM):
         except Exception:
             # print('Could not return pts3, {:}'.format(e))
             return np.int64([]), np.array([])        
+    
 
 # class SLAM3D(BaseSLAM): 
 #     def __init__(self, update_on_odom=False): 
