@@ -43,6 +43,8 @@ class VisualizationMsgsPub:
     # def sensor_uid(self, channel): 
     #     uid = self._sensor_uid.setdefault(channel, len(self._sensor_uid))
     #     return uid
+    def has_sensor_pose(self, channel): 
+        return channel in self._sensor_pose
 
     def get_sensor_pose(self, channel): 
         return self._sensor_pose[channel]
@@ -88,6 +90,10 @@ g_viz_pub = VisualizationMsgsPub()
 def get_sensor_pose(frame_id='camera'): 
     global g_viz_pub
     return g_viz_pub.get_sensor_pose(frame_id)
+
+def has_sensor_frame(frame_id): 
+    global g_viz_pub
+    return g_viz_pub.has_sensor_pose(frame_id)
 
 def publish_sensor_frame(frame_id, pose): 
     global g_viz_pub
