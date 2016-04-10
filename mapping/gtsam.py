@@ -4,7 +4,7 @@ import networkx as nx
 from collections import deque, defaultdict, Counter
 from itertools import izip
 
-from pygtsam import extractPose2, extractPose3, extractKeys
+from pygtsam import extractPose2, extractPose3, extractPoint3, extractKeys
 from pygtsam import symbol as _symbol
 from pygtsam import Point2, Rot2, Pose2, \
     PriorFactorPose2, BetweenFactorPose2, \
@@ -93,20 +93,23 @@ class BaseSLAM(object):
         self.ls_ = {}
         self.xls_ = []
 
-        # Graph visualization
-        self.gviz_ = nx.Graph()
+        # # Graph visualization
+        # self.gviz_ = nx.Graph()
 
     @property
     def poses(self): 
-        return {k: v.matrix for k,v in self.xs_.iteritems()}
+        " Expects poses to be Pose3 "
+        return {k: v.matrix() for k,v in self.xs_.iteritems()}
         
     @property
-    def targets(self): 
-        return {k: v.matrix for k,v in self.ls_.iteritems()}
+    def target_poses(self): 
+        " Expects landmarks to be Pose3 "
+        return {k: v.matrix() for k,v in self.ls_.iteritems()}
         
     @property
     def target_landmarks(self): 
-        return {k: v for k,v in self.ls_.iteritems()}
+        " Expects landmarks to be Point3 " 
+        return {k: v.vector().ravel() for k,v in self.ls_.iteritems()}
         
     @property
     def edges(self): 
@@ -124,17 +127,17 @@ class BaseSLAM(object):
         self.xs_[index] = pose0
         self.idx_ = index
 
-        # Add node to graphviz
-        self.gviz_.add_node(x_id) # , label='x0')
-        self.gviz_.node[x_id]['label'] = 'X %i' % index
+        # # Add node to graphviz
+        # self.gviz_.add_node(x_id) # , label='x0')
+        # self.gviz_.node[x_id]['label'] = 'X %i' % index
 
         # Add prior factor to graphviz
-        p_id = symbol('p', index)
-        self.gviz_.add_edge(p_id, symbol('x', index))
-        self.gviz_.node[p_id]['label'] = 'P %i' % index
-        self.gviz_.node[p_id]['color'] = 'blue'
-        self.gviz_.node[p_id]['style'] = 'filled'
-        self.gviz_.node[p_id]['shape'] = 'box'
+        # p_id = symbol('p', index)
+        # self.gviz_.add_edge(p_id, symbol('x', index))
+        # self.gviz_.node[p_id]['label'] = 'P %i' % index
+        # self.gviz_.node[p_id]['color'] = 'blue'
+        # self.gviz_.node[p_id]['style'] = 'filled'
+        # self.gviz_.node[p_id]['shape'] = 'box'
 
     def add_odom_incremental(self, delta): 
         """
@@ -163,47 +166,50 @@ class BaseSLAM(object):
         self.initial_.insert(x_id2, pred_pose)
         self.xs_[xid2] = pred_pose
 
-        # Add edge to graphviz
-        self.gviz_.add_edge(x_id1, x_id2)
-        self.gviz_.node[x_id2]['label'] = 'X ' + str(xid2)
+        # # Add edge to graphviz
+        # self.gviz_.add_edge(x_id1, x_id2)
+        # self.gviz_.node[x_id2]['label'] = 'X ' + str(xid2)
 
-    def add_landmark(self, xid, lid, delta): 
-        print_red('\t\t{:}::add_landmark {:}->{:}'.format(self.__class__.__name__, xid, lid))
+    def add_pose_landmarks(self, xid, lids, deltas): 
+        print_red('\t\t{:}::add_landmark {:}->{:}'.format(self.__class__.__name__, xid, len(lids)))
 
         # Add Pose-Pose landmark factor
         x_id = symbol('x', xid)
-        l_id = symbol('l', lid)
+        l_ids = [symbol('l', lid) for lid in lids]
         
-        # Add landmark pose
-        pdelta = Pose3(delta)
-        self.graph_.add(BetweenFactorPose3(x_id, l_id, pdelta, 
-                                           self.measurement_noise_))
+        # Add landmark poses
+        assert(len(l_ids) == len(deltas))
+        for l_id, delta in izip(l_ids, deltas): 
+            pdelta = Pose3(delta)
+            self.graph_.add(BetweenFactorPose3(x_id, l_id, pdelta, 
+                                               self.measurement_noise_))
 
         # Add to landmark measurements
-        self.xls_.append((xid, lid))
+        self.xls_.extend([(xid, lid) for lid in lids])
 
-        # Add landmark edge to graphviz
-        self.gviz_.add_edge(x_id, l_id)
+        # # Add landmark edge to graphviz
+        # self.gviz_.add_edge(x_id, l_id)
 
         # Initialize new landmark pose node from the latest robot
         # pose. This should be done just once
-        if lid not in self.ls_:
-            try: 
-                pred_pose = self.xs_[xid].compose(pdelta)
-                self.initial_.insert(l_id, pred_pose)
-                self.ls_[lid] = pred_pose
-            except: 
-                raise KeyError('Pose {:} not available'
-                               .format(xid))
+        for (l_id, lid, delta) in izip(l_ids, lids, deltas): 
+            if lid not in self.ls_:
+                try: 
+                    pred_pose = self.xs_[xid].compose(Pose3(delta))
+                    self.initial_.insert(l_id, pred_pose)
+                    self.ls_[lid] = pred_pose
+                except: 
+                    raise KeyError('Pose {:} not available'
+                                   .format(xid))
 
-            # Label landmark node
-            self.gviz_.node[l_id]['label'] = 'L ' + str(lid)            
-            self.gviz_.node[l_id]['color'] = 'red'
-            self.gviz_.node[l_id]['style'] = 'filled'
+                # # Label landmark node
+                # self.gviz_.node[l_id]['label'] = 'L ' + str(lid)            
+                # self.gviz_.node[l_id]['color'] = 'red'
+                # self.gviz_.node[l_id]['style'] = 'filled'
             
         return 
 
-    def add_landmark_points(self, xid, lids, pts, pts3d): 
+    def add_point_landmarks(self, xid, lids, pts, pts3d): 
         print_red('\t\tadd_landmark_points xid:{:}-> lid count:{:}'.format(xid, len(lids)))
         
         # Add landmark-ids to ids queue in order to check
@@ -251,21 +257,21 @@ class BaseSLAM(object):
         
         return 
 
-    def add_landmark_points_incremental(self, lids, pts, pts3d): 
+    def add_point_landmarks_incremental(self, lids, pts, pts3d): 
         """
         Add landmark measurement (image features)
         from the latest robot pose to the
         set of specified landmark ids
         """
-        self.add_landmark_points(self.latest, lids, pts, pts3d)
+        self.add_point_landmarks(self.latest, lids, pts, pts3d)
 
-    def add_landmark_incremental(self, lid, delta): 
+    def add_pose_landmarks_incremental(self, lid, delta): 
         """
         Add landmark measurement (pose3d) 
         from the latest robot pose to the
         specified landmark id
         """
-        self.add_landmark(self.latest, lid, delta)
+        self.add_pose_landmarks(self.latest, lid, delta)
 
     @property
     def latest(self): 
@@ -282,10 +288,10 @@ class BaseSLAM(object):
     def save_graph(self, filename): 
         self.slam_.saveGraph(filename)
 
-    def save_dot_graph(self, filename): 
-        nx.write_dot(self.gviz_, filename)
-        # nx.draw_graphviz(self.gviz_, prog='neato')
-        # nx_force_draw(self.gviz_)
+    # def save_dot_graph(self, filename): 
+    #     nx.write_dot(self.gviz_, filename)
+    #     # nx.draw_graphviz(self.gviz_, prog='neato')
+    #     # nx_force_draw(self.gviz_)
 
     @timeitmethod
     def update(self): 
@@ -310,22 +316,21 @@ class BaseSLAM(object):
         # Extract and update landmarks
         for k,v in landmarks.iteritems():
             if k.chr() == ord('l'): 
-                self.ls_[k.index()] = v
+                self.ls_[k.index()] = v.vector().ravel()
             else: 
                 raise RuntimeError('Unknown key chr {:}'.format(k.chr))
 
         self.graph_.resize(0)
         self.initial_.clear()
 
-        if self.index % 10 == 0 and self.index > 0: 
-            self.save_graph("slam_fg.dot")
-            self.save_dot_graph("slam_graph.dot")
+        # if self.index % 10 == 0 and self.index > 0: 
+        #     self.save_graph("slam_fg.dot")
+        #     self.save_dot_graph("slam_graph.dot")
 
-class VSLAM(BaseSLAM): 
-    def __init__(self, calib, min_landmark_obs=3, px_error_threshold=4, noise=[1.0, 1.0], update_on_odom=False): 
+class VisualSLAM(BaseSLAM): 
+    def __init__(self, calib, min_landmark_obs=3, px_error_threshold=4, noise=[1.0, 1.0]):
         BaseSLAM.__init__(self)
 
-        self.update_on_odom_ = update_on_odom
         self.px_error_threshold_ = px_error_threshold
         self.min_landmark_obs_ = min_landmark_obs
         assert(self.min_landmark_obs_ >= 2)
@@ -351,7 +356,7 @@ class VSLAM(BaseSLAM):
         # Measurement noise (2 px in u and v)
         self.image_measurement_noise_ = Diagonal.Sigmas(vec(*noise))
 
-    def add_landmark_points_smart(self, xid, lids, pts, keep_tracked=True): 
+    def add_point_landmarks_smart(self, xid, lids, pts, keep_tracked=True): 
         """
         keep_tracked: Maintain only tracked measurements in the smart factor list; 
         The alternative is that all measurements are added to the smart factor list
@@ -424,13 +429,13 @@ class VSLAM(BaseSLAM):
 
         return 
 
-    def add_landmark_points_incremental_smart(self, lids, pts, keep_tracked=True): 
+    def add_point_landmarks_incremental_smart(self, lids, pts, keep_tracked=True): 
         """
         Add landmark measurement (image features)
         from the latest robot pose to the
         set of specified landmark ids
         """
-        self.add_landmark_points_smart(self.latest, lids, pts, keep_tracked=keep_tracked)
+        self.add_point_landmarks_smart(self.latest, lids, pts, keep_tracked=keep_tracked)
 
     @timeitmethod
     def smart_update(self, delete_factors=True): 
@@ -484,6 +489,7 @@ class VSLAM(BaseSLAM):
                 
                 # Initialize the point value
                 pt3 = smart.point_compute(current)
+                print 'pt3', type(pt3)
                 if lid not in self.ls_: 
                     self.initial_.insert(l_id, pt3)
                 self.ls_[lid] = pt3
@@ -507,26 +513,26 @@ class VSLAM(BaseSLAM):
             # print('Could not return pts3, {:}'.format(e))
             return np.int64([]), np.array([])        
 
-class SLAM3D(BaseSLAM): 
-    def __init__(self, update_on_odom=False): 
-        BaseSLAM.__init__(self)
-        self.update_on_odom_ = update_on_odom
+# class SLAM3D(BaseSLAM): 
+#     def __init__(self, update_on_odom=False): 
+#         BaseSLAM.__init__(self)
+#         self.update_on_odom_ = update_on_odom
 
-    def on_odom(self, t, odom): 
-        print('\ton_odom')
-        self.add_odom_incremental(odom)
-        if self.update_on_odom_: self.update()
-        return self.latest
+#     def on_odom(self, t, odom): 
+#         print('\ton_odom')
+#         self.add_odom_incremental(odom)
+#         if self.update_on_odom_: self.update()
+#         return self.latest
 
-    def on_pose_ids(self, t, ids, poses): 
-        print('\ton_pose_ids')
-        for (pid, pose) in izip(ids, poses): 
-            self.add_landmark_incremental(pid, pose)
-        self.update()
-        return self.latest
+#     def on_pose_ids(self, t, ids, poses): 
+#         print('\ton_pose_ids')
+#         for (pid, pose) in izip(ids, poses): 
+#             self.add_landmark_incremental(pid, pose)
+#         self.update()
+#         return self.latest
 
-    def on_landmark(self, p): 
-        pass
+#     def on_landmark(self, p): 
+#         pass
 
 # class Tag3D(BaseSLAM): 
 #     def __init__(self, K): 
