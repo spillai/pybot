@@ -22,8 +22,8 @@ def vis_slam_odom(poses, frame_id='camera'):
 
     # Draw robot poses
     draw_utils.publish_pose_t('POSE', poses.latest, frame_id=frame_id)
-    draw_utils.publish_pose_list('CAMERA_POSES', [Pose.from_rigid_transform(poses.index, poses.latest)], 
-                                 frame_id=frame_id, reset=False)
+    # draw_utils.publish_pose_list('CAMERA_POSES', [Pose.from_rigid_transform(poses.index, poses.latest)], 
+    #                              frame_id=frame_id, reset=False)
 
     # Draw odometry link
     if poses.length >= 2:
@@ -48,6 +48,13 @@ class RobotSLAMMixin(object):
         self.__poses = Accumulator(maxlen=2)
         self.landmark_type_ = landmark_type
         self.update_on_odom_ = update_on_odom
+
+        # Visualizations
+        self.landmark_text_lut_ = {}
+
+    def set_landmark_texts(self, landmark_lut): 
+        " {landmark id -> landmark str, ... }"
+        self.landmark_text_lut_ = landmark_lut
 
     def on_odom_absolute(self, t, p): 
         """
@@ -75,7 +82,7 @@ class RobotSLAMMixin(object):
         self.add_odom_incremental(p_odom.matrix)
 
         # 3. Visualize
-        # vis_slam_odom(self.__poses)        
+        vis_slam_odom(self.__poses)        
 
 
         return self.latest
@@ -127,7 +134,8 @@ class RobotSLAMMixin(object):
         updated_poses = {pid : Pose.from_rigid_transform(
             pid, RigidTransform.from_matrix(p)) 
                          for (pid,p) in self.poses.iteritems()}
-        draw_utils.publish_pose_list('optimized_node_poses', updated_poses.values(), frame_id=frame_id, reset=False)
+        draw_utils.publish_cameras('optimized_node_poses', updated_poses.values(), 
+                                   frame_id=frame_id, reset=True)
 
         if self.landmark_type_ == 'pose': 
             # Draw targets (constantly updated, so draw with reset)
@@ -152,10 +160,19 @@ class RobotSLAMMixin(object):
             # Draw targets (constantly updated, so draw with reset)
             updated_targets = {pid : pt3
                                for (pid, pt3) in self.target_landmarks.iteritems()}
+
+            # Draw something reasonably large for visualization
+            poses = [Pose(k, tvec=v) for k, v in updated_targets.iteritems()]
+            texts = [self.landmark_text_lut_.get(k, '') for k in updated_targets.keys()] \
+                    if len(self.landmark_text_lut_) else []
+            draw_utils.publish_pose_list('optimized_node_landmark_poses', poses, texts=texts, 
+                                         frame_id=frame_id, reset=True)
+
             if len(updated_targets): 
                 points3d = np.vstack(updated_targets.values())
                 draw_utils.publish_cloud('optimized_node_landmark', points3d, c='r', 
                                          frame_id=frame_id, reset=True)
+
 
             # Draw edges (between landmarks and poses)
             landmark_edges = self.edges
@@ -226,6 +243,7 @@ class RobotVisualSLAM(RobotSLAMMixin, GTSAM_VisualSLAM):
                                   px_error_threshold=px_error_threshold, 
                                   noise=noise)
         RobotSLAMMixin.__init__(self, landmark_type='point', update_on_odom=update_on_odom)
+
     
     # def on_pose_ids(self, t, ids, poses): 
     #     print('\ton_pose_ids')

@@ -99,17 +99,17 @@ class BaseSLAM(object):
 
     @property
     def poses(self): 
-        " Expects poses to be Pose3 "
+        " Robot poses: Expects poses to be Pose3 "
         return {k: v.matrix() for k,v in self.xs_.iteritems()}
         
     @property
     def target_poses(self): 
-        " Expects landmarks to be Pose3 "
+        " Landmark Poses: Expects landmarks to be Pose3 "
         return {k: v.matrix() for k,v in self.ls_.iteritems()}
         
     @property
     def target_landmarks(self): 
-        " Expects landmarks to be Point3 " 
+        " Landmark Points: Expects landmarks to be Point3 " 
         return {k: v.vector().ravel() for k,v in self.ls_.iteritems()}
         
     @property
