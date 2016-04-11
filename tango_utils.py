@@ -161,8 +161,6 @@ class TangoGroundTruthImageDecoder(TangoImageDecoder):
                     polygons = val['polygon']
                 except: 
                     continue
-
-                print polygons
                     
                 annotations = []
                 for poly in polygons:
@@ -184,7 +182,6 @@ class TangoGroundTruthImageDecoder(TangoImageDecoder):
 
         print('\nGround Truth\n========\n'
               '\tAnnotations: {:}\n'.format(len(self.meta_)))
-        print self.meta_
 
     def decode(self, msg): 
         """

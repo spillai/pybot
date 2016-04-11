@@ -430,14 +430,15 @@ def publish_covar_list(pub_channel, poses, covars=[], frame_id='camera', reset=T
     covar_list_msg.covs = [vs.cov_t() for j in range(0,nposes)]
     covar_list_msg.ncovs = nposes
 
-    assert(covars.ndim == 2 and covars.shape[1] == 6)
     for j,pose in enumerate(poses):
+        # assert(covars[j].ndim == 2 and covars[j].shape[1] == 6)
+        
         covar_list_msg.covs[j].id = getattr(pose, 'id', j) 
         covar_list_msg.covs[j].collection = g_viz_pub.channel_uid(pub_channel)
         covar_list_msg.covs[j].element_id = getattr(pose, 'id', j) 
         covar_list_msg.covs[j].entries = covars[j]
         covar_list_msg.covs[j].n = len(covars[j])
-        print 'covar_list', nposes, covar_list_msg.covs[j].id
+        # print 'covar_list', nposes, covar_list_msg.covs[j].id
 
     g_viz_pub.lc.publish("COV_COLLECTION", covar_list_msg.encode())
 
@@ -774,14 +775,14 @@ def draw_laser_frustum(pose, zmin=0.0, zmax=10, fov=np.deg2rad(60)):
 def publish_quads(pub_channel, quads, frame_id='camera', reset=True):
     publish_point_type(pub_channel, quads, point_type='QUADS', frame_id=frame_id, reset=reset)
     
-def publish_cameras(pub_channel, poses, c='y', texts=[], frame_id='camera', 
-                    draw_faces=False, draw_edges=True, draw_nodes=False, size=1, zmin=0.01, zmax=0.1, reset=True):
+def publish_cameras(pub_channel, poses, c='y', texts=[], covars=[], frame_id='camera', 
+                    draw_faces=False, draw_edges=True, draw_nodes=False, size=1, zmin=0.01, zmax=0.3, reset=True):
     cam_feats = [draw_camera(pose, zmax=zmax * size) for pose in poses]
     cam_faces = map(lambda x: x[0], cam_feats)
     cam_edges = map(lambda x: x[1], cam_feats)
 
     # Publish pose, and corresponding texts
-    publish_pose_list(pub_channel, poses, texts=texts, frame_id=frame_id, reset=reset)
+    publish_pose_list(pub_channel, poses, texts=texts, covars=covars, frame_id=frame_id, reset=reset)
     
     # Draw blue node at camera pose translation
     if draw_nodes: 
