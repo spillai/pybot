@@ -94,6 +94,11 @@ class BaseSLAM(object):
         self.ls_ = {}
         self.xls_ = []
 
+        self.xcovs_ = {}
+        self.lcovs_ = {}
+        self.current_ = None
+
+
         # # Graph visualization
         # self.gviz_ = nx.Graph()
 
@@ -111,6 +116,22 @@ class BaseSLAM(object):
     def target_landmarks(self): 
         " Landmark Points: Expects landmarks to be Point3 " 
         return {k: v.vector().ravel() for k,v in self.ls_.iteritems()}
+
+    @property
+    def poses_marginals(self): 
+        " Marginals for Robot poses: Expects poses to be Pose3 "
+        return {k: v for k,v in self.xcovs_.iteritems()}
+        
+    @property
+    def target_poses_marginals(self): 
+        " Marginals for Landmark Poses: Expects landmarks to be Pose3 "
+        return {k: v for k,v in self.lcovs_.iteritems()}
+        
+    @property
+    def target_landmarks_marginals(self): 
+        " Marginals for Landmark Points: Expects landmarks to be Point3 " 
+        return {k: v for k,v in self.lcovs_.iteritems()}
+
         
     @property
     def edges(self): 
@@ -286,6 +307,14 @@ class BaseSLAM(object):
     def is_initialized(self): 
         return self.latest >= 0
 
+    @property
+    def estimate_available(self): 
+        return self.current_ is not None
+
+    @property
+    def marginals_available(self): 
+        return len(self.xcovs_) > 0 or len(self.lcovs_) > 0
+
     def save_graph(self, filename): 
         self.slam_.saveGraph(filename)
 
@@ -301,9 +330,9 @@ class BaseSLAM(object):
         self.slam_.update()
 
         # Get current estimate
-        current = self.slam_.calculateEstimate()
-        poses = extractPose3(current)
-        landmarks = extractPoint3(current)
+        self.current_ = self.slam_.calculateEstimate()
+        poses = extractPose3(self.current_)
+        landmarks = extractPoint3(self.current_)
 
         # Extract and update landmarks and poses
         for k,v in poses.iteritems():
@@ -327,6 +356,17 @@ class BaseSLAM(object):
         # if self.index % 10 == 0 and self.index > 0: 
         #     self.save_graph("slam_fg.dot")
         #     self.save_dot_graph("slam_graph.dot")
+
+    def update_marginals(self): 
+        if not self.estimate_available: 
+            return 
+
+        # Retrieve marginals for each of the poses
+        for xid in self.xs_: 
+            self.xcovs_[xid] = self.slam_.marginalCovariance(symbol('x', xid))
+
+        for lid in self.ls_: 
+            self.lcovs_[lid] = self.slam_.marginalCovariance(symbol('l', lid))
 
 class VisualSLAM(BaseSLAM): 
     def __init__(self, calib, min_landmark_obs=3, px_error_threshold=4, noise=[1.0, 1.0]):

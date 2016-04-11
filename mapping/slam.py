@@ -17,24 +17,6 @@ from pybot_slam import ISAMTags, draw_tags
 from pybot_apriltags import AprilTag, AprilTagsWrapper
 
 
-def vis_slam_odom(poses, frame_id='camera'): 
-    assert(isinstance(poses, Accumulator))
-
-    # Draw robot poses
-    draw_utils.publish_pose_t('POSE', poses.latest, frame_id=frame_id)
-    # draw_utils.publish_pose_list('CAMERA_POSES', [Pose.from_rigid_transform(poses.index, poses.latest)], 
-    #                              frame_id=frame_id, reset=False)
-
-    # Draw odometry link
-    if poses.length >= 2:
-
-        p_odom = (poses.items[-2].inverse()).oplus(poses.items[-1])
-
-        factor_st = (poses.items[-2].tvec).reshape(-1,3)
-        factor_end = (poses.items[-1].tvec).reshape(-1,3)
-        draw_utils.publish_line_segments('measured_factor_odom', factor_st, factor_end, c='r', 
-                                         frame_id=frame_id, reset=False)
-
 
 class RobotSLAMMixin(object): 
     def __init__(self, landmark_type='point', update_on_odom=False): 
@@ -82,7 +64,7 @@ class RobotSLAMMixin(object):
         self.add_odom_incremental(p_odom.matrix)
 
         # 3. Visualize
-        vis_slam_odom(self.__poses)        
+        # self.vis_odom()        
 
 
         return self.latest
@@ -100,7 +82,7 @@ class RobotSLAMMixin(object):
         self.add_odom_incremental(p.matrix)
 
         # 3. Visualize
-        # vis_slam_odom(self.__poses)        
+        # self.vis_odom()
 
         return self.latest
 
@@ -108,6 +90,7 @@ class RobotSLAMMixin(object):
         self.add_point_landmarks_incremental_smart(ids, pts, keep_tracked=keep_tracked)
         if self.__poses.length >= 2: 
             self.update()
+            self.update_marginals()
             ids, pts3 = self.smart_update()
             # draw_utils.publish_cloud('gtsam-pc', pts3, c='b', frame_id='camera', reset=False)
 
@@ -122,6 +105,26 @@ class RobotSLAMMixin(object):
     # Visualization #
     #################
 
+    def vis_odom(self, frame_id='camera'): 
+        poses = self.__poses
+        assert(isinstance(poses, Accumulator))
+
+        # Draw robot poses
+        # draw_utils.publish_pose_t('POSE', poses.latest, frame_id=frame_id)
+        # draw_utils.publish_pose_list('CAMERA_POSES', [Pose.from_rigid_transform(poses.index, poses.latest)], 
+        #                              frame_id=frame_id, reset=False)
+
+        # # Draw odometry link
+        # if poses.length >= 2:
+
+        #     p_odom = (poses.items[-2].inverse()).oplus(poses.items[-1])
+
+        #     factor_st = (poses.items[-2].tvec).reshape(-1,3)
+        #     factor_end = (poses.items[-1].tvec).reshape(-1,3)
+        #     draw_utils.publish_line_segments('measured_factor_odom', factor_st, factor_end, c='r', 
+        #                                      frame_id=frame_id, reset=False)
+
+
     def vis_optimized(self, frame_id='camera'): 
         """
         Update SLAM visualizations with optimized factors
@@ -134,8 +137,20 @@ class RobotSLAMMixin(object):
         updated_poses = {pid : Pose.from_rigid_transform(
             pid, RigidTransform.from_matrix(p)) 
                          for (pid,p) in self.poses.iteritems()}
+
+        # Draw marginals
+        poses_marginals = self.poses_marginals
+
+        triu_inds = np.triu_indices(3)
+        covars = []
+        if self.marginals_available: 
+            for pid in updated_poses.keys(): 
+                covars.append(
+                    poses_marginals.get(pid, np.ones(shape=(6,6), dtype=np.float32) * 100)[triu_inds]
+                )
         draw_utils.publish_cameras('optimized_node_poses', updated_poses.values(), 
-                                   frame_id=frame_id, reset=True)
+                                   covars=covars, frame_id=frame_id, reset=True)
+
 
         if self.landmark_type_ == 'pose': 
             # Draw targets (constantly updated, so draw with reset)
@@ -161,18 +176,29 @@ class RobotSLAMMixin(object):
             updated_targets = {pid : pt3
                                for (pid, pt3) in self.target_landmarks.iteritems()}
 
-            # Draw something reasonably large for visualization
+            # Draw ML estimate and marginals
             poses = [Pose(k, tvec=v) for k, v in updated_targets.iteritems()]
             texts = [self.landmark_text_lut_.get(k, '') for k in updated_targets.keys()] \
                     if len(self.landmark_text_lut_) else []
+
+            # Marginals
+            target_landmarks_marginals = self.target_landmarks_marginals
+            
+            covars = []
+            triu_inds = np.triu_indices(3)
+            if self.marginals_available: 
+                for pid in updated_targets.keys(): 
+                    covars.append(
+                        target_landmarks_marginals.get(pid, np.ones(shape=(6,6), dtype=np.float32) * 100)[triu_inds]
+                    )
+            # print 'len', len(covars), len(poses)
             draw_utils.publish_pose_list('optimized_node_landmark_poses', poses, texts=texts, 
-                                         frame_id=frame_id, reset=True)
+                                         covars=covars, frame_id=frame_id, reset=True)
 
             if len(updated_targets): 
                 points3d = np.vstack(updated_targets.values())
                 draw_utils.publish_cloud('optimized_node_landmark', points3d, c='r', 
                                          frame_id=frame_id, reset=True)
-
 
             # Draw edges (between landmarks and poses)
             landmark_edges = self.edges
