@@ -86,8 +86,8 @@ class BaseSLAM(object):
         
         # Pose3D measurement
         self.measurement_noise_ = Isotropic.Sigma(6, 0.4)
-        self.prior_noise_ = Isotropic.Sigma(6, 0.01)
-        self.odo_noise_ = Isotropic.Sigma(6, 0.1)
+        self.prior_noise_ = Isotropic.Sigma(6, 0.001)
+        self.odo_noise_ = Isotropic.Sigma(6, 0.01)
 
         # Optimized robot state
         self.xs_ = {}
