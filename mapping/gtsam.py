@@ -369,7 +369,7 @@ class BaseSLAM(object):
             self.lcovs_[lid] = self.slam_.marginalCovariance(symbol('l', lid))
 
 class VisualSLAM(BaseSLAM): 
-    def __init__(self, calib, min_landmark_obs=3, px_error_threshold=4, noise=[1.0, 1.0]):
+    def __init__(self, calib, min_landmark_obs=3, px_error_threshold=4, px_noise=[1.0, 1.0]):
         BaseSLAM.__init__(self)
 
         self.px_error_threshold_ = px_error_threshold
@@ -395,7 +395,7 @@ class VisualSLAM(BaseSLAM):
         self.lid_update_needed_ = np.int64([])
         
         # Measurement noise (2 px in u and v)
-        self.image_measurement_noise_ = Diagonal.Sigmas(vec(*noise))
+        self.image_measurement_noise_ = Diagonal.Sigmas(vec(*px_noise))
 
     def add_point_landmarks_smart(self, xid, lids, pts, keep_tracked=True): 
         """

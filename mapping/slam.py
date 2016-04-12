@@ -141,12 +141,12 @@ class RobotSLAMMixin(object):
         # Draw marginals
         poses_marginals = self.poses_marginals
 
-        triu_inds = np.triu_indices(3)
         covars = []
+        triu_inds = np.triu_indices(3)
         if self.marginals_available: 
             for pid in updated_poses.keys(): 
                 covars.append(
-                    poses_marginals.get(pid, np.ones(shape=(6,6), dtype=np.float32) * 100)[triu_inds]
+                    poses_marginals.get(pid, np.eye(6, dtype=np.float32) * 100)[triu_inds]
                 )
         draw_utils.publish_cameras('optimized_node_poses', updated_poses.values(), 
                                    covars=covars, frame_id=frame_id, reset=True)
@@ -178,9 +178,10 @@ class RobotSLAMMixin(object):
 
             # Draw ML estimate and marginals
             poses = [Pose(k, tvec=v) for k, v in updated_targets.iteritems()]
+            # poses = [RigidTransform(tvec=v) for k, v in updated_targets.iteritems()]
             texts = [self.landmark_text_lut_.get(k, '') for k in updated_targets.keys()] \
                     if len(self.landmark_text_lut_) else []
-
+            
             # Marginals
             target_landmarks_marginals = self.target_landmarks_marginals
             
@@ -189,9 +190,10 @@ class RobotSLAMMixin(object):
             if self.marginals_available: 
                 for pid in updated_targets.keys(): 
                     covars.append(
-                        target_landmarks_marginals.get(pid, np.ones(shape=(6,6), dtype=np.float32) * 100)[triu_inds]
+                        target_landmarks_marginals.get(pid, np.ones(shape=(6,6)) * 10)[triu_inds]
                     )
             # print 'len', len(covars), len(poses)
+            print zip(texts, covars)
             draw_utils.publish_pose_list('optimized_node_landmark_poses', poses, texts=texts, 
                                          covars=covars, frame_id=frame_id, reset=True)
 
@@ -262,12 +264,12 @@ class RobotSLAM(RobotSLAMMixin, GTSAM_BaseSLAM):
 
 class RobotVisualSLAM(RobotSLAMMixin, GTSAM_VisualSLAM): 
     def __init__(self, calib, 
-                 min_landmark_obs=3, px_error_threshold=4, noise=[1.0, 1.0], 
+                 min_landmark_obs=3, px_error_threshold=4, px_noise=[1.0, 1.0], 
                  update_on_odom=False):
         GTSAM_VisualSLAM.__init__(self, calib, 
                                   min_landmark_obs=min_landmark_obs, 
                                   px_error_threshold=px_error_threshold, 
-                                  noise=noise)
+                                  px_noise=px_noise)
         RobotSLAMMixin.__init__(self, landmark_type='point', update_on_odom=update_on_odom)
 
     
