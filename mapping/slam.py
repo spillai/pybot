@@ -17,6 +17,25 @@ from pybot_slam import ISAMTags, draw_tags
 from pybot_apriltags import AprilTag, AprilTagsWrapper
 
 
+# Mahalanobis distance
+# Normalized mahalanobis distance
+# fbn_remus/apps/ranger_nav/Point3DLM.h
+# LinAlg::Matrix<3,1,double> X = m_X-pLM.m_X;
+# 	LinAlg::Matrix<3,3,double> P = (m_P+pLM.m_P).inverse();
+# 	LinAlg::Matrix<1,1,double> d = (X.transpose()*P)*X;
+
+	# LinAlg::Matrix<3,1,double> rX;
+	# rX(1,1) = pA.GetX()-pB.GetX();
+	# rX(2,1) = pA.GetY()-pB.GetY();
+	# rX(3,1) = pA.GetZ()-pB.GetZ();
+	# LinAlg::Matrix<3,3,double> iP =(pA.GetCov()+pB.GetCov()).inverse();
+	# LinAlg::Matrix<3,1,double> iPrX = iP*rX;
+	# double d = rX(1,1)*iPrx(1,1)+rX(2,1)*iPrX(2,1)+rX(3,1)*iPrX(3,1);
+
+from scipy.spatial.distance import mahalanobis
+
+def mahalanobis_distance(u, v, VI): 
+    return mahalanobis(u, v, VI)
 
 class RobotSLAMMixin(object): 
     def __init__(self, landmark_type='point', update_on_odom=False): 
@@ -57,15 +76,14 @@ class RobotSLAMMixin(object):
         if not self.is_initialized: 
             self.initialize(self.__poses.latest.matrix)
             return self.latest
-        assert(self.__poses.length > 1)
+        assert(self.__poses.length >= 2)
 
         # 2. SLAM: Add relative pose measurements (odometry)
         p_odom = (self.__poses.items[-2].inverse()).oplus(self.__poses.items[-1])
         self.add_odom_incremental(p_odom.matrix)
 
         # 3. Visualize
-        # self.vis_odom()        
-
+        # self.vis_measurements()        
 
         return self.latest
 
@@ -82,7 +100,7 @@ class RobotSLAMMixin(object):
         self.add_odom_incremental(p.matrix)
 
         # 3. Visualize
-        # self.vis_odom()
+        # self.vis_measurements()
 
         return self.latest
 
@@ -99,13 +117,17 @@ class RobotSLAMMixin(object):
         return self.latest
 
     def finish(self): 
+        self.update()
+        self.update_marginals()
+        ids, pts3 = self.smart_update()
+
         self.vis_optimized()
 
     #################
     # Visualization #
     #################
 
-    def vis_odom(self, frame_id='camera'): 
+    def vis_measurements(self, frame_id='camera'): 
         poses = self.__poses
         assert(isinstance(poses, Accumulator))
 
@@ -133,6 +155,9 @@ class RobotSLAMMixin(object):
         # if not draw_utils.has_sensor_frame('optcamera'): 
         #     draw_utils.publish_sensor_frame()
 
+        # =========================================================
+        # POSES/MARGINALS
+
         # Draw poses 
         updated_poses = {pid : Pose.from_rigid_transform(
             pid, RigidTransform.from_matrix(p)) 
@@ -151,6 +176,18 @@ class RobotSLAMMixin(object):
         draw_utils.publish_cameras('optimized_node_poses', updated_poses.values(), 
                                    covars=covars, frame_id=frame_id, reset=True)
 
+        # Draw odometry edges (between robot poses)
+        robot_edges = self.robot_edges
+        if len(robot_edges): 
+            factor_st = np.vstack([(updated_poses[xid].tvec).reshape(-1,3) for (xid, _) in robot_edges])
+            factor_end = np.vstack([(updated_poses[xid].tvec).reshape(-1,3) for (_, xid) in robot_edges])
+
+            draw_utils.publish_line_segments('optimized_factor_odom', factor_st, factor_end, c='b', 
+                                             frame_id=frame_id, reset=True) 
+
+
+        # =========================================================
+        # TARGETS/LANDMARKS
 
         if self.landmark_type_ == 'pose': 
             # Draw targets (constantly updated, so draw with reset)
@@ -162,7 +199,7 @@ class RobotSLAMMixin(object):
                                                  frame_id=frame_id, reset=True)
 
             # Draw edges (between landmarks and poses)
-            landmark_edges = self.edges
+            landmark_edges = self.landmark_edges
             if len(landmark_edges): 
                 factor_st = np.vstack([(updated_poses[xid].tvec).reshape(-1,3) for (xid, _) in landmark_edges])
                 factor_end = np.vstack([(updated_targets[lid].tvec).reshape(-1,3) for (_, lid) in landmark_edges])
@@ -193,7 +230,7 @@ class RobotSLAMMixin(object):
                         target_landmarks_marginals.get(pid, np.ones(shape=(6,6)) * 10)[triu_inds]
                     )
             # print 'len', len(covars), len(poses)
-            print zip(texts, covars)
+            # print zip(texts, covars)
             draw_utils.publish_pose_list('optimized_node_landmark_poses', poses, texts=texts, 
                                          covars=covars, frame_id=frame_id, reset=True)
 
@@ -203,7 +240,7 @@ class RobotSLAMMixin(object):
                                          frame_id=frame_id, reset=True)
 
             # Draw edges (between landmarks and poses)
-            landmark_edges = self.edges
+            landmark_edges = self.landmark_edges
             if len(landmark_edges): 
                 factor_st = np.vstack([(updated_poses[xid].tvec).reshape(-1,3) for (xid, _) in landmark_edges])
                 factor_end = np.vstack([(updated_targets[lid]).reshape(-1,3) for (_, lid) in landmark_edges])
@@ -264,11 +301,14 @@ class RobotSLAM(RobotSLAMMixin, GTSAM_BaseSLAM):
 
 class RobotVisualSLAM(RobotSLAMMixin, GTSAM_VisualSLAM): 
     def __init__(self, calib, 
-                 min_landmark_obs=3, px_error_threshold=4, px_noise=[1.0, 1.0], 
+                 min_landmark_obs=3, 
+                 odom_noise=np.ones(6) * 0.01, prior_noise=np.ones(6) * 0.001, 
+                 px_error_threshold=4, px_noise=[1.0, 1.0], 
                  update_on_odom=False):
         GTSAM_VisualSLAM.__init__(self, calib, 
                                   min_landmark_obs=min_landmark_obs, 
                                   px_error_threshold=px_error_threshold, 
+                                  odom_noise=odom_noise, prior_noise=prior_noise, 
                                   px_noise=px_noise)
         RobotSLAMMixin.__init__(self, landmark_type='point', update_on_odom=update_on_odom)
 
@@ -464,3 +504,11 @@ class TagDetector(object):
         # self.slam_.draw_tags(vis, tags)
         
         return tags
+
+# Test /home/spillai/perceptual-learning/software/python/apps/tango/tango_annotations_app.py
+
+# import subprocess
+# print ("1. Running tango slam")
+# app = subprocess.Popen( [os.path.join("/home/spillai/perceptual-learning/software/python/apps/tango/tango_annotations_app.py")] )
+# app.wait()
+

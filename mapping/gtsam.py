@@ -74,7 +74,7 @@ class BaseSLAM(object):
 
     """
 
-    def __init__(self):
+    def __init__(self, odom_noise=np.ones(6) * 0.01, prior_noise=np.ones(6) * 0.001):
  
         # ISAM2 interface
         self.slam_ = ISAM2()
@@ -86,13 +86,14 @@ class BaseSLAM(object):
         
         # Pose3D measurement
         self.measurement_noise_ = Isotropic.Sigma(6, 0.4)
-        self.prior_noise_ = Isotropic.Sigma(6, 0.001)
-        self.odo_noise_ = Isotropic.Sigma(6, 0.01)
+        self.prior_noise_ = Diagonal.Sigmas(prior_noise)
+        self.odo_noise_ = Diagonal.Sigmas(odom_noise)
 
         # Optimized robot state
         self.xs_ = {}
         self.ls_ = {}
         self.xls_ = []
+        self.xxs_ = []
 
         self.xcovs_ = {}
         self.lcovs_ = {}
@@ -120,22 +121,31 @@ class BaseSLAM(object):
     @property
     def poses_marginals(self): 
         " Marginals for Robot poses: Expects poses to be Pose3 "
-        return {k: v for k,v in self.xcovs_.iteritems()}
+        return self.xcovs_ 
         
     @property
     def target_poses_marginals(self): 
         " Marginals for Landmark Poses: Expects landmarks to be Pose3 "
-        return {k: v for k,v in self.lcovs_.iteritems()}
+        return self.lcovs_
         
     @property
     def target_landmarks_marginals(self): 
         " Marginals for Landmark Points: Expects landmarks to be Point3 " 
-        return {k: v for k,v in self.lcovs_.iteritems()}
+        return self.lcovs_
 
+    def pose_marginal(self, node_id): 
+        return self.xcovs_[node_id]
+
+    def landmark_marginal(self, node_id): 
+        return self.lcovs_[node_id]
         
     @property
-    def edges(self): 
+    def landmark_edges(self): 
         return self.xls_
+
+    @property
+    def robot_edges(self): 
+        return self.xxs_
 
     def initialize(self, p_init=None, index=0): 
         # print_red('\t\t{:}::add_p0 index: {:}'.format(self.__class__.__name__, index))
@@ -187,6 +197,9 @@ class BaseSLAM(object):
         pred_pose = self.xs_[xid1].compose(pdelta)
         self.initial_.insert(x_id2, pred_pose)
         self.xs_[xid2] = pred_pose
+
+        # Add to edges
+        self.xxs_.append((xid1, xid2))
 
         # # Add edge to graphviz
         # self.gviz_.add_edge(x_id1, x_id2)
@@ -369,8 +382,10 @@ class BaseSLAM(object):
             self.lcovs_[lid] = self.slam_.marginalCovariance(symbol('l', lid))
 
 class VisualSLAM(BaseSLAM): 
-    def __init__(self, calib, min_landmark_obs=3, px_error_threshold=4, px_noise=[1.0, 1.0]):
-        BaseSLAM.__init__(self)
+    def __init__(self, calib, min_landmark_obs=3, 
+                 odom_noise=np.ones(6) * 0.01, prior_noise=np.ones(6) * 0.001, 
+                 px_error_threshold=4, px_noise=[1.0, 1.0]):
+        BaseSLAM.__init__(self, odom_noise=odom_noise, prior_noise=prior_noise)
 
         self.px_error_threshold_ = px_error_threshold
         self.min_landmark_obs_ = min_landmark_obs
