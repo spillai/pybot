@@ -114,6 +114,16 @@ class TrackManager(object):
         return self.tracks_
 
     @property
+    def flow(self): 
+        try: 
+            return np.vstack([ track.item(-1)-track.item(-2) 
+                               if track.length > 1 else np.zeros(2)
+                               for track in self.tracks_.itervalues() 
+                           ])
+        except: 
+            return np.array([])
+
+    @property
     def pts(self): 
         try: 
             return np.vstack([ track.latest_item for track in self.tracks_.itervalues() ])

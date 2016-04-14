@@ -161,15 +161,13 @@ class BaseKLT(object):
     def latest_ids(self): 
         return self.tm_.ids
 
-        # valid = self.tm_.lengths >= self.min_track_length_
-        # return self.tm_.ids[valid]
-
     @property
     def latest_pts(self): 
         return self.tm_.pts
 
-        # valid = self.tm_.lengths >= self.min_track_length_
-        # return self.tm_.pts[valid]
+    @property
+    def latest_flow(self): 
+        return self.tm_.flow
 
 class OpenCVKLT(BaseKLT): 
     """
@@ -187,6 +185,7 @@ class OpenCVKLT(BaseKLT):
         self.add_features_ = True
 
     def process(self, im, detected_pts=None):
+
         # Preprocess
         self.ims_.append(gaussian_blur(to_gray(im)))
 
@@ -207,7 +206,7 @@ class OpenCVKLT(BaseKLT):
         # Initialize or add more features
         if self.add_features_: 
             # Extract features
-            mask = self.create_mask(im.shape, ppts)            
+            mask = self.create_mask(im.shape[:2], ppts)            
             # imshow_cv('mask', mask)
 
             if detected_pts is None: 
@@ -228,6 +227,79 @@ class OpenCVKLT(BaseKLT):
         # Returns only tracks that have a minimum trajectory length
         # This is different from self.tm_.ids, self.tm_.pts
         return self.latest_ids, self.latest_pts
+
+class BoundingBoxKLT(OpenCVKLT): 
+    """
+    KLT Tracker with bounding boxes
+    """
+    def __init__(self, *args, **kwargs): 
+        OpenCVKLT.__init__(self, *args, **kwargs)
+        self.tree_ = None
+        self.K_ = 8
+        self.bboxes_ = None
+
+    @property
+    def initialized(self): 
+        return self.bboxes_ is not None
+
+    def process(self, im, bboxes=None): 
+        """
+        Propagate bounding boxes based on feature tracks
+        ccw: a b c d
+        """
+        ids, pts = OpenCVKLT.process(self, im, detected_pts=None)
+
+        # Expects bboxes to be propagated if None
+        if bboxes is None: 
+            # Check if not previously set
+            # (it should be if bboxes is None )
+            if not self.initialized: 
+                raise ValueError('BBoxes has not been initialized')
+            bboxes = self.bboxes_
+        else: 
+            # If not previously set, set and return as is
+            self.bboxes_ = bboxes
+            return bboxes
+
+        # Degenerate case where no points are available to propagate
+        if not len(pts): 
+            return bboxes
+
+        # Index pts, and query bbox corners
+        # bboxes: x1, y1, x2, y2
+        # a (x1,y1), b (x1,y2), c (x2,y2), d (x2,y1)
+        x1, y1, x2, y2 = bboxes[:,0], bboxes[:,1], bboxes[:,2], bboxes[:,3]
+        bboxes_a = np.vstack([x1, y1]).T
+        bboxes_b = np.vstack([x1, y2]).T
+        bboxes_c = np.vstack([x2, y2]).T
+        bboxes_d = np.vstack([x2, y1]).T
+        self.tree_ = cKDTree(pts)
+
+        # Query pts
+        dists_a, inds_a = self.tree_.query(bboxes_a, k=self.K_)
+        dists_b, inds_b = self.tree_.query(bboxes_b, k=self.K_)
+        dists_c, inds_c = self.tree_.query(bboxes_c, k=self.K_)
+        dists_d, inds_d = self.tree_.query(bboxes_d, k=self.K_)
+
+        # Weighted averaging
+        flow = self.latest_flow * 1.0 / self.K_
+        for k in xrange(self.K_):
+            bboxes_a += flow[inds_a[:,k]]
+            bboxes_b += flow[inds_b[:,k]]
+            bboxes_c += flow[inds_c[:,k]]
+            bboxes_d += flow[inds_d[:,k]]
+
+        # Find the extent of the newly propagated bbox
+        x1 = np.minimum(bboxes_a[:,0], bboxes_b[:,0])
+        y1 = np.minimum(bboxes_a[:,1], bboxes_d[:,1])
+        x2 = np.maximum(bboxes_c[:,0], bboxes_d[:,0])
+        y2 = np.maximum(bboxes_b[:,1], bboxes_d[:,1])
+
+        # Maintain the prediction 
+        bboxes_pred = np.vstack([x1, y1, x2, y2]).T
+        self.bboxes_ = bboxes_pred
+        
+        return bboxes_pred
 
 class MeshKLT(OpenCVKLT): 
     """
