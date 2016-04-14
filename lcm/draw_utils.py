@@ -392,6 +392,7 @@ def publish_pose_list(pub_channel, poses, texts=[], covars=[], frame_id='camera'
 
     # Publish corresponding text
     if len(texts): 
+        assert(len(texts) == len(poses))
         publish_text_list(pub_channel, poses, texts, frame_id=frame_id, reset=reset)
 
     # Publish corresponding covariances
@@ -407,7 +408,7 @@ def publish_text_list(pub_channel, poses, texts=[], frame_id='camera', reset=Tru
 
     assert(len(poses) == len(texts))
     nposes = len(texts)
-    text_list_msg.texts = [vs.text_t() for j in range(0,nposes)]
+    text_list_msg.texts = [vs.text_t() for j in range(nposes)]
     text_list_msg.n = nposes
 
     for j,pose in enumerate(poses):
@@ -427,7 +428,7 @@ def publish_covar_list(pub_channel, poses, covars=[], frame_id='camera', reset=T
 
     assert(len(poses) == len(covars))
     nposes = len(covars)
-    covar_list_msg.covs = [vs.cov_t() for j in range(0,nposes)]
+    covar_list_msg.covs = [vs.cov_t() for j in range(nposes)]
     covar_list_msg.ncovs = nposes
 
     for j,pose in enumerate(poses):
@@ -438,7 +439,8 @@ def publish_covar_list(pub_channel, poses, covars=[], frame_id='camera', reset=T
         covar_list_msg.covs[j].element_id = getattr(pose, 'id', j) 
         covar_list_msg.covs[j].entries = covars[j]
         covar_list_msg.covs[j].n = len(covars[j])
-        # print 'covar_list', nposes, covar_list_msg.covs[j].id
+        # print 'covar_list', nposes, covar_list_msg.covs[j].collection, covar_list_msg.covs[j].id, \
+        #     covar_list_msg.covs[j].element_id, covars[j]
 
     g_viz_pub.lc.publish("COV_COLLECTION", covar_list_msg.encode())
 
