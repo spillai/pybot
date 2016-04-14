@@ -124,7 +124,7 @@ class TangoImageDecoder(Decoder):
 
 
 # Basic type for image annotations
-AnnotatedImage = namedtuple('AnnotatedImage', ['im', 'bboxes'])
+AnnotatedImage = namedtuple('AnnotatedImage', ['img', 'bboxes'])
 
 class TangoGroundTruthImageDecoder(TangoImageDecoder):
     def __init__(self, directory, filename, channel='RGB', color=True, every_k_frames=1, shape=(720,1280)): 
@@ -201,7 +201,7 @@ class TangoGroundTruthImageDecoder(TangoImageDecoder):
 
         except Exception as e: 
             bboxes = []
-        return AnnotatedImage(im=im, bboxes=bboxes)
+        return AnnotatedImage(img=im, bboxes=bboxes)
 
 class TangoLog(object): 
     def __init__(self, filename): 
@@ -301,6 +301,7 @@ class TangoLogReader(LogReader):
         H, W = self.shape_
 
         # Load ground truth filename
+        self.with_ground_truth_ = with_ground_truth
         if with_ground_truth: 
             im_dec = TangoGroundTruthImageDecoder(self.directory_, filename='annotation/index.json', 
                                                    channel='RGB', color=True, 
@@ -319,6 +320,10 @@ class TangoLogReader(LogReader):
         
         if isinstance(self.start_idx_, float):
             raise ValueError('start_idx in TangoReader expects an integer, provided {:}'.format(self.start_idx_))
+
+    @property
+    def ground_truth_available(self): 
+        return self.with_ground_truth_
 
     @property
     def directory(self): 
@@ -411,26 +416,39 @@ def iter_tango_logs(directory, logs):
         for item in dataset.iter_frames(): 
             yield item
 
+
+# Basic type for tango frame (includes pose, image, timestamp)
+Frame = namedtuple('Frame', ['img', 'pose', 't_pose', 't_img'])
+AnnotatedFrame = namedtuple('AnnotatedFrame', ['img', 'pose', 't_pose', 't_img', 'bboxes'])
+
 class TangoLogController(LogController): 
     def __init__(self, dataset): 
         super(TangoLogController, self).__init__(dataset)
 
-        self.subscribe('RGB', self.on_rgb)
+        if not self.controller.ground_truth_available: 
+            self.subscribe('RGB', self.on_rgb)
+        else: 
+            print('Ground Truth available, subscribe to LogController.on_rgb_gt')
+            self.subscribe('RGB', self.on_rgb_gt)
+
         self.subscribe('RGB_VIO', self.on_pose)
 
         # Keep a queue of finite lenght to ensure 
         # time-sync with RGB and IMU
         self.__pose_q = deque(maxlen=10)
-        # self.__item_q = deque(maxlen=3)
 
-    def on_rgb(self, t_img, img): 
-        # self.__item_q.append((0, t_img, img))
-
+    def on_rgb_gt(self, t_img, ann_img): 
         if not len(self.__pose_q):
             return
 
         t_pose, pose = self.__pose_q[-1]
-        self.on_frame(t_pose, t_img, pose, img)
+        self.on_frame(AnnotatedFrame(img=ann_img.img, pose=pose, t_pose=t_pose, t_img=t_img, bboxes=ann_img.bboxes))
+        
+    def on_rgb(self, t_img, img): 
+        if not len(self.__pose_q):
+            return
+        t_pose, pose = self.__pose_q[-1]
+        self.on_frame(AnnotatedFrame(img=ann_img.img, pose=pose, t_pose=t_pose, t_img=t_img, bboxes=[]))
 
     def on_pose(self, t, pose): 
         # self.__item_q.append((1, t, pose))
@@ -449,7 +467,7 @@ class TangoLogController(LogController):
         #     print np.array_str(np.float64([t1, t2, t3]) * 1e-14, precision=6, suppress_small=True), \
         #         (t2-t1) * 1e-6, (t3-t2) * 1e-6, w1, w2, p2
 
-    def on_frame(self, t_pose, t_img, pose, img): 
+    def on_frame(self, frame): 
         raise NotImplementedError()
 
     # @abstractmethod
