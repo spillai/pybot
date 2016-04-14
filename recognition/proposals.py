@@ -2,6 +2,7 @@
 import cv2
 import numpy as np
 
+from bot_utils.plot_utils import colormap
 from bot_vision.image_utils import im_resize
 
 import os.path
@@ -30,9 +31,19 @@ class ObjectProposal(object):
         return (boxes * 1 / self.scale_).astype(np.int32)
 
     @staticmethod
-    def visualize(vis, bboxes): 
-        for b in bboxes: 
-            cv2.rectangle(vis, (b[0], b[1]), (b[2], b[3]), (200,200,200), 2)
+    def visualize(vis, bboxes, ellipse=False, colored=True): 
+        if not colored: 
+            cols = np.tile([240,240,240], [len(bboxes), 1])
+        else: 
+            N = 20
+            cwheel = colormap(np.linspace(0, 1, N))
+            cols = np.vstack([cwheel[idx % N] for idx, _ in enumerate(bboxes)])            
+
+        for col, b in zip(cols, bboxes): 
+            if ellipse: 
+                cv2.ellipse(vis, ((b[0]+b[2])/2, (b[1]+b[3])/2), ((b[2]-b[0])/2, (b[3]-b[1])/2), 0, 0, 360, tuple(col), 1)
+            else: 
+                cv2.rectangle(vis, (b[0], b[1]), (b[2], b[3]), tuple(col), 2)
         return vis
 
     @classmethod

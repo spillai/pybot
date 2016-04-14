@@ -153,3 +153,26 @@ class KeyframeSampler(PoseSampler):
 
     def get_item(self, item): 
         return item.pose
+
+# class PoseInterpolation(object): 
+#     def __init__(self, ncontrol=2, nposes=10): 
+#         self.q_ = deque(maxlen=ncontrol)
+#         self.interp_ = deque(maxlen=nposes)
+
+#         self.ncontrol_ = ncontrol
+#         self.nposes_ = nposes
+
+#     def append(self, p): 
+#         if not isinstance(p, RigidTransform): 
+#             raise TypeError('PoseInterpolation expects RigidTransform')
+#         self.q_.append(p)
+
+#     def interpolate(self, p1, p2, w): 
+#         assert(w >= 0 and w <= 1.0)
+#         return p1.interpolate(p2, w) 
+
+#     def iteritems(self): 
+#         if len(self.q_) >= 2: 
+#             for w in np.linspace(0,1,self.nposes_): 
+#                 yield self.interpolate(self.q_[-2], self.q_[-1], w)
+#             self.q_.popleft()
