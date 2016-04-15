@@ -458,9 +458,9 @@ class VisualSLAM(BaseSLAM):
             if lid in self.ls_:
                 # print_yellow('Adding graph measurement: {:}'.format(lid))
 
-                # Add projection factors 
-                self.graph_.add(GenericProjectionFactorPose3Point3Cal3_S2(
-                    Point2(vec(*pt)), self.image_measurement_noise_, x_id, l_id, self.K_))
+                # # Add projection factors 
+                # self.graph_.add(GenericProjectionFactorPose3Point3Cal3_S2(
+                #     Point2(vec(*pt)), self.image_measurement_noise_, x_id, l_id, self.K_))
                 
                 # Add to landmark measurements
                 self.xls_.append((xid, lid))
@@ -533,10 +533,9 @@ class VisualSLAM(BaseSLAM):
 
             # Check smartfactor reprojection error 
             err = smart.error(current)
-            
             if err > self.px_error_threshold_ or err <= 0.0:
                 continue
-            print err
+
             # Add triangulated smart factors back into the graph for
             # complete point-pose optimization Each of the projection
             # factors, including the points, and their initial values
@@ -551,8 +550,8 @@ class VisualSLAM(BaseSLAM):
             # Add each of the smart factor measurements to the 
             # factor graph
             for x_id,pt in zip(x_ids, pts): 
-                self.graph_.add(GenericProjectionFactorPose3Point3Cal3_S2(
-                    pt, self.image_measurement_noise_, x_id, l_id, self.K_))
+                # self.graph_.add(GenericProjectionFactorPose3Point3Cal3_S2(
+                #     pt, self.image_measurement_noise_, x_id, l_id, self.K_))
 
                 # Add to landmark measurements
                 self.xls_.append((Symbol(x_id).index(), lid))

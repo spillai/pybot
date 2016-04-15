@@ -38,7 +38,8 @@ def mahalanobis_distance(u, v, VI):
     return mahalanobis(u, v, VI)
 
 class RobotSLAMMixin(object): 
-    def __init__(self, landmark_type='point', update_on_odom=False): 
+    def __init__(self, landmark_type='point', update_on_odom=False, 
+                 visualize_factors=False, visualize_nodes=False, visualize_marginals=False): 
         if not isinstance(self, (GTSAM_BaseSLAM, GTSAM_VisualSLAM)): 
             raise RuntimeError('Cannot mixin without mixing with one of the SLAM classes')
         if not ((isinstance(self, GTSAM_BaseSLAM) and landmark_type == 'pose') or 
@@ -51,6 +52,10 @@ class RobotSLAMMixin(object):
         self.update_on_odom_ = update_on_odom
 
         # Visualizations
+        self.visualize_factors_ = visualize_factors
+        self.visualize_nodes_ = visualize_nodes
+        self.visualize_marginals_ = visualize_marginals
+
         self.landmark_text_lut_ = {}
 
     def set_landmark_texts(self, landmark_lut): 
@@ -118,7 +123,7 @@ class RobotSLAMMixin(object):
 
     def finish(self): 
         self.update()
-        self.update_marginals()
+        # self.update_marginals()
         ids, pts3 = self.smart_update()
 
         self.vis_optimized()
@@ -158,32 +163,35 @@ class RobotSLAMMixin(object):
         # =========================================================
         # POSES/MARGINALS
 
-        # Draw poses 
+        # Poses 
+        covars = []
         updated_poses = {pid : Pose.from_rigid_transform(
             pid, RigidTransform.from_matrix(p)) 
                          for (pid,p) in self.poses.iteritems()}
 
-        # Draw marginals
-        poses_marginals = self.poses_marginals
+        # Marginals
+        if self.visualize_marginals_: 
+            poses_marginals = self.poses_marginals
+            triu_inds = np.triu_indices(3)
+            if self.marginals_available: 
+                for pid in updated_poses.keys(): 
+                    covars.append(
+                        poses_marginals.get(pid, np.eye(6, dtype=np.float32) * 100)[triu_inds]
+                    )
 
-        covars = []
-        triu_inds = np.triu_indices(3)
-        if self.marginals_available: 
-            for pid in updated_poses.keys(): 
-                covars.append(
-                    poses_marginals.get(pid, np.eye(6, dtype=np.float32) * 100)[triu_inds]
-                )
+        # Draw cameras (with poses and marginals)
         draw_utils.publish_cameras('optimized_node_poses', updated_poses.values(), 
                                    covars=covars, frame_id=frame_id, reset=True)
-        
-        # Draw odometry edges (between robot poses)
-        robot_edges = self.robot_edges
-        if len(robot_edges): 
-            factor_st = np.vstack([(updated_poses[xid].tvec).reshape(-1,3) for (xid, _) in robot_edges])
-            factor_end = np.vstack([(updated_poses[xid].tvec).reshape(-1,3) for (_, xid) in robot_edges])
 
-            draw_utils.publish_line_segments('optimized_factor_odom', factor_st, factor_end, c='b', 
-                                             frame_id=frame_id, reset=True) 
+        # Draw odometry edges (between robot poses)
+        if self.visualize_factors_: 
+            robot_edges = self.robot_edges
+            if len(robot_edges): 
+                factor_st = np.vstack([(updated_poses[xid].tvec).reshape(-1,3) for (xid, _) in robot_edges])
+                factor_end = np.vstack([(updated_poses[xid].tvec).reshape(-1,3) for (_, xid) in robot_edges])
+
+                draw_utils.publish_line_segments('optimized_factor_odom', factor_st, factor_end, c='b', 
+                                                 frame_id=frame_id, reset=True) 
 
 
         # =========================================================
@@ -199,54 +207,55 @@ class RobotSLAMMixin(object):
                                                  frame_id=frame_id, reset=True)
 
             # Draw edges (between landmarks and poses)
-            landmark_edges = self.landmark_edges
-            if len(landmark_edges): 
-                factor_st = np.vstack([(updated_poses[xid].tvec).reshape(-1,3) for (xid, _) in landmark_edges])
-                factor_end = np.vstack([(updated_targets[lid].tvec).reshape(-1,3) for (_, lid) in landmark_edges])
+            if self.visualize_factors_: 
+                landmark_edges = self.landmark_edges
+                if len(landmark_edges): 
+                    factor_st = np.vstack([(updated_poses[xid].tvec).reshape(-1,3) for (xid, _) in landmark_edges])
+                    factor_end = np.vstack([(updated_targets[lid].tvec).reshape(-1,3) for (_, lid) in landmark_edges])
 
-                draw_utils.publish_line_segments('optimized_factor_landmark', factor_st, factor_end, c='b', 
-                                                 frame_id=frame_id, reset=True) 
+                    draw_utils.publish_line_segments('optimized_factor_landmark', factor_st, factor_end, c='b', 
+                                                     frame_id=frame_id, reset=True) 
 
         elif self.landmark_type_ == 'point': 
 
             # Draw targets (constantly updated, so draw with reset)
             updated_targets = {pid : pt3
                                for (pid, pt3) in self.target_landmarks.iteritems()}
-
-            # Draw ML estimate and marginals
-            poses = [Pose(k, tvec=v) for k, v in updated_targets.iteritems()]
-            # poses = [RigidTransform(tvec=v) for k, v in updated_targets.iteritems()]
-            texts = [self.landmark_text_lut_.get(k, '') for k in updated_targets.keys()] \
-                    if len(self.landmark_text_lut_) else []
-            
-            # Marginals
-            target_landmarks_marginals = self.target_landmarks_marginals
-            
-            covars = []
-            triu_inds = np.triu_indices(3)
-            if self.marginals_available: 
-                for pid in updated_targets.keys(): 
-                    covars.append(
-                        target_landmarks_marginals.get(pid, np.ones(shape=(6,6)) * 10)[triu_inds]
-                    )
-            # print 'len', len(covars), len(poses)
-            # print zip(texts, covars)
-            draw_utils.publish_pose_list('optimized_node_landmark_poses', poses, texts=texts, 
-                                         covars=covars, frame_id=frame_id, reset=True)
-
             if len(updated_targets): 
                 points3d = np.vstack(updated_targets.values())
                 draw_utils.publish_cloud('optimized_node_landmark', points3d, c='r', 
                                          frame_id=frame_id, reset=True)
 
-            # Draw edges (between landmarks and poses)
-            landmark_edges = self.landmark_edges
-            if len(landmark_edges): 
-                factor_st = np.vstack([(updated_poses[xid].tvec).reshape(-1,3) for (xid, _) in landmark_edges])
-                factor_end = np.vstack([(updated_targets[lid]).reshape(-1,3) for (_, lid) in landmark_edges])
+            # Landmark points
+            if self.visualize_nodes_: 
+                covars = []
+                poses = [Pose(k, tvec=v) for k, v in updated_targets.iteritems()]
+                texts = [self.landmark_text_lut_.get(k, '') for k in updated_targets.keys()] \
+                        if len(self.landmark_text_lut_) else []
 
-                draw_utils.publish_line_segments('optimized_factor_landmark', factor_st, factor_end, c='b', 
-                                                 frame_id=frame_id, reset=True) 
+                # Marginals
+                if self.visualize_marginals_: 
+                    target_landmarks_marginals = self.target_landmarks_marginals
+                    triu_inds = np.triu_indices(3)
+                    if self.marginals_available: 
+                        for pid in updated_targets.keys(): 
+                            covars.append(
+                                target_landmarks_marginals.get(pid, np.ones(shape=(6,6)) * 10)[triu_inds]
+                            )
+
+                # Draw landmark points
+                draw_utils.publish_pose_list('optimized_node_landmark_poses', poses, texts=texts, 
+                                             covars=covars, frame_id=frame_id, reset=True)
+
+            # Draw edges (between landmarks and poses)
+            if self.visualize_factors_: 
+                landmark_edges = self.landmark_edges
+                if len(landmark_edges): 
+                    factor_st = np.vstack([(updated_poses[xid].tvec).reshape(-1,3) for (xid, _) in landmark_edges])
+                    factor_end = np.vstack([(updated_targets[lid]).reshape(-1,3) for (_, lid) in landmark_edges])
+
+                    draw_utils.publish_line_segments('optimized_factor_landmark', factor_st, factor_end, c='b', 
+                                                     frame_id=frame_id, reset=True) 
 
         else: 
             raise ValueError('Unknown landmark_type {:}'.format(self.landmark_type_))
@@ -295,24 +304,34 @@ class RobotSLAMMixin(object):
 
 # Right to left inheritance
 class RobotSLAM(RobotSLAMMixin, GTSAM_BaseSLAM): 
-    def __init__(self, update_on_odom=False, verbose=False): 
+    def __init__(self, update_on_odom=False, verbose=False, 
+                 visualize_nodes=False, visualize_factors=False, visualize_marginals=False): 
         GTSAM_BaseSLAM.__init__(self, 
                                 odom_noise=GTSAM_BaseSLAM.odom_noise, 
                                 prior_noise=GTSAM_BaseSLAM.prior_noise, verbose=verbose)
-        RobotSLAMMixin.__init__(self, landmark_type='pose', update_on_odom=update_on_odom)
+        RobotSLAMMixin.__init__(self, landmark_type='pose', update_on_odom=update_on_odom, 
+                                visualize_nodes=visualize_nodes, 
+                                visualize_factors=visualize_factors, 
+                                visualize_marginals=visualize_marginals)
+        
 
 class RobotVisualSLAM(RobotSLAMMixin, GTSAM_VisualSLAM): 
     def __init__(self, calib, 
                  min_landmark_obs=3, 
                  odom_noise=GTSAM_VisualSLAM.odom_noise, prior_noise=GTSAM_VisualSLAM.prior_noise, 
                  px_error_threshold=4, px_noise=[1.0, 1.0], 
-                 update_on_odom=False, verbose=False):
+                 update_on_odom=False, verbose=False, 
+                 visualize_nodes=False, visualize_factors=False, visualize_marginals=False): 
         GTSAM_VisualSLAM.__init__(self, calib, 
                                   min_landmark_obs=min_landmark_obs, 
                                   px_error_threshold=px_error_threshold, 
                                   odom_noise=odom_noise, prior_noise=prior_noise, 
                                   px_noise=px_noise, verbose=verbose)
-        RobotSLAMMixin.__init__(self, landmark_type='point', update_on_odom=update_on_odom)
+        RobotSLAMMixin.__init__(self, landmark_type='point', 
+                                update_on_odom=update_on_odom, 
+                                visualize_nodes=visualize_nodes, 
+                                visualize_factors=visualize_factors, 
+                                visualize_marginals=visualize_marginals)
 
     
     # def on_pose_ids(self, t, ids, poses): 
