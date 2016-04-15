@@ -34,6 +34,9 @@ class ObjectProposal(object):
 
     @staticmethod
     def visualize(vis, bboxes, ellipse=False, colored=True): 
+        if not len(bboxes): 
+            return vis
+
         if not colored: 
             cols = np.tile([240,240,240], [len(bboxes), 1])
         else: 
@@ -43,7 +46,8 @@ class ObjectProposal(object):
 
         for col, b in zip(cols, bboxes): 
             if ellipse: 
-                cv2.ellipse(vis, ((b[0]+b[2])/2, (b[1]+b[3])/2), ((b[2]-b[0])/2, (b[3]-b[1])/2), 0, 0, 360, tuple(col), 1)
+                cv2.ellipse(vis, ((b[0]+b[2])/2, (b[1]+b[3])/2), ((b[2]-b[0])/2, (b[3]-b[1])/2), 0, 0, 360, 
+                            color=tuple(col), thickness=1)
             else: 
                 cv2.rectangle(vis, (b[0], b[1]), (b[2], b[3]), tuple(col), 2)
         return vis
