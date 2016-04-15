@@ -115,7 +115,7 @@ class RobotSLAMMixin(object):
             self.update()
             # self.update_marginals()
             ids, pts3 = self.smart_update()
-            # draw_utils.publish_cloud('gtsam-pc', pts3, c='b', frame_id='camera', reset=False)
+            draw_utils.publish_cloud('gtsam-pc', pts3, c='b', frame_id='camera', reset=False)
 
         self.vis_optimized()
 
@@ -156,6 +156,10 @@ class RobotSLAMMixin(object):
         """
         Update SLAM visualizations with optimized factors
         """
+        if not self.visualize_nodes_ and \
+           not self.visualize_factors_ and \
+           not self.visualize_marginals_: 
+            return 
 
         # if not draw_utils.has_sensor_frame('optcamera'): 
         #     draw_utils.publish_sensor_frame()

@@ -410,9 +410,9 @@ class VisualSLAM(BaseSLAM):
         # Dictionary pointing to smartfactor set
         # for each landmark id
         # self.lid_factors_ = defaultdict(SmartFactor)
-        self.lid_factors_ = defaultdict(lambda: dict(
-            in_graph=False, factor=SmartFactor(rankTol=1, linThreshold=-1, manageDegeneracy=False)))
-        # self.lid_factors_ = defaultdict(lambda: dict(in_graph=False, factor=SmartFactor()))
+        # self.lid_factors_ = defaultdict(lambda: dict(
+        #     in_graph=False, factor=SmartFactor(rankTol=1, linThreshold=-1, manageDegeneracy=False)))
+        self.lid_factors_ = defaultdict(lambda: dict(in_graph=False, factor=SmartFactor()))
         self.lid_update_needed_ = np.int64([])
         
         # Measurement noise (2 px in u and v)
@@ -426,6 +426,7 @@ class VisualSLAM(BaseSLAM):
         """
         self.add_point_landmarks_smart(self.latest, lids, pts, keep_tracked=keep_tracked)
 
+    @timeitmethod
     def add_point_landmarks_smart(self, xid, lids, pts, keep_tracked=True): 
         """
         keep_tracked: Maintain only tracked measurements in the smart factor list; 
@@ -444,6 +445,13 @@ class VisualSLAM(BaseSLAM):
         # consistency in matches between keyframes. This 
         # allows an easier interface to check overlapping 
         # ids across successive function calls.
+
+        # Only maintain lid counts for previously tracked 
+        for lid in self.lid_count_.keys():
+            if lid not in self.lid_factors_: 
+                self.lid_count_.pop(lid)
+
+        # Add new tracks to the counter
         self.lid_count_ += Counter(lids)
 
         # Add Pose-Pose landmark factor
@@ -476,7 +484,7 @@ class VisualSLAM(BaseSLAM):
                 )
                 
         # Keep only successively tracked features
-        if keep_tracked: 
+        if not keep_tracked: 
             # Add smartfactors to the graph only if that 
             # landmark ID is no longer visible. setdiff1d
             # returns the set of IDs that are unique to 
@@ -492,11 +500,16 @@ class VisualSLAM(BaseSLAM):
             dropped_lids = np.setdiff1d(smart_lids, lids)
             for lid in dropped_lids:
                 self.lid_factors_.pop(lid)
-                self.lid_count_.pop(lid)
 
+        if self.verbose_: 
+            self.print_stats()
         return 
 
-    # @timeitmethod
+    def print_stats(self): 
+        print_red('\tLID factors: {}\n'
+                  '\tLID count: {}\n'.format(len(self.lid_factors_), len(self.lid_count_)))
+
+    @timeitmethod
     def smart_update(self, delete_factors=True): 
         """
         Update the smart factors and add 
@@ -504,15 +517,6 @@ class VisualSLAM(BaseSLAM):
         extracted, remove them from the factor list
         """
         current = self.slam_.calculateEstimate()
-
-        # # Remove smart factors whose reprojection errors are large
-        # for lid in self.lid_factors_.keys(): 
-        #     if self.lid_factors_[lid]['in_graph'] or self.lid_count_[lid] < self.min_landmark_obs_: 
-        #         continue
-
-        #     smart = self.lid_factors_[lid]['factor']
-        #     self.lid_factors_.pop(lid)
-        #     self.lid_count_.pop(lid)
 
         ids, pts3 = [], []
         for lid in self.lid_factors_.keys(): 

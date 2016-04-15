@@ -138,6 +138,10 @@ class TrackManager(object):
     def lengths(self): 
         return np.int32([ track.length for track in self.tracks_.itervalues() ])
 
+    def confident_tracks(self, min_length=4): 
+        inds, = np.where(self.lengths >= min_length)
+        return inds
+
     @property
     def index(self): 
         return self.index_

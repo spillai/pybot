@@ -106,18 +106,26 @@ class BaseKLT(object):
         """
         self.aug_pts_ = pts
 
-    def draw_tracks(self, out, colored=False, color_type='unique', max_track_length=4):
+    def draw_tracks(self, out, colored=False, color_type='unique', min_track_length=4, max_track_length=4):
         """
         color_type: {age, unique}
         """
 
         N = 20
-        
+        # inds = self.confident_tracks(min_length=min_track_length)
+        # if not len(inds): 
+        #     return
+
+        # ids, pts = self.latest_ids[inds], self.latest_pts[inds]
+        # lengths = self.tm_.lengths[inds]
+
+        ids, pts, lengths = self.latest_ids, self.latest_pts, self.tm_.lengths
+
         if color_type == 'unique': 
             cwheel = colormap(np.linspace(0, 1, N))
-            cols = np.vstack([cwheel[tid % N] for idx, (tid, pts) in enumerate(self.tm_.tracks.iteritems())])            
+            cols = np.vstack([cwheel[tid % N] for idx, tid in enumerate(ids)])
         elif color_type == 'age': 
-            cols = colormap(np.int32([pts.length for pts in self.tm_.tracks.itervalues()]))            
+            cols = colormap(lengths)
         else: 
             raise ValueError('Color type {:} undefined, use age or unique'.format(color_type))
 
@@ -168,6 +176,9 @@ class BaseKLT(object):
     @property
     def latest_flow(self): 
         return self.tm_.flow
+
+    def confident_tracks(self, min_length=4): 
+        return self.tm_.confident_tracks(min_length=min_length)
 
 class OpenCVKLT(BaseKLT): 
     """
@@ -230,116 +241,6 @@ class OpenCVKLT(BaseKLT):
 
 from scipy.spatial import cKDTree
 
-class BoundingBoxKLT(OpenCVKLT): 
-    """
-    KLT Tracker with bounding boxes
-    """
-    def __init__(self, *args, **kwargs): 
-        OpenCVKLT.__init__(self, *args, **kwargs)
-        self.tree_ = None
-        self.K_ = 2
-        self.bboxes_ = None
-        self.predict_all_corners_ = True
-
-    @property
-    def initialized(self): 
-        return self.bboxes_ is not None
-
-    @timeitmethod
-    def process(self, im, bboxes=None): 
-        """
-        Propagate bounding boxes based on feature tracks
-        ccw: a b c d
-        """
-        ids, pts = OpenCVKLT.process(self, im, detected_pts=None)
-
-        # Expects bboxes to be propagated if None
-        if bboxes is None: 
-            # Check if not previously set
-            # (it should be if bboxes is None )
-            if not self.initialized: 
-                return [] 
-                # raise ValueError('BBoxes has not been initialized')
-            bboxes = self.bboxes_
-            print('BBOX Prediction ===============')
-        else: 
-            # If not previously set, set and return as is
-            self.bboxes_ = bboxes
-            print('BBOX Reset ===============')
-            return bboxes
-
-        # Degenerate case where no points are available to propagate
-        if not len(pts): 
-            return bboxes
-
-        # Index pts, and query bbox corners
-        self.tree_ = cKDTree(pts)
-
-        if self.predict_all_corners_: 
-            # BBOX PREDICTION for all 4 corners
-
-            # bboxes: x1, y1, x2, y2
-            # a (x1,y1), b (x1,y2), c (x2,y2), d (x2,y1)
-            bboxes = bboxes.astype(np.float32)
-            x1, y1, x2, y2 = bboxes[:,0], bboxes[:,1], bboxes[:,2], bboxes[:,3]
-            bboxes_a = np.vstack([x1, y1]).T
-            bboxes_b = np.vstack([x1, y2]).T
-            bboxes_c = np.vstack([x2, y2]).T
-            bboxes_d = np.vstack([x2, y1]).T
-
-            # Query pts
-            dists_a, inds_a = self.tree_.query(bboxes_a, k=self.K_)
-            dists_b, inds_b = self.tree_.query(bboxes_b, k=self.K_)
-            dists_c, inds_c = self.tree_.query(bboxes_c, k=self.K_)
-            dists_d, inds_d = self.tree_.query(bboxes_d, k=self.K_)
-
-            # Weighted averaging
-            flow = self.latest_flow * 1.0 / self.K_
-            for k in xrange(self.K_):
-                bboxes_a += flow[inds_a[:,k]]
-                bboxes_b += flow[inds_b[:,k]]
-                bboxes_c += flow[inds_c[:,k]]
-                bboxes_d += flow[inds_d[:,k]]
-
-            # Find the extent of the newly propagated bbox
-            x1 = np.minimum(bboxes_a[:,0], bboxes_b[:,0])
-            y1 = np.minimum(bboxes_a[:,1], bboxes_d[:,1])
-            x2 = np.maximum(bboxes_c[:,0], bboxes_d[:,0])
-            y2 = np.maximum(bboxes_b[:,1], bboxes_d[:,1])
-
-            # Maintain the prediction 
-            bboxes_pred = np.vstack([x1, y1, x2, y2]).T.astype(np.int64)
-        else: 
-            # Get centers for bboxes
-            bboxes = bboxes.astype(np.float32)
-            xy = np.vstack([(bboxes[:,0] + bboxes[:,2]) / 2, (bboxes[:,1] + bboxes[:,3]) / 2]).T
-            wh = np.vstack([bboxes[:,2]-bboxes[:,0], bboxes[:,3]-bboxes[:,1]]).T / 2
-
-            # Query pts
-            dists, inds = self.tree_.query(xy, k=self.K_)
-
-            # Weighted averaging
-            flow = self.latest_flow * 1.0 / self.K_
-            for k in xrange(self.K_):
-                xy += flow[inds[:,k]]            
-                
-            # Find the extent of the newly propagated bbox
-            x1 = xy[:,0] - wh[:,0]
-            y1 = xy[:,1] - wh[:,1]
-            x2 = xy[:,0] + wh[:,0]
-            y2 = xy[:,1] + wh[:,1]
-
-            # Maintain the prediction 
-            bboxes_pred = np.vstack([x1, y1, x2, y2]).T.astype(np.int64)
-
-        self.bboxes_ = bboxes_pred
-        
-        return bboxes_pred
-
-    def visualize(self, vis, colored=True): 
-        OpenCVKLT.draw_tracks(self, vis, colored=colored, max_track_length=2)
-        return vis
-
 class MeshKLT(OpenCVKLT): 
     """
     KLT Tracker as implemented in OpenCV 2.4.9
@@ -354,6 +255,9 @@ class MeshKLT(OpenCVKLT):
     @timeitmethod
     def process(self, im, detected_pts=None): 
         ids, pts = OpenCVKLT.process(self, im, detected_pts=detected_pts)
+        # # Mesh KLT over confident tracks 
+        # inds = self.confident_tracks(min_length=4)
+        # ids, pts = self.latest_ids[inds], self.latest_pts[inds]
         if len(pts) > 3: 
             self.dt_.batch_triangulate(pts)
         return ids, pts
@@ -373,10 +277,136 @@ class MeshKLT(OpenCVKLT):
     def visualize(self, im, ids, pts, colored=False): 
         vis = to_color(im)
         dt_vis = self.dt_.visualize(vis, pts)
-        # OpenCVKLT.viz(self, dt_vis, colored=colored)
-        
-        OpenCVKLT.draw_tracks(self, vis, colored=colored, max_track_length=2)
+
+        OpenCVKLT.draw_tracks(self, vis, colored=colored, max_track_length=10)
         out = np.vstack([vis, dt_vis])
         imshow_cv('dt_vis', out, wait=1)
 
         return out
+
+class BoundingBoxKLT(OpenCVKLT): 
+    """
+    KLT Tracker with bounding boxes
+    """
+    def __init__(self, *args, **kwargs): 
+        OpenCVKLT.__init__(self, *args, **kwargs)
+        self.tree_ = None
+        self.K_ = 2
+        self.bboxes_ = None
+        self.predict_all_corners_ = False
+
+    @property
+    def initialized(self): 
+        return self.bboxes_ is not None
+
+    def predict_bbox_center(self, bboxes, flow): 
+
+        # Get centers for bboxes
+        bboxes = bboxes.astype(np.float32)
+        xy = np.vstack([(bboxes[:,0] + bboxes[:,2]) / 2, (bboxes[:,1] + bboxes[:,3]) / 2]).T
+        wh = np.vstack([bboxes[:,2]-bboxes[:,0], bboxes[:,3]-bboxes[:,1]]).T / 2
+
+        # Query pts
+        dists, inds = self.tree_.query(xy, k=self.K_)
+
+        # Weighted averaging
+        wflow = flow  * 1.0 / self.K_
+        for k in xrange(self.K_):
+            xy += wflow[inds[:,k]]            
+
+        # Find the extent of the newly propagated bbox
+        x1 = xy[:,0] - wh[:,0]
+        y1 = xy[:,1] - wh[:,1]
+        x2 = xy[:,0] + wh[:,0]
+        y2 = xy[:,1] + wh[:,1]
+
+        # Maintain the prediction 
+        bboxes_pred = np.vstack([x1, y1, x2, y2]).T.astype(np.int64)
+        
+        return bboxes_pred
+
+    def predict_bbox_corners(self, bboxes, flow): 
+        # BBOX PREDICTION for all 4 corners
+
+        # bboxes: x1, y1, x2, y2
+        # a (x1,y1), b (x1,y2), c (x2,y2), d (x2,y1)
+        bboxes = bboxes.astype(np.float32)
+        x1, y1, x2, y2 = bboxes[:,0], bboxes[:,1], bboxes[:,2], bboxes[:,3]
+        bboxes_a = np.vstack([x1, y1]).T
+        bboxes_b = np.vstack([x1, y2]).T
+        bboxes_c = np.vstack([x2, y2]).T
+        bboxes_d = np.vstack([x2, y1]).T
+
+        # Query pts
+        dists_a, inds_a = self.tree_.query(bboxes_a, k=self.K_)
+        dists_b, inds_b = self.tree_.query(bboxes_b, k=self.K_)
+        dists_c, inds_c = self.tree_.query(bboxes_c, k=self.K_)
+        dists_d, inds_d = self.tree_.query(bboxes_d, k=self.K_)
+
+        # Weighted averaging
+        wflow = flow * 1.0 / self.K_
+        for k in xrange(self.K_):
+            bboxes_a += wflow[inds_a[:,k]]
+            bboxes_b += wflow[inds_b[:,k]]
+            bboxes_c += wflow[inds_c[:,k]]
+            bboxes_d += wflow[inds_d[:,k]]
+
+        # Find the extent of the newly propagated bbox
+        x1 = np.minimum(bboxes_a[:,0], bboxes_b[:,0])
+        y1 = np.minimum(bboxes_a[:,1], bboxes_d[:,1])
+        x2 = np.maximum(bboxes_c[:,0], bboxes_d[:,0])
+        y2 = np.maximum(bboxes_b[:,1], bboxes_d[:,1])
+
+        # Maintain the prediction 
+        bboxes_pred = np.vstack([x1, y1, x2, y2]).T.astype(np.int64)
+        return bboxes_pred
+
+    @timeitmethod
+    def process(self, im, bboxes=None): 
+        """
+        Propagate bounding boxes based on feature tracks
+        ccw: a b c d
+        """
+
+        # pids, ppts = self.latest_ids, self.latest_pts
+
+        OpenCVKLT.process(self, im, detected_pts=None)
+
+        # Expects bboxes to be propagated if None
+        if bboxes is None: 
+            # Check if not previously set
+            # (it should be if bboxes is None )
+            if not self.initialized: 
+                return [] 
+                # raise ValueError('BBoxes has not been initialized')
+            bboxes = self.bboxes_
+            print('BBOX Prediction ===============')
+        else: 
+            # If not previously set, set and return as is
+            self.bboxes_ = bboxes
+            print('BBOX Reset ===============')
+            return bboxes
+
+        # Degenerate case where no points are available to propagate
+        # inds = self.confident_tracks(min_length=10)
+        # ids, pts, flow = self.latest_ids[inds], self.latest_pts[inds], self.latest_flow[inds]
+        ids, pts, flow = self.latest_ids, self.latest_pts, self.latest_flow
+
+        if not len(pts): 
+            return bboxes
+
+        # Index pts, and query bbox corners
+        if self.predict_all_corners_: 
+            self.tree_ = cKDTree(pts-flow)
+            bboxes_pred = self.predict_bbox_corners(bboxes, flow)
+        else: 
+            # Predict bboxes
+            self.tree_ = cKDTree(pts-flow)
+            bboxes_pred = self.predict_bbox_center(bboxes, flow)
+
+        self.bboxes_ = bboxes_pred
+        return bboxes_pred
+
+    # def visualize(self, vis, colored=True): 
+    #     # OpenCVKLT.draw_tracks(self, vis, colored=colored, max_track_length=10)
+    #     return vis
