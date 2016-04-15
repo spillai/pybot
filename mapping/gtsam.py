@@ -73,12 +73,14 @@ class BaseSLAM(object):
         Updated slam every landmark addition
 
     """
-
-    def __init__(self, odom_noise=np.ones(6) * 0.01, prior_noise=np.ones(6) * 0.001):
+    odom_noise = np.ones(6) * 0.01
+    prior_noise = np.ones(6) * 0.001
+    def __init__(self, odom_noise=np.ones(6) * 0.01, prior_noise=np.ones(6) * 0.001, verbose=False):
  
         # ISAM2 interface
         self.slam_ = ISAM2()
         self.idx_ = -1
+        self.verbose_ = verbose
 
         # Factor graph storage
         self.graph_ = NonlinearFactorGraph()
@@ -206,7 +208,8 @@ class BaseSLAM(object):
         # self.gviz_.node[x_id2]['label'] = 'X ' + str(xid2)
 
     def add_pose_landmarks(self, xid, lids, deltas): 
-        print_red('\t\t{:}::add_landmark {:}->{:}'.format(self.__class__.__name__, xid, len(lids)))
+        if self.verbose_: 
+            print_red('\t\t{:}::add_landmark {:}->{:}'.format(self.__class__.__name__, xid, len(lids)))
 
         # Add Pose-Pose landmark factor
         x_id = symbol('x', xid)
@@ -245,7 +248,9 @@ class BaseSLAM(object):
         return 
 
     def add_point_landmarks(self, xid, lids, pts, pts3d): 
-        print_red('\t\tadd_landmark_points xid:{:}-> lid count:{:}'.format(xid, len(lids)))
+        if self.verbose_: 
+            print_red('\t\tadd_landmark_points xid:{:}-> lid count:{:}'
+                      .format(xid, len(lids)))
         
         # Add landmark-ids to ids queue in order to check
         # consistency in matches between keyframes. This 
@@ -336,7 +341,7 @@ class BaseSLAM(object):
     #     # nx.draw_graphviz(self.gviz_, prog='neato')
     #     # nx_force_draw(self.gviz_)
 
-    @timeitmethod
+    # @timeitmethod
     def update(self): 
         # Update ISAM with new nodes/factors and initial estimates
         self.slam_.update(self.graph_, self.initial_)
@@ -383,9 +388,9 @@ class BaseSLAM(object):
 
 class VisualSLAM(BaseSLAM): 
     def __init__(self, calib, min_landmark_obs=3, 
-                 odom_noise=np.ones(6) * 0.01, prior_noise=np.ones(6) * 0.001, 
-                 px_error_threshold=4, px_noise=[1.0, 1.0]):
-        BaseSLAM.__init__(self, odom_noise=odom_noise, prior_noise=prior_noise)
+                 odom_noise=BaseSLAM.odom_noise, prior_noise=BaseSLAM.prior_noise,
+                 px_error_threshold=4, px_noise=[1.0, 1.0], verbose=False):
+        BaseSLAM.__init__(self, odom_noise=odom_noise, prior_noise=prior_noise, verbose=verbose)
 
         self.px_error_threshold_ = px_error_threshold
         self.min_landmark_obs_ = min_landmark_obs
@@ -405,12 +410,21 @@ class VisualSLAM(BaseSLAM):
         # Dictionary pointing to smartfactor set
         # for each landmark id
         # self.lid_factors_ = defaultdict(SmartFactor)
-        # self.lid_factors_ = defaultdict(lambda: SmartFactor(rankTol=1, linThreshold=-1, manageDegeneracy=True))
-        self.lid_factors_ = defaultdict(lambda: dict(in_graph=False, factor=SmartFactor(), dirty=False))
+        self.lid_factors_ = defaultdict(lambda: dict(
+            in_graph=False, factor=SmartFactor(rankTol=1, linThreshold=-1, manageDegeneracy=False)))
+        # self.lid_factors_ = defaultdict(lambda: dict(in_graph=False, factor=SmartFactor()))
         self.lid_update_needed_ = np.int64([])
         
         # Measurement noise (2 px in u and v)
         self.image_measurement_noise_ = Diagonal.Sigmas(vec(*px_noise))
+
+    def add_point_landmarks_incremental_smart(self, lids, pts, keep_tracked=True): 
+        """
+        Add landmark measurement (image features)
+        from the latest robot pose to the
+        set of specified landmark ids
+        """
+        self.add_point_landmarks_smart(self.latest, lids, pts, keep_tracked=keep_tracked)
 
     def add_point_landmarks_smart(self, xid, lids, pts, keep_tracked=True): 
         """
@@ -418,7 +432,13 @@ class VisualSLAM(BaseSLAM):
         The alternative is that all measurements are added to the smart factor list
         """
         # print_red('\t\t{:}::add_landmark_points_smart {:}->{:}'.format(self.__class__.__name__, xid, len(lids)))
-        print_red('\t\t{:}::add_landmark_points_smart {:}->{:}'.format(self.__class__.__name__, xid, lids))
+        if self.verbose_: 
+            print_red('\t\t{:}::add_landmark_points_smart {:}->{:}'
+                      .format(self.__class__.__name__, xid, lids))
+
+        # Mahalanobis check before adding points to the 
+        # factor graph
+        # self.check_point_landmarks(xid, lids, pts)
         
         # Add landmark-ids to ids queue in order to check 
         # consistency in matches between keyframes. This 
@@ -435,14 +455,13 @@ class VisualSLAM(BaseSLAM):
 
             # If the landmark is already initialized, 
             # then add to graph
-            if self.lid_factors_[lid]['in_graph']:
-                print_yellow('Adding graph measurement: {:}'.format(lid))
+            if lid in self.ls_:
+                # print_yellow('Adding graph measurement: {:}'.format(lid))
 
                 # Add projection factors 
                 self.graph_.add(GenericProjectionFactorPose3Point3Cal3_S2(
                     Point2(vec(*pt)), self.image_measurement_noise_, x_id, l_id, self.K_))
-                self.lid_factors_[lid]['dirty'] = False
-
+                
                 # Add to landmark measurements
                 self.xls_.append((xid, lid))
 
@@ -450,14 +469,13 @@ class VisualSLAM(BaseSLAM):
             # as a smart factor and delay until multiple views have
             # been registered
             else: 
-                print_yellow('Adding smartfactor measurement: {:}'.format(lid))
+                # print_yellow('Adding smartfactor measurement: {:}'.format(lid))
                 # Insert smart factor based on landmark id
-                self.lid_factors_[lid]['factor'].add_single(Point2(vec(*pt)), x_id, self.image_measurement_noise_, self.K_)
-                self.lid_factors_[lid]['dirty'] = True
-
-        # Two Options: 
-        # 1. Keep only successively tracked features
-        # 2. Add all lids to the graph for estimation
+                self.lid_factors_[lid]['factor'].add_single(
+                    Point2(vec(*pt)), x_id, self.image_measurement_noise_, self.K_
+                )
+                
+        # Keep only successively tracked features
         if keep_tracked: 
             # Add smartfactors to the graph only if that 
             # landmark ID is no longer visible. setdiff1d
@@ -466,36 +484,19 @@ class VisualSLAM(BaseSLAM):
             # in `lids` (current)
             smart_lids = np.int64(self.lid_factors_.keys())
 
-            # Determine old lids that are no longer tracked
-            # and add only the ones that have at least 3
-            # observations. Delete old factors that have 
-            # insufficient number of observations
-            # add_lids = []
-            self.lid_update_needed_ = []
-            old_lids = np.setdiff1d(smart_lids, lids)
-            for lid in old_lids:
-                if self.lid_count_[lid] >= self.min_landmark_obs_: 
-                    # self.graph_.add(self.lid_factors_[lid])
-                    self.lid_update_needed_.append(lid)
-                else: 
-                    del self.lid_factors_[lid]
-        else: 
-            # Update only landmarks that have been observed minimum
-            # number of times
-            self.lid_update_needed_ = [lid for lid in lids 
-                                       if self.lid_count_[lid] >= self.min_landmark_obs_]
+            # Determine old lids that are no longer tracked and add
+            # only the ones that have at least min_landmark_obs
+            # observations. Delete old factors that have insufficient
+            # number of observations
+
+            dropped_lids = np.setdiff1d(smart_lids, lids)
+            for lid in dropped_lids:
+                self.lid_factors_.pop(lid)
+                self.lid_count_.pop(lid)
 
         return 
 
-    def add_point_landmarks_incremental_smart(self, lids, pts, keep_tracked=True): 
-        """
-        Add landmark measurement (image features)
-        from the latest robot pose to the
-        set of specified landmark ids
-        """
-        self.add_point_landmarks_smart(self.latest, lids, pts, keep_tracked=keep_tracked)
-
-    @timeitmethod
+    # @timeitmethod
     def smart_update(self, delete_factors=True): 
         """
         Update the smart factors and add 
@@ -506,65 +507,81 @@ class VisualSLAM(BaseSLAM):
 
         # # Remove smart factors whose reprojection errors are large
         # for lid in self.lid_factors_.keys(): 
-        #     smart = self.lid_factors_[lid]
-        #     if smart.error(current) > self.px_error_threshold_: 
-        #         del self.lid_factors_[lid]
-        #         del self.lid_count_[lid]
+        #     if self.lid_factors_[lid]['in_graph'] or self.lid_count_[lid] < self.min_landmark_obs_: 
+        #         continue
+
+        #     smart = self.lid_factors_[lid]['factor']
+        #     self.lid_factors_.pop(lid)
+        #     self.lid_count_.pop(lid)
 
         ids, pts3 = [], []
-        for lid in self.lid_factors_: 
-            
-            # Cannot incorporate factor without sufficient observations
-            if self.lid_count_[lid] < self.min_landmark_obs_: 
-                continue
+        for lid in self.lid_factors_.keys(): 
 
             # No need to initialize smart factor if already 
-            # added to the graph
+            # added to the graph OR 
+            # Cannot incorporate factor without sufficient observations
             lid_factor = self.lid_factors_[lid]
-            if lid_factor['in_graph']: #  or not lid_factor['dirty']: 
+            if lid_factor['in_graph'] or self.lid_count_[lid] < self.min_landmark_obs_:
                 continue
 
             l_id = symbol('l', lid)
             smart = lid_factor['factor']
 
+            # Cannot do much when degenerate or behind camera
+            if smart.isDegenerate() or smart.isPointBehindCamera():
+                continue
+
+            # Check smartfactor reprojection error 
+            err = smart.error(current)
+            
+            if err > self.px_error_threshold_ or err <= 0.0:
+                continue
+            print err
             # Add triangulated smart factors back into the graph for
             # complete point-pose optimization Each of the projection
             # factors, including the points, and their initial values
             # are added back to the graph. Optionally, we can choose
             # to subsample and add only a few measurements from the
             # set of original measurements
-            if not smart.isDegenerate() and not smart.isPointBehindCamera():
-                x_ids = smart.keys()
-                pts = smart.measured()
-                assert len(pts) == len(x_ids)
 
-                # Add each of the smart factor measurements to the 
-                # factor graph
-                for x_id,pt in zip(x_ids, pts): 
-                    self.graph_.add(GenericProjectionFactorPose3Point3Cal3_S2(
-                        pt, self.image_measurement_noise_, x_id, l_id, self.K_))
-                    
-                    # Add to landmark measurements
-                    self.xls_.append((Symbol(x_id).index(), lid))
+            x_ids = smart.keys()
+            pts = smart.measured()
+            assert len(pts) == len(x_ids)
 
-                self.lid_factors_[lid]['in_graph'] = True
-                
-                # Initialize the point value
-                pt3 = smart.point_compute(current)
-                if lid not in self.ls_: 
-                    self.initial_.insert(l_id, pt3)
-                self.ls_[lid] = pt3
+            # Add each of the smart factor measurements to the 
+            # factor graph
+            for x_id,pt in zip(x_ids, pts): 
+                self.graph_.add(GenericProjectionFactorPose3Point3Cal3_S2(
+                    pt, self.image_measurement_noise_, x_id, l_id, self.K_))
 
-                # Add the points for visualization 
-                ids.append(lid)
-                pts3.append(pt3.vector().ravel())
+                # Add to landmark measurements
+                self.xls_.append((Symbol(x_id).index(), lid))
 
-                if delete_factors: 
-                    # Once all observations are incorporated, 
-                    # remove feature altogether
-                    del self.lid_factors_[lid]['factor']
-                    self.lid_factors_[lid]['factor'] = None
-                    del self.lid_count_[lid]
+            # Initialize the point value, set in_graph, and
+            # remove the smart factor once point is computed
+            pt3 = smart.point_compute(current)
+
+            del self.lid_factors_[lid]['factor']
+            self.lid_factors_.pop(lid)
+
+            # self.lid_factors_[lid]['in_graph'] = True
+            # self.lid_factors_[lid]['factor'] = None
+
+            # Provide initial estimate to factor graph
+            assert(lid not in self.ls_)
+            if lid not in self.ls_: 
+                self.initial_.insert(l_id, pt3)
+            self.ls_[lid] = pt3
+
+            # Add the points for visualization 
+            ids.append(lid)
+            pts3.append(pt3.vector().ravel())
+
+            # if delete_factors: 
+            #     # Once all observations are incorporated, 
+            #     # remove feature altogether. Can be deleted
+            #     # as long as the landmarks are initialized
+            #     self.lid_count_.pop(lid)
 
         try: 
             ids, pts3 = np.int64(ids).ravel(), np.vstack(pts3)
@@ -573,7 +590,36 @@ class VisualSLAM(BaseSLAM):
         except Exception:
             # print('Could not return pts3, {:}'.format(e))
             return np.int64([]), np.array([])        
-    
+
+    # def check_point_landmarks(self, xid, lids, pts): 
+    #     print_red('\t\t{:}::check_point_landmarks {:}->{:}, ls:{:}'.format(
+    #         self.__class__.__name__, xid, len(lids), len(self.ls_)))
+
+
+    #     print 'new landmark', xid, lids
+
+    #     if not len(self.ls_): 
+    #         return
+
+    #     # Recover pose
+    #     camera = SimpleCamera(self.xs_[xid], self.K_)
+    #     # Project landmarks onto current frame, 
+    #     # and check mahalanobis distance
+    #     for (pt, lid) in izip(pts, lids): 
+    #         if lid not in self.ls_: 
+    #             continue
+
+    #         print 'new landmark', xid, lid
+        
+
+    #         # Project feature onto camera and check
+    #         # distance metric
+    #         pred_pt = camera.project(self.ls_[lid])
+    #         print('LID {:} Distance {:}'.format(lid, pred_pt.vector().ravel()-pt))
+            
+    #         # pred_cov = camera.project(self.lcovs_[lid])
+    #         # mahalanobis_distance(pt, pred_pt)
+
 
 # class SLAM3D(BaseSLAM): 
 #     def __init__(self, update_on_odom=False): 

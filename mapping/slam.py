@@ -108,7 +108,7 @@ class RobotSLAMMixin(object):
         self.add_point_landmarks_incremental_smart(ids, pts, keep_tracked=keep_tracked)
         if self.__poses.length >= 2: 
             self.update()
-            self.update_marginals()
+            # self.update_marginals()
             ids, pts3 = self.smart_update()
             # draw_utils.publish_cloud('gtsam-pc', pts3, c='b', frame_id='camera', reset=False)
 
@@ -175,7 +175,7 @@ class RobotSLAMMixin(object):
                 )
         draw_utils.publish_cameras('optimized_node_poses', updated_poses.values(), 
                                    covars=covars, frame_id=frame_id, reset=True)
-
+        
         # Draw odometry edges (between robot poses)
         robot_edges = self.robot_edges
         if len(robot_edges): 
@@ -295,21 +295,23 @@ class RobotSLAMMixin(object):
 
 # Right to left inheritance
 class RobotSLAM(RobotSLAMMixin, GTSAM_BaseSLAM): 
-    def __init__(self, update_on_odom=False): 
-        GTSAM_BaseSLAM.__init__(self)
+    def __init__(self, update_on_odom=False, verbose=False): 
+        GTSAM_BaseSLAM.__init__(self, 
+                                odom_noise=GTSAM_BaseSLAM.odom_noise, 
+                                prior_noise=GTSAM_BaseSLAM.prior_noise, verbose=verbose)
         RobotSLAMMixin.__init__(self, landmark_type='pose', update_on_odom=update_on_odom)
 
 class RobotVisualSLAM(RobotSLAMMixin, GTSAM_VisualSLAM): 
     def __init__(self, calib, 
                  min_landmark_obs=3, 
-                 odom_noise=np.ones(6) * 0.01, prior_noise=np.ones(6) * 0.001, 
+                 odom_noise=GTSAM_VisualSLAM.odom_noise, prior_noise=GTSAM_VisualSLAM.prior_noise, 
                  px_error_threshold=4, px_noise=[1.0, 1.0], 
-                 update_on_odom=False):
+                 update_on_odom=False, verbose=False):
         GTSAM_VisualSLAM.__init__(self, calib, 
                                   min_landmark_obs=min_landmark_obs, 
                                   px_error_threshold=px_error_threshold, 
                                   odom_noise=odom_noise, prior_noise=prior_noise, 
-                                  px_noise=px_noise)
+                                  px_noise=px_noise, verbose=verbose)
         RobotSLAMMixin.__init__(self, landmark_type='point', update_on_odom=update_on_odom)
 
     
