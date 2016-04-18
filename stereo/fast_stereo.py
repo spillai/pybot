@@ -8,11 +8,13 @@ class FastStereo(object):
     def __init__(self, calib, threshold=10, scale=1.0, iterations=1): 
         # Stereo Methods: CROSS_RATIO_DISPARITY, TESSELLATED_DISPARITY, PLANAR_INTERP_DISPARITY
         self.stereo = _FastStereo(threshold=threshold, 
-                                  stereo_method=_FastStereo.TESSELLATED_DISPARITY, iterations=iterations, lr_consistency_check=True)
+                                  stereo_method=_FastStereo.TESSELLATED_DISPARITY, 
+                                  iterations=iterations, lr_consistency_check=True)
         self.stereo.set_calibration(calib.left.K, calib.right.K, 
                                     calib.left.D, calib.right.D, calib.left.R, calib.right.R, 
                                     calib.left.P, calib.right.P, calib.Q, calib.right.t)
-        print calib.left.K, calib.right.K, calib.left.D, calib.right.D, calib.left.R, calib.right.R, calib.left.P, calib.right.P, calib.Q, calib.right.t
+        # print calib.left.K, calib.right.K, calib.left.D, calib.right.D, 
+        # calib.left.R, calib.right.R, calib.left.P, calib.right.P, calib.Q, calib.right.t
 
     def process(self, left_im, right_im): 
         return self.stereo.process(to_gray(left_im), to_gray(right_im))
