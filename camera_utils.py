@@ -112,6 +112,8 @@ def undistort_image(im, K, D):
     Kprime, roi = cv2.getOptimalNewCameraMatrix(K, D, (W,H), 1, (W,H))
     return cv2.undistort(im, K, D, None, K)
 
+# def camera_from_P(P): 
+    
 def get_calib_params(fx, fy, cx, cy, baseline=None, baseline_px=None): 
     raise RuntimeError('Deprecated, see camera_utils.StereoCamera')
 

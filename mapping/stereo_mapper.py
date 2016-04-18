@@ -94,7 +94,7 @@ class VOMixin(object):
         return pose_ct
 
 class StereoMapper(VOMixin): 
-    def __init__(self, camera, vo_alg='viso2', stereo_alg='elas'): 
+    def __init__(self, camera, vo_alg='viso2', stereo_alg='elas', draw_relative=False): 
         VOMixin.__init__(self, camera, alg=vo_alg)
 
         # Check VO
@@ -104,11 +104,12 @@ class StereoMapper(VOMixin):
         # Dataset calib
         self.camera_ = camera
         self.idx_ = 0
-        self.map_every_ = 3
+        self.map_every_ = 1
+        self.draw_relative_ = draw_relative
 
         # Rolling window length
         # Queue length, and image subsample
-        self.qlen_, self.s_ = 10000, 2
+        self.qlen_, self.s_ = 10, 2
         self.poses_ = deque(maxlen=self.qlen_)
   
         # Setup stereo solver (VO + Stereo disparity estimation)
@@ -131,7 +132,11 @@ class StereoMapper(VOMixin):
         print self.poses_[-1]
 
         # Move body frame of reference
-        draw_utils.publish_pose_list('stereo_vo', self.poses_, frame_id='camera', reset=(self.idx_ == 0))
+        if self.draw_relative_: 
+            poses = [Pose.from_rigid_transform(p.id, self.poses_[-1].inverse() * p) for p in self.poses_]
+        else: 
+            poses = self.poses_ 
+        draw_utils.publish_pose_list('stereo_vo', poses, frame_id='camera', reset=(self.idx_ == 0))
         draw_utils.publish_pose_t('CAMERA_POSE',  pose_ct, frame_id='camera')
 
         # Draw matches
@@ -205,7 +210,11 @@ class StereoMapper(VOMixin):
         self.poses_.append(pose_ct)
 
         # Move body frame of reference
-        draw_utils.publish_pose_list('stereo_vo', self.poses_, frame_id='camera', reset=(self.idx_ == 0))
+        if self.draw_relative_: 
+            poses = [Pose.from_rigid_transform(p.id, self.poses_[-1].inverse() * p) for p in self.poses_]
+        else: 
+            poses = self.poses_ 
+        draw_utils.publish_pose_list('stereo_vo', poses, frame_id='camera', reset=(self.idx_ == 0))
         draw_utils.publish_pose_t('CAMERA_POSE',  pose_ct, frame_id='camera')
 
         return True
