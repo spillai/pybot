@@ -94,7 +94,7 @@ class VOMixin(object):
         return pose_ct
 
 class StereoMapper(VOMixin): 
-    def __init__(self, camera, vo_alg='viso2', stereo_alg='elas', draw_relative=False): 
+    def __init__(self, camera, iterations=2, vo_alg='viso2', stereo_alg='elas', draw_relative=False): 
         VOMixin.__init__(self, camera, alg=vo_alg)
 
         # Check VO
@@ -104,17 +104,17 @@ class StereoMapper(VOMixin):
         # Dataset calib
         self.camera_ = camera
         self.idx_ = 0
-        self.map_every_ = 1
+        self.map_every_ = 3
         self.draw_relative_ = draw_relative
 
         # Rolling window length
         # Queue length, and image subsample
-        self.qlen_, self.s_ = 10, 2
+        self.qlen_, self.s_ = 20, 2
         self.poses_ = deque(maxlen=self.qlen_)
   
         # Setup stereo solver (VO + Stereo disparity estimation)
         # self._setup_vo(alg=vo_alg)
-        self._setup_stereo(alg=stereo_alg)
+        self._setup_stereo(alg=stereo_alg, iterations=iterations)
 
         # Check stereo
         if not hasattr(self, 'stereo_'): 
@@ -158,7 +158,7 @@ class StereoMapper(VOMixin):
         return True
 
 
-    def _setup_stereo(self, alg='elas'): 
+    def _setup_stereo(self, alg='elas', iterations=2): 
         """
         Setup stereo disparity estimation
         """
@@ -181,14 +181,14 @@ class StereoMapper(VOMixin):
             self.stereo_ = CrossRatioStereo()
         elif alg == 'fast-stereo': 
             calib = self.camera_
-            self.stereo_ = FastStereo(threshold=25, 
+            self.stereo_ = FastStereo(threshold=20, 
                                       stereo_method=FastStereo.TESSELLATED_DISPARITY, 
                                       lr_consistency_check=True)
             self.stereo_.set_calibration(calib.left.K, calib.right.K, 
                                          calib.left.D, calib.right.D, calib.left.R, calib.right.R, 
                                          calib.left.P, calib.right.P, calib.Q, calib.right.t)
-            self.stereo_.cost_threshold = 0.1
-            self.stereo_.iterations = 2
+            self.stereo_.cost_threshold = 0.15
+            self.stereo_.iterations = iterations
             # self.stereo_ = CalibratedFastStereo(stereo, self.calib_, rectify=None)
         else: 
             raise RuntimeError('Unknown stereo algorithm: %s. Use either sgbm, elas or ordered' % alg)
@@ -228,7 +228,7 @@ class StereoMapper(VOMixin):
 
         # Reconstruct stereo
         im_pub, X_pub = self.camera_.reconstruct_with_texture(disp, to_color(left_im), sample=self.s_)
-        m = np.bitwise_and(X_pub[:,2] < 40, X_pub[:,2] > 0.1)
+        m = np.bitwise_and(X_pub[:,2] < 60, X_pub[:,2] > 0.1)
         im_pub, X_pub = im_pub[m], X_pub[m]
 
         draw_utils.publish_cloud('stereo_cloud', X_pub, c=im_pub, 
