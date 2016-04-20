@@ -29,7 +29,7 @@ class FastStereoViz(FastStereo):
 
         # Trackbar
         trackbar_create('cost_threshold', 'disparity', int(cost_threshold * 100), 100, scale=0.01)
-        trackbar_create('fast_threshold', 'disparity', 20, 50, scale=1)
+        trackbar_create('fast_threshold', 'disparity', threshold, 50, scale=1)
         trackbar_create('iterations', 'disparity', iterations, 10, scale=1)
 
     def process(self, left_im, right_im): 

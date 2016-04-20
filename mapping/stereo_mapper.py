@@ -94,7 +94,8 @@ class VOMixin(object):
         return pose_ct
 
 class StereoMapper(VOMixin): 
-    def __init__(self, camera, iterations=2, vo_alg='viso2', stereo_alg='elas', draw_relative=False): 
+    def __init__(self, camera, vo_alg='viso2', stereo_alg='elas', 
+                 iterations=2, threshold=20, cost_threshold=0.15, draw_relative=False): 
         VOMixin.__init__(self, camera, alg=vo_alg)
 
         # Check VO
@@ -109,12 +110,12 @@ class StereoMapper(VOMixin):
 
         # Rolling window length
         # Queue length, and image subsample
-        self.qlen_, self.s_ = 20, 2
+        self.qlen_, self.s_ = 100, 2
         self.poses_ = deque(maxlen=self.qlen_)
   
         # Setup stereo solver (VO + Stereo disparity estimation)
         # self._setup_vo(alg=vo_alg)
-        self._setup_stereo(alg=stereo_alg, iterations=iterations)
+        self._setup_stereo(alg=stereo_alg, iterations=iterations, threshold=threshold, cost_threshold=cost_threshold)
 
         # Check stereo
         if not hasattr(self, 'stereo_'): 
@@ -133,7 +134,7 @@ class StereoMapper(VOMixin):
 
         # Move body frame of reference
         if self.draw_relative_: 
-            poses = [Pose.from_rigid_transform(p.id, self.poses_[-1].inverse() * p) for p in self.poses_]
+            poses = [Pose.from_rigid_transform(p.id, p * self.poses_[-1].inverse() ) for p in self.poses_]
         else: 
             poses = self.poses_ 
         draw_utils.publish_pose_list('stereo_vo', poses, frame_id='camera', reset=(self.idx_ == 0))
@@ -158,7 +159,7 @@ class StereoMapper(VOMixin):
         return True
 
 
-    def _setup_stereo(self, alg='elas', iterations=2): 
+    def _setup_stereo(self, alg='elas', iterations=2, cost_threshold=0.15, threshold=20): 
         """
         Setup stereo disparity estimation
         """
@@ -181,13 +182,13 @@ class StereoMapper(VOMixin):
             self.stereo_ = CrossRatioStereo()
         elif alg == 'fast-stereo': 
             calib = self.camera_
-            self.stereo_ = FastStereo(threshold=20, 
+            self.stereo_ = FastStereo(threshold=threshold, 
                                       stereo_method=FastStereo.TESSELLATED_DISPARITY, 
                                       lr_consistency_check=True)
             self.stereo_.set_calibration(calib.left.K, calib.right.K, 
                                          calib.left.D, calib.right.D, calib.left.R, calib.right.R, 
                                          calib.left.P, calib.right.P, calib.Q, calib.right.t)
-            self.stereo_.cost_threshold = 0.15
+            self.stereo_.cost_threshold = cost_threshold
             self.stereo_.iterations = iterations
             # self.stereo_ = CalibratedFastStereo(stereo, self.calib_, rectify=None)
         else: 
