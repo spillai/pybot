@@ -197,7 +197,9 @@ class TangoGroundTruthImageDecoder(TangoImageDecoder):
             # and original annotated image
             bboxes = self.meta_[basename]
             for idx, bbox in enumerate(bboxes): 
-                bboxes[idx]['polygon'] = bbox['polygon'] * self.get_image_scale(H)
+                sbbox = bbox['polygon'] * self.get_image_scale(H)
+                bboxes[idx]['polygon'] = sbbox
+                bboxes[idx]['bbox'] = np.int64([sbbox[:,0].min(), sbbox[:,1].min(), sbbox[:,0].max(), sbbox[:,1].max()])
 
         except Exception as e: 
             bboxes = []
@@ -448,7 +450,7 @@ class TangoLogController(LogController):
         if not len(self.__pose_q):
             return
         t_pose, pose = self.__pose_q[-1]
-        self.on_frame(AnnotatedFrame(img=ann_img.img, pose=pose, t_pose=t_pose, t_img=t_img, bboxes=[]))
+        self.on_frame(AnnotatedFrame(img=img, pose=pose, t_pose=t_pose, t_img=t_img, bboxes=[]))
 
     def on_pose(self, t, pose): 
         # self.__item_q.append((1, t, pose))
