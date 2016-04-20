@@ -106,8 +106,8 @@ class RigidTransform(object):
         self.tvec = np.array(tvec)
 
     def __repr__(self):
-        return 'rpy: %s tvec: %s' % \
-            (np.array_str(self.quat.to_roll_pitch_yaw(), precision=2, suppress_small=True), 
+        return 'rpy (rxyz): %s tvec: %s' % \
+            (np.array_str(self.quat.to_roll_pitch_yaw(axes='rxyz'), precision=2, suppress_small=True), 
              np.array_str(self.tvec, precision=2, suppress_small=True))
         # return 'quat: %s, tvec: %s' % (self.quat, self.tvec)
 
@@ -406,8 +406,10 @@ class Pose(RigidTransform):
         return cls(pid, pose.quat, pose.tvec)
     
     def __repr__(self): 
-        return 'Pose ID: %i, rpy: %s tvec: %s' % \
-            (self.id, np.array_str(self.quat.to_roll_pitch_yaw(), precision=2), np.array_str(self.tvec, precision=2))
+        return 'Pose ID: %i, rpy (rxyz): %s tvec: %s' % \
+            (self.id, 
+             np.array_str(self.quat.to_roll_pitch_yaw(axes='rxyz'), precision=2), 
+             np.array_str(self.tvec, precision=2))
 
 if __name__ == "__main__":
 
