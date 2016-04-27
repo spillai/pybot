@@ -46,9 +46,9 @@ class Quaternion(object):
     def normalize(self): 
         """ Check validity of unit-quaternion norm """
         norm = self.norm()
-        if abs(norm - 1) > 1e-2:
+        if abs(norm - 1) > 1e-6:
             self.q /= norm
-        if abs(self.norm()-1) > 1e-2: 
+        if abs(self.norm()-1) > 1e-6: 
             raise RuntimeError('Norm computed is %5.3f' % norm)
 
     def norm(self): 
@@ -58,8 +58,8 @@ class Quaternion(object):
         return self.q.dot(other.q)
 
     def inverse(self):
-        """ Invert rotation """
-        return Quaternion(tf.quaternion_inverse(self.q))
+        """ Invert rotation assuming unit quaternion """
+        return Quaternion(tf.quaternion_conjugate(self.q))
 
     def conjugate(self):
         """ Quaternion conjugate """
