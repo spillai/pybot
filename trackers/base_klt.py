@@ -291,6 +291,18 @@ def get_weights(dists):
     g = np.exp(dists / (2 * 10**2))
     return g / np.sum(g)
 
+def get_bbox(pts): 
+    x1, x2, y1, y2 = np.min(pts[:,0]), np.max(pts[:,0]), np.min(pts[:,1]), np.max(pts[:,1]) 
+    return np.int64([x1, y1, x2, y2])
+
+def inside_bboxes(pts, bboxes): 
+    try: 
+        bboxes = bboxes.astype(np.float32)
+        return np.vstack([((pts[:,0] >= x1) & (pts[:,0] <= x2) & (pts[:,1] >= y1) & (pts[:,1] <= y2))
+                          for (x1, y1, x2, y2) in izip(bboxes[:,0], bboxes[:,1], bboxes[:,2], bboxes[:,3])])
+    except: 
+        return np.array([])
+
 class BoundingBoxKLT(OpenCVKLT): 
     """
     KLT Tracker with bounding boxes
@@ -301,6 +313,8 @@ class BoundingBoxKLT(OpenCVKLT):
         self.K_ = 4
         self.bids_, self.bboxes_ = [], []
         self.predict_all_corners_ = True
+
+        self.hulls_ = {}
 
     @property
     def initialized(self): 
@@ -373,47 +387,50 @@ class BoundingBoxKLT(OpenCVKLT):
         Propagate bounding boxes based on feature tracks
         ccw: a b c d
         """
-
-        # pids, ppts = self.latest_ids, self.latest_pts
-
         OpenCVKLT.process(self, im, detected_pts=None)
 
-        # Expects bboxes to be propagated if None
-        if bboxes is None: 
-            # Check if not previously set
-            # (it should be if bboxes is None )
-            if not self.initialized: 
-                return [] 
-                # raise ValueError('BBoxes has not been initialized')
-            bboxes = self.bboxes_
-        else: 
-            # If not previously set, set and return as is
-            self.bboxes_ = bboxes
-            return bboxes
-
-            # self.bboxes_.extend(bboxes)
-            # max_id = np.max(self.bids_) + 1 if len(self.bids_) else 0
-            # bids = np.arange(max_id, max_id + len(bboxes))
-            # print('BBOX Add ===============')
-            
         # Degenerate case where no points are available to propagate
+        # OPTIONALLY: only look at confident tracks
         # inds = self.confident_tracks(min_length=10)
         # ids, pts, flow = self.latest_ids[inds], self.latest_pts[inds], self.latest_flow[inds]
         ids, pts, flow = self.latest_ids, self.latest_pts, self.latest_flow
+        valid_pts = inside_bboxes(pts, bboxes)
 
-        if not len(pts): 
-            self.bboxes_ = []
-            return []
+        # Update hulls based on the newly tracked locations and 
+        for hid in self.hulls_.keys(): 
 
-        # Index pts, and query bbox corners
-        self.tree_ = cKDTree(pts-flow)
-        if self.predict_all_corners_: 
-            bboxes_pred = self.predict_bboxflow_corners(bboxes, flow, im.shape[:2])
-        else: 
-            bboxes_pred = self.predict_bboxflow_center(bboxes, flow, im.shape[:2])
+            # Find the intersection of previously tracked and currently tracking
+            tids = self.hulls_[hid].ids
+            common_inds, = np.where(np.in1d(tids, ids))
 
-        self.bboxes_ = bboxes_pred
-        return bboxes_pred
+            # Delete the hull if no common tracked ids
+            if not len(common_inds): 
+                self.hulls_.pop(hid)
+                continue
+
+            # Update the hull to the latest points
+            self.hulls_[hid].pts = pts[common_inds]
+
+        # Add new hulls that are provided, and keep old tracked ones
+        max_id = len(self.hulls_)
+        for bidx, valid in enumerate(valid_pts):
+            self.hulls_[max_id + bidx] = AttrDict(ids=ids[valid], pts=pts[valid], bbox=get_bbox(pts[valid])) # bbox=bboxes[bidx])
+
+        # # Index pts, and query bbox corners
+        # self.tree_ = cKDTree(pts-flow)
+        # if self.predict_all_corners_: 
+        #     bboxes_pred = self.predict_bboxflow_corners(bboxes, flow, im.shape[:2])
+        # else: 
+        #     bboxes_pred = self.predict_bboxflow_center(bboxes, flow, im.shape[:2])
+
+        # self.bboxes_ = bboxes_pred
+
+        try: 
+            hids = self.hulls_.keys()
+            hboxes = np.vstack([ hull.bbox for hull in self.hulls_.itervalues() ])
+        except: 
+            hids, hboxes = [], []
+        return hids, hboxes
 
     def visualize(self, vis, colored=True): 
         # OpenCVKLT.draw_tracks(self, vis, colored=colored, max_track_length=10)
