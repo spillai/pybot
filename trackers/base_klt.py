@@ -320,66 +320,66 @@ class BoundingBoxKLT(OpenCVKLT):
     def initialized(self): 
         return len(self.bboxes_) > 0
 
-    def predict_flow(self, xy, flow): 
-        # Query pts
-        dists, inds = self.tree_.query(xy, k=self.K_)
+    # def predict_flow(self, xy, flow): 
+    #     # Query pts
+    #     dists, inds = self.tree_.query(xy, k=self.K_)
 
-        # Weighted averaging
-        weights = get_weights(dists)
-        pflow = np.array([np.average(flow[inds[i,:], :], axis=0, weights=weights[i])
-                           for i in xrange(len(xy))])
-        return xy + pflow
+    #     # Weighted averaging
+    #     weights = get_weights(dists)
+    #     pflow = np.array([np.average(flow[inds[i,:], :], axis=0, weights=weights[i])
+    #                        for i in xrange(len(xy))])
+    #     return xy + pflow
 
-    def predict_bboxflow_center(self, bboxes, flow, shape): 
+    # def predict_bboxflow_center(self, bboxes, flow, shape): 
 
-        # Get centers for bboxes
-        bboxes = bboxes.astype(np.float32)
-        xy = np.vstack([(bboxes[:,0] + bboxes[:,2]) / 2, (bboxes[:,1] + bboxes[:,3]) / 2]).T
-        wh = np.vstack([bboxes[:,2]-bboxes[:,0], bboxes[:,3]-bboxes[:,1]]).T / 2
-        xy = self.predict_flow(xy, flow)
+    #     # Get centers for bboxes
+    #     bboxes = bboxes.astype(np.float32)
+    #     xy = np.vstack([(bboxes[:,0] + bboxes[:,2]) / 2, (bboxes[:,1] + bboxes[:,3]) / 2]).T
+    #     wh = np.vstack([bboxes[:,2]-bboxes[:,0], bboxes[:,3]-bboxes[:,1]]).T / 2
+    #     xy = self.predict_flow(xy, flow)
 
-        # Find the extent of the newly propagated bbox
-        x1 = xy[:,0] - wh[:,0]
-        y1 = xy[:,1] - wh[:,1]
-        x2 = xy[:,0] + wh[:,0]
-        y2 = xy[:,1] + wh[:,1]
+    #     # Find the extent of the newly propagated bbox
+    #     x1 = xy[:,0] - wh[:,0]
+    #     y1 = xy[:,1] - wh[:,1]
+    #     x2 = xy[:,0] + wh[:,0]
+    #     y2 = xy[:,1] + wh[:,1]
 
-        # Maintain the prediction 
-        bboxes_pred = np.vstack([x1, y1, x2, y2]).T.astype(np.int64)
+    #     # Maintain the prediction 
+    #     bboxes_pred = np.vstack([x1, y1, x2, y2]).T.astype(np.int64)
         
-        return bboxes_pred
+    #     return bboxes_pred
         
 
-    def predict_bboxflow_corners(self, bboxes, flow, shape): 
-        # BBOX PREDICTION for all 4 corners
+    # def predict_bboxflow_corners(self, bboxes, flow, shape): 
+    #     # BBOX PREDICTION for all 4 corners
 
-        # bboxes: x1, y1, x2, y2
-        # a (x1,y1), b (x1,y2), c (x2,y2), d (x2,y1)
-        bboxes = bboxes.astype(np.float32)
-        x1, y1, x2, y2 = bboxes[:,0], bboxes[:,1], bboxes[:,2], bboxes[:,3]
-        bboxes_a = np.vstack([x1, y1]).T
-        bboxes_b = np.vstack([x1, y2]).T
-        bboxes_c = np.vstack([x2, y2]).T
-        bboxes_d = np.vstack([x2, y1]).T
+    #     # bboxes: x1, y1, x2, y2
+    #     # a (x1,y1), b (x1,y2), c (x2,y2), d (x2,y1)
+    #     bboxes = bboxes.astype(np.float32)
+    #     x1, y1, x2, y2 = bboxes[:,0], bboxes[:,1], bboxes[:,2], bboxes[:,3]
+    #     bboxes_a = np.vstack([x1, y1]).T
+    #     bboxes_b = np.vstack([x1, y2]).T
+    #     bboxes_c = np.vstack([x2, y2]).T
+    #     bboxes_d = np.vstack([x2, y1]).T
                 
-        bboxes_a = self.predict_flow(bboxes_a, flow)
-        bboxes_b = self.predict_flow(bboxes_b, flow)
-        bboxes_c = self.predict_flow(bboxes_c, flow)
-        bboxes_d = self.predict_flow(bboxes_d, flow)
+    #     bboxes_a = self.predict_flow(bboxes_a, flow)
+    #     bboxes_b = self.predict_flow(bboxes_b, flow)
+    #     bboxes_c = self.predict_flow(bboxes_c, flow)
+    #     bboxes_d = self.predict_flow(bboxes_d, flow)
 
-        # Find the extent of the newly propagated bbox
-        H, W = shape[:2]
-        x1 = np.maximum(0, np.minimum(bboxes_a[:,0], bboxes_b[:,0]))
-        y1 = np.maximum(0, np.minimum(bboxes_a[:,1], bboxes_d[:,1]))
-        x2 = np.minimum(W, np.maximum(bboxes_c[:,0], bboxes_d[:,0]))
-        y2 = np.minimum(H, np.maximum(bboxes_b[:,1], bboxes_d[:,1]))
-        invalid = (x1 < 0) | (y1 < 0) | (x2 < 0) | (y2 < 0) | \
-                  (x1 >= W) | (x2 >= W) | (y1 >= H) | (y2 >= H)
+    #     # Find the extent of the newly propagated bbox
+    #     H, W = shape[:2]
+    #     x1 = np.maximum(0, np.minimum(bboxes_a[:,0], bboxes_b[:,0]))
+    #     y1 = np.maximum(0, np.minimum(bboxes_a[:,1], bboxes_d[:,1]))
+    #     x2 = np.minimum(W, np.maximum(bboxes_c[:,0], bboxes_d[:,0]))
+    #     y2 = np.minimum(H, np.maximum(bboxes_b[:,1], bboxes_d[:,1]))
+    #     invalid = (x1 < 0) | (y1 < 0) | (x2 < 0) | (y2 < 0) | \
+    #               (x1 >= W) | (x2 >= W) | (y1 >= H) | (y2 >= H)
         
-        # Maintain the prediction 
-        bboxes_pred = np.vstack([x1, y1, x2, y2]).T.astype(np.int64)
-        bboxes_pred[invalid,:] = -1
-        return bboxes_pred
+    #     # Maintain the prediction 
+    #     bboxes_pred = np.vstack([x1, y1, x2, y2]).T.astype(np.int64)
+    #     bboxes_pred[invalid,:] = -1
+    #     return bboxes_pred
 
     @timeitmethod
     def process(self, im, bboxes=None): 
@@ -403,7 +403,7 @@ class BoundingBoxKLT(OpenCVKLT):
             # TODO: can potentially update the ids within the newly tracked hull, 
             # so that the propagation is more prolonged
             tids = self.hulls_[hid].ids
-            common_inds, = np.where(np.in1d(tids, ids))
+            common_inds, = np.where(np.in1d(ids, tids))
 
             # Delete the hull if no common tracked ids
             if not len(common_inds): 
@@ -411,7 +411,11 @@ class BoundingBoxKLT(OpenCVKLT):
                 continue
 
             # Update the hull to the latest points
-            self.hulls_[hid].pts = pts[common_inds]
+            # TODO: can update the ids as well so that 
+            # the tracking is more proloned
+            vpts = pts[common_inds]
+            self.hulls_[hid].pts = vpts
+            self.hulls_[hid].bbox = get_bbox(vpts)
 
         # Add new hulls that are provided, and keep old tracked ones
         max_id = len(self.hulls_)
@@ -435,5 +439,18 @@ class BoundingBoxKLT(OpenCVKLT):
         return hids, hboxes
 
     def visualize(self, vis, colored=True): 
+
+        try: 
+            tids = set(np.hstack([hull.ids for hull in self.hulls_.itervalues()]))
+        except: 
+            return vis
+
+        for tid, pts in self.tm_.tracks.iteritems(): 
+            if tid not in tids: continue
+            cv2.polylines(vis, [np.vstack(pts.items).astype(np.int32)[-4:]], False, 
+                          (0,255,0), thickness=1)
+            tl, br = np.int32(pts.latest_item)-2, np.int32(pts.latest_item)+2
+            cv2.rectangle(vis, (tl[0], tl[1]), (br[0], br[1]), (0,255,0), -1)
+
         # OpenCVKLT.draw_tracks(self, vis, colored=colored, max_track_length=10)
         return vis
