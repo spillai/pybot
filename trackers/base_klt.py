@@ -400,6 +400,8 @@ class BoundingBoxKLT(OpenCVKLT):
         for hid in self.hulls_.keys(): 
 
             # Find the intersection of previously tracked and currently tracking
+            # TODO: can potentially update the ids within the newly tracked hull, 
+            # so that the propagation is more prolonged
             tids = self.hulls_[hid].ids
             common_inds, = np.where(np.in1d(tids, ids))
 
