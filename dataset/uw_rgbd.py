@@ -36,6 +36,7 @@ class UWRGBDDataset(object):
     default_rgb_shape = (480,640,3)
     default_depth_shape = (480,640)
     camera_params = kinect_v1_params
+    calib = CameraIntrinsic(K=kinect_v1_params.K_rgb, shape=default_rgb_shape[:2])
     class_names = ["apple", "ball", "banana", "bell_pepper", "binder", "bowl", "calculator", "camera", 
                    "cap", "cell_phone", "cereal_box", "coffee_mug", "comb", "dry_battery", "flashlight", 
                    "food_bag", "food_box", "food_can", "food_cup", "food_jar", "garlic", "glue_stick", 
@@ -334,6 +335,10 @@ class UWRGBDSceneDataset(UWRGBDDataset):
         def scene_name(self): 
             return self.name
 
+        @property
+        def calib(self): 
+            return UWRGBDDataset.calib
+            
         @staticmethod
         def cluster_ply_labels(ply_xyz, ply_rgb, ply_label): 
             """
