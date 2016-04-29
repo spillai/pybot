@@ -296,6 +296,10 @@ def get_bbox(pts):
     return np.int64([x1, y1, x2, y2])
 
 def inside_bboxes(pts, bboxes): 
+    """    
+    Returns the set of points that are within each bbox
+    B x N boolean mask where B bboxes, N pts    
+    """
     try: 
         bboxes = bboxes.astype(np.float32)
         return np.vstack([((pts[:,0] >= x1) & (pts[:,0] <= x2) & (pts[:,1] >= y1) & (pts[:,1] <= y2))
@@ -390,11 +394,8 @@ class BoundingBoxKLT(OpenCVKLT):
         OpenCVKLT.process(self, im, detected_pts=None)
 
         # Degenerate case where no points are available to propagate
-        # OPTIONALLY: only look at confident tracks
-        # inds = self.confident_tracks(min_length=10)
-        # ids, pts, flow = self.latest_ids[inds], self.latest_pts[inds], self.latest_flow[inds]
         ids, pts, flow = self.latest_ids, self.latest_pts, self.latest_flow
-        valid_pts = inside_bboxes(pts, bboxes)
+        valid_mask = inside_bboxes(pts, bboxes)
 
         # Update hulls based on the newly tracked locations and 
         for hid in self.hulls_.keys(): 
@@ -414,12 +415,18 @@ class BoundingBoxKLT(OpenCVKLT):
             # TODO: can update the ids as well so that 
             # the tracking is more proloned
             vpts = pts[common_inds]
+            vbox = get_bbox(vpts)
+            valid_pts = inside_bboxes(pts, [vbox])
+            vinds, = np.where(valid_pts.ravel())
+            vids = ids[np.r_[common_inds, vinds]]
+
             self.hulls_[hid].pts = vpts
-            self.hulls_[hid].bbox = get_bbox(vpts)
+            self.hulls_[hid].bbox = vbox
+            self.hulls_[hid].ids = vids
 
         # Add new hulls that are provided, and keep old tracked ones
         max_id = len(self.hulls_)
-        for bidx, valid in enumerate(valid_pts):
+        for bidx, valid in enumerate(valid_mask):
             self.hulls_[max_id + bidx] = AttrDict(ids=ids[valid], pts=pts[valid], bbox=get_bbox(pts[valid])) # bbox=bboxes[bidx])
 
         # # Index pts, and query bbox corners
