@@ -33,6 +33,7 @@ from bot_utils.timer import timeitmethod
 from bot_vision.trackers import FeatureDetector, OpticalFlowTracker, LKTracker
 from bot_vision.trackers import finite_and_within_bounds, to_pts, \
     TrackManager, FeatureDetector, OpticalFlowTracker, LKTracker
+from bot_vision.recognition.bbox import brute_force_match, intersection_over_union
 
 class BaseKLT(object): 
     """
@@ -324,67 +325,6 @@ class BoundingBoxKLT(OpenCVKLT):
     def initialized(self): 
         return len(self.bboxes_) > 0
 
-    # def predict_flow(self, xy, flow): 
-    #     # Query pts
-    #     dists, inds = self.tree_.query(xy, k=self.K_)
-
-    #     # Weighted averaging
-    #     weights = get_weights(dists)
-    #     pflow = np.array([np.average(flow[inds[i,:], :], axis=0, weights=weights[i])
-    #                        for i in xrange(len(xy))])
-    #     return xy + pflow
-
-    # def predict_bboxflow_center(self, bboxes, flow, shape): 
-
-    #     # Get centers for bboxes
-    #     bboxes = bboxes.astype(np.float32)
-    #     xy = np.vstack([(bboxes[:,0] + bboxes[:,2]) / 2, (bboxes[:,1] + bboxes[:,3]) / 2]).T
-    #     wh = np.vstack([bboxes[:,2]-bboxes[:,0], bboxes[:,3]-bboxes[:,1]]).T / 2
-    #     xy = self.predict_flow(xy, flow)
-
-    #     # Find the extent of the newly propagated bbox
-    #     x1 = xy[:,0] - wh[:,0]
-    #     y1 = xy[:,1] - wh[:,1]
-    #     x2 = xy[:,0] + wh[:,0]
-    #     y2 = xy[:,1] + wh[:,1]
-
-    #     # Maintain the prediction 
-    #     bboxes_pred = np.vstack([x1, y1, x2, y2]).T.astype(np.int64)
-        
-    #     return bboxes_pred
-        
-
-    # def predict_bboxflow_corners(self, bboxes, flow, shape): 
-    #     # BBOX PREDICTION for all 4 corners
-
-    #     # bboxes: x1, y1, x2, y2
-    #     # a (x1,y1), b (x1,y2), c (x2,y2), d (x2,y1)
-    #     bboxes = bboxes.astype(np.float32)
-    #     x1, y1, x2, y2 = bboxes[:,0], bboxes[:,1], bboxes[:,2], bboxes[:,3]
-    #     bboxes_a = np.vstack([x1, y1]).T
-    #     bboxes_b = np.vstack([x1, y2]).T
-    #     bboxes_c = np.vstack([x2, y2]).T
-    #     bboxes_d = np.vstack([x2, y1]).T
-                
-    #     bboxes_a = self.predict_flow(bboxes_a, flow)
-    #     bboxes_b = self.predict_flow(bboxes_b, flow)
-    #     bboxes_c = self.predict_flow(bboxes_c, flow)
-    #     bboxes_d = self.predict_flow(bboxes_d, flow)
-
-    #     # Find the extent of the newly propagated bbox
-    #     H, W = shape[:2]
-    #     x1 = np.maximum(0, np.minimum(bboxes_a[:,0], bboxes_b[:,0]))
-    #     y1 = np.maximum(0, np.minimum(bboxes_a[:,1], bboxes_d[:,1]))
-    #     x2 = np.minimum(W, np.maximum(bboxes_c[:,0], bboxes_d[:,0]))
-    #     y2 = np.minimum(H, np.maximum(bboxes_b[:,1], bboxes_d[:,1]))
-    #     invalid = (x1 < 0) | (y1 < 0) | (x2 < 0) | (y2 < 0) | \
-    #               (x1 >= W) | (x2 >= W) | (y1 >= H) | (y2 >= H)
-        
-    #     # Maintain the prediction 
-    #     bboxes_pred = np.vstack([x1, y1, x2, y2]).T.astype(np.int64)
-    #     bboxes_pred[invalid,:] = -1
-    #     return bboxes_pred
-
     @timeitmethod
     def process(self, im, bboxes=None): 
         """
@@ -395,9 +335,8 @@ class BoundingBoxKLT(OpenCVKLT):
 
         # Degenerate case where no points are available to propagate
         ids, pts, flow = self.latest_ids, self.latest_pts, self.latest_flow
-        valid_mask = inside_bboxes(pts, bboxes)
 
-        # Update hulls based on the newly tracked locations and 
+        # 1. Update hulls based on the newly tracked locations and 
         for hid in self.hulls_.keys(): 
 
             # Find the intersection of previously tracked and currently tracking
@@ -424,20 +363,25 @@ class BoundingBoxKLT(OpenCVKLT):
             self.hulls_[hid].bbox = vbox
             self.hulls_[hid].ids = vids
 
-        # Add new hulls that are provided, and keep old tracked ones
+        # 2. Add new hulls that are provided, and keep old tracked ones
         max_id = len(self.hulls_)
+        
+        # Find the bounding boxes that are relatively new (IoU < 0.3)
+        if len(self.hulls_) and bboxes is not None: 
+            hbboxes = np.vstack([hull.bbox for hull in self.hulls_.itervalues()])
+            HB = brute_force_match(hbboxes, bboxes, 
+                                   match_func=lambda x,y: intersection_over_union(x, y),
+                                   dtype=np.float32)
+            newinds, = np.where(HB.max(axis=0) < 0.3)
+            bboxes = bboxes[newinds]
+
+        valid_mask = inside_bboxes(pts, bboxes)
         for bidx, valid in enumerate(valid_mask):
-            self.hulls_[max_id + bidx] = AttrDict(ids=ids[valid], pts=pts[valid], bbox=get_bbox(pts[valid])) # bbox=bboxes[bidx])
+            vids, vpts = ids[valid], pts[valid], 
+            if len(vpts): 
+                self.hulls_[max_id + bidx] = AttrDict(ids=vids, pts=vpts, bbox=get_bbox(vpts)) # bbox=bboxes[bidx])
 
-        # # Index pts, and query bbox corners
-        # self.tree_ = cKDTree(pts-flow)
-        # if self.predict_all_corners_: 
-        #     bboxes_pred = self.predict_bboxflow_corners(bboxes, flow, im.shape[:2])
-        # else: 
-        #     bboxes_pred = self.predict_bboxflow_center(bboxes, flow, im.shape[:2])
-
-        # self.bboxes_ = bboxes_pred
-
+        # Return hulls, and corresponding ids
         try: 
             hids = self.hulls_.keys()
             hboxes = np.vstack([ hull.bbox for hull in self.hulls_.itervalues() ])
