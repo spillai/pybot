@@ -109,15 +109,15 @@ class RigidTransform(object):
         qinv = self.quat.inverse()
         return RigidTransform(qinv, qinv.rotate(- self.tvec))
 
-    def to_homogeneous_matrix(self):
+    def to_matrix(self):
         """ Returns a 4x4 homogenous matrix of the form [R t; 0 1] """
-        result = self.quat.to_homogeneous_matrix()
+        result = self.quat.to_matrix()
         result[:3, 3] = self.tvec
         return result
 
     def to_Rt(self):
         """ Returns rotation R, and translational vector t """
-        T = self.to_homogeneous_matrix()
+        T = self.to_matrix()
         return T[:3,:3].copy(), T[:3,3].copy()
 
     def __mul__(self, other):
@@ -133,7 +133,7 @@ class RigidTransform(object):
             return self.oplus(other)
         else:          
             X = np.hstack([other, np.ones((len(other),1))]).T
-            return (np.dot(self.to_homogeneous_matrix(), X).T)[:,:3]
+            return (np.dot(self.matrix, X).T)[:,:3]
 
     def __rmul__(self, other): 
         raise NotImplementedError('Right multiply not implemented yet!')                    
@@ -168,16 +168,16 @@ class RigidTransform(object):
     def from_Rt(cls, R, t):
         T = np.eye(4)
         T[:3,:3] = R.copy();
-        return cls(Quaternion.from_homogenous_matrix(T), t)
+        return cls(Quaternion.from_matrix(T), t)
 
     @classmethod
-    def from_homogenous_matrix(cls, T):
-        return cls(Quaternion.from_homogenous_matrix(T), T[:3,3])
+    def from_matrix(cls, T):
+        return cls(Quaternion.from_matrix(T), T[:3,3])
 
     @classmethod
     def from_triad(cls, pos, v1, v2):
         # print v1, v2, type(v1)
-        return RigidTransform.from_homogenous_matrix(tf_compose(tf_construct(v1, v2), pos))
+        return RigidTransform.from_matrix(tf_compose(tf_construct(v1, v2), pos))
 
     @classmethod
     def from_angle_axis(cls, angle, axis, tvec): 
@@ -190,12 +190,40 @@ class RigidTransform(object):
         return self.quat.to_xyzw()
 
     @property
+    def R(self): 
+        return self.quat.R
+
+    @property
+    def t(self): 
+        return self.tvec
+
+    @property
+    def rotation(self): 
+        return self.quat
+
+    @property
     def translation(self):
         return self.tvec
 
     @classmethod
     def identity(cls):
         return cls()
+
+    @property
+    def matrix(self): 
+        return self.to_matrix()
+
+    def interpolate(self, other, w): 
+        """
+        LERP interpolation on rotation, and linear interpolation on position 
+        Other approaches: 
+        https://www.cvl.isy.liu.se/education/graduate/geometry-for-computer-vision-2014/geometry2014/lecture7.pdf
+        """
+        assert(w >= 0 and w <= 1.0)
+        return self.from_Rt(self.rotation.interpolate(other.rotation, w).R, self.t + w * (other.t - self.t))
+
+        # return self.from_Rt(self.R * expm3(w * logm(self.R.T * other.R)), self.t + w * (other.t - self.t))
+        # return self.from_matrix(self.matrix * expm(w * logm((self.inverse() * other).matrix)))
 
     # def interpolate(self, other_transform, this_weight):
     #     assert this_weight >= 0 and this_weight <= 1
@@ -239,15 +267,15 @@ class DualQuaternion(object):
         qinv = self.dual.inverse()
         return DualQuaternion.from_dq(qinv.q, qinv.rotate(- self.tvec))
 
-    def to_homogeneous_matrix(self):
+    def to_matrix(self):
         """ Returns a 4x4 homogenous matrix of the form [R t; 0 1] """
-        result = self.rotation.to_homogeneous_matrix()
+        result = self.rotation.to_matrix()
         result[:3, 3] = self.translation
         return result
 
     def to_Rt(self):
         """ Returns rotation R, and translational vector t """
-        T = self.to_homogeneous_matrix()
+        T = self.to_matrix()
         return T[:3,:3].copy(), T[:3,3].copy()
 
     def conjugate(self): 
@@ -279,7 +307,7 @@ class DualQuaternion(object):
             return DualQuaternion.from_dq(self.real * other, self.dual * other)
         # elif isinstance(other, nd.array): 
         #     X = np.hstack([other, np.ones((len(other),1))]).T
-        #     return (np.dot(self.to_homogeneous_matrix(), X).T)[:,:3]
+        #     return (np.dot(self.matrix, X).T)[:,:3]
         else: 
             raise TypeError('__mul__ typeerror {:}'.format(type(other)))
             
@@ -328,16 +356,16 @@ class DualQuaternion(object):
     # def from_Rt(cls, R, t):
     #     T = np.eye(4)
     #     T[:3,:3] = R.copy();
-    #     return cls(Quaternion.from_homogenous_matrix(T), t)
+    #     return cls(Quaternion.from_matrix(T), t)
 
     # @classmethod
-    # def from_homogenous_matrix(cls, T):
-    #     return cls(Quaternion.from_homogenous_matrix(T), T[:3,3])
+    # def from_matrix(cls, T):
+    #     return cls(Quaternion.from_matrix(T), T[:3,3])
 
     # @classmethod
     # def from_triad(cls, pos, v1, v2):
     #     # print v1, v2, type(v1)
-    #     return RigidTransform.from_homogenous_matrix(tf_compose(tf_construct(v1, v2), pos))
+    #     return RigidTransform.from_matrix(tf_compose(tf_construct(v1, v2), pos))
 
     # @classmethod
     # def from_angle_axis(cls, angle, axis, tvec): 
@@ -363,13 +391,13 @@ class Sim3(RigidTransform):
         self.scale = scale
 
     @classmethod
-    def from_homogenous_matrix(cls, T):
+    def from_matrix(cls, T):
         sR_t = np.eye(4)
         sR_t[:3,:3] = T[:3,:3] / T[3,3]
         return cls(Quaternion.from_matrix(sR_t), T[:3,3], scale=1.0 / T[3,3])
 
-    def to_homogeneous_matrix(self):
-        result = self.quat.to_homogeneous_matrix()
+    def to_matrix(self):
+        result = self.quat.to_matrix()
         result[:3, 3] = self.tvec
         result[3, 3] = 1.0 / self.scale
         result[:3, :3] /= self.scale
@@ -404,26 +432,26 @@ if __name__ == "__main__":
     t = [ 1, 2, 3 ]
     m = RigidTransform(q, t)
     print "m"
-    print m.to_homogeneous_matrix()
+    print m.to_matrix()
     print "--------------------------"
 
     q2 = Quaternion.from_roll_pitch_yaw(np.pi / 4, 0, 0)
     t2 = [ 0, 0, 0 ]
     m2 = RigidTransform(q2, t2)
     print "m2"
-    print m2.to_homogeneous_matrix()
+    print m2.to_matrix()
 
     print "--------------------------"
     m3 = m * m2
     print "m * m2"
-    print m3.to_homogeneous_matrix()
-    print np.dot(m.to_homogeneous_matrix(), m2.to_homogeneous_matrix())
+    print m3.to_matrix()
+    print np.dot(m.to_matrix(), m2.to_matrix())
     print "--------------------------"
 
     m4 = m2 * m
     print "m * m2"
-    print m4.to_homogeneous_matrix()
-    print np.dot(m2.to_homogeneous_matrix(), m.to_homogeneous_matrix())
+    print m4.to_matrix()
+    print np.dot(m2.to_matrix(), m.to_matrix())
     print "--------------------------"
 
     print "Testing inverse"
@@ -438,7 +466,7 @@ if __name__ == "__main__":
         r = RigidTransform.identity()
         for m in ms + inverses:
             r *= m
-        errs = (identity - r.to_homogeneous_matrix()).flatten().tolist()[0]
+        errs = (identity - r.to_matrix()).flatten().tolist()[0]
         sse = np.dot(errs, errs)
         assert sse < 1e-10
     print "OK"
@@ -447,10 +475,10 @@ if __name__ == "__main__":
     print 'check inverse'
     for _ in range(10): 
         m = make_random_transform()
-        t = m.to_homogeneous_matrix()
+        t = m.to_matrix()
         tinv = np.linalg.inv(t) # tf_compose(t[:3,:3].T, np.dot(t[:3,:3],-t[:3,3]))
         print tinv, '\n', tf_compose(t[:3,:3].T, np.dot(t[:3,:3],-t[:3,3]))
-        assert(tf.is_same_transform(tinv, m.inverse().to_homogeneous_matrix()))
+        assert(tf.is_same_transform(tinv, m.inverse().to_matrix()))
 
 
     print "Testing composition"
@@ -458,34 +486,34 @@ if __name__ == "__main__":
     m = np.identity(4)
     for unused in range(1000):
 #        print "===="
-#        print t.to_homogeneous_matrix()
+#        print t.to_matrix()
 #        print m
 
         n = make_random_transform()
-        # print 't: ', t.to_homogeneous_matrix()
+        # print 't: ', t.to_matrix()
         # print 'm: ', m
 #        n.quat = Quaternion(1, 0, 0, 0)
 #        print "applying "
-#        print n.to_homogeneous_matrix()
+#        print n.to_matrix()
 
 
         t = t * n
-        m = np.dot(m, n.to_homogeneous_matrix())
-        errs = (t.to_homogeneous_matrix() - m).flatten().tolist()[0]
+        m = np.dot(m, n.to_matrix())
+        errs = (t.to_matrix() - m).flatten().tolist()[0]
         # print errs
 
         sse = np.dot(errs, errs)
 
 
 #        print "--"
-#        print t.to_homogeneous_matrix()
+#        print t.to_matrix()
 #        print m
         assert (sse < 1e-10)
 
     for unused in range(1000):
         t1 = make_random_transform()
         t2 = make_random_transform()
-        t1.to_homogeneous_matrix
+        t1.to_matrix()
 
 
     # Composition, and inverse
@@ -499,6 +527,6 @@ if __name__ == "__main__":
     print np.dot(b, a), b * a
 
     # retrieve relative pose 
-    assert(tf.is_same_transform((ba * a.inverse()).to_homogeneous_matrix(), b.to_homogeneous_matrix()))
+    assert(tf.is_same_transform((ba * a.inverse()).to_matrix(), b.to_matrix()))
 
     print "OK"
