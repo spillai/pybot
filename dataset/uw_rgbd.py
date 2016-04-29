@@ -302,33 +302,33 @@ class UWRGBDSceneDataset(UWRGBDDataset):
             print len(self.poses), len(rgb_files)
             assert(len(self.poses) == len(rgb_files))
 
-            # Aligned point cloud
-            if aligned_file is not None: 
-                if version != 'v2': 
-                    raise RuntimeError('Version v2 is only supported')
+            # # Aligned point cloud
+            # if aligned_file is not None: 
+            #     if version != 'v2': 
+            #         raise RuntimeError('Version v2 is only supported')
 
-                ply_xyz, ply_rgb = UWRGBDSceneDataset._reader.load_ply(aligned_file.ply, version)
-                ply_label = UWRGBDSceneDataset._reader.load_plylabel(aligned_file.label, version)
+            #     ply_xyz, ply_rgb = UWRGBDSceneDataset._reader.load_ply(aligned_file.ply, version)
+            #     ply_label = UWRGBDSceneDataset._reader.load_plylabel(aligned_file.label, version)
 
-                # Remapping to v1 index
-                ply_label = np.array([UWRGBDSceneDataset.v2_to_v1[l] for l in ply_label], dtype=np.int32)
+            #     # Remapping to v1 index
+            #     ply_label = np.array([UWRGBDSceneDataset.v2_to_v1[l] for l in ply_label], dtype=np.int32)
 
-                # Get object info
-                object_info = UWRGBDSceneDataset._reader.cluster_ply_labels(ply_xyz[::30], ply_rgb[::30], ply_label[::30])
+            #     # Get object info
+            #     object_info = UWRGBDSceneDataset._reader.cluster_ply_labels(ply_xyz[::30], ply_rgb[::30], ply_label[::30])
 
-                # Add camera info
-                intrinsic = CameraIntrinsic(K=UWRGBDSceneDataset.camera_params.K_rgb, shape=UWRGBDDataset.default_rgb_shape)
-                camera = Camera.from_intrinsics_extrinsics(intrinsic, CameraExtrinsic.identity())
-                self.map_info = AttrDict(camera=camera, objects=object_info)
+            #     # Add camera info
+            #     intrinsic = CameraIntrinsic(K=UWRGBDSceneDataset.camera_params.K_rgb, shape=UWRGBDDataset.default_rgb_shape)
+            #     camera = Camera.from_intrinsics_extrinsics(intrinsic, CameraExtrinsic.identity())
+            #     self.map_info = AttrDict(camera=camera, objects=object_info)
 
-                # # 1c. Determine centroid of each cluster
-                # unique_centers = np.vstack([np.mean(ply_xyz[ply_label == l], axis=0) for l in unique_labels])
+            #     # # 1c. Determine centroid of each cluster
+            #     # unique_centers = np.vstack([np.mean(ply_xyz[ply_label == l], axis=0) for l in unique_labels])
 
-                # self.map_info = AttrDict(
-                #     points=ply_xyz, color=ply_rgb, labels=ply_label, 
-                #     unique_labels=unique_labels, unique_centers=unique_centers, camera=camera
-                # ) 
-                assert(len(ply_xyz) == len(ply_rgb))
+            #     # self.map_info = AttrDict(
+            #     #     points=ply_xyz, color=ply_rgb, labels=ply_label, 
+            #     #     unique_labels=unique_labels, unique_centers=unique_centers, camera=camera
+            #     # ) 
+            #     assert(len(ply_xyz) == len(ply_rgb))
 
         @property
         def scene_name(self): 
