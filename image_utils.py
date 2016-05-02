@@ -82,9 +82,9 @@ def im_mosaic(*args, **kwargs):
     return im_resize(mosaic, scale=scale)
         
 
-def to_color(im): 
+def to_color(im, flip_rb=False): 
     if im.ndim == 2: 
-        return cv2.cvtColor(im, cv2.COLOR_GRAY2BGR)
+        return cv2.cvtColor(im, cv2.COLOR_GRAY2RGB if flip_rb else cv2.COLOR_GRAY2BGR)
     else: 
         return im.copy()
 
