@@ -101,6 +101,8 @@ class BaseSLAM(object):
         self.lcovs_ = {}
         self.current_ = None
 
+        # Timestamped look up for landmarks, and poses
+        self.timer_ls_ = defaultdict(list)
 
         # # Graph visualization
         # self.gviz_ = nx.Graph()
@@ -109,16 +111,25 @@ class BaseSLAM(object):
     def poses(self): 
         " Robot poses: Expects poses to be Pose3 "
         return {k: v.matrix() for k,v in self.xs_.iteritems()}
+
+    def pose(self, k): 
+        return self.xs_[k].matrix()
         
     @property
     def target_poses(self): 
         " Landmark Poses: Expects landmarks to be Pose3 "
         return {k: v.matrix() for k,v in self.ls_.iteritems()}
+
+    def target_pose(self, k): 
+        return self.ls_[k].matrix()
         
     @property
     def target_landmarks(self): 
         " Landmark Points: Expects landmarks to be Point3 " 
         return {k: v.vector().ravel() for k,v in self.ls_.iteritems()}
+
+    def target_landmark(self, k): 
+        return self.ls_[k].vector().ravel()
 
     @property
     def poses_marginals(self): 
@@ -222,8 +233,8 @@ class BaseSLAM(object):
             self.graph_.add(BetweenFactorPose3(x_id, l_id, pdelta, 
                                                self.measurement_noise_))
 
-        # Add to landmark measurements
-        self.xls_.extend([(xid, lid) for lid in lids])
+        # # Add to landmark measurements
+        # self.xls_.extend([(xid, lid) for lid in lids])
 
         # # Add landmark edge to graphviz
         # self.gviz_.add_edge(x_id, l_id)
@@ -236,6 +247,7 @@ class BaseSLAM(object):
                     pred_pose = self.xs_[xid].compose(Pose3(delta))
                     self.initial_.insert(l_id, pred_pose)
                     self.ls_[lid] = pred_pose
+                    self.timer_ls_[xid].append(lid)
                 except: 
                     raise KeyError('Pose {:} not available'
                                    .format(xid))
@@ -271,8 +283,8 @@ class BaseSLAM(object):
                 GenericProjectionFactorPose3Point3Cal3_S2(
                     Point2(vec(*pt)), self.image_measurement_noise_, x_id, l_id, self.K_))
 
-        # Add to landmark measurements
-        self.xls_.extend([(xid, lid) for lid in lids])
+        # # Add to landmark measurements
+        # self.xls_.extend([(xid, lid) for lid in lids])
 
         # # Add landmark edge to graphviz
         # for l_id in l_ids: 
@@ -286,6 +298,7 @@ class BaseSLAM(object):
                     pred_pt3 = self.xs_[xid].transform_from(Point3(vec(*pt3)))
                     self.initial_.insert(l_id, pred_pt3)
                     self.ls_[lid] = pred_pt3
+                    self.timer_ls_[xid].append(lid)
                 except Exception, e: 
                     raise RuntimeError('Initialization failed ({:}). xid:{:}, lid:{:}, l_id: {:}'
                                        .format(e, xid, lid, l_id))
@@ -370,7 +383,8 @@ class BaseSLAM(object):
 
         self.graph_.resize(0)
         self.initial_.clear()
-
+        # self.cleanup()
+        
         # if self.index % 10 == 0 and self.index > 0: 
         #     self.save_graph("slam_fg.dot")
         #     self.save_dot_graph("slam_graph.dot")
@@ -385,6 +399,27 @@ class BaseSLAM(object):
 
         for lid in self.ls_: 
             self.lcovs_[lid] = self.slam_.marginalCovariance(symbol('l', lid))
+
+    def cleanup(self): 
+
+        clean_l = []
+        idx = self.latest
+        for index in self.timer_ls_.keys(): 
+            if abs(idx-index) > 20: 
+                lids = self.timer_ls_[index]
+                for lid in lids: 
+                    self.ls_.pop(lid)
+                    clean_l.append(lid)
+                self.timer_ls_.pop(index)
+                
+        # clean_x = []
+        # for index in self.xs_.keys(): 
+        #     if abs(idx-index) > 20: 
+        #         self.xs_.pop(index)
+        #         clean_x.append(index)
+
+        print clean_l
+                
 
 class VisualSLAM(BaseSLAM): 
     def __init__(self, calib, min_landmark_obs=3, 
@@ -556,9 +591,10 @@ class VisualSLAM(BaseSLAM):
             for x_id,pt in zip(x_ids, pts): 
                 # self.graph_.add(GenericProjectionFactorPose3Point3Cal3_S2(
                 #     pt, self.image_measurement_noise_, x_id, l_id, self.K_))
-
-                # Add to landmark measurements
-                self.xls_.append((Symbol(x_id).index(), lid))
+                
+                # # Add to landmark measurements
+                # self.xls_.append((Symbol(x_id).index(), lid))
+                pass
 
             # Initialize the point value, set in_graph, and
             # remove the smart factor once point is computed
@@ -575,6 +611,7 @@ class VisualSLAM(BaseSLAM):
             if lid not in self.ls_: 
                 self.initial_.insert(l_id, pt3)
             self.ls_[lid] = pt3
+            self.timer_ls_[self.latest].append(lid)
 
             # Add the points for visualization 
             ids.append(lid)
@@ -587,10 +624,10 @@ class VisualSLAM(BaseSLAM):
             #     self.lid_count_.pop(lid)
 
         try: 
-            ids, pts3 = np.int64(ids).ravel(), np.vstack(pts3)
+            ids, pts3 = np.int64(ids).ravel(), np.vstack(pts3)            
             assert(len(ids) == len(pts3))
             return ids, pts3
-        except Exception:
+        except Exception, e:
             # print('Could not return pts3, {:}'.format(e))
             return np.int64([]), np.array([])        
 

@@ -115,7 +115,14 @@ class RobotSLAMMixin(object):
             self.update()
             # self.update_marginals()
             ids, pts3 = self.smart_update()
-            draw_utils.publish_cloud('gtsam-pc', pts3, c='b', frame_id='camera', reset=False)
+
+            # Publish pose
+            draw_utils.publish_pose_list('gtsam-pose', [Pose.from_rigid_transform(t, self.__poses.latest)], 
+                                         frame_id='camera', reset=False)
+            # Publish cloud in latest pose reference frame
+            if len(pts3): 
+                pts3 = RigidTransform.from_matrix(self.pose(self.latest)).inverse() * pts3
+            draw_utils.publish_cloud('gtsam-pc', [pts3], c='b', frame_id='gtsam-pose', element_id=[t], reset=False)
 
         self.vis_optimized()
 

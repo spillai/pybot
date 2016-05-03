@@ -285,13 +285,6 @@ class MeshKLT(OpenCVKLT):
 
         return out
 
-
-
-# Weighted averaging
-def get_weights(dists): 
-    g = np.exp(dists / (2 * 10**2))
-    return g / np.sum(g)
-
 def get_bbox(pts): 
     x1, x2, y1, y2 = np.min(pts[:,0]), np.max(pts[:,0]), np.min(pts[:,1]), np.max(pts[:,1]) 
     return np.int64([x1, y1, x2, y2])
@@ -314,11 +307,6 @@ class BoundingBoxKLT(OpenCVKLT):
     """
     def __init__(self, *args, **kwargs): 
         OpenCVKLT.__init__(self, *args, **kwargs)
-        self.tree_ = None
-        self.K_ = 4
-        self.bids_, self.bboxes_ = [], []
-        self.predict_all_corners_ = True
-
         self.hulls_ = {}
 
     @property
@@ -366,14 +354,14 @@ class BoundingBoxKLT(OpenCVKLT):
         # 2. Add new hulls that are provided, and keep old tracked ones
         max_id = len(self.hulls_)
         
-        # Find the bounding boxes that are relatively new (IoU < 0.3)
-        if len(self.hulls_) and bboxes is not None: 
-            hbboxes = np.vstack([hull.bbox for hull in self.hulls_.itervalues()])
-            HB = brute_force_match(hbboxes, bboxes, 
-                                   match_func=lambda x,y: intersection_over_union(x, y),
-                                   dtype=np.float32)
-            newinds, = np.where(HB.max(axis=0) < 0.3)
-            bboxes = bboxes[newinds]
+        # # Find the bounding boxes that are relatively new (IoU < 0.3)
+        # if len(self.hulls_) and bboxes is not None: 
+        #     hbboxes = np.vstack([hull.bbox for hull in self.hulls_.itervalues()])
+        #     HB = brute_force_match(hbboxes, bboxes, 
+        #                            match_func=lambda x,y: intersection_over_union(x, y),
+        #                            dtype=np.float32)
+        #     newinds, = np.where(HB.max(axis=0) < 0.3)
+        #     bboxes = bboxes[newinds]
 
         valid_mask = inside_bboxes(pts, bboxes)
         for bidx, valid in enumerate(valid_mask):

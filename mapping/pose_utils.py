@@ -19,6 +19,7 @@ class Sampler(object):
                  on_sampled_cb=lambda index, item: None, verbose=False): 
         self.q_ = deque(maxlen=lookup_history)
         self.on_sampled_cb_ = on_sampled_cb
+        self.force_sample_ = False
 
         # Maintain total items pushed and sampled
         self.all_items_ = Counter()
@@ -34,6 +35,14 @@ class Sampler(object):
             self.verbose_all_ = deque()
             self.verbose_index_ = deque()
 
+    def force_check(self): 
+        sample = self.force_sample_
+        self.force_sample_ = False
+        return sample
+            
+    def force_sample(self): 
+        self.force_sample_ = True
+
     def length(self, type='samples'): 
         if type=='samples': 
             return self.sampled_items_.length
@@ -46,6 +55,66 @@ class Sampler(object):
                     .format(self.all_items_.index, self.sampled_items_.index, 
                             self.sampled_items_.index * 100.0 / self.all_items_.index))
         # self.visualize(finish=finish)
+
+    @abstractmethod
+    def visualize(self, finish=False): 
+        raise NotImplementedError()
+
+    @abstractmethod
+    def check_sample(self, item): 
+        raise NotImplementedError()
+    
+    def append(self, item): 
+        """
+        Add item to the sampler, returns the 
+        index of the sampled item and the 
+        corresponding item.
+        """
+        if self.verbose_: 
+            self.verbose_all_.append(item)
+
+        self.all_items_.count()                    
+        ret = self.check_sample(item) 
+
+        if ret: 
+            self.q_.append(item)
+            self.on_sampled_cb_(self.all_items_.index, item)
+            self.sampled_items_.count()            
+
+            if self.verbose_: 
+                self.verbose_index_.append(self.all_items_.index)
+
+        return ret
+
+    @property
+    def latest_sample(self): 
+        return self.q_[-1]
+
+class PoseSampler(Sampler): 
+    def __init__(self, theta=20, displacement=0.25, lookup_history=10, 
+                 on_sampled_cb=lambda index, item: None, verbose=False): 
+        Sampler.__init__(self, lookup_history=lookup_history, 
+                         on_sampled_cb=on_sampled_cb, verbose=verbose)
+
+        self.displacement_ = displacement
+        self.theta_ = np.deg2rad(theta)
+        
+    def check_sample(self, pose):
+        if self.force_check(): 
+            return True
+
+        pinv = self.get_item(pose).inverse()
+
+        # Check starting from new to old items
+        # print '------------'
+        for p in reversed(self.q_): 
+            newp = pinv * self.get_item(p)
+            d, r = np.linalg.norm(newp.tvec), np.fabs(newp.to_roll_pitch_yaw_x_y_z()[:3])
+            # print r, d < self.displacement_, (r < self.theta_).all(), newp
+            if d < self.displacement_ and (r < self.theta_).all(): 
+                return False
+
+        return True
 
     def visualize(self, finish=False): 
         # # RPY
@@ -89,70 +158,16 @@ class Sampler(object):
 
         plt.show(block=finish)
 
-    @abstractmethod
-    def check_sample(self, item): 
-        raise NotImplementedError()
-    
-    def append(self, item): 
-        """
-        Add item to the sampler, returns the 
-        index of the sampled item and the 
-        corresponding item.
-        """
-        if self.verbose_: 
-            self.verbose_all_.append(item)
-
-        self.all_items_.count()                    
-        ret = self.check_sample(item) 
-
-        if ret: 
-            self.q_.append(item)
-            self.on_sampled_cb_(self.all_items_.index, item)
-            self.sampled_items_.count()            
-
-            if self.verbose_: 
-                self.verbose_index_.append(self.all_items_.index)
-
-        return ret
-
-    @property
-    def latest_sample(self): 
-        return self.q_[-1]
-
-class PoseSampler(Sampler): 
-    def __init__(self, theta=20, displacement=0.25, lookup_history=10, 
-                 on_sampled_cb=lambda index, item: None, verbose=False): 
-        Sampler.__init__(self, lookup_history=lookup_history, 
-                         on_sampled_cb=on_sampled_cb, verbose=verbose)
-
-        self.displacement_ = displacement
-        self.theta_ = np.deg2rad(theta)
-        
-    def check_sample(self, pose): 
-        pinv = self.get_item(pose).inverse()
-
-        # Check starting from new to old items
-        # print '------------'
-        for p in reversed(self.q_): 
-            newp = pinv * self.get_item(p)
-            d, r = np.linalg.norm(newp.tvec), np.fabs(newp.to_roll_pitch_yaw_x_y_z()[:3])
-            # print r, d < self.displacement_, (r < self.theta_).all(), newp
-            if d < self.displacement_ and (r < self.theta_).all(): 
-                return False
-
-        return True
-
 Keyframe = namedtuple('Keyframe', ['img', 'pose', 'index'], verbose=False)
 
 class KeyframeSampler(PoseSampler): 
     def __init__(self, theta=20, displacement=0.25, lookup_history=10, 
+                 get_item=lambda item: item.pose,  
                  on_sampled_cb=lambda index, item: None, verbose=False): 
         PoseSampler.__init__(self, displacement=displacement, theta=theta, 
                              lookup_history=lookup_history, 
                              on_sampled_cb=on_sampled_cb, verbose=verbose)
-
-    def get_item(self, item): 
-        return item.pose
+        self.get_item = get_item
 
 # class PoseInterpolation(object): 
 #     def __init__(self, ncontrol=2, nposes=10): 
