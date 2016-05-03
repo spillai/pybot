@@ -17,6 +17,12 @@ from bot_vision.image_utils import im_resize
 from bot_geometry.rigid_transform import RigidTransform
 from bot_vision.camera_utils import CameraIntrinsic
 
+# def test_coords(): 
+#     IF = RigidTransform(Quaternion.from_wxyz([0.002592, 0.704923, 0.709254, -0.005954]), tvec=[0.000663, 0.011257, 0.004177])
+#     ID = RigidTransform(Quaternion.from_wxyz([0.702596, -0.079740, -0.079740, 0.702596]), tvec=[0.000000, 0.000000, 0.000000])
+#     IC = RigidTransform(Quaternion.from_wxyz([0.000585, 0.707940, 0.706271, 0.001000]), tvec=[0.000339, 0.061691, 0.002792])
+#     DC = ID.inverse() * IC
+ 
 def TangoOdomDecoder(channel, every_k_frames=1, noise=[0,0]): 
     """
     https://developers.google.com/project-tango/overview/coordinate-systems
@@ -24,6 +30,20 @@ def TangoOdomDecoder(channel, every_k_frames=1, noise=[0,0]):
     DYNAMIC base: COORDINATE_FRAME_START_OF_SERVICE (SS), target: COORDINATE_FRAME_DEVICE (D)	
     Reported measurements
 
+    May 2016
+    base: IMU, target: FISHEYE
+    frame->camera t: 0.000663, 0.011257, 0.004177 q: 0.002592, 0.704923, 0.709254, -0.005954
+
+    base: IMU, target: DEVICE
+    frame->camera t: 0.000000, 0.000000, 0.000000 q: 0.702596, -0.079740, -0.079740, 0.702596
+
+    base: IMU, target: CAMERA_COLOR
+    frame->camera t: 0.000339, 0.061691, 0.002792 q: 0.000585, 0.707940, 0.706271, 0.001000
+
+    base: SS, target: DEVICE
+    -0.005353, -0.000184, -0.004125 q: 0.814851, 0.578699, 0.019265, -0.027478
+
+    Jan 2016
     STATIC base: IMU (I), target: CAMERA (C)
     t: 0.000339, 0.061691, 0.002792 q: (w) 0.000585, (x)0.707940, (y)0.706271, (z)0.001000
 
@@ -48,10 +68,14 @@ def TangoOdomDecoder(channel, every_k_frames=1, noise=[0,0]):
     a) (-90, 0, 0)   => LEFT (X), DOWN (Y), FWD (Z) => CAM
 
     """
+    # IF = RigidTransform(Quaternion.from_wxyz([0.002592, 0.704923, 0.709254, -0.005954]), tvec=[0.000663, 0.011257, 0.004177])
+    # ID = RigidTransform(Quaternion.from_wxyz([0.702596, -0.079740, -0.079740, 0.702596]), tvec=[0.000000, 0.000000, 0.000000])
+    # IC = RigidTransform(Quaternion.from_wxyz([0.000585, 0.707940, 0.706271, 0.001000]), tvec=[0.000339, 0.061691, 0.002792])
 
-    p_IF = RigidTransform(tvec=[0.000663, 0.011257, 0.004177], xyzw=[0.704923, 0.709254, -0.005954, 0.002592])
-    p_ID = RigidTransform(tvec=[0,0,0], xyzw=[-0.079740, -0.079740, 0.706271, 0.706271])
-    p_IC = RigidTransform(tvec=[0.000339, 0.061691, 0.002792], xyzw=[0.707940, 0.706271, 0.001000, 0.000585])
+    p_IF = RigidTransform(tvec=[0.000662555, 0.011257, 0.0041772], xyzw=[0.70492326,  0.7092538 , -0.00595375,  0.00259168])
+    # p_ID = RigidTransform(tvec=[0,0,0], xyzw=[-0.079740, -0.079740, 0.706271, 0.706271]) # Jan 2016
+    p_ID = RigidTransform(tvec=[0,0,0], xyzw=[-0.079740, -0.079740, 0.702596, 0.702596]) # May 2016
+    p_IC = RigidTransform(tvec=[0.000339052, 0.0616911, 0.00279207], xyzw=[0.707940, 0.706271, 0.001000, 0.000585])
     p_DC = p_ID.inverse() * p_IC
     p_DF = p_ID.inverse() * p_IF
     print 'p_ID: %s, \np_IC: %s, \np_DC: %s, \np_DF: %s' % (p_ID, p_IC, p_DC, p_DF)
@@ -147,7 +171,8 @@ class TangoGroundTruthImageDecoder(TangoImageDecoder):
                 # Hard-coded scaling for image annotation
                 H,W = data['img_height'], data['img_width']
                 self.get_image_scale = lambda height: height * 1.0 / H
-            except Exception as e:                raise RuntimeError('Missing img_height, and img_width key, try re-saving annotation')
+            except Exception as e:                
+                raise RuntimeError('Missing img_height, and img_width key, try re-saving annotation')
 
             print data.keys(), data['objects']
             target_hash = {label['name']: lid for (lid,label) in enumerate(data['objects'])  if label is not None}
