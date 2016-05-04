@@ -10,7 +10,7 @@ import argparse
 import ConfigParser
 import os
 import numpy as np
-import psutil
+
 import joblib
 from cStringIO import StringIO
 from bot_vision.image_utils import im_resize
@@ -105,6 +105,7 @@ def joblib_dump(item, path):
     
 def memory_usage_psutil():
     # return the memory usage in MB
+    import psutil
     process = psutil.Process(os.getpid())
     mem = process.get_memory_info()[0] / float(2 ** 20)
     return mem
