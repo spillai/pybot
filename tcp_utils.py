@@ -116,7 +116,7 @@ class TCPPub:
         self.server_uid_ = dict()
         self.get_uid = lambda ip, port: '{}:{}'.format(ip,port)
 
-    def publish_image(self, im, ip='mrg-liljon.csail.mit.edu', port=12347, scale=0.5): 
+    def publish_image(self, im, ip='mrg-liljon.csail.mit.edu', port=12347, scale=1.0): 
         s = None
         suid = self.get_uid(ip,port)
         if suid not in self.server_uid_: 
