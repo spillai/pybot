@@ -86,7 +86,7 @@ def to_color(im, flip_rb=False):
     if im.ndim == 2: 
         return cv2.cvtColor(im, cv2.COLOR_GRAY2RGB if flip_rb else cv2.COLOR_GRAY2BGR)
     else: 
-        return im.copy()
+        return cv2.cvtColor(im, cv2.COLOR_RGB2BGR) if flip_rb else im.copy()
 
 def to_gray(im): 
     if im.ndim == 3: 
@@ -131,6 +131,11 @@ def blur_detect(im, threshold=7):
 def variance_of_laplacian(image):
     return cv2.Laplacian(image, cv2.CV_64F).var()
 
+def im_normalize(im, lo=0, hi=255, dtype='uint8'):
+    return cv2.normalize(im, alpha=lo, beta=hi, norm_type=cv2.NORM_MINMAX, dtype={'uint8': cv2.CV_8U, \
+                                                                                  'float32': cv2.CV_32F, \
+                                                                                  'float64': cv2.CV_64F}[dtype])
+
 def valid_pixels(im, valid): 
     """
     Determine valid pixel (x,y) coords for the image
@@ -145,17 +150,22 @@ def valid_pixels(im, valid):
 
 
 class MosaicBuilder(object): 
-    def __init__(self, filename_template, maxlen=100, shape=(1600,900), glyph_shape=(50,50)): 
+    def __init__(self, filename_template, maxlen=100, shape=(1600,900),
+                 glyph_shape=(50,50), visualize_name='mosaics'): 
         self.idx_ = 0
         self.filename_template_ = filename_template
         self.save_mosaic_ = len(self.filename_template_) > 0
         self.shape_ = shape
-            
+        self.visualize_name_ = visualize_name
+        
         self.maxlen_ = maxlen
         self.ims_ = []
         self.resize_cb_ = lambda im: im_resize(im, shape=glyph_shape)
         self.mosaic_cb_ = lambda ims: im_mosaic_list(ims, shape=None)
 
+    def clear(self):
+        self.ims_ = []
+        
     def add(self, im): 
         self.ims_.append(self.resize_cb_(im))
         if len(self.ims_) % self.maxlen_ == 0: 
@@ -169,7 +179,7 @@ class MosaicBuilder(object):
         if not len(self.ims_): 
             return
         mosaic = self.mosaic_cb_(self.ims_)
-        cv2.imshow('mosaic', mosaic)
+        cv2.imshow(self.visualize_name_, mosaic)
         return
 
     def _save(self): 
