@@ -2,6 +2,7 @@ import numpy as np
 from collections import deque, namedtuple
 from abc import ABCMeta, abstractmethod
 
+from itertools import imap
 from bot_utils.misc import print_green, print_red
 from bot_utils.misc import Counter, Accumulator, CounterWithPeriodicCallback 
 
@@ -14,13 +15,30 @@ mpl.rcParams.update({'font.size':11,
 
 class Sampler(object): 
     __metaclass__ = ABCMeta
+    """
+    Sampling based on a specific criteria
 
+    get_sample:
+        Provides a map function for sample retrieval
+        For e.g. Keyframe={'img': im, 'pose': pose}, get_sample 
+        employs the sampling criteria over a specific attribute 
+        such as pose, where get_sample=lambda item: item['pose']
+
+    """
     def __init__(self, lookup_history=10, 
+                 get_sample=lambda item: item, 
                  on_sampled_cb=lambda index, item: None, verbose=False): 
+
+        if not hasattr(get_sample, '__call__'): 
+            raise ValueError('''get_sample is not a function, '''
+                             '''Provide an appropriate attribute selection''')
+            
+        self.get_sample = get_sample
+
         self.q_ = deque(maxlen=lookup_history)
         self.on_sampled_cb_ = on_sampled_cb
         self.force_sample_ = False
-
+        
         # Maintain total items pushed and sampled
         self.all_items_ = Counter()
         self.sampled_items_ = Counter()
@@ -47,18 +65,15 @@ class Sampler(object):
         if type=='samples': 
             return self.sampled_items_.length
 
-    def get_item(self, item): 
-        return item
-
     def print_stats(self, finish=False): 
         print_green('Sampler: Total: {:}, Samples: {:}, Ratio: {:3.2f} %'
                     .format(self.all_items_.index, self.sampled_items_.index, 
                             self.sampled_items_.index * 100.0 / self.all_items_.index))
         # self.visualize(finish=finish)
 
-    @abstractmethod
-    def visualize(self, finish=False): 
-        raise NotImplementedError()
+    # @abstractmethod
+    # def visualize(self, finish=False): 
+    #     raise NotImplementedError()
 
     @abstractmethod
     def check_sample(self, item): 
@@ -92,23 +107,26 @@ class Sampler(object):
 
 class PoseSampler(Sampler): 
     def __init__(self, theta=20, displacement=0.25, lookup_history=10, 
+                 get_sample=lambda item: item, 
                  on_sampled_cb=lambda index, item: None, verbose=False): 
         Sampler.__init__(self, lookup_history=lookup_history, 
+                         get_sample=get_sample, 
                          on_sampled_cb=on_sampled_cb, verbose=verbose)
 
         self.displacement_ = displacement
         self.theta_ = np.deg2rad(theta)
         
-    def check_sample(self, pose):
+    def check_sample(self, item):
         if self.force_check(): 
             return True
 
-        pinv = self.get_item(pose).inverse()
+        pose = self.get_sample(item)
+        pinv = pose.inverse()
 
         # Check starting from new to old items
         # print '------------'
         for p in reversed(self.q_): 
-            newp = pinv * self.get_item(p)
+            newp = pinv * self.get_sample(p)
             d, r = np.linalg.norm(newp.tvec), np.fabs(newp.to_roll_pitch_yaw_x_y_z()[:3])
             # print r, d < self.displacement_, (r < self.theta_).all(), newp
             if d < self.displacement_ and (r < self.theta_).all(): 
@@ -116,58 +134,127 @@ class PoseSampler(Sampler):
 
         return True
 
-    def visualize(self, finish=False): 
-        # # RPY
-        # rpyxyz = np.vstack(item.to_roll_pitch_yaw_x_y_z() for item in self.all_)
-        # rot = rpyxyz[:,:3]
-        # trans = rpyxyz[:,3:6]
+    # def visualize(self, finish=False): 
+    #     # # RPY
+    #     # rpyxyz = np.vstack(item.to_roll_pitch_yaw_x_y_z() for item in self.all_)
+    #     # rot = rpyxyz[:,:3]
+    #     # trans = rpyxyz[:,3:6]
 
-        # Quaternion
-        rpyxyz = np.hstack([np.vstack(self.get_item(item).rotation.wxyz for item in self.verbose_all_), 
-                            np.vstack(self.get_item(item).translation for item in self.verbose_all_)])
-        rot = rpyxyz[:,:4]
-        trans = rpyxyz[:,4:7]
+    #     # Quaternion
+    #     rpyxyz = np.hstack([np.vstack(self.get_sample(item).rotation.wxyz for item in self.verbose_all_), 
+    #                         np.vstack(self.get_sample(item).translation for item in self.verbose_all_)])
+    #     rot = rpyxyz[:,:4]
+    #     trans = rpyxyz[:,4:7]
 
-        # # Angle axis
-        # rpyxyz = np.hstack([np.vstack(np.hstack(item.rotation.to_angle_axis()) for item in self.all_), 
-        #                     np.vstack(item.translation for item in self.all_)])
+    #     # # Angle axis
+    #     # rpyxyz = np.hstack([np.vstack(np.hstack(item.rotation.to_angle_axis()) for item in self.all_), 
+    #     #                     np.vstack(item.translation for item in self.all_)])
 
-        # # Delta Quaternion
-        # delta = [self.all_[idx+1].inverse() * self.all_[idx] for idx in xrange(len(self.all_)-1)]
-        # print delta[0]
-        # rpyxyz = np.hstack([np.vstack(item.rotation.wxyz for item in delta), 
-        #                     np.vstack(item.translation for item in delta)])
+    #     # # Delta Quaternion
+    #     # delta = [self.all_[idx+1].inverse() * self.all_[idx] for idx in xrange(len(self.all_)-1)]
+    #     # print delta[0]
+    #     # rpyxyz = np.hstack([np.vstack(item.rotation.wxyz for item in delta), 
+    #     #                     np.vstack(item.translation for item in delta)])
 
-        ts = np.tile(np.arange(len(rpyxyz)).reshape(-1,1), [1,3])
-        print rpyxyz.shape, ts.shape
-        if not finish:
-            return
+    #     ts = np.tile(np.arange(len(rpyxyz)).reshape(-1,1), [1,3])
+    #     print rpyxyz.shape, ts.shape
+    #     if not finish:
+    #         return
 
-        fig = plt.figure(1, figsize=(8.0,4.5), dpi=100) 
-        fig.clf()
+    #     fig = plt.figure(1, figsize=(8.0,4.5), dpi=100) 
+    #     fig.clf()
         
-        ax1 = plt.subplot(2,1,1)
-        plt.plot(ts, rot)
-        plt.vlines(np.int32(self.verbose_index_), ymin=-1, ymax=1, color='k')
-        ax1.set_xlim([max(0, np.max(ts)-400), np.max(ts)])
+    #     ax1 = plt.subplot(2,1,1)
+    #     plt.plot(ts, rot)
+    #     plt.vlines(np.int32(self.verbose_index_), ymin=-1, ymax=1, color='k')
+    #     ax1.set_xlim([max(0, np.max(ts)-400), np.max(ts)])
 
-        ax2 = plt.subplot(2,1,2)
-        plt.plot(ts, trans)
-        plt.vlines(np.int32(self.verbose_index_), ymin=-100, ymax=100, color='k')
-        ax2.set_xlim([max(0, np.max(ts)-400), np.max(ts)])
+    #     ax2 = plt.subplot(2,1,2)
+    #     plt.plot(ts, trans)
+    #     plt.vlines(np.int32(self.verbose_index_), ymin=-100, ymax=100, color='k')
+    #     ax2.set_xlim([max(0, np.max(ts)-400), np.max(ts)])
 
-        plt.show(block=finish)
+    #     plt.show(block=finish)
+
+
+class FrustumVolumeIntersectionPoseSampler(Sampler): 
+    def __init__(self, iou=0.5, depth=20, fov=np.deg2rad(60), lookup_history=10, 
+                 get_sample=lambda item: item, 
+                 on_sampled_cb=lambda index, item: None, verbose=False): 
+        Sampler.__init__(self, lookup_history=lookup_history, 
+                         get_sample=get_sample, 
+                         on_sampled_cb=on_sampled_cb, verbose=verbose)
+        self.iou_ = iou
+        self.depth_ = depth
+        self.fov_ = fov
+        
+        from bot_geometry.rigid_transform import RigidTransform
+        from bot_vision.camera_utils import Frustum
+        from bot_graphics.volumes import SweepingFrustum
+
+        self.volume_ = SweepingFrustum()
+        self.get_frustum = lambda pose: Frustum(pose, zmin=0.05, zmax=self.depth_, fov=self.fov_)
+
+        # Get canonical volume
+        fverts = self.get_frustum(RigidTransform.identity()).get_vertices()
+
+        print 'Adding basic shape'
+        self.volume_.add_vertices(fverts)
+        self.fvol_ = self.volume_.get_volume()
+        self.volume_.clear()
+
+    def check_sample(self, item):
+        if self.force_check(): 
+            return True
+        
+        pose = self.get_sample(item)
+        # pinv = pose.inverse()
+
+        fverts = self.get_frustum(pose).get_vertices()
+        
+        # Check starting from new to old items
+        # print '------------'
+        for p in reversed(self.q_): 
+            verts = self.get_frustum(self.get_sample(p)).get_vertices()
+
+            self.volume_.clear()
+            self.volume_.add_vertices(fverts)
+            self.volume_.add_vertices(verts)
+            assert(self.volume_.volume_.getNumComponents() > 0)
+            intersection = self.volume_.get_volume()
+            union = self.fvol_ * 2 - intersection
+            print intersection, self.fvol_ * 2, self.fvol_
+            # print p, self.volume_.get_volume()
+
+            # newp = pinv * self.get_sample(p)
+            # d, r = np.linalg.norm(newp.tvec), np.fabs(newp.to_roll_pitch_yaw_x_y_z()[:3])
+            # print r, d < self.displacement_, (r < self.theta_).all(), newp
+            # if d < self.displacement_ and (r < self.theta_).all(): 
+            #     return False
+
+        return True
+
 
 Keyframe = namedtuple('Keyframe', ['img', 'pose', 'index'], verbose=False)
 
-class KeyframeSampler(PoseSampler): 
+class KeyframeSampler(PoseSampler):
     def __init__(self, theta=20, displacement=0.25, lookup_history=10, 
-                 get_item=lambda item: item.pose,  
+                 get_sample=lambda item: item.pose,  
                  on_sampled_cb=lambda index, item: None, verbose=False): 
         PoseSampler.__init__(self, displacement=displacement, theta=theta, 
                              lookup_history=lookup_history, 
+                             get_sample=get_sample, 
                              on_sampled_cb=on_sampled_cb, verbose=verbose)
-        self.get_item = get_item
+
+class KeyframeVolumeSampler(FrustumVolumeIntersectionPoseSampler): 
+    def __init__(self, iou=0.5, depth=20, fov=np.deg2rad(60), lookup_history=10, 
+                 get_sample=lambda item: item.pose,  
+                 on_sampled_cb=lambda index, item: None, verbose=False): 
+        FrustumVolumeIntersectionPoseSampler.__init__(self, iou=iou, depth=depth, fov=fov, 
+                                                      lookup_history=lookup_history, 
+                                                      get_sample=get_sample, 
+                                                      on_sampled_cb=on_sampled_cb, verbose=verbose)
+
 
 # class PoseInterpolation(object): 
 #     def __init__(self, ncontrol=2, nposes=10): 
