@@ -913,14 +913,16 @@ def test_HalfPlane():
 
 class Frustum(object): 
     def __init__(self, pose, zmin=0.0, zmax=0.1, fov=np.deg2rad(60)): 
-    
+        if fov >= np.pi: 
+            raise ValueError('Frustum fov cannot be {} radians'.format(fov))
+
         self.p0 = np.array([0,0,0])
         self.near, self.far = np.array([0,0,zmin]), np.array([0,0,zmax])
         self.near_off, self.far_off = np.tan(fov / 2) * zmin, np.tan(fov / 2) * zmax
         self.zmin = zmin
         self.zmax = zmax
         self.fov = fov
-
+        
         self.pose = pose
         self.p0 = pose.tvec
 
@@ -934,7 +936,7 @@ class Frustum(object):
                self.far + np.array([1, -1, 0]) * self.far_off, 
                self.far + np.array([1, 1, 0]) * self.far_off, 
                self.far + np.array([-1, 1, 0]) * self.far_off]
-        
+
         nll, nlr, nur, nul, fll, flr, fur, ful = self.pose * np.vstack(arr)
         return nll, nlr, nur, nul, fll, flr, fur, ful
 
