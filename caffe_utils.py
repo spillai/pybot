@@ -20,7 +20,7 @@ class FastRCNNDescription(object):
 
         rcnn_dir = '/home/spillai/code/recognition-pod/recognition/fast-rcnn/'
         
-        demo_net = 'caffenet'
+        demo_net = 'vgg_cnn_m_1024'
         model_def = os.path.join(rcnn_dir, 'models', NETS[demo_net][0],
                                  'test.prototxt')
         pretrained_model = os.path.join(rcnn_dir, 'data', 'fast_rcnn_models',
@@ -31,9 +31,8 @@ class FastRCNNDescription(object):
         cfg.TEST.BBOX_REG = False
 
     def describe(self, img, bboxes):
-        self.rcnn_.hypercolumn_bboxes(img, bboxes)
+        # self.rcnn_.hypercolumn_bboxes(img, bboxes)
         return self.rcnn_.detect_bboxes(img, bboxes)
-
 
     def hypercolumn(self, img, bboxes):
         return self.rcnn_.hypercolumn_bboxes(img, bboxes)

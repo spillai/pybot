@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 
+from bot_utils.timer import timeitmethod
 from .image_utils import to_gray
 
         
@@ -34,6 +35,7 @@ class MSER:
 
         self.mser = cv2.MSER(*args, **kwargs)
 
+    @timeitmethod
     def detect(self, im, colorspace='hsv'): 
         if colorspace == 'hsv': 
             cim = cv2.cvtColor(im, cv2.COLOR_BGR2HLS)

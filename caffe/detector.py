@@ -305,7 +305,11 @@ def extract_hypercolumns(net, im, boxes):
     print dir(net.blobs), net.blobs.keys(), net.blobs['conv1'].data.shape
 
     hypercolumns = []
-    for layer in ['conv1', 'conv2', 'conv3', 'conv4', 'conv5', 'pool1', 'pool2', 'pool5']: # , 'fc6', 'fc7']: 
+    # layers = ['conv2', 'conv3', 'conv4', 'conv5']
+    layers = ['norm1', 'norm2']
+    layers = ['pool1', 'pool2', 'pool5']
+    # layers = ['fc6', 'fc7']
+    for layer in layers: 
         print layer, net.blobs[layer].data.shape
         convmap = net.blobs[layer].data
         for fmap in convmap[0]:
