@@ -1,4 +1,3 @@
-
 from fast_rcnn.config import cfg
 import os
 import warnings
@@ -7,6 +6,17 @@ with warnings.catch_warnings():
     from bot_vision.caffe.detector import Detector, DetectorFastRCNN, nms
 
 from bot_vision.recognition_utils import BOWClassifier
+ 
+def extract_hypercolums(net, im, layers): 
+    hypercolumns = []
+    for layer in layers:
+        convmap = net.blobs[layer].data
+        for fmap in convmap[0]:
+            upscaled = sp.misc.imresize(fmap, size=(im.shape[0], im.shape[1]),
+                                        mode="F", interp='bilinear')
+            hypercolumns.append(upscaled)
+    return np.asarray(hypercolumns)
+
 
 class FastRCNNDescription(object): 
     def __init__(self): 
