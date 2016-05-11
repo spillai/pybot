@@ -262,10 +262,12 @@ class TangoLog(object):
     def length(self): 
         return self.length_
 
-    def read_messages(self, topics=None, start_time=0): 
+    def read_messages(self, topics=[], start_time=0): 
 
         N = 10000
         heap = []
+
+        topics_set = set(topics)
 
         # Read messages in ascending order of timestamps
         # Push messages onto the heap and pop such that 
@@ -275,6 +277,9 @@ class TangoLog(object):
             try: 
                 t, ch, data = l.replace('\n', '').split('\t')
             except: 
+                continue
+                
+            if not len(topics_set) or ch not in topics_set: 
                 continue
 
             if len(heap) == N: 
@@ -370,7 +375,7 @@ class TangoLogReader(LogReader):
     def load_log(self, filename): 
         return TangoLog(filename)
 
-    def iteritems(self, reverse=False): 
+    def iteritems(self, topics=[], reverse=False): 
         if self.index is not None: 
             raise NotImplementedError('Cannot provide items indexed')
         
@@ -379,7 +384,7 @@ class TangoLogReader(LogReader):
 
         # Decode only messages that are supposed to be decoded 
         print('Reading TangoLog from index={:} onwards'.format(self.start_idx_))
-        for self.idx, (channel, msg, t) in enumerate(self.log.read_messages()):
+        for self.idx, (channel, msg, t) in enumerate(self.log.read_messages(topics=topics)):
             if self.idx < self.start_idx_: 
                 continue
             try: 
@@ -391,7 +396,7 @@ class TangoLogReader(LogReader):
                 pass
 
 
-    def iterframes(self, reverse=False): 
+    def iterframes(self, topics=[], reverse=False): 
         """
         Ground truth reader interface
         Overload decode msg to lookup corresponding annotation
@@ -407,7 +412,7 @@ class TangoLogReader(LogReader):
 
         # Decode only messages that are supposed to be decoded 
         print('Reading TangoLog from index={:} onwards'.format(self.start_idx_))
-        for self.idx, (channel, msg, t) in enumerate(self.log.read_messages()):
+        for self.idx, (channel, msg, t) in enumerate(self.log.read_messages(topics=topics)):
             if self.idx < self.start_idx_: 
                 continue
             try: 
@@ -432,15 +437,15 @@ class TangoLogReader(LogReader):
         
         return False, (None, None, None)
 
-    def iter_frames(self):
-        return self.iteritems()
+    def iter_frames(self, topics=[]):
+        return self.iteritems(topics=topics)
 
-def iter_tango_logs(directory, logs):
+def iter_tango_logs(directory, logs, topics=[]):
     for log in logs: 
         directory = os.path.expanduser(os.path.join(args.directory, log))
         print('Accessing Tango directory {:}'.format(directory))
         dataset = TangoLogReader(directory=directory, scale=im_scale) 
-        for item in dataset.iter_frames(): 
+        for item in dataset.iter_frames(topics=topics): 
             yield item
 
 
