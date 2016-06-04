@@ -1,4 +1,3 @@
-
 from fast_rcnn.config import cfg
 import os
 import warnings
@@ -7,6 +6,17 @@ with warnings.catch_warnings():
     from bot_vision.caffe.detector import Detector, DetectorFastRCNN, nms
 
 from bot_vision.recognition_utils import BOWClassifier
+ 
+def extract_hypercolums(net, im, layers): 
+    hypercolumns = []
+    for layer in layers:
+        convmap = net.blobs[layer].data
+        for fmap in convmap[0]:
+            upscaled = sp.misc.imresize(fmap, size=(im.shape[0], im.shape[1]),
+                                        mode="F", interp='bilinear')
+            hypercolumns.append(upscaled)
+    return np.asarray(hypercolumns)
+
 
 class FastRCNNDescription(object): 
     def __init__(self): 
@@ -20,7 +30,7 @@ class FastRCNNDescription(object):
 
         rcnn_dir = '/home/spillai/code/recognition-pod/recognition/fast-rcnn/'
         
-        demo_net = 'caffenet'
+        demo_net = 'vgg_cnn_m_1024'
         model_def = os.path.join(rcnn_dir, 'models', NETS[demo_net][0],
                                  'test.prototxt')
         pretrained_model = os.path.join(rcnn_dir, 'data', 'fast_rcnn_models',
@@ -31,8 +41,12 @@ class FastRCNNDescription(object):
         cfg.TEST.BBOX_REG = False
 
     def describe(self, img, bboxes):
+        # self.rcnn_.hypercolumn_bboxes(img, bboxes)
         return self.rcnn_.detect_bboxes(img, bboxes)
 
+    def hypercolumn(self, img, bboxes):
+        return self.rcnn_.hypercolumn_bboxes(img, bboxes)
+        
 
 class HistogramClassifier(BOWClassifier): 
     """

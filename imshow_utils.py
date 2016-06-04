@@ -62,11 +62,11 @@ def print_status(vis, text=None):
         cv2.putText(vis, '%s' % text, (2, vis.shape[0] - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.4, 
                     (240, 240, 240), thickness = 1)
 
-def imshow_cv(label, im, block=False, text=None): 
+def imshow_cv(label, im, block=False, text=None, wait=2): 
     vis = im.copy()
     print_status(vis, text=text)
     window_manager.imshow(label, vis)
-    ch = cv2.waitKey(0 if block else 2) & 0xFF
+    ch = cv2.waitKey(0 if block else wait) & 0xFF
     if ch == ord(' '):
         cv2.waitKey(0)
     if ch == ord('v'):

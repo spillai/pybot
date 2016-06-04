@@ -22,7 +22,7 @@ def intersection_over_union(A,B):
     return I * 1.0 / U
 
 def brute_force_match(bboxes_truth, bboxes_test, 
-                      match_func=lambda (x,y): None, dtype=np.float32):
+                      match_func=lambda x,y: None, dtype=np.float32):
     A = np.zeros(shape=(len(bboxes_truth), len(bboxes_test)), dtype=dtype)
     for i, bbox_truth in enumerate(bboxes_truth): 
         for j, bbox_test in enumerate(bboxes_test): 

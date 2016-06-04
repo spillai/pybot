@@ -14,6 +14,7 @@ import pandas as pd
 
 from pybot_vision import BINGObjectness
 
+from bot_vision.feature_detection import get_dense_detector, get_detector
 from bot_vision.image_utils import im_resize, gaussian_blur, median_blur, box_blur
 from bot_vision.bow_utils import BoWVectorizer, bow_codebook, bow_project, flair_project
 from pybot_vision import FLAIR_code
@@ -252,31 +253,6 @@ def classification_report(y_true, y_pred, labels=None, target_names=None,
     report += fmt % tuple(values)
     return report
 
-
-def get_dense_detector(step=4, levels=7, scale=np.sqrt(2)): 
-    """
-    Standalone dense detector instantiation
-    """
-    detector = cv2.FeatureDetector_create('Dense')
-    detector.setInt('initXyStep', step)
-    # detector.setDouble('initFeatureScale', 0.5)
-
-    detector.setDouble('featureScaleMul', scale)
-    detector.setInt('featureScaleLevels', levels)
-
-    detector.setBool('varyImgBoundWithScale', True)
-    detector.setBool('varyXyStepWithScale', False)
-
-    # detector = cv2.PyramidAdaptedFeatureDetector(detector, maxLevel=4)
-    return detector
-
-def get_detector(detector='dense', step=4, levels=7, scale=np.sqrt(2)): 
-    """ Get opencv dense-sampler or specific feature detector """
-    if detector == 'dense': 
-        return get_dense_detector(step=step, levels=levels, scale=scale)
-    else: 
-        detector = cv2.FeatureDetector_create(detector)
-        return cv2.PyramidAdaptedFeatureDetector(detector, maxLevel=levels)
 
 def root_sift(kpts, desc, eps=1e-7): 
     """ Compute Root-SIFT on descriptor """

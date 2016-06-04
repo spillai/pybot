@@ -15,6 +15,7 @@ spillai: added detect_bboxes, with fc7 output
 
 import os
 import numpy as np
+import scipy as sp
 
 import caffe
 caffe.set_mode_gpu()
@@ -280,6 +281,48 @@ def im_detect(net, im, boxes, layer='fc7'):
 
     # return scores, pred_boxes
 
+def extract_hypercolumns(net, im, boxes): 
+    blobs, unused_im_scale_factors = _get_blobs(im, boxes)
+
+    # # When mapping from image ROIs to feature map ROIs, there's some aliasing
+    # # (some distinct image ROIs get mapped to the same feature ROI).
+    # # Here, we identify duplicate feature ROIs, so we only compute features
+    # # on the unique subset.
+    # if cfg.DEDUP_BOXES > 0:
+    #     v = np.array([1, 1e3, 1e6, 1e9, 1e12])
+    #     hashes = np.round(blobs['rois'] * cfg.DEDUP_BOXES).dot(v)
+    #     _, index, inv_index = np.unique(hashes, return_index=True,
+    #                                     return_inverse=True)
+    #     blobs['rois'] = blobs['rois'][index, :]
+    #     boxes = boxes[index, :]
+
+    # reshape network inputs
+    net.blobs['data'].reshape(*(blobs['data'].shape))
+    net.blobs['rois'].reshape(*(blobs['rois'].shape))
+    blobs_out = net.forward(data=blobs['data'].astype(np.float32, copy=False),
+                            rois=blobs['rois'].astype(np.float32, copy=False))
+
+    print dir(net.blobs), net.blobs.keys(), net.blobs['conv1'].data.shape
+
+    hypercolumns = []
+    # layers = ['conv2', 'conv3', 'conv4', 'conv5']
+    layers = ['norm1', 'norm2']
+    layers = ['pool1', 'pool2', 'pool5']
+    # layers = ['fc6', 'fc7']
+    for layer in layers: 
+        print layer, net.blobs[layer].data.shape
+        convmap = net.blobs[layer].data
+        for fmap in convmap[0]:
+            # print 'fmap', fmap.shape
+            upscaled = sp.misc.imresize(fmap, size=(im.shape[0], im.shape[1]),
+                                        mode="F", interp='bilinear')
+            hypercolumns.append(upscaled)
+    return np.asarray(hypercolumns)
+
+    # data = net.blobs['fc7'].data
+    # return data[inv_index, :] 
+
+
 class DetectorFastRCNN(caffe.Net):
     """
     Detector extends Net for windowed detection by a list of crops or
@@ -294,3 +337,5 @@ class DetectorFastRCNN(caffe.Net):
     def detect_bboxes(self, im, boxes, layer='fc7'): 
         return im_detect(self, im, boxes, layer=layer)
 
+    def hypercolumn_bboxes(self, im, boxes): 
+        return extract_hypercolumns(self, im, boxes)

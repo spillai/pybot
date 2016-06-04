@@ -1,52 +1,34 @@
-# Helper functions for plotting
+import cv2
 import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib.colors import colorConverter
-from copy import deepcopy
+from bot_vision.image_utils import to_color
 
-def height_map(hX, hmin=-0.20, hmax=5.0): 
-    return np.array(plt.cm.hsv((hX-hmin)/(hmax-hmin)))[:,:3]
-
-def color_by_height_axis(axis=2): 
-    return height_map(X[:,axis]) * 255
-
-def get_color_arr_label(c, n, color_func=plt.cm.gist_rainbow, palette_size=20): 
-    if c < 0: 
-        carr = np.tile(np.array([0,0,0,0]), [n,1])
+def draw_features(im, pts, colors=None, size=2): 
+    out = to_color(im)
+    if colors is not None: 
+        cols = colors.astype(np.int64)
     else: 
-        carr = np.tile(np.array(color_func( (c % palette_size) * 1. / palette_size)), [n,1])
-    return carr
+        cols = np.tile([0, 255, 0], (len(pts), 1)).astype(np.int64)
 
-def reshape_arr(arr):
-    """ 
-    Reshapes organized point clouds to [Nx3] form
-    """
-    return arr.reshape(-1,3) if arr.ndim == 3 else arr
+    for col, pt in zip(cols, pts): 
+        tl = np.int32(pt - size)
+        br = np.int32(pt + size)
+        cv2.rectangle(out, (tl[0], tl[1]), (br[0], br[1]), tuple(col), -1)
+        # cv2.circle(out, tuple(map(int, pt)), 3, (0,255,0), -1, lineType=cv2.CV_AA)
+    return out
 
-def get_color_arr(c, n, flip_rb=False):
-    """ 
-    Convert string c to carr array (N x 3) format
-    """
-    carr = None;
+def draw_lines(im, pts1, pts2, colors=None, thickness=1): 
+    out = to_color(im)
+    if colors is not None: 
+        cols = colors.astype(np.int64)
+    else: 
+        cols = np.tile([0, 255, 0], (len(pts1), 1)).astype(np.int64)
 
-    if isinstance(c, str): # single color
-        carr = np.tile(np.array(colorConverter.to_rgb(c)), [n,1])
-    elif  isinstance(c, float):
-        carr = np.tile(np.array(color_func(c)), [n,1])
-    else:
-        carr = reshape_arr(c)
+    for col, pt1, pt2 in zip(cols, pts1, pts2): 
+        cv2.line(out, (pt1[0], pt1[1]), (pt2[0], pt2[1]), tuple(col), thickness)
+    return out
 
-    if flip_rb: 
-        b, r = carr[:,0], carr[:,2]
-        carr[:,0], carr[:,2] = r.copy(), b.copy()
 
-    # return floating point with values in [0,1]
-    return carr.astype(np.float32) / 255.0 if carr.dtype == np.uint8 else carr.astype(np.float32)
-
-def copy_pointcloud_data(_arr, _carr, flip_rb=False): 
-    arr, carr = deepcopy(_arr), deepcopy(_carr)
-    arr = arr.reshape(-1,3)
-    N, D = arr.shape[:2]
-    carr = get_color_arr(carr, N, flip_rb=flip_rb);
-    return arr, carr
-
+def draw_matches(out, pts1, pts2, colors=None, thickness=1, size=2): 
+    out = draw_lines(out, pts1, pts2, colors=colors, thickness=thickness)
+    out = draw_features(out, pts2, colors=colors, size=size)
+    return out

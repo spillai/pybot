@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 
+from bot_utils.timer import timeitmethod
 from .image_utils import to_gray
 
         
@@ -34,18 +35,19 @@ class MSER:
 
         self.mser = cv2.MSER(*args, **kwargs)
 
+    @timeitmethod
     def detect(self, im, colorspace='hsv'): 
         if colorspace == 'hsv': 
             cim = cv2.cvtColor(im, cv2.COLOR_BGR2HLS)
-        else: 
+        elif colorspace is None: 
             cim = im
         return self.mser.detect(cim)
 
-    def hulls(self, im):
-        regions = self.detect(im)
+    def hulls(self, im, colorspace='hsv'):
+        regions = self.detect(im, colorspace=colorspace)
         return [cv2.convexHull(p.reshape(-1, 1, 2)) for p in regions]
 
-    def ellipses(self, im): 
-        hulls = self.hulls(im)
+    def ellipses(self, im, colorspace='hsv'): 
+        hulls = self.hulls(im, colorspace=colorspace)
         return [cv2.fitEllipse(contours_from_endpoints(hull.reshape(-1,2),10))
                 for hull in hulls]

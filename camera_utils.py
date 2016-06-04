@@ -5,6 +5,7 @@ from numpy.linalg import det, norm
 import numpy.matlib as npm
 from scipy import linalg
 
+from bot_vision.color_utils import get_color_by_label
 from bot_vision.image_utils import to_color
 from bot_utils.db_utils import AttrDict
 from bot_geometry.rigid_transform import Quaternion, RigidTransform
@@ -21,6 +22,50 @@ kinect_v1_params = AttrDict(
     projector_depth_baseline = 0.07214
 )
 
+def colvec(vec): 
+    """ Convert to column vector """
+    return vec.reshape(-1,1)
+
+def rowvec(vec): 
+    """ Convert to row vector """
+    return vec.reshape(1,-1)
+
+def unproject(a):
+  """ Homogenize vector """
+  return np.append(a, 1)
+
+def project(a):
+  """ De-homogenize vector """
+  return a[:-1]/float(a[-1])
+
+def unproject_points(pts): 
+    assert(pts.ndim == 2 and pts.shape[1] == 2)
+    return np.hstack([pts, colvec(np.ones(len(pts)))])
+
+def project_points(pts): 
+    z = colvec(pts[:,2])
+    return pts[:,:2] / z
+
+def sampson_error(F, pts1, pts2): 
+    """
+    Computes the sampson error for F, and points pts1, pts2. Sampson
+    error is the first order approximation to the geometric error.
+    Remember that this is a squared error.
+   
+    (x'^{T} * F * x)^2
+    -----------------
+    (F * x)_1^2 + (F * x)_2^2 + (F^T * x')_1^2 + (F^T * x')_2^2
+
+    where (F * x)_i^2 is the square of the i-th entry of the vector Fx
+    """
+    x1, x2 = unproject_points(pts1).T, unproject_points(pts2).T
+    Fx1 = np.dot(F, x1)
+    Fx2 = np.dot(F, x2)
+       
+    # Sampson distance as error measure
+    denom = Fx1[0]**2 + Fx1[1]**2 + Fx2[0]**2 + Fx2[1]**2
+    return ( np.diag(x1.T.dot(Fx2)) )**2 / denom 
+    
 def get_baseline(fx, baseline=None, baseline_px=None): 
     """
     Retrieve baseline / baseline(in pixels) using the focal length
@@ -34,6 +79,15 @@ def get_baseline(fx, baseline=None, baseline_px=None):
         raise AssertionError('Ambiguous baseline and baseline_px values. Provide either, not both')
     return baseline, baseline_px
 
+def triangulate_points(cam1, pts1, cam2, pts2): 
+    """
+    Triangulate 2D corresponding points using 2-views 
+    """
+    assert(isinstance(cam1, Camera) and isinstance(cam2, Camera))
+    assert(isinstance(pts1, np.ndarray) and isinstance(pts2, np.ndarray))
+    X = cv2.triangulatePoints(cam1.P, cam2.P, pts1.reshape(-1,1,2), pts2.reshape(-1,1,2)).T 
+    return X[:,:3] / colvec(X[:,3])
+    
 def construct_K(fx=500.0, fy=500.0, cx=319.5, cy=239.5): 
     """
     Create camera intrinsics from focal lengths and focal centers
@@ -47,15 +101,19 @@ def construct_D(k1=0, k2=0, k3=0, p1=0, p2=0):
     """
     Create camera distortion params
     """
-    return np.float64([k1,k2,k3,p1,p2])
+    return np.float64([k1,k2,p1,p2,k3])
 
 def undistort_image(im, K, D): 
     """
     Optionally: 
         newcamera, roi = cv2.getOptimalNewCameraMatrix(self.K, self.D, (W,H), 0) 
     """
+    H,W = im.shape[:2]
+    Kprime, roi = cv2.getOptimalNewCameraMatrix(K, D, (W,H), 1, (W,H))
     return cv2.undistort(im, K, D, None, K)
 
+# def camera_from_P(P): 
+    
 def get_calib_params(fx, fy, cx, cy, baseline=None, baseline_px=None): 
     raise RuntimeError('Deprecated, see camera_utils.StereoCamera')
 
@@ -90,14 +148,14 @@ class CameraIntrinsic(object):
         D: Distortion
         shape: Image Size (H,W,C): (480,640,3)
         """
-        self.K = npm.mat(K)
+        self.K = K
         self.D = D
-        self.shape = shape
+        self.shape = np.int32(shape) if shape is not None else None
 
     def __repr__(self): 
         return 'CameraIntrinsic =======>\n K = {:}\n D = {:}\n fx={:}, fy={:}, '\
             'cx={:}, cy={:}, shape={:}'.format(
-                np.array_str(np.array(self.K), precision=2), 
+                np.array_str(np.array(self.K), precision=2, suppress_small=True), 
                 np.array_str(self.D, precision=2),
                 self.fx, self.fy, self.cx, self.cy, self.shape) 
 
@@ -118,40 +176,31 @@ class CameraIntrinsic(object):
         return cls(construct_K(cx / np.tan(fov), cy / np.tan(fov), cx, cy), D=D, shape=shape)
 
     @property
-    def fx(self): 
-        return self.K[0,0]
+    def fx(self): return self.K[0,0]
 
     @property
-    def fy(self): 
-        return self.K[1,1]
+    def fy(self): return self.K[1,1]
 
     @property
-    def cx(self): 
-        return self.K[0,2]
+    def cx(self): return self.K[0,2]
 
     @property
-    def cy(self): 
-        return self.K[1,2]
+    def cy(self): return self.K[1,2]
 
     @property
-    def k1(self): 
-        return self.D[0]
+    def k1(self): return self.D[0]
 
     @property
-    def k2(self): 
-        return self.D[1]
+    def k2(self): return self.D[1]
 
     @property
-    def k3(self): 
-        return self.D[2]
+    def k3(self): return self.D[4]
 
     @property
-    def p1(self): 
-        return self.D[3]
+    def p1(self): return self.D[2]
 
     @property
-    def p2(self): 
-        return self.D[4]
+    def p2(self): return self.D[3]
 
     @property
     def fov(self): 
@@ -172,8 +221,39 @@ class CameraIntrinsic(object):
                                                  p1=self.p1, p2=self.p2, 
                                                  shape=shape)
 
+    def ray(self, pts, undistort=True, rotate=False): 
+        """
+        Returns the ray corresponding to the points. 
+        Optionally undistort (defaults to true), and 
+        rotate ray to the camera's viewpoint 
+        """
+        upts = self.undistort_points(pts) if undistort else pts
+        ret = unproject_points(
+            np.hstack([ (colvec(upts[:,0])-self.cx) / self.fx, (colvec(upts[:,1])-self.cy) / self.fy ])
+        )
+        if rotate: 
+            ret = self.extrinsics.rotate_vec(ret)
+        return ret
+
+    def reconstruct(self, xyZ, undistort=True): 
+        """
+        Reproject to 3D with calib params
+        """
+        Z = colvec(xyZ[:,2])
+        return self.ray(xyZ[:,:2], undistort=undistort) * Z
+        
     def undistort(self, im): 
         return undistort_image(im, self.K, self.D)
+
+    def undistort_points(self, pts): 
+        """
+        Undistort image points using camera matrix, and distortion coeffs
+ 
+        Have to provide P matrix for appropriate scaling
+        http://code.opencv.org/issues/1964#note-2
+        """
+        out = cv2.undistortPoints(pts.reshape(-1,1,2).astype(np.float32), self.K, self.D, P=self.K)
+        return out.reshape(-1,2) 
         
     def undistort_debug(self, im=None): 
         if im is None: 
@@ -190,7 +270,7 @@ class CameraIntrinsic(object):
         AttrDict(
             fx=float(self.fx), fy=float(self.fy), 
             cx=float(self.cx), cy=float(self.cy), 
-            k1=float(self.D[0]), k2=float(self.D[1]), k3=float(self.D[2]), p1=float(self.D[3]), p2=float(self.D[4]),
+            k1=float(self.D[0]), k2=float(self.D[1]), k3=float(self.D[4]), p1=float(self.D[2]), p2=float(self.D[3]),
             width=int(width), height=int(height)
         ).save_yaml(filename)
         
@@ -212,6 +292,18 @@ class CameraExtrinsic(RigidTransform):
     def __repr__(self): 
         return 'CameraExtrinsic =======>\npose = {:}'.format(RigidTransform.__repr__(self))
 
+    def c2w(self, X): 
+        """
+        Transform points in camera coordinates to world
+        """
+        return self * X
+
+    def w2c(self, X): 
+        """
+        Transform points from world coordinates to camera
+        """
+        return self.inverse() * X
+        
     @classmethod
     def from_rigid_transform(cls, p): 
         R, t = p.to_Rt()
@@ -219,11 +311,11 @@ class CameraExtrinsic(RigidTransform):
     
     @property
     def R(self): 
-        return self.quat.to_homogeneous_matrix()[:3,:3]
+        return self.quat.R
 
     @property
     def Rt(self): 
-        return self.quat.to_homogeneous_matrix()[:3]
+        return self.matrix[:3]
 
     @property
     def t(self): 
@@ -242,6 +334,14 @@ class CameraExtrinsic(RigidTransform):
         Simulate a camera at identity
         """
         return cls.identity()
+
+    @property
+    def o2w(self): 
+        return self
+
+    @property
+    def w2o(self): 
+        return self.inverse()
 
     def save(self, filename): 
         R, t = p.to_Rt()
@@ -303,18 +403,27 @@ class Camera(CameraIntrinsic, CameraExtrinsic):
         x = proj.reshape(-1,2)
         
         if check_bounds: 
+            if self.shape is None: 
+                raise ValueError('check_bounds cannot proceed. Camera.shape is not set')
+        
             # Only return points within-image bounds
             valid = np.bitwise_and(np.bitwise_and(x[:,0] >= 0, x[:,0] < self.shape[1]), \
                                    np.bitwise_and(x[:,1] >= 0, x[:,1] < self.shape[0]))
             x, X = x[valid], X[valid]
             
         if return_depth: 
-            # Transform points in camera frame, and check z-vector: 
-            # [p_c = T_cw * p_w]
-            depths = (self.extrinsics * X)[:,2]
+            depths = self.depth_from_projection(X)
             return x, depths
-	
         return x
+
+    def depth_from_projection(self, X): 
+        """
+        Determine the depth of the [Nx3] points given camera pose
+        
+        Transform points in camera frame, and check z-vector: 
+        [p_c = T_cw * p_w]
+        """
+        return (self.extrinsics * X)[:,2]
 
     def factor(self): 
         """
@@ -352,23 +461,41 @@ class Camera(CameraIntrinsic, CameraExtrinsic):
         """
         Compute the fundamental matrix with respect to other camera 
         http://www.robots.ox.ac.uk/~vgg/hzbook/code/vgg_multiview/vgg_F_from_P.m
+
+        The computed fundamental matrix, given by the formula 17.3 (p. 412) in
+        Hartley & Zisserman book (2nd ed.).
         
         Use as: 
-           F_10 = poses[1].F(poses[0])
-           l_1 = F_10 * x_0
+            F_10 = poses[0].F(poses[1])
+            l_1 = F_10 * x_0
 
         """
+
         X1 = self.P[[1,2],:]
         X2 = self.P[[2,0],:]
         X3 = self.P[[0,1],:]
         Y1 = other.P[[1,2],:]
         Y2 = other.P[[2,0],:]
         Y3 = other.P[[0,1],:]
-        
-        return np.float64([[det(np.vstack([X1, Y1])), det(np.vstack([X2, Y1])), det(np.vstack([X3, Y1]))],
-                        [det(np.vstack([X1, Y2])), det(np.vstack([X2, Y2])), det(np.vstack([X3, Y2]))],
-                        [det(np.vstack([X1, Y3])), det(np.vstack([X2, Y3])), det(np.vstack([X3, Y3]))]])
 
+        F = np.float64([
+            [det(np.vstack([X1, Y1])), det(np.vstack([X2, Y1])), det(np.vstack([X3, Y1]))],
+            [det(np.vstack([X1, Y2])), det(np.vstack([X2, Y2])), det(np.vstack([X3, Y2]))],
+            [det(np.vstack([X1, Y3])), det(np.vstack([X2, Y3])), det(np.vstack([X3, Y3]))] 
+        ])
+
+        return F #  / F[2,2]
+
+    def E(self, other): 
+        """ 
+        Computes the essential matrix between this camera 
+        and the other, via E = [t]_x * R
+        See HZ, Sec 9.6, p 257
+        """
+        return skew(self.t).dot(self.R)
+
+    def triangulate(self, pts, other_cam, other_pts): 
+        return triangulate_points(self, pts, other_cam, other_pts)
 
     def save(self, filename): 
         raise NotImplementedError()
@@ -379,6 +506,9 @@ class Camera(CameraIntrinsic, CameraExtrinsic):
 
 class StereoCamera(Camera): 
     def __init__(self, lcamera, rcamera, baseline): 
+        if not isinstance(lcamera, Camera) or not isinstance(rcamera, Camera): 
+            raise TypeError('lcamera, rcamera are not Camera type')
+
         Camera.__init__(self, lcamera.K, lcamera.R, lcamera.t, D=lcamera.D, shape=lcamera.shape) 
 
         # CameraIntrinsic.__init__(self, K, D, shape=shape)
@@ -561,9 +691,9 @@ class DepthCamera(CameraIntrinsic):
         assert(depth.shape == self.xs.shape)
         return np.dstack([self.xs * depth, self.ys * depth, depth])
 
-    def reconstruct_points(self, pts, depth): 
-        return np.vstack([self.xs[pts[:,1], pts[:,0]] * depth,
-                          self.ys[pts[:,1], pts[:,0]] * depth,
+    def reconstruct_sparse(self, pts, depth): 
+        return np.vstack([(pts[:,0] - self.cx) * 1.0 / self.fx * depth,
+                          (pts[:,1] - self.cy) * 1.0 / self.fx * depth, 
                           depth]).T
 
     def save(self, filename): 
@@ -589,6 +719,9 @@ def compute_fundamental(x1, x2, method=cv2.FM_RANSAC):
     CV_FM_LMEDS for the LMedS algorithm.  N >= 8"
     """
     assert(x1.shape == x2.shape)
+    if len(x1) < 8:
+        raise RuntimeError('Fundamental matrix requires N >= 8 pts')
+
     F, mask = cv2.findFundamentalMat(x1, x2, method)
     return F, mask
 
@@ -699,16 +832,20 @@ def get_object_bbox(camera, pts, subsample=10, scale=1.0, min_height=10, min_wid
     else: 
         return [None] * 3
 
-def epipolar_line(F_10, x_1): 
+def epipolar_line(F_10, x_0): 
     """
-    l_1 = F_10 * x_1
+    l_1 = F_10 * x_0
     line = F.dot(np.hstack([x, np.ones(shape=(len(x),1))]).T)
     """
-    return cv2.computeCorrespondEpilines(x_1.reshape(-1,1,2), 1, F_10).reshape(-1,3)
+    return cv2.computeCorrespondEpilines(x_0.reshape(-1,1,2), 1, F_10).reshape(-1,3)
 
 def plot_epipolar_line(im_1, F_10, x_0, im_0=None): 
     """
     Plot the epipole and epipolar line F * x = 0.
+
+    l[0] * x + l[1] * y + l[2] = 0
+    @ x=0: y = -l[2] / l[1]
+    @ x=W: y = (-l[2] -l[0]*W) / l[1]
     """
     
     H,W = im_1.shape[:2]
@@ -717,8 +854,15 @@ def plot_epipolar_line(im_1, F_10, x_0, im_0=None):
     vis_1 = to_color(im_1)
     vis_0 = to_color(im_0) if im_0 is not None else None
     
-    col = (0,255,0)
-    for l1 in lines_1:
+    N = 20
+    cols = get_color_by_label(np.arange(len(x_0)) % N) * 255
+    # for tid, pt in zip(ids, pts): 
+    #     cv2.circle(vis, tuple(map(int, pt)), 2, 
+    #                tuple(map(int, cols[tid % N])) if colored else (0,240,0),
+    #                -1, lineType=cv2.CV_AA)
+
+    # col = (0,255,0)
+    for col, l1 in zip(cols, lines_1):
         try: 
             x0, y0 = map(int, [0, -l1[2] / l1[1] ])
             x1, y1 = map(int, [W, -(l1[2] + l1[0] * W) / l1[1] ])
@@ -728,23 +872,57 @@ def plot_epipolar_line(im_1, F_10, x_0, im_0=None):
             # raise RuntimeWarning('Failed to estimate epipolar line {:s}'.format(l1))
 
     if vis_0 is not None: 
-        for x in x_0: 
-            cv2.circle(vis_0, tuple(x), 5, col, -1)
-        return np.hstack([vis_0, vis_1])
+        for col, x in zip(cols, x_0): 
+            cv2.circle(vis_0, tuple(x), 3, col, -1)
+        return np.vstack([vis_0, vis_1])
     
     return vis_1
 
+class HalfPlane(object): 
+    """
+    Half plane class where the plane is defined as passing through
+    points (p,q,r) with points in ccw order
+
+    Implemented from reference implementation in OpenMVG (Pierre Moulon). 
+    
+    """
+    def __init__(self, hp): 
+        assert(hp.ndim == 1 and len(hp) == 4)
+        self.hp_ = hp
+
+    @classmethod
+    def from_points(cls, p, q, r): 
+        abc = (p-r).cross(q-r)
+        hp = np.r_[abc, -abc.dot(r)]
+        return cls(hp)
+
+    def intersect(self): 
+        """
+        [1] Paper: Finding the intersection of n half-spaces in time
+        O(n log n).  
+        Author: F.P. Preparata, D.E. Muller 
+        Published in:
+        Theoretical Computer Science, Volume 8, Issue 1, Pages 45-55
+        Year: 1979 More: ISSN 0304-3975,
+        http://dx.doi.org/10.1016/0304-3975(79)90055-0.  
+        """
+        pass
+
+def test_HalfPlane(): 
+    pass
 
 class Frustum(object): 
     def __init__(self, pose, zmin=0.0, zmax=0.1, fov=np.deg2rad(60)): 
-    
+        if fov >= np.pi: 
+            raise ValueError('Frustum fov cannot be {} radians'.format(fov))
+
         self.p0 = np.array([0,0,0])
         self.near, self.far = np.array([0,0,zmin]), np.array([0,0,zmax])
         self.near_off, self.far_off = np.tan(fov / 2) * zmin, np.tan(fov / 2) * zmax
         self.zmin = zmin
         self.zmax = zmax
         self.fov = fov
-
+        
         self.pose = pose
         self.p0 = pose.tvec
 
@@ -758,15 +936,20 @@ class Frustum(object):
                self.far + np.array([1, -1, 0]) * self.far_off, 
                self.far + np.array([1, 1, 0]) * self.far_off, 
                self.far + np.array([-1, 1, 0]) * self.far_off]
-        
+
         nll, nlr, nur, nul, fll, flr, fur, ful = self.pose * np.vstack(arr)
         return nll, nlr, nur, nul, fll, flr, fur, ful
+
+def test_Frustum(): 
+    pass
 
 
 if __name__ == "__main__": 
     cam = CameraIntrinsic.from_calib_params(718.856, 718.856, 607.1928, 185.2157, shape=np.int32([1241,376]))
     print cam.shape
     cam.save('kitti00-02.yaml')
+
+    
 
 #   m, n = im.shape[:2]
 #   line = numpy.dot(F, x)

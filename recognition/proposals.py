@@ -2,7 +2,9 @@
 import cv2
 import numpy as np
 
+from bot_utils.plot_utils import colormap
 from bot_vision.image_utils import im_resize
+from bot_utils.timer import timeitmethod
 
 import os.path
 import warnings
@@ -11,6 +13,25 @@ with warnings.catch_warnings():
     import gop
     from bot_vision.recognition.gop_util import setupLearned as gop_setuplearned
 
+def visualize_bboxes(vis, bboxes, ellipse=False, colored=True):
+    if not len(bboxes): 
+        return vis
+
+    if not colored: 
+        cols = np.tile([240,240,240], [len(bboxes), 1])
+    else: 
+        N = 20
+        cwheel = colormap(np.linspace(0, 1, N))
+        cols = np.vstack([cwheel[idx % N] for idx, _ in enumerate(bboxes)])            
+
+    for col, b in zip(cols, bboxes): 
+        if ellipse: 
+            cv2.ellipse(vis, ((b[0]+b[2])/2, (b[1]+b[3])/2), ((b[2]-b[0])/2, (b[3]-b[1])/2), 0, 0, 360, 
+                        color=tuple(col), thickness=1)
+        else: 
+            cv2.rectangle(vis, (b[0], b[1]), (b[2], b[3]), tuple(col), 2)
+    return vis
+    
 class ObjectProposal(object): 
     """
     Usage: 
@@ -25,16 +46,15 @@ class ObjectProposal(object):
         if not hasattr(self.proposer_, 'process'): 
             raise NotImplementedError('Proposer does not have process implemented')
 
+    @timeitmethod
     def process(self, im): 
         boxes = self.proposer_.process(im_resize(im, scale=self.scale_))
         return (boxes * 1 / self.scale_).astype(np.int32)
 
     @staticmethod
-    def visualize(vis, bboxes): 
-        for b in bboxes: 
-            cv2.rectangle(vis, (b[0], b[1]), (b[2], b[3]), (200,200,200), 2)
-        return vis
-
+    def visualize(vis, bboxes, ellipse=False, colored=True): 
+        return visualize_bboxes(vis, bboxes, ellipse=ellipse, colored=colored)
+    
     @classmethod
     def create(cls, method='GOP', scale=1, num_proposals=1000, params=None): 
         if method == 'GOP': 
