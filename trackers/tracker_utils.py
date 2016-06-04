@@ -66,13 +66,10 @@ class TrackManager(object):
 
     def prune(self): 
         # Remove tracks that are not most recent
-        # count = 0
         for tid, val in self.tracks_ts.items(): 
             if val < self.idx: 
                 del self.tracks[tid]
                 del self.tracks_ts[tid]
-                # count += 1
-        # print 'Total pruned: ', count
 
     @property
     def pts(self): 
@@ -82,13 +79,6 @@ class TrackManager(object):
     def ids(self): 
         return self._ids
 
-
-# class BaseFeatureDetector(object): 
-#     def __init__(self): 
-#         pass
-
-#     def detect(self, im, mask=None): 
-#         raise NotImplementedError()
 
 class AprilTagFeatureDetector(object): 
     """
