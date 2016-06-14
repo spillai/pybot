@@ -535,7 +535,7 @@ class UWRGBDSceneDataset(UWRGBDDataset):
             for ind in visible_inds:
                 obj = self.map_info.objects[ind]
                 label = obj.label
-                pts2d, coords, depth = get_object_bbox(self.map_info.camera, obj.points, subsample=3, scale=1.2)
+                pts2d, coords, depth = get_object_bbox(self.map_info.camera, obj.points, subsample=3, scale=1)
                 if coords is not None: 
                     object_candidates.append(
                         AttrDict(
