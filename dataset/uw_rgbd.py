@@ -597,8 +597,8 @@ class UWRGBDSceneDataset(UWRGBDDataset):
                                                      self.depth.iteritems(every_k_frames=every_k_frames), 
                                                      self.bboxes[::every_k_frames], 
                                                      self.poses[::every_k_frames]): 
-                index += every_k_frames
                 yield self._process_items(index, rgb_im, depth_im, bbox, pose)
+                index += every_k_frames
 
         def iterinds(self, inds): 
             for index, rgb_im, depth_im, bbox, pose in izip(inds, 
