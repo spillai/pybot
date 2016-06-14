@@ -247,12 +247,12 @@ class UWRGBDObjectDataset(UWRGBDDataset):
         # Save target names for metrics
         self.target_names = targets
 
-    def iteritems(self, every_k_frames=1, verbose=False): 
+    def iteritems(self, every_k_frames=1, verbose=False):
         pbar = setup_pbar(len(self.data)) if verbose else None
         for key, frames in self.data.iteritems(): 
+            print 'Processing: %s' % key
             if verbose: 
                 pbar.increment()
-                # print 'Processing: %s' % key
 
             for frame in frames.iteritems(every_k_frames=every_k_frames): 
                 yield frame
