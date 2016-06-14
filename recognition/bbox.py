@@ -46,7 +46,7 @@ def brute_force_match(bboxes_truth, bboxes_test,
 
 def brute_force_match_coords(bboxes_truth, bboxes_test): 
     return brute_force_match(bboxes_truth, bboxes_test, 
-                             match_func=lambda x,y: intersection_over_union(x.coords, y.coords),
+                             match_func=lambda x,y: intersection_over_union(x['coords'], y['coords']),
                              dtype=np.float32)
 
 def brute_force_match_target(bboxes_truth, bboxes_test): 

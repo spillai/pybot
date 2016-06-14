@@ -27,8 +27,26 @@ def draw_lines(im, pts1, pts2, colors=None, thickness=1):
         cv2.line(out, (pt1[0], pt1[1]), (pt2[0], pt2[1]), tuple(col), thickness)
     return out
 
-
 def draw_matches(out, pts1, pts2, colors=None, thickness=1, size=2): 
     out = draw_lines(out, pts1, pts2, colors=colors, thickness=thickness)
     out = draw_features(out, pts2, colors=colors, size=size)
     return out
+
+def draw_bboxes(vis, bboxes, ellipse=False, colored=True):
+    if not len(bboxes): 
+        return vis
+
+    if not colored: 
+        cols = np.tile([240,240,240], [len(bboxes), 1])
+    else: 
+        N = 20
+        cwheel = colormap(np.linspace(0, 1, N))
+        cols = np.vstack([cwheel[idx % N] for idx, _ in enumerate(bboxes)])            
+
+    for col, b in zip(cols, bboxes): 
+        if ellipse: 
+            cv2.ellipse(vis, ((b[0]+b[2])/2, (b[1]+b[3])/2), ((b[2]-b[0])/2, (b[3]-b[1])/2), 0, 0, 360, 
+                        color=tuple(col), thickness=1)
+        else: 
+            cv2.rectangle(vis, (b[0], b[1]), (b[2], b[3]), tuple(col), 2)
+    return vis

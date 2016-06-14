@@ -4,6 +4,7 @@ import numpy as np
 
 from bot_utils.plot_utils import colormap
 from bot_vision.image_utils import im_resize
+from bot_vision.draw_utils import draw_bboxes
 from bot_utils.timer import timeitmethod
 
 import os.path
@@ -13,25 +14,6 @@ with warnings.catch_warnings():
     import gop
     from bot_vision.recognition.gop_util import setupLearned as gop_setuplearned
 
-def visualize_bboxes(vis, bboxes, ellipse=False, colored=True):
-    if not len(bboxes): 
-        return vis
-
-    if not colored: 
-        cols = np.tile([240,240,240], [len(bboxes), 1])
-    else: 
-        N = 20
-        cwheel = colormap(np.linspace(0, 1, N))
-        cols = np.vstack([cwheel[idx % N] for idx, _ in enumerate(bboxes)])            
-
-    for col, b in zip(cols, bboxes): 
-        if ellipse: 
-            cv2.ellipse(vis, ((b[0]+b[2])/2, (b[1]+b[3])/2), ((b[2]-b[0])/2, (b[3]-b[1])/2), 0, 0, 360, 
-                        color=tuple(col), thickness=1)
-        else: 
-            cv2.rectangle(vis, (b[0], b[1]), (b[2], b[3]), tuple(col), 2)
-    return vis
-    
 class ObjectProposal(object): 
     """
     Usage: 
@@ -53,7 +35,7 @@ class ObjectProposal(object):
 
     @staticmethod
     def visualize(vis, bboxes, ellipse=False, colored=True): 
-        return visualize_bboxes(vis, bboxes, ellipse=ellipse, colored=colored)
+        return draw_bboxes(vis, bboxes, ellipse=ellipse, colored=colored)
     
     @classmethod
     def create(cls, method='GOP', scale=1, num_proposals=1000, params=None): 
