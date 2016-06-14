@@ -514,6 +514,10 @@ class UWRGBDSceneDataset(UWRGBDDataset):
                                          texts=[str(obj.label) for obj in self.map_info.objects])
 
         def get_bboxes(self, pose): 
+            """
+            Support for occlusion handling is incomplete/bug-ridden
+            """
+
             # 1. Get pose for a particular frame, 
             # and set camera extrinsic
             try: 
@@ -541,29 +545,29 @@ class UWRGBDSceneDataset(UWRGBDDataset):
                             depth=depth, 
                             uid=obj.uid))
 
-            # 3. Ensure occlusions are handled, sort by increasing depth, and filter 
-            # based on overlapping threshold
-            sorted_object_candidates = sorted(object_candidates, key=lambda obj: obj.depth)
+            # # 3. Ensure occlusions are handled, sort by increasing depth, and filter 
+            # # based on overlapping threshold
+            # sorted_object_candidates = sorted(object_candidates, key=lambda obj: obj.depth)
             
-            # Occlusion mask
-            im_sz = self.map_info.camera.shape[:2]
-            occ_mask = np.zeros(shape=im_sz, dtype=np.uint8)
+            # # Occlusion mask
+            # im_sz = self.map_info.camera.shape[:2]
+            # occ_mask = np.zeros(shape=im_sz, dtype=np.uint8)
             
-            # Non-occluded object_candidates
-            nonocc_object_candidates = []
-            for obj in sorted_object_candidates: 
-                x0, y0, x1, y1 = obj.coords
-                xc, yc = (x0 + x1) / 2, (y0 + y1) / 2
+            # # Non-occluded object_candidates
+            # nonocc_object_candidates = []
+            # for obj in sorted_object_candidates: 
+            #     x0, y0, x1, y1 = obj.coords
+            #     xc, yc = (x0 + x1) / 2, (y0 + y1) / 2
 
-                # If the bbox center is previously occupied, skip
-                if occ_mask[yc,xc]: 
-                    continue
+            #     # If the bbox center is previously occupied, skip
+            #     if occ_mask[yc,xc]: 
+            #         continue
 
-                # Set as occupied
-                occ_mask[y0:y1,x0:x1] = 1
-                nonocc_object_candidates.append(obj)
-                
-            return nonocc_object_candidates
+            #     # Set as occupied
+            #     occ_mask[y0:y1,x0:x1] = 1
+            #     nonocc_object_candidates.append(obj)
+
+            return object_candidates
 
         def _process_items(self, index, rgb_im, depth_im, bbox, pose): 
             # print 'Processing pose', pose, bbox
