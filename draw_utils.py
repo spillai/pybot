@@ -1,5 +1,7 @@
 import cv2
 import numpy as np
+
+from bot_utils.plot_utils import colormap
 from bot_vision.image_utils import to_color
 
 def draw_features(im, pts, colors=None, size=2): 
@@ -50,3 +52,13 @@ def draw_bboxes(vis, bboxes, ellipse=False, colored=True):
         else: 
             cv2.rectangle(vis, (b[0], b[1]), (b[2], b[3]), tuple(col), 2)
     return vis
+
+        
+def draw_ellipses(im, ellipses): 
+    for e in ellipses:
+        cv2.ellipse(im, e, (255, 255, 0) if im.ndim == 3 else 255,1)
+    return im
+
+def draw_hulls(im, hulls): 
+    cv2.polylines(im, hulls, 1, (0, 255, 0) if im.ndim == 3 else 255, thickness=1)       
+    return im

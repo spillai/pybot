@@ -3,16 +3,7 @@ import numpy as np
 
 from bot_utils.timer import timeitmethod
 from .image_utils import to_gray
-
-        
-def draw_ellipses(im, ellipses): 
-    for e in ellipses:
-        cv2.ellipse(im, e, (255, 255, 0) if im.ndim == 3 else 255,1)
-    return im
-
-def draw_hulls(im, hulls): 
-    cv2.polylines(im, hulls, 1, (0, 255, 0) if im.ndim == 3 else 255, thickness=1)       
-    return im
+from bot_vision.draw_utils import draw_ellipses, draw_hulls
 
 def fill_hulls(im, hulls): 
     for hull in hulls: 
