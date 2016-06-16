@@ -102,32 +102,32 @@ class Detector(caffe.Net):
                 ix += 1
         return detections
 
-    def detect_bboxes(self, im, bboxes, layer='fc7'):
-        """
-        Take
-        image: 
-        bboxes: set of bboxes returned by BING/GOP
+    # def detect_bboxes(self, im, bboxes, layer='fc7'):
+    #     """
+    #     Take
+    #     image: 
+    #     bboxes: set of bboxes returned by BING/GOP
 
-        """
-        # Extract windows.
-        window_inputs = []
+    #     """
+    #     # Extract windows.
+    #     window_inputs = []
         
-        image = im.astype(np.float32)
-        for bbox in bboxes:
-            window_inputs.append(self.crop(image, np.array([bbox[1],bbox[0], bbox[3],bbox[2]]).ravel()))
+    #     image = im.astype(np.float32)
+    #     for bbox in bboxes:
+    #         window_inputs.append(self.crop(image, np.array([bbox[1],bbox[0], bbox[3],bbox[2]]).ravel()))
 
-        # Run through the net (warping windows to input dimensions).
-        in_ = self.inputs[0]
-        caffe_in = np.zeros((len(window_inputs), window_inputs[0].shape[2])
-                            + self.blobs[in_].data.shape[2:],
-                            dtype=np.float32)
+    #     # Run through the net (warping windows to input dimensions).
+    #     in_ = self.inputs[0]
+    #     caffe_in = np.zeros((len(window_inputs), window_inputs[0].shape[2])
+    #                         + self.blobs[in_].data.shape[2:],
+    #                         dtype=np.float32)
         
-        for ix, window_in in enumerate(window_inputs):
-            caffe_in[ix] = self.transformer.preprocess(in_, window_in)
-        out = self.forward_all(**{in_: caffe_in, 'blobs': [layer]})
+    #     for ix, window_in in enumerate(window_inputs):
+    #         caffe_in[ix] = self.transformer.preprocess(in_, window_in)
+    #     out = self.forward_all(**{in_: caffe_in, 'blobs': [layer]})
 
-        # predictions = out[self.outputs[0]].squeeze(axis=(2,3))
-        return out[name]
+    #     # predictions = out[self.outputs[0]].squeeze(axis=(2,3))
+    #     return out[name]
 
 
     def crop(self, im, window):
@@ -322,20 +322,31 @@ def extract_hypercolumns(net, im, boxes):
     # data = net.blobs['fc7'].data
     # return data[inv_index, :] 
 
+class FastRCNNDescription(caffe.Net): 
+    def __init__(self, rcnn_dir=''): 
+        
+        NETS = {'vgg16': ('VGG16',
+                  'vgg16_fast_rcnn_iter_40000.caffemodel'),
+        'vgg_cnn_m_1024': ('VGG_CNN_M_1024',
+                           'vgg_cnn_m_1024_fast_rcnn_iter_40000.caffemodel'),
+        'caffenet': ('CaffeNet',
+                     'caffenet_fast_rcnn_iter_40000.caffemodel')}
 
-class DetectorFastRCNN(caffe.Net):
-    """
-    Detector extends Net for windowed detection by a list of crops or
-    selective search proposals.
-    """
-    def __init__(self, model_file, pretrained_file):
-        """
-        FastRCNN
-        """
-        caffe.Net.__init__(self, model_file, pretrained_file, caffe.TEST)
+        if not len(rcnn_dir): 
+            rcnn_dir = '/home/spillai/code/recognition-pod/recognition/fast-rcnn/'
+            import warnings
+            warnings.warn('Warning, loading hard-coded rcnn_dir {}'.format(rcnn_dir))
 
-    def detect_bboxes(self, im, boxes, layer='fc7'): 
+        demo_net = 'vgg_cnn_m_1024'
+        model_file = os.path.join(rcnn_dir, 'models', NETS[demo_net][0],
+                                 'test.prototxt')
+        pretrained_file = os.path.join(rcnn_dir, 'data', 'fast_rcnn_models',
+                                        NETS[demo_net][1])
+        caffe.Net.__init__(self, model_file, pretrained_file, caffe.TEST)        
+        cfg.TEST.BBOX_REG = False
+
+    def describe(self, im, boxes, layer='fc7'):
         return im_detect(self, im, boxes, layer=layer)
 
-    def hypercolumn_bboxes(self, im, boxes): 
+    def hypercolumn(self, im, boxes):
         return extract_hypercolumns(self, im, boxes)
