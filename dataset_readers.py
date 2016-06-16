@@ -42,6 +42,7 @@ def read_files(directory, pattern='*.png'):
     """
     matched_files = []
     for root, dirs, files in os.walk(directory): 
+        
         # Filter only filename matches 
         matches = [os.path.join(root, fn) 
                    for fn in fnmatch.filter(files, pattern)]
@@ -50,7 +51,7 @@ def read_files(directory, pattern='*.png'):
 
     return matched_files
 
-def read_dir(directory, pattern='*.png', recursive=True, expected=None, verbose=False, flatten=False): 
+def read_dir(directory, pattern='*.png', recursive=True, expected_dirs=[], verbose=False, flatten=False): 
     """
     Recursively read a directory and return a dictionary tree 
     that match file pattern. 
@@ -58,39 +59,45 @@ def read_dir(directory, pattern='*.png', recursive=True, expected=None, verbose=
 
     # Get directory, and filename pattern
     directory = os.path.expanduser(directory)
-
+    
     if not os.path.exists(directory): 
         raise Exception("""Path %s doesn't exist""" % directory)
 
     # Build dictionary [full_root_path -> pattern_matched_files]
     fn_map = {}
-    for root, dirs, files in os.walk(directory): 
+    expected_set = set(expected_dirs)
+
+    print os.listdir(directory)
+    for rootd in os.listdir(directory): 
 
         # Filter only expected folders if given
         # Go through /root/root_1 and see if root is in expected ["root", "other1", "other2"]
-        if expected is not None and not any((root.split('/')[-1]).startswith(exp) for exp in expected): 
+        if len(expected_set) and not rootd in expected_set: 
             continue
 
-        # Verbose print
-        if verbose: 
-            print root, dirs
+        for root, dirs, files in os.walk(os.path.join(directory, rootd)): 
 
-        # Filter only filename matches 
-        matches = [os.path.join(root, fn) 
-                   for fn in fnmatch.filter(files, pattern)]
-        if not len(matches): continue
+            # Verbose print
+            if verbose: 
+                print 'Processing {}, {}'.format(root, dirs)
+                
+            # Filter only filename matches 
+            matches = [os.path.join(root, fn) 
+                       for fn in fnmatch.filter(files, pattern)]
+            if not len(matches): continue
 
-        base = root[len(directory):]
-        splits = filter(lambda x: len(x) > 0, base.split('/'))
-        if recursive and len(splits) > 1: 
-            recursive_set_dict(fn_map, splits, matches)
-        elif len(splits) == 1: 
-            fn_map[splits[0]] = matches
-        else: 
-            fn_map[os.path.basename(root)] = matches
+            base = root[len(directory):]
+            splits = filter(lambda x: len(x) > 0, base.split('/'))
+            if recursive and len(splits) > 1: 
+                recursive_set_dict(fn_map, splits, matches)
+            elif len(splits) == 1: 
+                fn_map[splits[0]] = matches
+            else: 
+                fn_map[os.path.basename(root)] = matches
 
     if flatten: 
         return list(chain([fn for fns in fn_map.values() for fn in fns]))
+
     return fn_map
 
 class FileReader(object): 

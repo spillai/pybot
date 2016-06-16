@@ -9,7 +9,7 @@ import os, time
 import numpy as np
 import cv2
 
-from itertools import izip, imap
+from itertools import izip
 from collections import defaultdict
 
 from scipy.io import loadmat
@@ -27,6 +27,11 @@ from bot_geometry.rigid_transform import Quaternion, RigidTransform
 from bot_externals.plyfile import PlyData
 
 # __categories__ = ['flashlight', 'cap', 'cereal_box', 'coffee_mug', 'soda_can']
+
+def create_roidb_item(f): 
+    bboxes = np.vstack([bbox.coords for bbox in f.bbox])
+    targets = np.int64([bbox.target for bbox in f.bbox])
+    return f.img, bboxes, targets
 
 # =====================================================================
 # Generic UW-RGBD Dataset class
@@ -54,13 +59,12 @@ class UWRGBDDataset(object):
     # train_names = ["bowl", "cap", "cereal_box", "background"]
     # train_names = ["cap", "cereal_box", "coffee_mug", "soda_can", "background"]
     # train_names = ["bowl", "cap", "cereal_box", "soda_can", "background"]
-    # train_names = ["bowl", "cap", "cereal_box", "coffee_mug", "soda_can", "background"]
+    train_names = ["bowl", "cap", "cereal_box", "coffee_mug", "soda_can", "background"]
     # train_names = ["bowl", "cap", "cereal_box", "coffee_mug", "soda_can"]
     # train_names = ["bowl", "cap", "cereal_box", "coffee_mug", "flashlight", 
     #                "keyboard", "kleenex", "scissors",  "soda_can", 
     #                "stapler", "background"]
-
-    train_names = class_names
+    # train_names = class_names
 
     train_ids = [target_hash[name] for name in train_names]
     train_names_set, train_ids_set = set(train_names), set(train_ids)
@@ -99,8 +103,8 @@ class UWRGBDDataset(object):
         )
 
     @classmethod
-    def get_object_dataset(cls, object_dir, targets=train_names, version='v1'): 
-        return UWRGBDObjectDataset(directory=object_dir, targets=targets)
+    def get_object_dataset(cls, object_dir, targets=train_names, verbose=False, version='v1'): 
+        return UWRGBDObjectDataset(directory=object_dir, targets=targets, verbose=verbose)
 
     @classmethod
     def get_scene_dataset(cls, scene_dir, version='v1'): 
@@ -193,15 +197,15 @@ class UWRGBDObjectDataset(UWRGBDDataset):
 
                 # Only a single bbox per image
                 yield AttrDict(img=rgb, depth=depth, mask=mask, 
-                               bbox=AttrDict(
+                               bbox=[AttrDict(
                                    coords=np.float32([loc[0], loc[1], 
                                                       loc[0]+mask_im.shape[1], 
                                                       loc[1]+mask_im.shape[0]]), 
                                    target=self.target, 
                                    category=UWRGBDDataset.get_category_name(self.target), 
-                                   instance=self.instance))
+                                   instance=self.instance)])
 
-    def __init__(self, directory='', targets=UWRGBDDataset.train_names, blacklist=['']):         
+    def __init__(self, directory='', targets=UWRGBDDataset.train_names, blacklist=[''], verbose=False):         
         get_category = lambda name: '_'.join(name.split('_')[:-1])
         get_instance = lambda name: int(name.split('_')[-1])
 
@@ -230,7 +234,7 @@ class UWRGBDObjectDataset(UWRGBDDataset):
         print 'Train targets, ', targets
         st = time.time()
         self.dataset_ = read_dir(os.path.expanduser(directory), pattern='*.png', 
-                                 recursive=False, expected=targets, verbose=False)
+                                 recursive=False, expected_dirs=targets, verbose=verbose)
         print 'Time taken to read_dir %5.3f s' % (time.time() - st)
         print 'Classes: %i' % len(targets), self.dataset_.keys()
 
@@ -258,6 +262,11 @@ class UWRGBDObjectDataset(UWRGBDDataset):
                 yield frame
         if verbose: pbar.finish()
 
+
+    def roidb(self, every_k_frames=1, verbose=True): 
+        for item in self.iteritems(every_k_frames=every_k_frames, verbose=verbose):
+            if len(item.bbox): 
+                yield create_roidb_item(item)
 
 # =====================================================================
 # UW-RGBD Scene Dataset Reader
@@ -299,8 +308,6 @@ class UWRGBDSceneDataset(UWRGBDDataset):
             # Version 2 only supported! Version 1 support for rgbd scene (unclear)
             self.poses = UWRGBDSceneDataset._reader.load_poses(aligned_file.pose, version) \
                          if aligned_file is not None and version == 'v2' else [None] * len(rgb_files)
-            print 'Aligned: ', aligned_file
-            print len(self.poses), len(rgb_files)
             assert(len(self.poses) == len(rgb_files))
 
             # Aligned point cloud
@@ -330,6 +337,11 @@ class UWRGBDSceneDataset(UWRGBDDataset):
                 #     unique_labels=unique_labels, unique_centers=unique_centers, camera=camera
                 # ) 
                 assert(len(ply_xyz) == len(ply_rgb))
+
+            print('*********************************')
+            print('Scene {}, Images: {}, Poses: {}\nAligned: {}'
+                  .format(self.scene_name, len(rgb_files), len(self.poses), aligned_file))
+
 
         @property
         def scene_name(self): 
@@ -570,12 +582,10 @@ class UWRGBDSceneDataset(UWRGBDDataset):
             return object_candidates
 
         def _process_items(self, index, rgb_im, depth_im, bbox, pose): 
-            # print 'Processing pose', pose, bbox
-
             def _process_bbox(bbox): 
-                return AttrDict(category=bbox.category, 
-                                target=UWRGBDDataset.target_hash[str(bbox.category)], 
-                                coords=bbox.coords)
+                return AttrDict(category=bbox['category'], 
+                                target=UWRGBDDataset.target_hash[str(bbox['category'])], 
+                                coords=np.int64([bbox['left'], bbox['top'], bbox['right'], bbox['bottom']]))
 
             # Compute bbox from pose and map (v2 support)
             if self.version == 'v1': 
@@ -599,7 +609,7 @@ class UWRGBDSceneDataset(UWRGBDDataset):
                                                      self.poses[::every_k_frames]): 
                 yield self._process_items(index, rgb_im, depth_im, bbox, pose)
                 index += every_k_frames
-
+                
         def iterinds(self, inds): 
             for index, rgb_im, depth_im, bbox, pose in izip(inds, 
                                                             self.rgb.iterinds(inds), 
@@ -649,8 +659,12 @@ class UWRGBDSceneDataset(UWRGBDDataset):
                 pbar.increment()
             for frame in scene.iteritems(every_k_frames=every_k_frames): 
                 yield frame
-            
         if verbose: pbar.finish()
+
+    def roidb(self, every_k_frames=1, verbose=True): 
+        for item in self.iteritems(every_k_frames=every_k_frames, with_ground_truth=True): 
+            if len(item.bbox): 
+                yield create_roidb_item(item)
 
     def scene(self, key, with_ground_truth=False): 
         if key in self.blacklist: 
