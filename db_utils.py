@@ -314,7 +314,6 @@ class IterDB(object):
 
         inds = np.sort(inds) if inds is not None else None
         for chunk_idx, chunk in enumerate(self.meta_file_.chunks): 
-            print chunk_idx
             data = AttrDict.load(self.get_chunk_filename(chunk_idx))
             if verbose: pbar.increment()
         
