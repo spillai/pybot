@@ -335,41 +335,32 @@ class ROSBagReader(LogReader):
     def _index(self): 
         raise NotImplementedError()
 
-    def iteritems(self, reverse=False): 
+    def iteritems(self, topics=[], reverse=False): 
         if self.index is not None: 
             raise NotImplementedError('Cannot provide items indexed')
-            # if reverse: 
-            #     for t in self.index[::-1]: 
-            #         if self.start_idx != 0: 
-            #             raise RuntimeWarning('No support for start_idx != 0')
-            #         frame = self.get_frame_with_timestamp(t)
-            #         yield frame
-            # else: 
-            #     for t in self.index: 
-            #         frame = self.get_frame_with_timestamp(t)
-            #         yield frame
-        else: 
-            if reverse: 
-                raise RuntimeError('Cannot provide items in reverse when file is not indexed')
 
-            # Decode only messages that are supposed to be decoded 
-            # print self._log.get_message_count(topic_filters=self.decoder_keys())
-            st, end = self.log.get_start_time(), self.log.get_end_time()
-            start_t = Time(st + (end-st) * self.start_idx / 100.0)
-            
-            print('Reading ROSBag from {:3.2f}% onwards'.format(self.start_idx))
-            for self.idx, (channel, msg, t) in enumerate(
-                    self.log.read_messages(
-                        topics=self.decoder.keys(), start_time=start_t
-                    )
-            ):
+        if reverse: 
+            raise NotImplementedError('Cannot provide items in reverse when file is not indexed')
 
-                if self.verbose: 
-                    print('Channel: {:}, t: {:}'.format(channel, t))
-                res, msg = self.decode_msg(channel, msg, t)
-                if res: 
-                    yield msg
-                
+        # Decode only messages that are supposed to be decoded 
+        # print self._log.get_message_count(topic_filters=self.decoder_keys())
+        st, end = self.log.get_start_time(), self.log.get_end_time()
+        start_t = Time(st + (end-st) * self.start_idx / 100.0)
+
+        print('Reading ROSBag from {:3.2f}% onwards'.format(self.start_idx))
+        for self.idx, (channel, msg, t) in enumerate(
+                self.log.read_messages(
+                    topics=self.decoder.keys() if not len(topics) else topics, 
+                    start_time=start_t
+                )
+        ):
+
+            if self.verbose: 
+                print('Channel: {:}, t: {:}'.format(channel, t))
+            res, msg = self.decode_msg(channel, msg, t)
+            if res: 
+                yield msg
+
     def decode_msg(self, channel, data, t): 
         try: 
             # Check if log index has reached desired start index, 
