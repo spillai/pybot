@@ -199,6 +199,10 @@ class ROSBagReader(LogReader):
 
         # TF relations
         self.relations_map = {}
+        print self.log
+
+        # for channel, ch_info in info.topics.iteritems(): 
+        #     print channel, ch_info.message_count
         
         # # Gazebo states (if available)
         # self._publish_gazebo_states()
@@ -234,6 +238,9 @@ class ROSBagReader(LogReader):
     #     # draw_utils.publish_pose_list('robot_poses', 
     #     #                              self.gt_poses[::10], frame_id='origin', reset=True)
 
+    def length(self, topic): 
+        info = self.log.get_type_and_topic_info()
+        return info.topics[topic].message_count
 
     def load_log(self, filename): 
         return rosbag.Bag(filename, 'r', chunk_threshold=100 * 1024 * 1024)

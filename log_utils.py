@@ -63,6 +63,9 @@ class LogReader(object):
         # Create Look-up table for subscriptions
         self.cb_ = {}
 
+    def length(self, channel): 
+        raise NotImplementedError()
+
     @property
     def log(self): 
         return self.log_
