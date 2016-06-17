@@ -279,6 +279,12 @@ class IterDB(object):
     #         print 'Seems like you have data stored away, but has not been flushed!'
     #         self.flush()
 
+    def __getitem__(self, key): 
+        return self.meta_file_[key]
+
+    def __setitem__(self, key, value): 
+        self.meta_file_[key] = value
+
     def add_fields(self, fields): 
         for field in fields: 
             if field in self.data_: 
@@ -324,6 +330,9 @@ class IterDB(object):
                 idx += len(data[key])
         if verbose: pbar.finish()
 
+    def keys(self): 
+        return self.keys_
+
     def iter_keys_values(self, keys, inds=None, verbose=False): 
         for key in keys: 
             if key not in self.keys_: 
@@ -363,9 +372,11 @@ class IterDB(object):
         batch_chunks = grouper(range(len(self.meta_file_.chunks)), batch_size)
         for chunk_group in batch_chunks: 
             items = []
-            print chunk_group
+            # print key, chunk_group
             for chunk_idx in chunk_group: 
+                # grouper will fill chunks with default none values
                 if chunk_idx is None: continue
+                # Load chunk
                 data = AttrDict.load(self.get_chunk_filename(chunk_idx))
                 for item in data[key]: 
                     items.append(item)
@@ -373,6 +384,17 @@ class IterDB(object):
             if verbose: pbar.increment(pbar.currval + len(chunk_group))
         if verbose: pbar.finish()
  
+    def iterchunks_keys(self, keys, batch_size=10, verbose=False): 
+        """
+        Iterate in chunks and izip specific keys
+        """
+        for key in keys: 
+            if key not in self.keys_: 
+                raise RuntimeError('Key %s not found in dataset. keys: %s' % (key, self.keys_))
+            
+        iterables = [self.iterchunks(key, batch_size=batch_size, verbose=verbose) for key in keys]
+        return izip(*iterables)
+
     def flush(self): 
         """
         Save dictionary with metadata, move to new chunk, 
