@@ -159,7 +159,7 @@ def plot_roc(y_score, y_test, target_map, title='ROC curve'):
 
 
 def classification_report(y_true, y_pred, labels=None, target_names=None,
-                          sample_weight=None):
+                          sample_weight=None, background=None):
     """Build a text report showing the main classification metrics
 
     Parameters
@@ -251,6 +251,7 @@ def classification_report(y_true, y_pred, labels=None, target_names=None,
         values += ["{0:0.3f}".format(v)]
     values += ['{0}'.format(np.sum(s))]
     report += fmt % tuple(values)
+
     return report
 
 
