@@ -53,6 +53,21 @@ def draw_bboxes(vis, bboxes, ellipse=False, colored=True):
             cv2.rectangle(vis, (b[0], b[1]), (b[2], b[3]), tuple(col), 2)
     return vis
 
+def annotate_bbox(vis, coords, color=(0,200,0), title=''): 
+    # Bounding Box and top header
+    icoords = coords.astype(np.int32)
+    cv2.rectangle(vis, (icoords[0], icoords[1]), (icoords[2], icoords[3]), color, 2)
+    cv2.rectangle(vis, (icoords[0]-1, icoords[1]-15), (icoords[2]+1, icoords[1]), color, -1)
+    cv2.putText(vis, '{}'.format(title), (icoords[0], icoords[1]-5), 
+                cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), thickness=1, lineType=cv2.CV_AA)
+    return vis
+
+def annotate_bboxes(vis, bboxes, texts, colors=None):
+    # target_name.title().replace('_', ' '))
+    for bbox,text in izip(bboxes, texts): 
+        box_color = (0, 200, 0) # if UWRGBDDataset.get_category_name(target) != 'background' else (100, 100, 100)
+        annotate_bbox(vis, bbox, color=box_color, title=text)
+    return vis
         
 def draw_ellipses(im, ellipses): 
     for e in ellipses:
@@ -62,3 +77,4 @@ def draw_ellipses(im, ellipses):
 def draw_hulls(im, hulls): 
     cv2.polylines(im, hulls, 1, (0, 255, 0) if im.ndim == 3 else 255, thickness=1)       
     return im
+

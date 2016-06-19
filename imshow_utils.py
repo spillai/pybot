@@ -107,12 +107,3 @@ def mouse_event_create(win_name, cb):
     cv2.namedWindow(win_name)
     cv2.setMouseCallback(win_name, cb)
 
-def annotate_bbox(vis, coords, color=(0,200,0), title=''): 
-    # Bounding Box and top header
-    icoords = coords.astype(np.int32)
-    cv2.rectangle(vis, (icoords[0], icoords[1]), (icoords[2], icoords[3]), color, 2)
-    cv2.rectangle(vis, (icoords[0]-1, icoords[1]-15), (icoords[2]+1, icoords[1]), color, -1)
-
-    cv2.putText(vis, '%s' % title, (icoords[0], icoords[1]-5), 
-                cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), thickness=1, lineType=cv2.CV_AA)
-
