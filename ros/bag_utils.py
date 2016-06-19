@@ -379,7 +379,7 @@ class ROSBagReader(LogReader):
             import traceback
             traceback.print_exc()
                     
-        return False, (None, None)
+        return False, (None, None, None)
 
     def iter_frames(self):
         return self.iteritems()
