@@ -18,7 +18,7 @@ from bot_utils.misc import setup_pbar
 from bot_utils.db_utils import AttrDict
 from bot_utils.dataset_readers import read_dir, read_files, natural_sort, \
     DatasetReader, ImageDatasetReader
-from bot_vision.imshow_utils import annotate_bbox
+from bot_vision.draw_utils import annotate_bbox
 from bot_vision.camera_utils import kinect_v1_params, \
     Camera, CameraIntrinsic, CameraExtrinsic, \
     check_visibility, get_object_bbox
