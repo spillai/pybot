@@ -67,7 +67,6 @@ def read_dir(directory, pattern='*.png', recursive=True, expected_dirs=[], verbo
     fn_map = {}
     expected_set = set(expected_dirs)
 
-    print os.listdir(directory)
     for rootd in os.listdir(directory): 
 
         # Filter only expected folders if given

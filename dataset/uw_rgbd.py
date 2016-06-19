@@ -257,7 +257,6 @@ class UWRGBDObjectDataset(UWRGBDDataset):
             print 'Processing: %s' % key
             if verbose: 
                 pbar.increment()
-
             for frame in frames.iteritems(every_k_frames=every_k_frames): 
                 yield frame
         if verbose: pbar.finish()
