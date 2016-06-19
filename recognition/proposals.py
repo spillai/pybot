@@ -5,7 +5,7 @@ import numpy as np
 from bot_utils.plot_utils import colormap
 from bot_vision.image_utils import im_resize
 from bot_vision.draw_utils import draw_bboxes
-from bot_utils.timer import timeitmethod
+# from bot_utils.timer import timeitmethod
 
 import os.path
 import warnings
@@ -28,7 +28,7 @@ class ObjectProposal(object):
         if not hasattr(self.proposer_, 'process'): 
             raise NotImplementedError('Proposer does not have process implemented')
 
-    @timeitmethod
+    # @timeitmethod
     def process(self, im): 
         boxes = self.proposer_.process(im_resize(im, scale=self.scale_))
         return (boxes * 1 / self.scale_).astype(np.int32)
