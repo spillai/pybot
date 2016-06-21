@@ -2,16 +2,6 @@ from fast_rcnn.config import cfg
 import os
 import warnings
 
-# Import FastRCNN
-with warnings.catch_warnings():
-    warnings.simplefilter("ignore")
-    from bot_vision.caffe.fast_rcnn_utils import FastRCNNDescription, nms
-
-# Import FasterRCNN
-with warnings.catch_warnings():
-    warnings.simplefilter("ignore")
-    from bot_vision.caffe.faster_rcnn_utils import FasterRCNNDescription, nms
-
 from bot_vision.recognition_utils import BOWClassifier
  
 def extract_hypercolums(net, im, layers): 
