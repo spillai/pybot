@@ -74,8 +74,11 @@ def im_detect(net, im, boxes=None, layer='fc7'):
 
     data = net.blobs[layer].data
     print 'Boxes: {}, data: {}'.format(data.shape, boxes.shape)
-
-    return data[inv_index, :], boxes[inv_index, :]
+    
+    if cfg.TEST.HAS_RPN: 
+        return data, boxes
+    else: 
+        return data[inv_index, :]
 
     # if cfg.TEST.SVM:
     #     # use the raw scores before softmax under the assumption they
@@ -103,17 +106,21 @@ def im_detect(net, im, boxes=None, layer='fc7'):
 
 
 class FasterRCNNDescription(caffe.Net): 
-
     NETS = {'vgg16': ('VGG16',
                       'VGG16_faster_rcnn_final.caffemodel'),
             'zf': ('ZF',
                    'ZF_faster_rcnn_final.caffemodel')}
-
-    def __init__(self, rcnn_dir, net='ZF', model_dir='pascal_voc'): 
+    def __init__(self, rcnn_dir, with_rpn=True, net='zf', model_dir='pascal_voc', opt_dir='fast_rcnn_end2end'): 
+        """
+        net: vgg16, zf
+        model_dir: [pascal_voc, coco]
+        opt_dir: [fast_rcnn, fast_rcnn_alt_opt, fast_rcnn_end2end]
+        """
+    
         model_file = os.path.join(
             rcnn_dir, 'models', model_dir, 
             FasterRCNNDescription.NETS[net][0], 
-            'faster_rcnn_end2end', 'test.prototxt')
+            opt_dir, 'test.prototxt')
         pretrained_file = os.path.join(
             rcnn_dir, 'data', 'faster_rcnn_models', 
             FasterRCNNDescription.NETS[net][1])
@@ -127,8 +134,9 @@ class FasterRCNNDescription(caffe.Net):
                                      model_file, pretrained_file))
 
         # Init caffe with model
-        caffe.Net.__init__(self, model_file, pretrained_file, caffe.TEST)
+        cfg.TEST.HAS_RPN = with_rpn
         cfg.TEST.BBOX_REG = False
+        caffe.Net.__init__(self, model_file, pretrained_file, caffe.TEST)
 
     def describe(self, im, boxes=None, layer='fc7'):
         return im_detect(self, im, boxes=boxes, layer=layer)

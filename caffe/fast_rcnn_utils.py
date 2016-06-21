@@ -150,8 +150,8 @@ class FastRCNNDescription(caffe.Net):
                                      model_file, pretrained_file))
 
         # Init caffe with model
-        caffe.Net.__init__(self, model_file, pretrained_file, caffe.TEST)        
         cfg.TEST.BBOX_REG = False
+        caffe.Net.__init__(self, model_file, pretrained_file, caffe.TEST)        
 
     def describe(self, im, boxes, layer='fc7'):
         return im_detect(self, im, boxes, layer=layer)
