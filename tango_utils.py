@@ -278,8 +278,8 @@ class TangoLog(object):
                 t, ch, data = l.replace('\n', '').split('\t')
             except: 
                 continue
-                
-            if not len(topics_set) or ch not in topics_set: 
+
+            if len(topics_set) and ch not in topics_set: 
                 continue
 
             if len(heap) == N: 
