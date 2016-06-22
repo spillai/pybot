@@ -12,29 +12,10 @@ import pprint
 import datetime
 import pandas as pd
 
-from pybot_vision import BINGObjectness
-
-from bot_vision.feature_detection import get_dense_detector, get_detector
 from bot_vision.image_utils import im_resize, gaussian_blur, median_blur, box_blur
-from bot_vision.bow_utils import BoWVectorizer, bow_codebook, bow_project, flair_project
-from pybot_vision import FLAIR_code
-
 from bot_utils.io_utils import memory_usage_psutil, format_time
 from bot_utils.db_utils import AttrDict, IterDB
 from bot_utils.itertools_recipes import chunks
-
-import sklearn.metrics as metrics
-from sklearn.preprocessing import normalize
-from sklearn.decomposition import PCA, RandomizedPCA
-from sklearn.svm import LinearSVC, SVC
-from sklearn.calibration import CalibratedClassifierCV
-from sklearn.ensemble import GradientBoostingClassifier, ExtraTreesClassifier
-from sklearn.linear_model import SGDClassifier
-from sklearn.grid_search import GridSearchCV
-from sklearn.cross_validation import train_test_split, ShuffleSplit
-from sklearn.kernel_approximation import AdditiveChi2Sampler, RBFSampler
-
-from sklearn.externals.joblib import Parallel, delayed
 
 # =====================================================================
 # Generic utility functions for object detection
@@ -329,6 +310,187 @@ def im_describe(*args, **kwargs):
 # =====================================================================
 # General-purpose object recognition interfaces, and functions
 # ---------------------------------------------------------------------
+
+from bot_vision.recognition.bbox import brute_force_match, intersection_over_union
+
+import sklearn.metrics as metrics
+from sklearn.svm import LinearSVC, SVC
+from sklearn.linear_model import SGDClassifier
+from sklearn.grid_search import GridSearchCV
+from sklearn.cross_validation import train_test_split, ShuffleSplit
+
+class HistogramClassifier(object): 
+    def __init__(self, filename, target_map, classifier='svm'): 
+        
+        self.seed_ = 0
+        self.filename_ = filename
+        self.target_map_ = target_map
+        self.target_ids_ = (np.unique(target_map.keys())).astype(np.int32)
+        self.epoch_no_ = 0
+        self.st_time_ = time.time()
+
+        # Setup classifier
+        print('-------------------------------')        
+        print('====> Building Classifier, setting class weights') 
+        if classifier == 'svm': 
+            self.clf_hyparams_ = {'C':[0.01, 0.1, 1.0, 10.0, 100.0], 'class_weight': ['balanced']}
+            self.clf_base_ = LinearSVC(random_state=self.seed_)
+        elif classifier == 'sgd': 
+            self.clf_hyparams_ = {'alpha':[0.0001, 0.001, 0.01, 0.1, 1.0, 10.0], 'class_weight':['auto']} # 'loss':['hinge'], 
+            self.clf_ = SGDClassifier(loss='log', penalty='l1', shuffle=False, random_state=self.seed_, 
+                                      warm_start=True, n_jobs=-1, n_iter=1, verbose=1)
+        else: 
+            raise Exception('Unknown classifier type %s. Choose from [sgd, svm, gradient-boosting, extra-trees]' 
+                            % classifier)
+
+    def fit(self, X, y, test_size=0.3):
+        # Grid search cross-val (best C param)
+        cv = ShuffleSplit(len(X), n_iter=1, test_size=0.3, random_state=self.seed_)
+        clf_cv = GridSearchCV(self.clf_base_, self.clf_hyparams_, cv=cv, n_jobs=4, verbose=4)
+
+        print('====> Training Classifier (with grid search hyperparam tuning) .. ')
+        print('====> BATCH Training (in-memory): {:4.3f} MB'.format(X.nbytes / 1024.0 / 1024.0) )
+        clf_cv.fit(X, y)
+        print('BEST: {}, {}'.format(clf_cv.best_score_, clf_cv.best_params_))
+
+        # Setting clf to best estimator
+        self.clf_ = clf_cv.best_estimator_
+        
+        # # Calibrating classifier
+        # print('Calibrating Classifier ... ')
+        # self.clf_prob_ = CalibratedClassifierCV(self.clf_, cv=cv, method='sigmoid')
+        # self.clf_prob_.fit(X, y)        
+        
+        # # Setting clf to best estimator
+        # self.clf_ = clf_cv.best_estimator_
+        # pred_targets = self.clf_.predict(X)
+
+        if self.epoch_no_ % 10 == 0: 
+            self.save(self.filename_.replace('.h5', '_iter_{}.h5'.format(self.epoch_no_)))
+        self.save(self.filename_)
+        self.epoch_no_ += 1
+
+    def partial_fit(self, X, y): 
+        self.clf_.partial_fit(X, y, classes=self.target_ids_, sample_weight=None)
+
+        if self.epoch_no_ % 10 == 0: 
+            self.save(self.filename_.replace('.h5', '_iter_{}.h5'.format(self.epoch_no_)))
+        self.save(self.filename_)
+        self.epoch_no_ += 1
+
+    def predict(self, X): 
+        return self.clf_.predict(X)
+
+    def decision_function(self, X): 
+        return self.clf_.decision_function(X)
+
+    def report(self, y, y_pred, background=None): 
+        print('-------------------------------')
+        print(' Accuracy score (Training): {:4.3f}'.format((metrics.accuracy_score(y, y_pred))))
+        print(' Report (Training):\n {}'.format(classification_report(y, y_pred, 
+                                                                      labels=self.target_map_.keys(), 
+                                                                      target_names=self.target_map_.values())))
+        if background is not None: 
+            inds = y != background
+            target_map = self.target_map_
+            if background in target_map: 
+                del target_map[background]
+            print(' Report (Training without background):\n {}'.format(classification_report(y[inds], y_pred[inds], 
+                                                                                             labels=target_map.keys(),
+                                                                                             target_names=target_map.values())))
+        print('Training Classifier took {}'.format(format_time(time.time() - self.st_time_)))              
+
+    def save(self, filename): 
+        print('====> Saving classifier ')
+        db = AttrDict(clf=self.clf_, target_map=self.target_map_)
+
+        # db = AttrDict(params=self.params_, 
+        #               bow=self.bow_.to_dict(), pca=self.pca_, kernel_tf=self.kernel_tf_, 
+        #               clf=self.clf_, clf_base=self.clf_base_, clf_hyparams=self.clf_hyparams_, 
+        #               clf_prob=self.clf_prob_, target_map=self.target_map_)
+
+        db.save(filename)
+        print('-------------------------------')
+
+    @classmethod
+    def load(cls, path): 
+        print('====> Loading classifier {}'.format(path))
+        db = AttrDict.load(path)
+        c = cls(path, target_map=dict((int(key), item) for key,item in db.target_map.iteritems()))
+        c.clf_ = db.clf
+        print('-------------------------------')
+        return c
+
+class NegativeMiningGenerator(object): 
+    """
+    Generate negative samples with training dataset generator, 
+    and object proposal technique
+    """
+    def __init__(self, dataset, proposer, target, num_proposals=50):
+        print_yellow('NegativeMiningGenerator: '
+                     'Generating negative samples with {}, num_proposals: {}'
+                     .format(proposer, num_proposals))
+        print('-------------------------------')
+
+        self.dataset_ = dataset
+        self.proposer_ = proposer
+        self.num_proposals_ = num_proposals
+        assert(hasattr(self.proposer_, 'process'))
+        
+        self.generate_targets = lambda N: np.ones(N, dtype=np.int64) * target
+
+    def mine(self, im, gt_bboxes): 
+        """
+        Propose bounding boxes using proposer, and
+        augment non-overlapping boxes with IoU < 0.1
+        to the ground truth set.
+        (up to a maximum of num_proposals)
+        """
+        bboxes = self.proposer_.process(im)
+
+        # Determine bboxes that have low IoU with ground truth
+        # iou = [N x GT]
+        iou = brute_force_match(bboxes, gt_bboxes, 
+                                match_func=lambda x,y: intersection_over_union(x,y))
+        # print('Detected {}, {}, {}'.format(iou.shape, len(gt_bboxes), len(bboxes))) # , np.max(iou, axis=1)
+        overlap_inds, = np.where(np.max(iou, axis=1) < 0.1)
+        bboxes = bboxes[overlap_inds[:self.num_proposals_]]
+        # print('Remaining non-overlapping {}'.format(len(bboxes)))
+
+        targets = self.generate_targets(len(bboxes))
+        return bboxes, targets
+
+    def __iter__(self, *args, **kwargs):
+        """
+        Iterate through dataset with ground truth bboxes, 
+        and generate bboxes with object proposer s.t. 
+        the IoU between gt_bboxes and bboxes < 0.1.
+        i.e. mine non-overlapping bboxes
+        """
+        for (im,gt_bboxes,_) in self.dataset_: 
+            bboxes, targets = self.mine(im, gt_bboxes)
+            yield im, bboxes, targets
+
+
+# =====================================================================
+# [Deprecated] General-purpose object recognition interfaces, and functions
+# ---------------------------------------------------------------------
+
+from bot_vision.feature_detection import get_dense_detector, get_detector
+from bot_vision.bow_utils import BoWVectorizer, bow_codebook, bow_project, flair_project
+
+import sklearn.metrics as metrics
+from sklearn.preprocessing import normalize
+from sklearn.decomposition import PCA, RandomizedPCA
+from sklearn.svm import LinearSVC, SVC
+from sklearn.calibration import CalibratedClassifierCV
+from sklearn.ensemble import GradientBoostingClassifier, ExtraTreesClassifier
+from sklearn.linear_model import SGDClassifier
+from sklearn.grid_search import GridSearchCV
+from sklearn.cross_validation import train_test_split, ShuffleSplit
+from sklearn.kernel_approximation import AdditiveChi2Sampler, RBFSampler
+
+from sklearn.externals.joblib import Parallel, delayed
 
 class HomogenousKernelMap(AdditiveChi2Sampler): 
     """ 
@@ -1008,6 +1170,7 @@ class BOWClassifier(object):
             raise RuntimeError('Vocabulary not setup')
 
         # Setup flair encoding
+        from pybot_vision import FLAIR_code
         self.flair_ = FLAIR_code(W=W, H=H, 
                                  K=self.bow_.dictionary_size, step=self.params_.descriptor.step, 
                                  levels=np.array(self.params_.bow.levels, dtype=np.int32), 
