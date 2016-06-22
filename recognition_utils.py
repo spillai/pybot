@@ -427,9 +427,9 @@ class NegativeMiningGenerator(object):
     and object proposal technique
     """
     def __init__(self, dataset, proposer, target, num_proposals=50):
-        print_yellow('NegativeMiningGenerator: '
-                     'Generating negative samples with {}, num_proposals: {}'
-                     .format(proposer, num_proposals))
+        print('NegativeMiningGenerator: '
+              'Generating negative samples with {}, num_proposals: {}'
+              .format(proposer, num_proposals))
         print('-------------------------------')
 
         self.dataset_ = dataset
