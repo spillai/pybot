@@ -259,6 +259,7 @@ class UWRGBDObjectDataset(UWRGBDDataset):
                 pbar.increment()
             for frame in frames.iteritems(every_k_frames=every_k_frames): 
                 yield frame
+            # break
         if verbose: pbar.finish()
 
 
@@ -658,7 +659,7 @@ class UWRGBDSceneDataset(UWRGBDDataset):
                 pbar.increment()
             for frame in scene.iteritems(every_k_frames=every_k_frames): 
                 yield frame
-            break
+            # break
         if verbose: pbar.finish()
 
     def roidb(self, every_k_frames=1, verbose=True): 
