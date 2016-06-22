@@ -37,6 +37,29 @@ from sklearn.kernel_approximation import AdditiveChi2Sampler, RBFSampler
 from sklearn.externals.joblib import Parallel, delayed
 
 # =====================================================================
+# Generic utility functions for object detection
+# ---------------------------------------------------------------------
+
+def recall_from_IoU(IoU, samples=500): 
+    """
+    plot recall_vs_IoU_threshold
+    """
+
+    if not (isinstance(IoU, list) or IoU.ndim == 1):
+        raise ValueError('IoU needs to be a list or 1-D')
+    iou = np.float32(IoU)
+
+    # Plot intersection over union
+    IoU_thresholds = np.linspace(0.0, 1.0, samples)
+    recall = np.zeros_like(IoU_thresholds)
+    for idx, IoU_th in enumerate(IoU_thresholds):
+        tp, relevant = 0, 0
+        inds, = np.where(iou >= IoU_th)
+        recall[idx] = len(inds) * 1.0 / len(IoU)
+
+    return recall, IoU_thresholds 
+
+# =====================================================================
 # Generic utility functions for object recognition
 # ---------------------------------------------------------------------
 
