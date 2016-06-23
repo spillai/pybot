@@ -12,6 +12,7 @@ from collections import deque, namedtuple, Counter
 from heapq import heappush, heappop
 from abc import ABCMeta, abstractmethod
 
+# from bot_vision.mapping.pose_utils import PoseAccumulator
 from bot_externals.log_utils import Decoder, LogReader, LogController
 from bot_vision.image_utils import im_resize
 from bot_geometry.rigid_transform import RigidTransform
@@ -22,7 +23,22 @@ from bot_vision.camera_utils import CameraIntrinsic
 #     ID = RigidTransform(Quaternion.from_wxyz([0.702596, -0.079740, -0.079740, 0.702596]), tvec=[0.000000, 0.000000, 0.000000])
 #     IC = RigidTransform(Quaternion.from_wxyz([0.000585, 0.707940, 0.706271, 0.001000]), tvec=[0.000339, 0.061691, 0.002792])
 #     DC = ID.inverse() * IC
- 
+
+# Decode odometry
+def odom_decode(data): 
+    """ 
+    Return Start-of-Service (SS) -> Device (D): 
+    x, y, z, qx, qy, qz, qw, status_code, confidence
+    """
+    p = np.float64(data.split(','))
+
+    # If incomplete data or status code is 0
+    if len(p) < 8 or p[7] == 0:
+        raise Exception('TangoOdomDecoder.odom_decode :: Failed to retreive pose')
+
+    tvec, ori = p[:3], p[3:7]
+    return RigidTransform(xyzw=ori, tvec=tvec)
+    
 def TangoOdomDecoder(channel, every_k_frames=1, noise=[0,0]): 
     """
     https://developers.google.com/project-tango/overview/coordinate-systems
@@ -78,7 +94,8 @@ def TangoOdomDecoder(channel, every_k_frames=1, noise=[0,0]):
     p_IC = RigidTransform(tvec=[0.000339052, 0.0616911, 0.00279207], xyzw=[0.707940, 0.706271, 0.001000, 0.000585])
     p_DC = p_ID.inverse() * p_IC
     p_DF = p_ID.inverse() * p_IF
-    print 'p_ID: %s, \np_IC: %s, \np_DC: %s, \np_DF: %s' % (p_ID, p_IC, p_DC, p_DF)
+    print('\nCalibration\n==============')
+    print('\tp_ID: {}, \n\tp_IC: {}, \n\tp_DC: {}, \n\tp_DF: {}'.format(p_ID, p_IC, p_DC, p_DF))
 
     # SS->CAM
     p_S_CAM = RigidTransform.from_roll_pitch_yaw_x_y_z(-np.pi/2, 0, 0, 
@@ -86,19 +103,11 @@ def TangoOdomDecoder(channel, every_k_frames=1, noise=[0,0]):
     p_CAM_S = p_S_CAM.inverse()
 
     # Decode odometry
-    def odom_decode(data): 
-        """ x, y, z, qx, qy, qz, qw, status_code, confidence """
-        p = np.float64(data.split(','))
-
-        # If incomplete data or status code is 0
-        if len(p) < 8 or p[7] == 0:
-            raise Exception('TangoOdomDecoder.odom_decode :: Failed to retreive pose')
-
-        tvec, ori = p[:3], p[3:7]
-        p_SD = RigidTransform(xyzw=ori, tvec=tvec)
+    def calibrated_odom_decode(data): 
+        p_SD = odom_decode(data)
         p_SC = p_SD * p_DC
         return p_CAM_S * p_SC
-    decode_cb = lambda data: odom_decode(data)
+    decode_cb = lambda data: calibrated_odom_decode(data)
 
     np.random.seed(1)
     noise = np.float32(noise)
@@ -123,7 +132,7 @@ def TangoOdomDecoder(channel, every_k_frames=1, noise=[0,0]):
 
             return p_accumulator_noisy[-1]
 
-        decode_cb = lambda data: odom_decode_with_noise(odom_decode(data))
+        decode_cb = lambda data: odom_decode_with_noise(calibrated_odom_decode(data))
 
     return Decoder(channel=channel, every_k_frames=every_k_frames, decode_cb=decode_cb)
 
@@ -174,22 +183,29 @@ class TangoGroundTruthImageDecoder(TangoImageDecoder):
             except Exception as e:                
                 raise RuntimeError('Missing img_height, and img_width key, try re-saving annotation')
 
-            print data.keys(), data['objects']
+            # print data.keys(), data['objects']
             target_hash = {label['name']: lid for (lid,label) in enumerate(data['objects'])  if label is not None}
             target_unhash = {lid: label['name'] for (lid,label) in enumerate(data['objects']) if label is not None}
 
-            # print meta
-
-            # Establish all annotations with appropriate class labels and instances
+            
+            # Establish all annotations with appropriate class labels
+            # and instances
+            # bbox: [polygon, class_label, class_id, instance_id]
             for fn, val in meta.iteritems(): 
+                basename = os.path.basename(str(fn))
+
+                # Polygons are extracted from the log, but dynamically
+                # resized according to the logs image size
                 try: 
                     polygons = val['polygon']
                 except: 
                     continue
-                    
+
+                # Read xy, objct, class_label, class_id, instance_id
                 annotations = []
                 for poly in polygons:
-                    xy = np.vstack([np.float32(poly['x']), np.float32(poly['y'])]).T
+                    xy = np.vstack([np.float32(poly['x']), 
+                                    np.float32(poly['y'])]).T
 
                     # Object label as described by target hash
                     lid = poly['object']
@@ -200,13 +216,12 @@ class TangoGroundTruthImageDecoder(TangoImageDecoder):
                     annotations.append(
                         dict(polygon=xy, class_label=label, class_id=None, instance_id=instance_id)
                     )
-                self.meta_[str(fn)] = annotations
+                self.meta_[basename] = annotations
 
-        # unique_objects = set()
-        # for k,v in self.meta_iteritems():
 
         print('\nGround Truth\n========\n'
-              '\tAnnotations: {:}\n'.format(len(self.meta_)))
+              '\tAnnotations: {}\n'
+              '\tObjects: {}'.format(len(self.meta_), target_hash.keys()))
 
     def decode(self, msg): 
         """
@@ -216,56 +231,110 @@ class TangoGroundTruthImageDecoder(TangoImageDecoder):
         basename = os.path.basename(msg)
         # print('Retrieving annotations for {:}'.format(basename))
 
+        # Annotations
+        # Available entries: polygon, bbox, class_label, class_id, instance_id
         H, W = im.shape[:2]
         try: 
             # Scale up annotations based on input image 
             # and original annotated image
             bboxes = self.meta_[basename]
             for idx, bbox in enumerate(bboxes): 
+                # Update the polygons according to the current image
+                # size, and original annotation image size
                 sbbox = bbox['polygon'] * self.get_image_scale(H)
                 bboxes[idx]['polygon'] = sbbox
                 bboxes[idx]['bbox'] = np.int64([sbbox[:,0].min(), sbbox[:,1].min(), sbbox[:,0].max(), sbbox[:,1].max()])
-
         except Exception as e: 
             bboxes = []
+
         return AnnotatedImage(img=im, bboxes=bboxes)
 
-class TangoLog(object): 
-    def __init__(self, filename): 
+class TangoFile(object): 
 
+    RGB_CHANNEL = 'RGB'
+    VIO_CHANNEL = 'RGB_VIO'
+
+    def __init__(self, filename): 
+        self.filename_ = filename
+
+        # Save topics and counts
+        ts, topics = self._get_stats()
+        c = Counter(topics)
+        self.topics_ = list(set(topics))
+        self.topic_lengths_ = dict(c.items())
+        self.length_ = sum(self.topic_lengths_.values())
+
+        # Get distance traveled (accumulate relative motion)
+        distance = self._get_distance_travelled()
+        
+        messages_str = ', '.join(['{:} ({:})'.format(k,v) 
+                                  for k,v in c.iteritems()])
+        print('\nTangoFile\n========\n'
+              '\tTopics: {:}\n'
+              '\tMessages: {:}\n'
+              '\tDistance Travelled: {:.2f} m\n'
+              '\tDuration: {:} s\n'.format(
+                  self.topics_, messages_str, 
+                  tvec, np.max(ts)-np.min(ts)))
+
+        # Initialize dataset
+        self.init()
+        
+    def _get_distance_travelled(self): 
+        " Retrieve distance traveled through relative motion "
+
+        self.init()
+        prev_pose, tvec = None, 0
+        for (_,pose_str,_) in self.read_messages(topics=TangoFile.VIO_CHANNEL): 
+            try: 
+                pose = odom_decode(pose_str)
+            except: 
+                continue
+
+            if prev_pose is not None: 
+                rel = prev_pose.inverse() * pose
+                tvec += np.linalg.norm(rel.tvec)
+                # print rel, np.linalg.norm(rel.tvec), tvec
+            prev_pose = pose
+
+        return tvec
+
+    def _get_stats(self): 
+        # Get stats
         # Determine topics that have at least 3 items (timestamp,
         # channel, data) separated by tabs
-        with open(filename, 'r') as f: 
+        with open(self.filename, 'r') as f: 
             data = filter(lambda ch: len(ch) == 3, 
                           map(lambda l: l.replace('\n','').split('\t'), 
                               filter(lambda l: '\n' in l, f.readlines())))
 
             ts = map(lambda (t,ch, data): float(t) * 1e-9, data)
             topics = map(lambda (t,ch,data): ch, data)
-            
-        # Save topics and counts
-        c = Counter(topics)
-        self.topics_ = list(set(topics))
-        self.topic_lengths_ = dict(c.items())
-        self.length_ = sum(self.topic_lengths_.values())
 
-        messages_str = ', '.join(['{:} ({:})'.format(k,v) for k,v in c.iteritems()])
-        print('\nTangoLog\n========\n'
-              '\tTopics: {:}\n'
-              '\tMessages: {:}\n'
-              '\tDuration: {:} s\n'.format(self.topics_, messages_str, np.max(ts)-np.min(ts)))
+        return ts, topics
 
-        # Open the tango meta data file
-        self.meta_ =  open(filename, 'r')
+    @property
+    def filename(self): 
+        return self.filename_
 
     @property
     def length(self): 
         return self.length_
 
+    def init(self): 
+        """ Open the tango meta data file """
+        self.meta_ =  open(self.filename, 'r')
+        
     def read_messages(self, topics=[], start_time=0): 
-
-        N = 10000
+        """
+        Read messages with a heap so that the measurements are monotonic, 
+        decoded iteratively (or when needed).
+        """
+        N = 1000
         heap = []
+        
+        if isinstance(topics, str): 
+            topics = [topics]
 
         topics_set = set(topics)
 
@@ -284,6 +353,7 @@ class TangoLog(object):
 
             if len(heap) == N: 
                 c_t, c_ch, c_data = heappop(heap)
+                # Check monotononic measurements
                 assert(c_t >= p_t)
                 p_t = c_t
                 yield c_ch, c_data, c_t
@@ -293,9 +363,9 @@ class TangoLog(object):
         # Pop the rest of the heap
         for j in range(len(heap)): 
             c_t, c_ch, c_data = heappop(heap)
+            # Check monotononic measurements
             assert(c_t >= p_t)
             p_t = c_t
-            
             yield c_ch, c_data, c_t
 
 class TangoLogReader(LogReader): 
@@ -312,12 +382,15 @@ class TangoLogReader(LogReader):
     #     0.925577
     #     shape=(480, 640)
     # )
-
+    """
+    TODO: 
+    1. Support for every_k_frames in iteritems
+    """
 
     # fisheye_cam = CameraIntrinsic(K=)
     def __init__(self, directory, scale=1., start_idx=0, every_k_frames=1, 
                  noise=[0,0], with_ground_truth=False): 
-        
+
         # Set directory and filename for time synchronized log reads 
         self.directory_ = os.path.expanduser(directory)
         self.filename_ = os.path.join(self.directory_, 'tango_data.txt')
@@ -336,17 +409,17 @@ class TangoLogReader(LogReader):
         self.with_ground_truth_ = with_ground_truth
         if with_ground_truth: 
             im_dec = TangoGroundTruthImageDecoder(self.directory_, filename='annotation/index.json', 
-                                                   channel='RGB', color=True, 
+                                                   channel=TangoFile.RGB_CHANNEL, color=True, 
                                                    shape=(W,H), every_k_frames=every_k_frames)
         else: 
-            im_dec = TangoImageDecoder(self.directory_, channel='RGB', color=True, 
+            im_dec = TangoImageDecoder(self.directory_, channel=TangoFile.RGB_CHANNEL, color=True, 
                                        shape=(W,H), every_k_frames=every_k_frames)
 
         # Setup log (calls load_log, and initializes decoders)
         super(TangoLogReader, self).__init__(
             self.filename_, 
             decoder=[
-                TangoOdomDecoder(channel='RGB_VIO', every_k_frames=every_k_frames, noise=noise), 
+                TangoOdomDecoder(channel=TangoFile.VIO_CHANNEL, every_k_frames=every_k_frames, noise=noise), 
                 im_dec
             ])
         
@@ -373,7 +446,21 @@ class TangoLogReader(LogReader):
         return self.calib_ 
 
     def load_log(self, filename): 
-        return TangoLog(filename)
+        return TangoFile(filename)
+                
+    def decode_msg(self, channel, msg, t): 
+        try: 
+            # Check if log index has reached desired start index, 
+            # and only then check if decode necessary  
+            dec = self.decoder[channel]
+            if dec.should_decode():
+                return True, (t, channel, dec.decode(msg))
+        except Exception as e:
+            pass
+            # print e
+            # raise RuntimeError('Failed to decode data from channel: %s, mis-specified decoder?' % channel)
+        
+        return False, (None, None, None)
 
     def iteritems(self, topics=[], reverse=False): 
         if self.index is not None: 
@@ -383,7 +470,7 @@ class TangoLogReader(LogReader):
             raise RuntimeError('Cannot provide items in reverse when file is not indexed')
 
         # Decode only messages that are supposed to be decoded 
-        print('Reading TangoLog from index={:} onwards'.format(self.start_idx_))
+        print('Reading TangoFile from index={:} onwards'.format(self.start_idx_))
         for self.idx, (channel, msg, t) in enumerate(self.log.read_messages(topics=topics)):
             if self.idx < self.start_idx_: 
                 continue
@@ -394,7 +481,6 @@ class TangoLogReader(LogReader):
             except Exception, e: 
                 print('TangLog.iteritems() :: {:}'.format(e))
                 pass
-
 
     def iterframes(self, topics=[], reverse=False): 
         """
@@ -411,7 +497,7 @@ class TangoLogReader(LogReader):
             raise RuntimeError('Cannot iterate, ground truth dataset not loaded')
 
         # Decode only messages that are supposed to be decoded 
-        print('Reading TangoLog from index={:} onwards'.format(self.start_idx_))
+        print('Reading TangoFile from index={:} onwards'.format(self.start_idx_))
         for self.idx, (channel, msg, t) in enumerate(self.log.read_messages(topics=topics)):
             if self.idx < self.start_idx_: 
                 continue
@@ -422,23 +508,22 @@ class TangoLogReader(LogReader):
             except Exception, e: 
                 print('TangLog.iteritems() :: {:}'.format(e))
                 pass
-                
-    def decode_msg(self, channel, msg, t): 
-        try: 
-            # Check if log index has reached desired start index, 
-            # and only then check if decode necessary  
-            dec = self.decoder[channel]
-            if dec.should_decode():
-                return True, (t, channel, dec.decode(msg))
-        except Exception as e:
-            # pass
-            print e
-            raise RuntimeError('Failed to decode data from channel: %s, mis-specified decoder?' % channel)
-        
-        return False, (None, None, None)
 
     def iter_frames(self, topics=[]):
         return self.iteritems(topics=topics)
+
+    def roidb(self, every_k_frames=1, verbose=True): 
+        """
+        Returns (img, bbox, targets [unique text])
+        """
+        for (t,ch,data) in self.iteritems(topics=topics): 
+            bboxes = data.bboxes
+            if len(bboxes): 
+                bbox = np.vstack([bbox['bbox'] 
+                                  for bbox in bboxes]).astype(np.int64)
+                targets = [bbox['class_label'] for bbox in bboxes]
+                yield data.img, bbox, targets
+                
 
 def iter_tango_logs(directory, logs, topics=[]):
     for log in logs: 
@@ -446,7 +531,8 @@ def iter_tango_logs(directory, logs, topics=[]):
         print('Accessing Tango directory {:}'.format(directory))
         dataset = TangoLogReader(directory=directory, scale=im_scale) 
         for item in dataset.iter_frames(topics=topics): 
-            yield item
+            bboxes = item.bboxes
+            targets = item.coords
 
 
 # Basic type for tango frame (includes pose, image, timestamp)
@@ -457,13 +543,15 @@ class TangoLogController(LogController):
     def __init__(self, dataset): 
         super(TangoLogController, self).__init__(dataset)
 
+        print('\nSubscriptions\n==============')
         if not self.controller.ground_truth_available: 
-            self.subscribe('RGB', self.on_rgb)
+            self.subscribe(TangoFile.RGB_CHANNEL, self.on_rgb)
         else: 
-            print('Ground Truth available, subscribe to LogController.on_rgb_gt')
-            self.subscribe('RGB', self.on_rgb_gt)
+            print('\tGround Truth available, subscribe to LogController.on_rgb_gt')
+            self.subscribe(TangoFile.RGB_CHANNEL, self.on_rgb_gt)
 
-        self.subscribe('RGB_VIO', self.on_pose)
+        self.subscribe(TangoFile.VIO_CHANNEL, self.on_pose)
+        print('')
 
         # Keep a queue of finite lenght to ensure 
         # time-sync with RGB and IMU
@@ -472,7 +560,6 @@ class TangoLogController(LogController):
     def on_rgb_gt(self, t_img, ann_img): 
         if not len(self.__pose_q):
             return
-
         t_pose, pose = self.__pose_q[-1]
         self.on_frame(AnnotatedFrame(img=ann_img.img, pose=pose, t_pose=t_pose, t_img=t_img, bboxes=ann_img.bboxes))
         

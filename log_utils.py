@@ -35,9 +35,8 @@ class LogReader(object):
     def __init__(self, filename, decoder=None, start_idx=0, every_k_frames=1, 
                  max_length=None, index=False, verbose=False):
         filename = os.path.expanduser(filename)
-		
-        if filename is None or not os.path.exists(os.path.expanduser(filename)):
-            raise Exception('Invalid Filename: %s' % filename)
+        if filename is None or not os.path.exists(filename):
+            raise RuntimeError('Invalid Filename: %s' % filename)
 
         # Store attributes
         self.filename = filename
@@ -51,10 +50,9 @@ class LogReader(object):
         self.verbose = verbose
 
         # Load the log
-        self.log_ = self.load_log(self.filename)
+        self._init_log()
 
         # Build index
-        self.idx = 0
         if index: 
             self._index()
         else: 
@@ -62,6 +60,16 @@ class LogReader(object):
 
         # Create Look-up table for subscriptions
         self.cb_ = {}
+
+    def _init_log(self): 
+        self.log_ = self.load_log(self.filename)
+        self.idx = 0
+
+    def reset(self): 
+        self._init_log()
+
+    def _index(self): 
+        raise NotImplementedError()
 
     def length(self, channel): 
         raise NotImplementedError()
@@ -136,8 +144,8 @@ class LogController(object):
         self.ctrl_cb_ = {}
         self.ctrl_idx_ = 0
 
-    def subscribe(self, channel, callback): 
-        print('{:}: Subscribing to {:} with callback {:}'.format(self.__class__.__name__, channel, callback))
+    def subscribe(self, channel, callback):
+        print('\t{:}: Subscribing to {:} with callback {:}'.format(self.__class__.__name__, channel, callback.im_func.func_name))
         self.ctrl_cb_[channel] = callback
 
     def run(self):
