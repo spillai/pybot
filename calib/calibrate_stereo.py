@@ -16,11 +16,12 @@ import os
 
 import time
 import cv2
-import progressbar
 
 import numpy as np
 from itertools import izip
 
+from bot_utils.itertools_recipes import grouper
+from bot_utils.misc import progressbar
 from bot_vision.image_utils import to_color, im_resize, im_mosaic, im_pad
 from bot_vision.imshow_utils import imshow_cv
 
@@ -344,26 +345,21 @@ def calibrate_folder(args):
     height, width = cv2.imread(args.input_files[0]).shape[:2]
     calibrator = StereoCalibrator(args.rows, args.columns, args.square_size,
                                   (width, height))
-    progress = progressbar.ProgressBar(maxval=len(args.input_files),
-                                       widgets=[progressbar.Bar("=", "[", "]"),
-                                                " ", progressbar.Percentage()])
 
     print("Reading input files...")
-    while args.input_files:
-        left, right = args.input_files[:2]
+    for (left, right) in progressbar(grouper(args.input_files, 2), size=len(args.input_files)/2):
+        
         im_left, im_right = cv2.imread(left), cv2.imread(right)
         im_left, im_right = im_resize(im_left, scale=args.scale, interpolation=cv2.INTER_CUBIC), \
                             im_resize(im_right, scale=args.scale, interpolation=cv2.INTER_CUBIC)
         print 'Image: {:}, Calib. Resolution: {}'.format(args.scale, im_left.shape)
         calibrator.add_corners((im_left, im_right),
                                write_path=os.path.join(args.output_folder, os.path.basename(left).replace('left', 'debug_%s')))
-        args.input_files = args.input_files[2:]
+        
         if args.show_chessboards: 
             imshow_cv('left/right', np.hstack([im_left, im_right]), block=True)
-        progress.update(progress.maxval - len(args.input_files))
+        
         # mosaic.append(im_pad(im_resize(np.hstack([im_left, im_right]), scale=0.125), pad=3))
-
-    progress.finish()
 
     st = time.time()
     print("Calibrating cameras. This can take a while.")
@@ -373,7 +369,7 @@ def calibrate_folder(args):
           "lines is \n"
           "{} pixels. This should be as small as possible.".format(avg_error))
     calibration.export(args.output_folder)
-    print 'Time taken to calibrate %i stereo pairs %4.3f s' % (progress.maxval/2, time.time() - st)
+    print 'Time taken to calibrate %i stereo pairs %4.3f s' % (len(args.input_files)/2, time.time() - st)
 
 CHESSBOARD_ARGUMENTS = argparse.ArgumentParser(add_help=False)
 CHESSBOARD_ARGUMENTS.add_argument("--rows", type=int,

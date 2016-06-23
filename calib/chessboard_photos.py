@@ -12,7 +12,6 @@ import os
 import webcams
 
 import cv2
-import progressbar
 
 import time
 import numpy as np
@@ -87,9 +86,9 @@ def main():
     if (args.calibration_folder and not args.square_size):
         args.print_help()
 
-    progress = progressbar.ProgressBar(maxval=args.num_pictures,
-                                       widgets=[progressbar.Bar("=", "[", "]"),
-                                                " ", progressbar.Percentage()])
+    # progress = progressbar.ProgressBar(maxval=args.num_pictures,
+    #                                    widgets=[progressbar.Bar("=", "[", "]"),
+    #                                             " ", progressbar.Percentage()])
     if not os.path.exists(args.output_folder):
         os.makedirs(args.output_folder)
     # with ChessboardFinder((args.left, args.right)) as pair:
@@ -121,9 +120,11 @@ def main():
             idx += 1
 
             mosaic.append(im_pad(im_resize(np.hstack(list(frames)), scale=0.125), pad=3))
-            progress.update(progress.maxval - (args.num_pictures - idx))
+            # progress.update(progress.maxval - (args.num_pictures - idx))
             imshow_cv('Calibration data', im_mosaic(*mosaic))
-        progress.finish()
+
+        # progress.finish()
+
     if args.calibration_folder:
         args.input_files = calibrate_stereo.find_files(args.output_folder)
         args.output_folder = args.calibration_folder
