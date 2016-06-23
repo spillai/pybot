@@ -647,19 +647,15 @@ class UWRGBDSceneDataset(UWRGBDDataset):
 
 
     def iteritems(self, every_k_frames=1, verbose=False, with_ground_truth=False): 
-        pbar = setup_pbar(len(self.dataset_)) if verbose else None
         
         print 'Scenes: %i %s' % (len(self.scenes()), self.scenes())
         for key, scene in progressbar(
                 self.iterscenes(verbose=verbose, with_ground_truth=with_ground_truth), 
                 size=len(self.scenes()), verbose=verbose): 
-            if verbose: 
-                pbar.increment()
             for frame in scene.iteritems(every_k_frames=every_k_frames): 
                 yield frame
             # break
-        if verbose: pbar.finish()
-
+        
     def roidb(self, every_k_frames=1, verbose=True): 
         for item in self.iteritems(every_k_frames=every_k_frames, with_ground_truth=True): 
             if len(item.bbox): 
@@ -682,16 +678,13 @@ class UWRGBDSceneDataset(UWRGBDDataset):
         return self.dataset_.keys()
 
     def iterscenes(self, targets=None, blacklist=None, verbose=False, with_ground_truth=False): 
-        pbar = setup_pbar(len(self.dataset_)) if verbose else None
-        for key in self.dataset_.iterkeys(): 
+        for key in progressbar(self.dataset_.iterkeys(), size=len(self.dataset_), verbose=verbose): 
             # Optionally only iterate over targets, and avoid blacklist
             if (targets is not None and key not in targets) or \
                (blacklist is not None and key in blacklist): 
                 continue
-            if verbose: pbar.increment()
             yield key, self.scene(key, with_ground_truth=with_ground_truth)
-        if verbose: pbar.finish()
-
+        
     @staticmethod
     def annotate_bboxes(vis, bboxes, target_names): # , box_color=lambda target: (0, 200, 0) if UWRGBDDataset.get_category_name(target) != 'background' else (100, 100, 100)): 
         for bbox,target_name in izip(bboxes, target_names): 
