@@ -9,8 +9,9 @@ import cv2
 import numpy as np
 import os, fnmatch, time
 import re
+
 from itertools import izip, imap, chain, islice
-from collections import defaultdict, namedtuple
+from collections import defaultdict, namedtuple, OrderedDict
 from bot_utils.async_utils import async_prefetch
 
 from bot_vision.image_utils import im_resize
@@ -64,7 +65,7 @@ def read_dir(directory, pattern='*.png', recursive=True, expected_dirs=[], verbo
         raise Exception("""Path %s doesn't exist""" % directory)
 
     # Build dictionary [full_root_path -> pattern_matched_files]
-    fn_map = {}
+    fn_map = OrderedDict()
     expected_set = set(expected_dirs)
 
     for rootd in os.listdir(directory): 
