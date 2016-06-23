@@ -14,7 +14,7 @@ from collections import defaultdict
 
 from scipy.io import loadmat
 
-from bot_utils.misc import setup_pbar
+from bot_utils.misc import progressbar
 from bot_utils.db_utils import AttrDict
 from bot_utils.dataset_readers import read_dir, read_files, natural_sort, \
     DatasetReader, ImageDatasetReader
@@ -252,17 +252,12 @@ class UWRGBDObjectDataset(UWRGBDDataset):
         self.target_names = targets
 
     def iteritems(self, every_k_frames=1, verbose=False):
-        pbar = setup_pbar(len(self.data)) if verbose else None
-        for key, frames in self.data.iteritems(): 
+        for key, frames in progressbar(self.data.iteritems(), size=len(self.data), verbose=verbose): 
             print 'Processing: %s' % key
-            if verbose: 
-                pbar.increment()
             for frame in frames.iteritems(every_k_frames=every_k_frames): 
                 yield frame
             # break
-        if verbose: pbar.finish()
-
-
+        
     def roidb(self, every_k_frames=1, verbose=True): 
         for item in self.iteritems(every_k_frames=every_k_frames, verbose=verbose):
             if len(item.bbox): 
@@ -653,8 +648,11 @@ class UWRGBDSceneDataset(UWRGBDDataset):
 
     def iteritems(self, every_k_frames=1, verbose=False, with_ground_truth=False): 
         pbar = setup_pbar(len(self.dataset_)) if verbose else None
+        
         print 'Scenes: %i %s' % (len(self.scenes()), self.scenes())
-        for key, scene in self.iterscenes(verbose=verbose, with_ground_truth=with_ground_truth): 
+        for key, scene in progressbar(
+                self.iterscenes(verbose=verbose, with_ground_truth=with_ground_truth), 
+                size=len(self.scenes()), verbose=verbose): 
             if verbose: 
                 pbar.increment()
             for frame in scene.iteritems(every_k_frames=every_k_frames): 

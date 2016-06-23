@@ -6,7 +6,7 @@ from collections import defaultdict
 from itertools import izip
 
 import os.path
-from bot_utils.misc import setup_pbar
+from bot_utils.misc import progressbar
 from bot_utils.io_utils import create_path_if_not_exists
 from bot_utils.itertools_recipes import grouper
 
@@ -310,13 +310,10 @@ class IterDB(object):
 
         idx, ii = 0, 0
         total_chunks = len(self.meta_file_.chunks)
-        pbar = setup_pbar(total_chunks) if verbose else None
-
         inds = np.sort(inds) if inds is not None else None
-        for chunk_idx, chunk in enumerate(self.meta_file_.chunks): 
+
+        for chunk_idx, chunk in enumerate(progressbar(self.meta_file_.chunks, size=total_chunks, verbose=verbose)): 
             data = AttrDict.load(self.get_chunk_filename(chunk_idx))
-            if verbose: pbar.increment()
-        
             if inds is None: 
                 for item in data[key]: 
                     yield item
@@ -327,7 +324,6 @@ class IterDB(object):
                         ii += 1
                         if ii >= len(inds): break
                 idx += len(data[key])
-        if verbose: pbar.finish()
 
     def keys(self): 
         return self.keys_
@@ -339,13 +335,11 @@ class IterDB(object):
 
         idx, ii = 0, 0
         total_chunks = len(self.meta_file_.chunks)
-        pbar = setup_pbar(total_chunks) if verbose else None
-
         inds = np.sort(inds) if inds is not None else None
-        for chunk_idx, chunk in enumerate(self.meta_file_.chunks): 
+
+        for chunk_idx, chunk in enumerate(progressbar(self.meta_file_.chunks, size=total_chunks, verbose=verbose)): 
             data = AttrDict.load(self.get_chunk_filename(chunk_idx))
-            if verbose: pbar.increment()
-        
+            
             # if inds is None: 
             items = (data[key] for key in keys)
             for item in izip(*items): 
@@ -357,8 +351,7 @@ class IterDB(object):
             #             ii += 1
             #             if ii >= len(inds): break
             #     idx += len(data[key])
-        if verbose: pbar.finish()
-
+        
 
     def iterchunks(self, key, batch_size=10, verbose=False): 
         if key not in self.keys_: 
@@ -366,10 +359,9 @@ class IterDB(object):
 
         idx, ii = 0, 0
         total_chunks = len(self.meta_file_.chunks)
-        pbar = setup_pbar(total_chunks) if verbose else None
-
         batch_chunks = grouper(range(len(self.meta_file_.chunks)), batch_size)
-        for chunk_group in batch_chunks: 
+
+        for chunk_group in progressbar(batch_chunks, size=total_chunks / batch_size, verbose=verbose): 
             items = []
             # print key, chunk_group
             for chunk_idx in chunk_group: 
@@ -380,8 +372,6 @@ class IterDB(object):
                 for item in data[key]: 
                     items.append(item)
             yield items
-            if verbose: pbar.increment(pbar.currval + len(chunk_group))
-        if verbose: pbar.finish()
  
     def iterchunks_keys(self, keys, batch_size=10, verbose=False): 
         """

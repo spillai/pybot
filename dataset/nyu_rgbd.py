@@ -14,7 +14,6 @@ from collections import defaultdict
 
 import h5py
 
-from bot_utils.misc import setup_pbar
 from bot_utils.db_utils import AttrDict
 from bot_utils.dataset_readers import read_dir, read_files, natural_sort, \
     DatasetReader, ImageDatasetReader

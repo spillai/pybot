@@ -1,3 +1,4 @@
+import sys
 from collections import deque
 
 def print_red(prt): print("\033[91m {}\033[00m" .format(prt))
@@ -18,13 +19,31 @@ def print_color(prt, color='green'):
     except: 
         raise KeyError('print_color lookup failed, use from {:}'.format(cols_lut.keys()))
 
-def setup_pbar(maxval): 
-    import progressbar as pb
-    widgets = ['Progress: ', pb.Percentage(), ' ', pb.Bar(), ' ', pb.ETA()]
-    pbar = pb.ProgressBar(widgets=widgets, maxval=maxval)
-    pbar.start()
-    pbar.increment = lambda : pbar.update(pbar.currval + 1)
-    return pbar
+# def setup_pbar(maxval): 
+#     import progressbar as pb
+#     widgets = ['Progress: ', pb.Percentage(), ' ', pb.Bar(), ' ', pb.ETA()]
+#     pbar = pb.ProgressBar(widgets=widgets, maxval=maxval)
+#     pbar.start()
+#     pbar.increment = lambda : pbar.update(pbar.currval + 1)
+#     return pbar
+
+def progressbar(it, prefix = "", size=60, verbose=True):
+    """
+    Optional progress bar, if verbose == True
+    """
+    count = len(it)
+    def _show(_i):
+        x = int(size*_i/count)
+        sys.stdout.write("%s[%s%s] %i/%i\r" % (prefix, "#"*x, "."*(size-x), _i, count))
+        sys.stdout.flush()
+    
+    _show(0)
+    for i, item in enumerate(it):
+        yield item
+        _show(i+1)
+    sys.stdout.write("\n")
+    sys.stdout.flush()
+
 
 class Counter(object): 
     def __init__(self): 

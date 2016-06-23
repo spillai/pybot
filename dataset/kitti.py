@@ -159,16 +159,13 @@ class KITTIDatasetReader(object):
                    left_template='image_0/%06i.png', right_template='image_1/%06i.png', 
                    velodyne_template='velodyne/%06i.bin', start_idx=0, max_files=50000, 
                    scale=1.0, verbose=False): 
-
-        pbar = setup_pbar(len(sequences)) if verbose else None
-        for seq in sequences: 
-            if verbose: pbar.increment()
+        
+        for seq in progressbar(sequences, size=len(sequences), verbose=verbose): 
             yield seq, cls(
                 directory=directory, sequence=seq, left_template=left_template, 
                 right_template=right_template, velodyne_template=velodyne_template, 
                 start_idx=start_idx, max_files=max_files)
-        if verbose: pbar.finish()
-
+            
 class KITTIStereoGroundTruthDatasetReader(object): 
     def __init__(self, directory, is_2015=False, scale=1.0):
         """
