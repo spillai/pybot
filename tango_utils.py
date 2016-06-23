@@ -275,7 +275,7 @@ class TangoFile(object):
               '\tDistance Travelled: {:.2f} m\n'
               '\tDuration: {:} s\n'.format(
                   self.topics_, messages_str, 
-                  tvec, np.max(ts)-np.min(ts)))
+                  distance, np.max(ts)-np.min(ts)))
 
         # Initialize dataset
         self.init()
@@ -292,9 +292,8 @@ class TangoFile(object):
                 continue
 
             if prev_pose is not None: 
-                rel = prev_pose.inverse() * pose
-                tvec += np.linalg.norm(rel.tvec)
-                # print rel, np.linalg.norm(rel.tvec), tvec
+                tvec += np.linalg.norm(prev_pose.tvec-pose.tvec)
+
             prev_pose = pose
 
         return tvec
