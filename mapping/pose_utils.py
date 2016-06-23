@@ -256,6 +256,60 @@ class KeyframeVolumeSampler(FrustumVolumeIntersectionPoseSampler):
                                                       on_sampled_cb=on_sampled_cb, verbose=verbose)
 
 
+class PoseAccumulator(Accumulator): 
+    def __init__(self, maxlen=100, relative=False): 
+        Accumulator.__init__(self, maxlen=maxlen)
+
+        self.relative_ = relative
+        self.init_ = None
+
+    def accumulate(self, pose):
+        if self.relative_: 
+            if self.init_ is None: 
+                self.init_ = pose
+            p = self.relative_to_init(pose)
+        else: 
+            p = pose
+
+        # Call accumulate on base class
+        super(PoseAccumulator, self).accumulate(p)
+        
+    def relative_to_init(self, pose_wt): 
+        """ pose of [t] wrt [0]:  p_0t = p_w0.inverse() * p_wt """  
+        return (self.init_.inverse()).oplus(pose_wt)
+
+class PoseInterpolator(PoseAccumulator): 
+    def __init__(self, maxlen=100, relative=False): 
+        PoseAccumulator.__init__(self, maxlen=maxlen, relative=relative)
+
+        self.relative_ = relative
+        self.init_ = None
+        
+    def add(self, pose): 
+        super(PoseAccumulator, self).accumulate(pose)
+
+    def query(self, pose): 
+        raise NotImplementedError()
+
+class SkippedPoseAccumulator(PoseAccumulator): 
+    def __init__(self, skip=10, **kwargs): 
+        Counter.__init__(self)
+        PoseAccumulator.__init__(self, **kwargs)
+        self.skip_ = skip
+        self.skipped_ = False
+
+    @property
+    def skipped(self): 
+        return self.skipped_
+
+    def accumulate(self, pose): 
+        self.skipped_ = True
+        if self.check_divisibility(self.skip_):
+            PoseAccumulator.accumulate(self, pose)
+            self.reset()
+            self.skipped_ = False
+        self.count()
+
 # class PoseInterpolation(object): 
 #     def __init__(self, ncontrol=2, nposes=10): 
 #         self.q_ = deque(maxlen=ncontrol)
