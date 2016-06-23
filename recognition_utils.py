@@ -12,6 +12,7 @@ import pprint
 import datetime
 import pandas as pd
 
+import matplotlib.pyplot as plt
 from bot_vision.image_utils import im_resize, gaussian_blur, median_blur, box_blur
 from bot_utils.io_utils import memory_usage_psutil, format_time
 from bot_utils.db_utils import AttrDict, IterDB
@@ -44,7 +45,7 @@ def recall_from_IoU(IoU, samples=500):
 # Generic utility functions for object recognition
 # ---------------------------------------------------------------------
 
-def multilabel_precision_recall(y_score, y_test, target_map): 
+def multilabel_precision_recall(y_score, y_test, clf_target_ids, clf_target_names): 
     from sklearn.metrics import precision_recall_curve
     from sklearn.metrics import average_precision_score
     from sklearn.preprocessing import label_binarize
@@ -54,34 +55,37 @@ def multilabel_precision_recall(y_score, y_test, target_map):
     recall = dict()
     average_precision = dict()
 
-    target_ids = target_map.keys()
-    target_names = target_map.values()
-    
-    y_test_multi = label_binarize(y_test, classes=target_ids)
-    N, n_classes = y_score.shape[:2]
-    for i,name in enumerate(target_names):
+    # Find indices that have non-zero detections
+    clf_target_map = { k: v for k,v in zip(clf_target_ids, clf_target_names)}
+    id2ind = {tid: idx for (idx,tid) in enumerate(clf_target_ids)}
+
+    # Only handle the targets encountered
+    unique = np.unique(y_test)
+    nzinds = np.int64([id2ind[target] for target in unique])
+
+    # Binarize and create precision-recall curves
+    y_test_multi = label_binarize(y_test, classes=unique)
+    for i,target in enumerate(unique):
+        index = id2ind[target]
+        name = clf_target_map[target]
         precision[name], recall[name], _ = precision_recall_curve(y_test_multi[:, i],
-                                                                  y_score[:, i])
-        average_precision[name] = average_precision_score(y_test_multi[:, i], y_score[:, i])
+                                                                  y_score[:, index])
+        average_precision[name] = average_precision_score(y_test_multi[:, i], y_score[:, index])
 
     # Compute micro-average ROC curve and ROC area
     precision["average"], recall["average"], _ = precision_recall_curve(y_test_multi.ravel(),
-        y_score.ravel())
-    average_precision["micro"] = average_precision_score(y_test_multi, y_score,
+                                                                        y_score[:,nzinds].ravel())
+    average_precision["micro"] = average_precision_score(y_test_multi, y_score[:,nzinds],
                                                          average="micro") 
-    average_precision["macro"] = average_precision_score(y_test_multi, y_score,
+    average_precision["macro"] = average_precision_score(y_test_multi, y_score[:,nzinds],
                                                          average="macro") 
     return precision, recall, average_precision
 
 
-def plot_precision_recall(y_score, y_test, target_map, title='Precision-Recall curve'): 
-    import matplotlib.pyplot as plt
-
-    target_ids = target_map.keys()
-    target_names = target_map.values()
+def plot_precision_recall(y_score, y_test, clf_target_ids, clf_target_names, title='Precision-Recall curve'): 
 
     # Get multilabel precision recall curve
-    precision, recall, average_precision = multilabel_precision_recall(y_score, y_test, target_map)
+    precision, recall, average_precision = multilabel_precision_recall(y_score, y_test, clf_target_ids, clf_target_names)
 
     # Plot Precision-Recall curve for each class
     plt.clf()
@@ -96,11 +100,12 @@ def plot_precision_recall(y_score, y_test, target_map, title='Precision-Recall c
     plt.legend(loc="lower left")
     plt.show()
 
-    for i,name in enumerate(target_names):
+    for name in clf_target_names:
+        if name not in recall: continue
         plt.plot(recall[name], precision[name],
-                 label='{0}'.format(name.title().replace('_', ' ')))
-                 # label='{0} (area = {1:0.2f})'
-                 #       ''.format(name.title().replace('_', ' '), average_precision[name]))
+                 # label='{}'.format(name.title().replace('_', ' ')))
+                 label='{0} (AP = {1:0.2f})'
+                       ''.format(name.title().replace('_', ' '), average_precision[name]))
 
     plt.xlim([0.0, 1.0])
     plt.ylim([0.0, 1.0])
@@ -399,6 +404,9 @@ class HistogramClassifier(object):
                                                                                              labels=target_map.keys(),
                                                                                              target_names=target_map.values())))
         print('Training Classifier took {}'.format(format_time(time.time() - self.st_time_)))              
+
+    def get_categories(self): 
+        return self.clf_.classes_
 
     def save(self, filename): 
         print('====> Saving classifier ')
