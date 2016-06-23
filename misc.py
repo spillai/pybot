@@ -19,22 +19,13 @@ def print_color(prt, color='green'):
     except: 
         raise KeyError('print_color lookup failed, use from {:}'.format(cols_lut.keys()))
 
-# def setup_pbar(maxval): 
-#     import progressbar as pb
-#     widgets = ['Progress: ', pb.Percentage(), ' ', pb.Bar(), ' ', pb.ETA()]
-#     pbar = pb.ProgressBar(widgets=widgets, maxval=maxval)
-#     pbar.start()
-#     pbar.increment = lambda : pbar.update(pbar.currval + 1)
-#     return pbar
-
-def progressbar(it, prefix = "", size=60, verbose=True):
+def progressbar(it, prefix = "", size=100, verbose=True):
     """
     Optional progress bar, if verbose == True
     """
-    count = len(it)
     def _show(_i):
-        x = int(size*_i/count)
-        sys.stdout.write("%s[%s%s] %i/%i\r" % (prefix, "#"*x, "."*(size-x), _i, count))
+        x = _i
+        sys.stdout.write("%s[%s%s] %i/%i\n" % (prefix, "#"*x, "."*(size-x), _i, size))
         sys.stdout.flush()
     
     _show(0)
