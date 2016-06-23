@@ -1,18 +1,28 @@
 import sys
 from collections import deque
 
-def print_red(prt): print("\033[91m {}\033[00m" .format(prt))
-def print_green(prt): print("\033[92m {}\033[00m" .format(prt))
-def print_yellow(prt): print("\033[93m {}\033[00m" .format(prt))
-def print_lightpurple(prt): print("\033[94m {}\033[00m" .format(prt))
-def print_purple(prt): print("\033[95m {}\033[00m" .format(prt))
-def print_cyan(prt): print("\033[96m {}\033[00m" .format(prt))
-def print_lightgray(prt): print("\033[97m {}\033[00m" .format(prt))
-def print_black(prt): print("\033[98m {}\033[00m" .format(prt))
+def color_red(prt): return "\033[91m {}\033[00m" .format(prt)
+def color_green(prt): return "\033[92m {}\033[00m" .format(prt)
+def color_yellow(prt): return "\033[93m {}\033[00m" .format(prt)
+def color_lightpurple(prt): return "\033[94m {}\033[00m" .format(prt)
+def color_purple(prt): return "\033[95m {}\033[00m" .format(prt)
+def color_cyan(prt): return "\033[96m {}\033[00m" .format(prt)
+def color_lightgray(prt): return "\033[97m {}\033[00m" .format(prt)
+def color_black(prt): return "\033[98m {}\033[00m" .format(prt)
+
+def print_red(prt): print(color_red(prt))
+def print_green(prt): print(color_green(prt))
+def print_yellow(prt): print(color_yellow(prt))
+def print_lightpurple(prt): print(color_lightpurple(prt))
+def print_purple(prt): print(color_purple(prt))
+def print_cyan(prt): print(color_cyan(prt))
+def print_lightgray(prt): print(color_lightgray(prt))
+def print_black(prt): print(color_black(prt))
 
 cols_lut = { 'red': print_red, 'green': print_green, 'yellow': print_yellow, 
              'lightpurple': print_lightpurple, 'purple': print_purple, 
              'cyan': print_cyan, 'lightgray': print_lightgray, 'black': print_black }
+
 def print_color(prt, color='green'): 
     try: 
         cols_lut[color](prt)
@@ -25,7 +35,7 @@ def progressbar(it, prefix = "", size=100, verbose=True, width=100):
     """
     def _show(_i):
         x = int(_i * (width * 1.0 / size))
-        sys.stdout.write("%s[%s%s] %i/%i\n" % (prefix, "#"*x, "."*(width-x), _i, size))
+        sys.stdout.write(color_green("%s[%s%s] %i/%i\n" % (prefix, "#"*x, "."*(width-x), _i, size)))
         sys.stdout.flush()
     
     _show(0)
