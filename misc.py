@@ -19,13 +19,13 @@ def print_color(prt, color='green'):
     except: 
         raise KeyError('print_color lookup failed, use from {:}'.format(cols_lut.keys()))
 
-def progressbar(it, prefix = "", size=100, verbose=True):
+def progressbar(it, prefix = "", size=100, verbose=True, width=100):
     """
     Optional progress bar, if verbose == True
     """
     def _show(_i):
-        x = _i
-        sys.stdout.write("%s[%s%s] %i/%i\n" % (prefix, "#"*x, "."*(size-x), _i, size))
+        x = int(_i * (width * 1.0 / size))
+        sys.stdout.write("%s[%s%s] %i/%i\n" % (prefix, "#"*x, "."*(width-x), _i, size))
         sys.stdout.flush()
     
     _show(0)
