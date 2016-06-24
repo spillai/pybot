@@ -4,7 +4,77 @@ import numpy as np
 from datetime import datetime
 from bot_utils.db_utils import load_json_dict
 
-class SUN3DAnnotation(object):
+class SUN3DAnnotationFrame(object): 
+    def __init__(self, frame=None): 
+        """
+        Load annotation from json
+        """
+        self.annotations_ = []
+
+        try: 
+            polygons = frame['polygon']
+        except: 
+            return
+
+        # For each polygon
+        for poly in polygons: 
+
+            # Get coordinates
+            xy = np.vstack([np.float32(poly['x']), 
+                            np.float32(poly['y'])]).T
+
+            # Object ID (from local annotation file)
+            object_id = poly['object']
+            object_info = dict(object_id=poly['object'], 
+                               xy=xy, 
+                               bbox=np.int64([xy[:,0].min(), xy[:,1].min(), xy[:,0].max(), xy[:,1].max()]))
+            
+            self.annotations_.append(object_info)
+
+    @property
+    def is_annotated(self): 
+        return len(self.annotations_) > 0
+
+    @property
+    def num_annotations(self): 
+        return len(self.annotations_)
+
+    @property
+    def unscaled_bboxes(self): 
+        try: 
+            return np.vstack([ann['bbox'] for ann in self.annotations_])
+        except: 
+            return np.empty(shape=(0,4), dtype=np.int64)
+
+    @property
+    def unscaled_polygons(self): 
+        try: 
+            return np.vstack([ann['xy'] for ann in self.annotations_])
+        except: 
+            return np.empty(shape=(0,2), dtype=np.int64)
+
+    # @bboxes.setter
+    # def bboxes(self, bboxes):
+    #     assert(len(bboxes) == self.num_annotations)
+    #     for idx in range(self.num_annotations): 
+    #         self.annotations_[idx]['bbox']
+
+    @property
+    def object_ids(self): 
+        return np.int64([ann['object_id'] for ann in self.annotations_])
+
+    # @property
+    # def target_names(self): 
+    #     return [ann['pretty_name'] for ann in self.annotations_]
+
+    # def to_json(): 
+    #     """
+    #     Write annotation to json
+    #     """
+    #     pass
+
+
+class SUN3DAnnotationDB(object):
     """
     SUN3D JSON Format
          {'date': time.time(),
@@ -16,12 +86,15 @@ class SUN3DAnnotation(object):
           'img_height': 360, 'img_width': 640}
     """
 
-    def __init__(self, filename, basename, scale=1.0):
+    def __init__(self, filename, basename, shape):
+        if shape[0] < shape[1]: 
+            raise RuntimeError('W > H requirement failed, W: {}, H: {}'.format(shape[0], shape[1]))
+
         self.filename_ = os.path.expanduser(filename)
         self.basename_ = basename.replace('/','')
-        self.scale_ = scale
+        self.shape_ = shape
         self.initialize()
-
+        
     @property
     def initialized(self): 
         return hasattr(self, 'data_')
@@ -34,26 +107,33 @@ class SUN3DAnnotation(object):
                 'date': datetime.now().strftime("%a, %d %b %Y %I:%M:%S %Z"),
                 'name': self.basename_ + '/',
                 'frames': [], 'objects': [], 'conflictList': [],
-                'fileList': [], 'img_height': 0, 'img_width': 0 
+                'fileList': [], 'img_height': -1, 'img_width': -1 
             }
         else: 
             self.data_ = data
+
+        # Determine scale
+        self.scale_ = self.shape_[1] * 1.0 / self.image_height
         
         # Data integrity check
         assert(self.data_ is not None)
 
         # Generate lookup tables for targets
-        self._generate_target_lut()
+        self._generate_object_lut()
 
-    def _generate_target_lut(self): 
+        # Object lookup
+        self.index_ = {fn: idx for (idx, fn) in enumerate(self.files)}
+        
+    def _generate_object_lut(self): 
         """
         Generate look up table for objects
         (from the aggregated annotation DB)
+        Object ID (oid) -> Object Name (pretty_name)
         """
         print self.objects
-        self.target_hash_ = { obj: object_id 
+        self.object_hash_ = { obj: object_id 
                               for (object_id, obj) in enumerate(self.objects) }
-        self.target_unhash_ = { object_id: obj 
+        self.object_unhash_ = { object_id: obj 
                                 for (object_id, obj) in enumerate(self.objects) }
         
     def _get_object_info(self, object_id): 
@@ -66,9 +146,9 @@ class SUN3DAnnotation(object):
         TODO: need to spec this
         """
         # Trailing number after hyphen is instance id
-        pretty_name = self.target_unhash_[object_id]
+        pretty_name = self.object_unhash_[object_id]
         pretty_class_name = ''.join(pretty_name.split('-')[:-1])
-        instance_name = self.target_unhash_[object_id].split('-')[-1]
+        # instance_name = self.object_unhash_[object_id].split('-')[-1]
 
         return dict(pretty_name=pretty_name, pretty_class_name=pretty_class_name, 
                     class_id=-1, instance_name=instance_name)
@@ -102,44 +182,54 @@ class SUN3DAnnotation(object):
         return len(self.data_['objects'])
 
     @property
+    def files(self):
+        return self.data_['fileList']
+
+    @property
     def num_files(self):
         return len(self.data_['fileList'])
 
     @property
     def num_annotations(self): 
         return sum([len(frame) for frame in self.data_['frames']], 0)
+        
 
-    def parse_frame(self, frame):
-        try: 
-            polygons = frame['polygon']
-        except: 
-            return []
+    def _get_prettynames(self, frame): 
+        return [self.object_unhash_[oid] for oid in frame.object_ids]
 
-        # For each polygon
-        annotations = []
-        for poly in polygons: 
+    # def _get_targets(self, frame): 
+    #     return np.int64([self.target_hash_[self.object_unhash_[oid]] for oid in frame.object_ids])
 
-            # Get coordinates
-            xy = np.vstack([np.float32(poly['x']), 
-                            np.float32(poly['y'])]).T
+    def _get_scaled_polygons(self, frame): 
+        return [(p * self.scale).astype(np.int64) for p in frame.unscaled_polygons]
 
-            # Object label as described by target hash
-            object_id = poly['object']
+    def _get_scaled_bboxes(self, frame): 
+        return [(bbox * self.scale).astype(np.int64) for bbox in frame.unscaled_bboxes]
 
-            object_info = self._get_object_info(object_id)
+    def decorate_frame(self, aframe): 
+        aframe.bboxes = self._get_scaled_bboxes(aframe)
+        aframe.polygons = self._get_scaled_polygons(aframe)
+        aframe.pretty_names = self._get_prettynames(aframe)
+        # aframe.targets = self._get_targets(aframe)
+        return aframe
 
-            sxy = np.int64(xy * self.scale)
+    def __getitem__(self, basename): 
+        index = self.index_[basename]
+        frame = SUN3DAnnotationFrame(self.data_['frames'][index])
+        return self.decorate_frame(frame)
 
-            object_info['xy'] = sxy
-            object_info['bbox'] = np.int64([sxy[:,0].min(), sxy[:,1].min(), sxy[:,0].max(), sxy[:,1].max()])
+    def __setitem__(self, basename, frame): 
+        " Write back to data_['frames'] "
+        assert(isinstance(frame, SUN3DAnnotationFrame))
 
-            annotations.append(object_info)
-
-        return annotations
+        # index = self.index_[basename]
+        # self.data_['frames'][index]
+        
+        pass
 
     @property
     def frames(self): 
-        return map(self.parse_frame, self.data_['frames'])
+        return map(SUN3DAnnotationFrame, self.data_['frames'])
 
     # def get_bboxes(self, index=None):
     #     if index is None: 
@@ -148,11 +238,11 @@ class SUN3DAnnotation(object):
         save_json_dict(self.filename_.replace('index.json', 'index_new.json'), self.data_)
 
     @classmethod
-    def load(cls, folder): 
+    def load(cls, folder, shape): 
         filename = os.path.join(os.path.expanduser(folder), 'annotation/index.json')
         _, basename = os.path.split(folder.rstrip('/'))
         
-        c = cls(filename, basename)
+        c = cls(filename, basename, shape=shape)
 
         data = load_json_dict(filename)
         c.initialize(data)
@@ -169,7 +259,12 @@ if __name__ == "__main__":
         default=None, help='Annotated image directory')
     args = parser.parse_args()
 
-    db = SUN3DAnnotation.load(args.directory)
-    print db.num_annotations, db.num_files, db.num_objects, db.name, db.objects
+    shape = (640,360)
+    db = SUN3DAnnotationDB.load(args.directory, shape)
     frames = db.frames
-    print frames, db.image_width, db.image_height
+    # print db.num_annotations, db.num_files, db.num_objects, db.name, db.objects
+    # print frames, db.image_width, db.image_height
+    files = db.files
+    print db[files[2996]]
+
+    # import ipdb; ipdb.set_trace()
