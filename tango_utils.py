@@ -17,6 +17,7 @@ from bot_externals.log_utils import Decoder, LogReader, LogController
 from bot_vision.image_utils import im_resize
 from bot_geometry.rigid_transform import RigidTransform
 from bot_vision.camera_utils import CameraIntrinsic
+from bot_utils.dataset.sun3d_utils import SUN3DAnnotationDB
 
 # def test_coords(): 
 #     IF = RigidTransform(Quaternion.from_wxyz([0.002592, 0.704923, 0.709254, -0.005954]), tvec=[0.000663, 0.011257, 0.004177])
@@ -139,9 +140,11 @@ def TangoOdomDecoder(channel, every_k_frames=1, noise=[0,0]):
 class TangoImageDecoder(Decoder): 
     """
     """
-    def __init__(self, directory, channel='RGB', color=True, every_k_frames=1, shape=(720,1280)): 
+    def __init__(self, directory, channel='RGB', color=True, every_k_frames=1, shape=(1280,720)): 
         Decoder.__init__(self, channel=channel, every_k_frames=every_k_frames)
         self.shape_ = shape 
+        if self.shape_[0] < self.shape_[1]: 
+            raise RuntimeError('W > H requirement failed, W: {}, H: {}'.format(self.shape_[0], self.shape_[1]))
         self.directory_ = directory
         self.color_ = color
 
@@ -157,10 +160,10 @@ class TangoImageDecoder(Decoder):
 
 
 # Basic type for image annotations
-AnnotatedImage = namedtuple('AnnotatedImage', ['img', 'bboxes'])
+AnnotatedImage = namedtuple('AnnotatedImage', ['img', 'annotation'])
 
 class TangoGroundTruthImageDecoder(TangoImageDecoder):
-    def __init__(self, directory, filename, channel='RGB', color=True, every_k_frames=1, shape=(720,1280)): 
+    def __init__(self, directory, filename, channel='RGB', color=True, every_k_frames=1, shape=(1280,720)): 
         self.filename_ = os.path.join(directory, filename)
         if not os.path.exists(self.filename_): 
             raise IOError('Cannot load ground truth file {:}'.format(self.filename_))
@@ -168,86 +171,36 @@ class TangoGroundTruthImageDecoder(TangoImageDecoder):
         TangoImageDecoder.__init__(self, directory, channel=channel, color=color, 
                                    every_k_frames=every_k_frames, shape=shape)
 
-        # Look up dictionary {fn -> annotations}
-        self.meta_ = {}
-
-        # Read annotations from index.json
-        with open(self.filename_) as f: 
-            data = json.loads(f.read())
-            meta = {fn: frame for (fn, frame) in zip(data['fileList'], data['frames'])}
-
-            try: 
-                # Hard-coded scaling for image annotation
-                H,W = data['img_height'], data['img_width']
-                self.get_image_scale = lambda height: height * 1.0 / H
-            except Exception as e:                
-                raise RuntimeError('Missing img_height, and img_width key, try re-saving annotation')
-
-            # print data.keys(), data['objects']
-            target_hash = {label['name']: lid for (lid,label) in enumerate(data['objects'])  if label is not None}
-            target_unhash = {lid: label['name'] for (lid,label) in enumerate(data['objects']) if label is not None}
-
-            
-            # Establish all annotations with appropriate class labels
-            # and instances
-            # bbox: [polygon, class_label, class_id, instance_id]
-            for fn, val in meta.iteritems(): 
-                basename = os.path.basename(str(fn))
-
-                # Polygons are extracted from the log, but dynamically
-                # resized according to the logs image size
-                try: 
-                    polygons = val['polygon']
-                except: 
-                    continue
-
-                # Read xy, objct, class_label, class_id, instance_id
-                annotations = []
-                for poly in polygons:
-                    xy = np.vstack([np.float32(poly['x']), 
-                                    np.float32(poly['y'])]).T
-
-                    # Object label as described by target hash
-                    lid = poly['object']
-
-                    # Trailing number after hyphen is instance id
-                    label = ''.join(target_unhash[lid].split('-')[:-1])
-                    instance_id = target_unhash[lid].split('-')[-1]
-                    annotations.append(
-                        dict(polygon=xy, class_label=label, class_id=None, instance_id=instance_id)
-                    )
-                self.meta_[basename] = annotations
-
-
+        # Read annotations from index.json {fn -> annotations}
+        self.meta_ = SUN3DAnnotationDB.load(directory, shape)
         print('\nGround Truth\n========\n'
               '\tAnnotations: {}\n'
-              '\tObjects: {}'.format(len(self.meta_), target_hash.keys()))
+              '\tObjects: {}'.format(self.meta_.num_annotations, self.meta_.num_objects))
 
     def decode(self, msg): 
         """
         Look up annotations based on basename of image
         """
         im = TangoImageDecoder.decode(self, msg)
-        basename = os.path.basename(msg)
-        # print('Retrieving annotations for {:}'.format(basename))
+        # print('Retrieving annotations for {:}, {}'.format(msg, im.shape))
 
         # Annotations
         # Available entries: polygon, bbox, class_label, class_id, instance_id
         H, W = im.shape[:2]
+            
         try: 
+
             # Scale up annotations based on input image 
             # and original annotated image
-            bboxes = self.meta_[basename]
-            for idx, bbox in enumerate(bboxes): 
-                # Update the polygons according to the current image
-                # size, and original annotation image size
-                sbbox = bbox['polygon'] * self.get_image_scale(H)
-                bboxes[idx]['polygon'] = sbbox
-                bboxes[idx]['bbox'] = np.int64([sbbox[:,0].min(), sbbox[:,1].min(), sbbox[:,0].max(), sbbox[:,1].max()])
+            annotation = self.meta_[msg]
+            # bboxes = frame.bboxes
+            # polygons = frame.polygons
+            # pretty_names = frame.pretty_names
+            
         except Exception as e: 
-            bboxes = []
-
-        return AnnotatedImage(img=im, bboxes=bboxes)
+            print(e)
+            
+        return AnnotatedImage(img=im, annotation=annotation)
 
 class TangoFile(object): 
 
@@ -455,8 +408,8 @@ class TangoLogReader(LogReader):
             if dec.should_decode():
                 return True, (t, channel, dec.decode(msg))
         except Exception as e:
+            print e
             pass
-            # print e
             # raise RuntimeError('Failed to decode data from channel: %s, mis-specified decoder?' % channel)
         
         return False, (None, None, None)
@@ -560,7 +513,7 @@ class TangoLogController(LogController):
         if not len(self.__pose_q):
             return
         t_pose, pose = self.__pose_q[-1]
-        self.on_frame(AnnotatedFrame(img=ann_img.img, pose=pose, t_pose=t_pose, t_img=t_img, bboxes=ann_img.bboxes))
+        self.on_frame(AnnotatedFrame(img=ann_img.img, pose=pose, t_pose=t_pose, t_img=t_img, bboxes=ann_img.annotation.bboxes))
         
     def on_rgb(self, t_img, img): 
         if not len(self.__pose_q):
