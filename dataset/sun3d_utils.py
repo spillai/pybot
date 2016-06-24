@@ -127,10 +127,11 @@ class SUN3DAnnotation(object):
             object_id = poly['object']
 
             object_info = self._get_object_info(object_id)
-            object_info['xy'] = xy
 
-            sbbox = xy * self.scale
-            object_info['bbox'] = np.int64([sbbox[:,0].min(), sbbox[:,1].min(), sbbox[:,0].max(), sbbox[:,1].max()])
+            sxy = xy * self.scale
+
+            object_info['xy'] = sxy
+            object_info['bbox'] = np.int64([sxy[:,0].min(), sxy[:,1].min(), sxy[:,0].max(), sxy[:,1].max()])
 
             annotations.append(object_info)
 
