@@ -16,9 +16,10 @@ class SUN3DAnnotation(object):
           'img_height': 360, 'img_width': 640}
     """
 
-    def __init__(self, filename, basename):
+    def __init__(self, filename, basename, scale=1.0):
         self.filename_ = os.path.expanduser(filename)
         self.basename_ = basename.replace('/','')
+        self.scale_ = scale
         self.initialize()
 
     @property
@@ -73,6 +74,10 @@ class SUN3DAnnotation(object):
                     class_id=-1, instance_name=instance_name)
 
     @property
+    def scale(self): 
+        return self.scale_
+
+    @property
     def name(self): 
         return self.basename_.replace('/', '')
 
@@ -124,8 +129,8 @@ class SUN3DAnnotation(object):
             object_info = self._get_object_info(object_id)
             object_info['xy'] = xy
 
-            # sbbox = xy * self.get_image_scale(H)
-            # object_info['bbox'] = np.int64([sbbox[:,0].min(), sbbox[:,1].min(), sbbox[:,0].max(), sbbox[:,1].max()])
+            sbbox = xy * self.scale
+            object_info['bbox'] = np.int64([sbbox[:,0].min(), sbbox[:,1].min(), sbbox[:,0].max(), sbbox[:,1].max()])
 
             annotations.append(object_info)
 
@@ -137,7 +142,6 @@ class SUN3DAnnotation(object):
 
     # def get_bboxes(self, index=None):
     #     if index is None: 
-            
 
     def save(self, filename): 
         save_json_dict(self.filename_.replace('index.json', 'index_new.json'), self.data_)
