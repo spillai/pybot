@@ -123,11 +123,9 @@ class SUN3DAnnotation(object):
 
             object_info = self._get_object_info(object_id)
             object_info['xy'] = xy
-            object_info['bbox'] = 
 
-            sbbox = bbox['polygon'] * self.get_image_scale(H)
-            bboxes[idx]['polygon'] = sbbox
-            bboxes[idx]['bbox'] = np.int64([sbbox[:,0].min(), sbbox[:,1].min(), sbbox[:,0].max(), sbbox[:,1].max()])
+            # sbbox = xy * self.get_image_scale(H)
+            # object_info['bbox'] = np.int64([sbbox[:,0].min(), sbbox[:,1].min(), sbbox[:,0].max(), sbbox[:,1].max()])
 
             annotations.append(object_info)
 
