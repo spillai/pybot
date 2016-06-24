@@ -122,13 +122,13 @@ class SUN3DAnnotation(object):
             # Get coordinates
             xy = np.vstack([np.float32(poly['x']), 
                             np.float32(poly['y'])]).T
-            print xy
+
             # Object label as described by target hash
             object_id = poly['object']
 
             object_info = self._get_object_info(object_id)
 
-            sxy = xy * self.scale
+            sxy = np.int64(xy * self.scale)
 
             object_info['xy'] = sxy
             object_info['bbox'] = np.int64([sxy[:,0].min(), sxy[:,1].min(), sxy[:,0].max(), sxy[:,1].max()])
@@ -172,4 +172,4 @@ if __name__ == "__main__":
     db = SUN3DAnnotation.load(args.directory)
     print db.num_annotations, db.num_files, db.num_objects, db.name, db.objects
     frames = db.frames
-    print frames
+    print frames, db.image_width, db.image_height
