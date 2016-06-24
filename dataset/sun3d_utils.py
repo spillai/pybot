@@ -11,6 +11,7 @@ class SUN3DAnnotationFrame(object):
         """
         self.annotations_ = []
 
+        # Retrieve polygons
         try: 
             polygons = frame['polygon']
         except: 
@@ -25,11 +26,12 @@ class SUN3DAnnotationFrame(object):
 
             # Object ID (from local annotation file)
             object_id = poly['object']
-            object_info = dict(object_id=poly['object'], 
-                               xy=xy, 
-                               bbox=np.int64([xy[:,0].min(), xy[:,1].min(), xy[:,0].max(), xy[:,1].max()]))
+            self.add(poly['object'], xy)
             
-            self.annotations_.append(object_info)
+    def add(self, object_id, xy, bbox=None): 
+        if bbox is None: 
+            bbox = np.int64([xy[:,0].min(), xy[:,1].min(), xy[:,0].max(), xy[:,1].max()])
+        self.annotations_.append(dict(object_id=object_id, xy=xy, bbox=bbox))
 
     @property
     def is_annotated(self): 
@@ -62,10 +64,6 @@ class SUN3DAnnotationFrame(object):
     @property
     def object_ids(self): 
         return np.int64([ann['object_id'] for ann in self.annotations_])
-
-    # @property
-    # def target_names(self): 
-    #     return [ann['pretty_name'] for ann in self.annotations_]
 
     # def to_json(): 
     #     """
@@ -192,13 +190,12 @@ class SUN3DAnnotationDB(object):
     @property
     def num_annotations(self): 
         return sum([len(frame) for frame in self.data_['frames']], 0)
-        
 
     def _get_prettynames(self, frame): 
         return [self.object_unhash_[oid] for oid in frame.object_ids]
 
-    # def _get_targets(self, frame): 
-    #     return np.int64([self.target_hash_[self.object_unhash_[oid]] for oid in frame.object_ids])
+    def _get_targets(self, frame): 
+        return np.int64([self.target_hash_[self.object_unhash_[oid]] for oid in frame.object_ids])
 
     def _get_scaled_polygons(self, frame): 
         return [(p * self.scale).astype(np.int64) for p in frame.unscaled_polygons]
@@ -230,9 +227,6 @@ class SUN3DAnnotationDB(object):
     @property
     def frames(self): 
         return map(SUN3DAnnotationFrame, self.data_['frames'])
-
-    # def get_bboxes(self, index=None):
-    #     if index is None: 
 
     def save(self, filename): 
         save_json_dict(self.filename_.replace('index.json', 'index_new.json'), self.data_)
