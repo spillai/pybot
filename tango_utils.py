@@ -181,25 +181,22 @@ class TangoGroundTruthImageDecoder(TangoImageDecoder):
         """
         Look up annotations based on basename of image
         """
+        # print('Retrieving annotations for {:}'.format(msg))
+        try: 
+            annotation = self.meta_[msg]
+        except Exception as e: 
+            raise Exception(e)
+            return
+
+        if not annotation.is_annotated: 
+            raise Exception('No annotation')
+
+        # print('Retrieving image for {:}'.format(msg))
         im = TangoImageDecoder.decode(self, msg)
-        # print('Retrieving annotations for {:}, {}'.format(msg, im.shape))
 
         # Annotations
         # Available entries: polygon, bbox, class_label, class_id, instance_id
         H, W = im.shape[:2]
-            
-        try: 
-
-            # Scale up annotations based on input image 
-            # and original annotated image
-            annotation = self.meta_[msg]
-            # bboxes = frame.bboxes
-            # polygons = frame.polygons
-            # pretty_names = frame.pretty_names
-            
-        except Exception as e: 
-            print(e)
-            
         return AnnotatedImage(img=im, annotation=annotation)
 
 class TangoFile(object): 
@@ -408,9 +405,10 @@ class TangoLogReader(LogReader):
             if dec.should_decode():
                 return True, (t, channel, dec.decode(msg))
         except Exception as e:
-            print e
-            pass
+            # print e
             # raise RuntimeError('Failed to decode data from channel: %s, mis-specified decoder?' % channel)
+            pass
+            
         
         return False, (None, None, None)
 
@@ -468,13 +466,14 @@ class TangoLogReader(LogReader):
         """
         Returns (img, bbox, targets [unique text])
         """
-        for (t,ch,data) in self.iteritems(topics=topics): 
-            bboxes = data.bboxes
+        for (t,ch,data) in self.iteritems(topics=TangoFile.RGB_CHANNEL): 
+            bboxes = data.annotation.bboxes
             if len(bboxes): 
-                bbox = np.vstack([bbox['bbox'] 
-                                  for bbox in bboxes]).astype(np.int64)
-                targets = [bbox['class_label'] for bbox in bboxes]
-                yield data.img, bbox, targets
+                # bbox = np.vstack([bbox['bbox'] 
+                #                   for bbox in bboxes]).astype(np.int64)
+                # targets = [bbox['class_label'] for bbox in bboxes]
+                targets = None
+                yield data.img, bboxes, targets
                 
 
 def iter_tango_logs(directory, logs, topics=[]):
