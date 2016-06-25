@@ -29,8 +29,12 @@ from bot_externals.plyfile import PlyData
 # __categories__ = ['flashlight', 'cap', 'cereal_box', 'coffee_mug', 'soda_can']
 
 def create_roidb_item(f): 
-    bboxes = np.vstack([bbox.coords for bbox in f.bbox])
-    targets = np.int64([bbox.target for bbox in f.bbox])
+    try: 
+        bboxes = np.vstack([bbox.coords for bbox in f.bbox])
+        targets = np.int64([bbox.target for bbox in f.bbox])
+    except: 
+        bboxes = np.empty(shape=(0,4), dtype=np.int64)
+        targets = []
     return f.img, bboxes, targets
 
 # =====================================================================
@@ -286,24 +290,24 @@ class UWRGBDSceneDataset(UWRGBDDataset):
             self.name = name
             self.version = version
 
-            rgb_files, depth_files = UWRGBDSceneDataset._reader.scene_files(files, version)
-            assert(len(depth_files) == len(rgb_files))
+            self.rgb_files, self.depth_files = UWRGBDSceneDataset._reader.scene_files(files, version)
+            assert(len(self.depth_files) == len(self.rgb_files))
 
             # RGB, Depth
             # TODO: Check depth seems scaled by 256 not 16
-            self.rgb = ImageDatasetReader.from_filenames(rgb_files)
-            self.depth = ImageDatasetReader.from_filenames(depth_files)
+            self.rgb = ImageDatasetReader.from_filenames(self.rgb_files)
+            self.depth = ImageDatasetReader.from_filenames(self.depth_files)
 
             # BBOX
             self.bboxes = UWRGBDSceneDataset._reader.load_bboxes(meta_file, version) \
-                         if meta_file is not None else [None] * len(rgb_files)
-            assert(len(self.bboxes) == len(rgb_files))
+                         if meta_file is not None else [None] * len(self.rgb_files)
+            assert(len(self.bboxes) == len(self.rgb_files))
             
             # POSE
             # Version 2 only supported! Version 1 support for rgbd scene (unclear)
             self.poses = UWRGBDSceneDataset._reader.load_poses(aligned_file.pose, version) \
-                         if aligned_file is not None and version == 'v2' else [None] * len(rgb_files)
-            assert(len(self.poses) == len(rgb_files))
+                         if aligned_file is not None and version == 'v2' else [None] * len(self.rgb_files)
+            assert(len(self.poses) == len(self.rgb_files))
 
             # Aligned point cloud
             if aligned_file is not None: 
@@ -335,7 +339,7 @@ class UWRGBDSceneDataset(UWRGBDDataset):
 
             print('*********************************')
             print('Scene {}, Images: {}, Poses: {}\nAligned: {}'
-                  .format(self.scene_name, len(rgb_files), len(self.poses), aligned_file))
+                  .format(self.scene_name, len(self.rgb_files), len(self.poses), aligned_file))
 
 
         @property
@@ -604,6 +608,13 @@ class UWRGBDSceneDataset(UWRGBDDataset):
                                                      self.poses[::every_k_frames]): 
                 yield self._process_items(index, rgb_im, depth_im, bbox, pose)
                 index += every_k_frames
+
+                
+        def roidb(self, every_k_frames=1, verbose=True, skip_empty=True): 
+            for item in self.iteritems(every_k_frames=every_k_frames): 
+                if not len(item.bbox) and skip_empty:
+                    continue
+                yield create_roidb_item(item)
                 
         def iterinds(self, inds): 
             for index, rgb_im, depth_im, bbox, pose in izip(inds, 
@@ -648,7 +659,7 @@ class UWRGBDSceneDataset(UWRGBDDataset):
 
     def iteritems(self, every_k_frames=1, verbose=False, with_ground_truth=False): 
         
-        print 'Scenes: %i %s' % (len(self.scenes()), self.scenes())
+        print 'Scenes: %i %s, With GT: {}' % (len(self.scenes()), self.scenes(), with_ground_truth)
         for key, scene in progressbar(
                 self.iterscenes(verbose=verbose, with_ground_truth=with_ground_truth), 
                 size=len(self.scenes()), verbose=verbose): 
@@ -656,10 +667,12 @@ class UWRGBDSceneDataset(UWRGBDDataset):
                 yield frame
             # break
         
-    def roidb(self, every_k_frames=1, verbose=True): 
-        for item in self.iteritems(every_k_frames=every_k_frames, with_ground_truth=True): 
-            if len(item.bbox): 
-                yield create_roidb_item(item)
+    def roidb(self, every_k_frames=1, verbose=True, skip_empty=True): 
+        for item in self.iteritems(every_k_frames=every_k_frames, 
+                                   with_ground_truth=True): 
+            if not len(item.bbox) and skip_empty:
+                continue
+            yield create_roidb_item(item)
 
     def scene(self, key, with_ground_truth=False): 
         if key in self.blacklist: 

@@ -2,8 +2,25 @@ import os
 import numpy as np
 
 from datetime import datetime
-from bot_utils.db_utils import load_json_dict
+from bot_utils.db_utils import load_json_dict, save_json_dict
 
+def frame_to_json(bboxes, targets): 
+    """
+    {'polygon': [{'x': [1,2,3], 'y': [2,3,4], 'object': 3}]}
+    """
+
+    assert(len(bboxes) == len(targets))
+    
+    if len(bboxes): 
+        bb = bboxes.astype(np.int32)
+        return {'polygon': 
+                [{'x': [int(b[0]), int(b[0]), int(b[2]), int(b[2])], 
+                  'y': [int(b[1]), int(b[3]), int(b[3]), int(b[1])], 
+                  'object': int(object_id)} \
+                 for object_id, b in zip(targets, bb)]}
+    else: 
+        return {}
+        
 class SUN3DAnnotationFrame(object): 
     def __init__(self, frame=None): 
         """
@@ -105,7 +122,10 @@ class SUN3DAnnotationDB(object):
                 'date': datetime.now().strftime("%a, %d %b %Y %I:%M:%S %Z"),
                 'name': self.basename_ + '/',
                 'frames': [], 'objects': [], 'conflictList': [],
-                'fileList': [], 'img_height': -1, 'img_width': -1 
+                'fileList': [], 
+                'extrinsics': None, 
+                'img_height': self.shape_[1], 
+                'img_width': self.shape_[0] 
             }
         else: 
             self.data_ = data
@@ -117,22 +137,38 @@ class SUN3DAnnotationDB(object):
         assert(self.data_ is not None)
 
         # Generate lookup tables for targets
-        self._generate_object_lut()
+        self._index_objects()
 
         # Object lookup
+        self._index_files()
+
+    def set_files(self, files):
+        self.data_['fileList'] = files
+        self.data_['frames'] = [{} for j in xrange(len(files))]
+        self.data_['conflictList'] = [None for j in xrange(len(files))]
+        self._index_files()
+
+    def _index_files(self): 
         self.index_ = {fn: idx for (idx, fn) in enumerate(self.files)}
-        
-    def _generate_object_lut(self): 
+
+    def set_objects(self, objects): 
+        self.data_['objects'] = [{'name': o} for o in objects]
+        self._index_objects()
+
+    def _index_objects(self): 
         """
         Generate look up table for objects
         (from the aggregated annotation DB)
         Object ID (oid) -> Object Name (pretty_name)
         """
-        print self.objects
         self.object_hash_ = { obj: object_id 
                               for (object_id, obj) in enumerate(self.objects) }
         self.object_unhash_ = { object_id: obj 
                                 for (object_id, obj) in enumerate(self.objects) }
+
+    def set_frame(self, basename, bboxes, targets):
+        index = self.index_[basename]
+        self.data_['frames'][index] = frame_to_json(bboxes, targets)
         
     def _get_object_info(self, object_id): 
         """
@@ -218,8 +254,7 @@ class SUN3DAnnotationDB(object):
     def __setitem__(self, basename, frame): 
         " Write back to data_['frames'] "
         assert(isinstance(frame, SUN3DAnnotationFrame))
-
-        # index = self.index_[basename]
+        index = self.index_[basename]
         # self.data_['frames'][index]
         
         pass
@@ -228,8 +263,8 @@ class SUN3DAnnotationDB(object):
     def frames(self): 
         return map(SUN3DAnnotationFrame, self.data_['frames'])
 
-    def save(self, filename): 
-        save_json_dict(self.filename_.replace('index.json', 'index_new.json'), self.data_)
+    def save(self): 
+        save_json_dict(self.filename_, self.data_)
 
     @classmethod
     def load(cls, folder, shape): 

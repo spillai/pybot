@@ -29,10 +29,13 @@ def load_json_dict(fn):
     import json
     return json.load(open(os.path.expanduser(fn), 'r'))
 
-def save_json_dict(fn, d): 
+def save_json_dict(fn, d, pretty=False): 
     import json
     with open(os.path.expanduser(fn), 'w') as fp:
-        json.dump(d, fp, sort_keys=True, indent=4, separators=(',', ':'))
+        if pretty: 
+            json.dump(d, fp, sort_keys=True, indent=4, separators=(',', ':'))
+        else: 
+            json.dump(d, fp)
 
 def load_yaml_dict(fn): 
     import yaml

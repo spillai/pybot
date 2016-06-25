@@ -3,7 +3,6 @@ import numpy as np
 import cv2
 
 from itertools import izip, repeat
-from bot_utils.misc import setup_pbar
 from bot_utils.db_utils import AttrDict
 
 from bot_vision.camera_utils import StereoCamera
