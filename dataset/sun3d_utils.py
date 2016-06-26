@@ -116,7 +116,6 @@ class SUN3DAnnotationDB(object):
         self.filename_ = os.path.expanduser(filename)
         self.basename_ = basename.replace('/','')
         self.shape_ = shape
-        print data['objects']
         self.initialize(data=data)
         
         
@@ -184,7 +183,16 @@ class SUN3DAnnotationDB(object):
     def set_frame(self, basename, bboxes, targets):
         index = self.index_[basename]
         self.data_['frames'][index] = frame_to_json(bboxes, targets)
-        
+
+    def has_object_name(self, object_name): 
+        return object_name in self.object_hash_
+
+    def get_object_name(self, object_id): 
+        return self.object_unhash_[object_id]
+
+    def get_object_id(self, object_name): 
+        return self.object_hash_[object_name]
+
     def _get_object_info(self, object_id): 
         """
         Get the object information from the object ID in the 
@@ -302,27 +310,59 @@ class SUN3DObjectDB(object):
         
         self.target_hash_ = {}
         self.target_unhash_ = {}
-
         self.annotation_db_ = {}
 
-        object_names = set()
+        self.objects_ = set()
         for d in directories: 
             basename = os.path.basename(d)
-
-            print 'Processing', basename, d
+            # print 'Processing', basename, d
 
             # Insert objects into unified set
             db = SUN3DAnnotationDB.load(d)
-            object_names.update(db.objects)
+            self.objects_.update(db.objects)
             self.annotation_db_[basename] = db
-            print db.objects
 
         # Unified object DB
-        self.target_unhash_ = {oid: name for oid, name in enumerate(object_names)}
-        self.target_hash_ = {oid: name for oid, name in enumerate(object_names)}
+        self.target_unhash_ = {oid: name for oid, name in enumerate(self.objects_)}
+        self.target_hash_ = {name: oid for oid, name in enumerate(self.objects_)}
         
         print('Total objects {}'.format(len(self.target_hash_)))
-        print self.target_unhash_.keys()
+        print self.target_hash_.keys()
+
+    @property
+    def objects(self): 
+        return list(self.objects_)
+
+    def get_object_id(self, object_name): 
+        """
+        Returns a look-up-table with dataset->object_id for 
+        the requested object_name
+        """
+        lut = {}
+        for basename, db in self.annotation_db_.iteritems():
+            if db.has_object_name(object_name): 
+                lut[basename] = db.get_object_id(object_name)
+        return lut
+
+    @property
+    def num_datasets(self): 
+        return len(self.annotation_db_)
+
+    @property
+    def datasets(self): 
+        return self.annotation_db_.keys()
+
+    def get_category_id(self): 
+        raise NotImplementedError()
+
+    def get_category_name(self): 
+        raise NotImplementedError()
+
+    def get_instance_id(self): 
+        raise NotImplementedError()
+
+    def get_instance_name(self): 
+        raise NotImplementedError()
 
 if __name__ == "__main__": 
     import argparse
