@@ -2,6 +2,7 @@ import os
 import numpy as np
 
 from datetime import datetime
+from bot_utils.io_utils import find_files
 from bot_utils.db_utils import load_json_dict, save_json_dict
 
 def frame_to_json(bboxes, targets): 
@@ -20,6 +21,9 @@ def frame_to_json(bboxes, targets):
                  for object_id, b in zip(targets, bb)]}
     else: 
         return {}
+
+def filter_none(items): 
+    return filter(lambda item: item is not None, items)
         
 class SUN3DAnnotationFrame(object): 
     def __init__(self, frame=None): 
@@ -101,14 +105,20 @@ class SUN3DAnnotationDB(object):
           'img_height': 360, 'img_width': 640}
     """
 
-    def __init__(self, filename, basename, shape):
-        if shape[0] < shape[1]: 
+    def __init__(self, filename, basename, shape=None, data=None):
+        if shape is None: 
+            import warnings
+            warnings.warn('Shape is not set, default scale being used')
+
+        if shape is not None and shape[0] < shape[1]: 
             raise RuntimeError('W > H requirement failed, W: {}, H: {}'.format(shape[0], shape[1]))
 
         self.filename_ = os.path.expanduser(filename)
         self.basename_ = basename.replace('/','')
         self.shape_ = shape
-        self.initialize()
+        print data['objects']
+        self.initialize(data=data)
+        
         
     @property
     def initialized(self): 
@@ -118,21 +128,26 @@ class SUN3DAnnotationDB(object):
         # Initialize data or set data, and
         # check data integrity
         if data is None: 
+            if self.shape_ is None: 
+                raise ValueError('shape has to be provided for initialization')
             self.data_ = {
                 'date': datetime.now().strftime("%a, %d %b %Y %I:%M:%S %Z"),
                 'name': self.basename_ + '/',
                 'frames': [], 'objects': [], 'conflictList': [],
                 'fileList': [], 
                 'extrinsics': None, 
-                'img_height': self.shape_[1], 
-                'img_width': self.shape_[0] 
+                'img_height': self.shape_[1],
+                'img_width': self.shape_[0]
             }
         else: 
             self.data_ = data
 
-        # Determine scale
-        self.scale_ = self.shape_[1] * 1.0 / self.image_height
-        
+        # Determine scale (if not already set)
+        if self.shape_ is not None: 
+            self.scale_ = self.shape_[1] * 1.0 / self.image_height
+        else: 
+            self.scale_ = 1.0
+
         # Data integrity check
         assert(self.data_ is not None)
 
@@ -209,11 +224,12 @@ class SUN3DAnnotationDB(object):
 
     @property
     def objects(self): 
-        return map(lambda item: item['name'], self.data_['objects'])
+        return map(lambda item: item['name'], 
+                   filter_none(self.data_['objects']))
 
     @property
     def num_objects(self): 
-        return len(self.data_['objects'])
+        return len(self.objects)
 
     @property
     def files(self):
@@ -267,17 +283,46 @@ class SUN3DAnnotationDB(object):
         save_json_dict(self.filename_, self.data_)
 
     @classmethod
-    def load(cls, folder, shape): 
-        filename = os.path.join(os.path.expanduser(folder), 'annotation/index.json')
+    def load(cls, folder, shape=None): 
+        filename = os.path.join(os.path.expanduser(folder), 
+                                'annotation/index.json')
         _, basename = os.path.split(folder.rstrip('/'))
-        
-        c = cls(filename, basename, shape=shape)
-
         data = load_json_dict(filename)
-        c.initialize(data)
-
+        
+        c = cls(filename, basename, shape=shape, data=data)
         return c
 
+class SUN3DObjectDB(object): 
+    def __init__(self, directory): 
+        files = filter(lambda fn: os.path.splitext(fn)[1] == '.json', \
+                       find_files(os.path.expanduser(directory), 
+                                  contains='index.json'))
+        directories = map(lambda fn: 
+                          fn.replace('/annotation/index.json',''), files)
+        
+        self.target_hash_ = {}
+        self.target_unhash_ = {}
+
+        self.annotation_db_ = {}
+
+        object_names = set()
+        for d in directories: 
+            basename = os.path.basename(d)
+
+            print 'Processing', basename, d
+
+            # Insert objects into unified set
+            db = SUN3DAnnotationDB.load(d)
+            object_names.update(db.objects)
+            self.annotation_db_[basename] = db
+            print db.objects
+
+        # Unified object DB
+        self.target_unhash_ = {oid: name for oid, name in enumerate(object_names)}
+        self.target_hash_ = {oid: name for oid, name in enumerate(object_names)}
+        
+        print('Total objects {}'.format(len(self.target_hash_)))
+        print self.target_unhash_.keys()
 
 if __name__ == "__main__": 
     import argparse
