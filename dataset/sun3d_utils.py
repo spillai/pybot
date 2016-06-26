@@ -184,6 +184,15 @@ class SUN3DAnnotationDB(object):
         index = self.index_[basename]
         self.data_['frames'][index] = frame_to_json(bboxes, targets)
 
+    @property
+    def annotation_sizes(self): 
+        return [len(f['polygon']) if 'polygon' in f else 0 \
+                for f in self.data_['frames'] ]
+
+    @property
+    def num_annotations(self): 
+        return sum(self.annotation_sizes, 0)
+
     def has_object_name(self, object_name): 
         return object_name in self.object_hash_
 
@@ -246,10 +255,6 @@ class SUN3DAnnotationDB(object):
     @property
     def num_files(self):
         return len(self.data_['fileList'])
-
-    @property
-    def num_annotations(self): 
-        return sum([len(frame) for frame in self.data_['frames']], 0)
 
     def _get_prettynames(self, frame): 
         return [self.object_unhash_[oid] for oid in frame.object_ids]
@@ -333,7 +338,7 @@ class SUN3DObjectDB(object):
     def objects(self): 
         return list(self.objects_)
 
-    def get_object_id(self, object_name): 
+    def get_object_ids(self, object_name): 
         """
         Returns a look-up-table with dataset->object_id for 
         the requested object_name
@@ -351,6 +356,9 @@ class SUN3DObjectDB(object):
     @property
     def datasets(self): 
         return self.annotation_db_.keys()
+
+    def get_target_id(self, object_name): 
+        return self.target_hash_[object_name]
 
     def get_category_id(self): 
         raise NotImplementedError()
