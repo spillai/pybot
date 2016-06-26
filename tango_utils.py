@@ -163,7 +163,7 @@ class TangoImageDecoder(Decoder):
 AnnotatedImage = namedtuple('AnnotatedImage', ['img', 'annotation'])
 
 class TangoGroundTruthImageDecoder(TangoImageDecoder):
-    def __init__(self, directory, filename, channel='RGB', color=True, every_k_frames=1, shape=(1280,720)): 
+    def __init__(self, annotationdb, directory, filename, channel='RGB', color=True, every_k_frames=1, shape=(1280,720)): 
         self.filename_ = os.path.join(directory, filename)
         if not os.path.exists(self.filename_): 
             raise IOError('Cannot load ground truth file {:}'.format(self.filename_))
@@ -171,11 +171,7 @@ class TangoGroundTruthImageDecoder(TangoImageDecoder):
         TangoImageDecoder.__init__(self, directory, channel=channel, color=color, 
                                    every_k_frames=every_k_frames, shape=shape)
 
-        # Read annotations from index.json {fn -> annotations}
-        self.meta_ = SUN3DAnnotationDB.load(directory, shape)
-        print('\nGround Truth\n========\n'
-              '\tAnnotations: {}\n'
-              '\tObjects: {}'.format(self.meta_.num_annotations, self.meta_.num_objects))
+        self.meta_ = annotationdb
 
     def decode(self, msg): 
         """
@@ -357,12 +353,23 @@ class TangoLogReader(LogReader):
         # Load ground truth filename
         self.with_ground_truth_ = with_ground_truth
         if with_ground_truth: 
-            im_dec = TangoGroundTruthImageDecoder(self.directory_, filename='annotation/index.json', 
-                                                   channel=TangoFile.RGB_CHANNEL, color=True, 
-                                                   shape=(W,H), every_k_frames=every_k_frames)
+
+            # Read annotations from index.json {fn -> annotations}
+            self.meta_ = SUN3DAnnotationDB.load(self.directory_, shape=(W,H))
+            print('\nGround Truth\n========\n'
+                  '\tAnnotations: {}\n'
+                  '\tObjects: {}'.format(self.meta_.num_annotations, 
+                                         self.meta_.num_objects))
+
+            im_dec = TangoGroundTruthImageDecoder(
+                self.meta_, self.directory_, filename='annotation/index.json', 
+                channel=TangoFile.RGB_CHANNEL, color=True, 
+                shape=(W,H), every_k_frames=every_k_frames)
         else: 
-            im_dec = TangoImageDecoder(self.directory_, channel=TangoFile.RGB_CHANNEL, color=True, 
-                                       shape=(W,H), every_k_frames=every_k_frames)
+            self.meta_ = None
+            im_dec = TangoImageDecoder(
+                self.directory_, channel=TangoFile.RGB_CHANNEL, color=True, 
+                shape=(W,H), every_k_frames=every_k_frames)
 
         # Setup log (calls load_log, and initializes decoders)
         super(TangoLogReader, self).__init__(
@@ -474,7 +481,13 @@ class TangoLogReader(LogReader):
                 # targets = [bbox['class_label'] for bbox in bboxes]
                 targets = None
                 yield data.img, bboxes, targets
-                
+
+    @property
+    def annotated_indices(self): 
+        assert(self.ground_truth_available)
+        assert(self.start_idx_ == 0)
+        inds, = np.where(self.meta_.annotation_sizes)
+        return inds
 
 def iter_tango_logs(directory, logs, topics=[]):
     for log in logs: 
