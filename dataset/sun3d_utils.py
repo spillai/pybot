@@ -241,7 +241,7 @@ class SUN3DAnnotationDB(object):
 
     @property
     def objects(self): 
-        return map(lambda item: item['name'], 
+        return map(lambda item: str(item['name']), 
                    filter_none(self.data_['objects']))
 
     @property
@@ -332,7 +332,6 @@ class SUN3DObjectDB(object):
         self.target_hash_ = {name: oid for oid, name in enumerate(self.objects_)}
         
         print('Total objects {}'.format(len(self.target_hash_)))
-        print self.target_hash_.keys()
 
     @property
     def objects(self): 
