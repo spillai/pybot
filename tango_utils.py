@@ -215,11 +215,13 @@ class TangoFile(object):
         
         messages_str = ', '.join(['{:} ({:})'.format(k,v) 
                                   for k,v in c.iteritems()])
-        print('\nTangoFile\n========\n'
+        print('\nTangoFile \n========\n'
+              '\tFile: {:}\n'
               '\tTopics: {:}\n'
               '\tMessages: {:}\n'
               '\tDistance Travelled: {:.2f} m\n'
               '\tDuration: {:} s\n'.format(
+                  self.filename_, 
                   self.topics_, messages_str, 
                   distance, np.max(ts)-np.min(ts)))
 
