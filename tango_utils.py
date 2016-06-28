@@ -458,7 +458,7 @@ class TangoLogReader(LogReader):
 
     #     return self.iterframes(topics=topics, reverse=reverse)
 
-    def roidb(self, every_k_frames=1, verbose=True, skip_empty=True): 
+    def roidb(self, target_hash, every_k_frames=1, verbose=True, skip_empty=True): 
         """
         Returns (img, bbox, targets [unique text])
         """
@@ -466,21 +466,22 @@ class TangoLogReader(LogReader):
             raise RuntimeError('roidb not meant for skipping frames,'
                                'and skipping empty simultaneously ')
 
+
+        # Iterate through all images
         for idx, (t,ch,data) in enumerate(self.iteritems(topics=TangoFile.RGB_CHANNEL)): 
 
+            # Skip every k frames, if requested
             if idx % every_k_frames != 0: 
                 continue
 
-            # Should probably change this to be 
-            # handled in a nicer way
-            # try: 
+            # Annotations may be empty, if 
+            # unlabeled, however we can request
+            # to yield if its empty or not
             bboxes = data.annotation.bboxes
             if not len(bboxes) and skip_empty: 
                 continue
-            targets = data.annotation.pretty_names
-            yield data.img, bboxes, targets
-            # except: 
-            #     yield data, np.zeros(shape=(0,4)), []
+            target_names = data.annotation.pretty_names
+            yield data.img, bboxes, np.int32(map(lambda key: target_hash[key], target_names))
 
     @property
     def annotated_indices(self): 
