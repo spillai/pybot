@@ -311,6 +311,7 @@ class SUN3DObjectDB(object):
         files = filter(lambda fn: os.path.splitext(fn)[1] == '.json', \
                        find_files(os.path.expanduser(directory), 
                                   contains='index.json'))
+
         directories = map(lambda fn: 
                           fn.replace('/annotation/index.json',''), files)
         
@@ -318,7 +319,9 @@ class SUN3DObjectDB(object):
         self.target_unhash_ = {}
         self.annotation_db_ = {}
 
-        self.objects_ = set()
+        # Create object look up table
+        # (default background class available)
+        self.objects_ = set(['background'])
         for d in directories: 
             basename = os.path.basename(d)
             # print 'Processing', basename, d
@@ -333,6 +336,14 @@ class SUN3DObjectDB(object):
         self.target_hash_ = {name: oid for oid, name in enumerate(self.objects_)}
         
         print('Total objects {}'.format(len(self.target_hash_)))
+
+    @property
+    def target_hash(self): 
+        return self.target_hash_
+
+    @property
+    def target_unhash(self): 
+        return self.target_unhash_
 
     @property
     def objects(self): 

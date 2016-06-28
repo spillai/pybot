@@ -48,8 +48,9 @@ def create_path_if_not_exists(filename):
     return False
 
 def find_files(directory, contains=''): 
-    return [os.path.join(root, file) 
-            for root, dirs, files in os.walk(os.path.expanduser(directory)) for file in files if contains in file]
+    return [os.path.join(root, f) 
+            for root, dirs, files in os.walk(os.path.expanduser(directory)) 
+            for f in files if contains in f]
                
 def number_of_files(directory, ext=''): 
     return len(filter(lambda x: ext in x, 
