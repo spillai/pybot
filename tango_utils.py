@@ -471,18 +471,16 @@ class TangoLogReader(LogReader):
     def iter_frames(self, topics=[]):
         return self.iteritems(topics=topics)
 
-    def roidb(self, every_k_frames=1, verbose=True): 
+    def roidb(self, every_k_frames=1, verbose=True, skip_empty=True): 
         """
         Returns (img, bbox, targets [unique text])
         """
         for (t,ch,data) in self.iteritems(topics=TangoFile.RGB_CHANNEL): 
             bboxes = data.annotation.bboxes
-            if len(bboxes): 
-                # bbox = np.vstack([bbox['bbox'] 
-                #                   for bbox in bboxes]).astype(np.int64)
-                # targets = [bbox['class_label'] for bbox in bboxes]
-                targets = None
-                yield data.img, bboxes, targets
+            if not len(bboxes) and skip_empty: 
+                continue
+            targets = data.annotation.pretty_names
+            yield data.img, bboxes, targets
 
     @property
     def annotated_indices(self): 
