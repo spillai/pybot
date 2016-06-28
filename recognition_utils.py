@@ -456,14 +456,15 @@ class NegativeMiningGenerator(object):
         """
         bboxes = self.proposer_.process(im)
 
-        # Determine bboxes that have low IoU with ground truth
-        # iou = [N x GT]
-        iou = brute_force_match(bboxes, gt_bboxes, 
-                                match_func=lambda x,y: intersection_over_union(x,y))
-        # print('Detected {}, {}, {}'.format(iou.shape, len(gt_bboxes), len(bboxes))) # , np.max(iou, axis=1)
-        overlap_inds, = np.where(np.max(iou, axis=1) < 0.1)
-        bboxes = bboxes[overlap_inds[:self.num_proposals_]]
-        # print('Remaining non-overlapping {}'.format(len(bboxes)))
+        if len(gt_bboxes): 
+            # Determine bboxes that have low IoU with ground truth
+            # iou = [N x GT]
+            iou = brute_force_match(bboxes, gt_bboxes, 
+                                    match_func=lambda x,y: intersection_over_union(x,y))
+            # print('Detected {}, {}, {}'.format(iou.shape, len(gt_bboxes), len(bboxes))) # , np.max(iou, axis=1)
+            overlap_inds, = np.where(np.max(iou, axis=1) < 0.1)
+            bboxes = bboxes[overlap_inds[:self.num_proposals_]]
+            # print('Remaining non-overlapping {}'.format(len(bboxes)))
 
         targets = self.generate_targets(len(bboxes))
         return bboxes, targets
