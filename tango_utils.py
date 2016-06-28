@@ -188,8 +188,8 @@ class TangoGroundTruthImageDecoder(TangoImageDecoder):
             raise Exception(e)
             return
 
-        if not annotation.is_annotated: 
-            raise Exception('No annotation')
+        # if not annotation.is_annotated: 
+        #     raise Exception('No annotation')
 
         # print('Retrieving image for {:}'.format(msg))
         im = TangoImageDecoder.decode(self, msg)
@@ -462,12 +462,25 @@ class TangoLogReader(LogReader):
         """
         Returns (img, bbox, targets [unique text])
         """
-        for (t,ch,data) in self.iteritems(topics=TangoFile.RGB_CHANNEL): 
+        if every_k_frames > 1 and skip_empty: 
+            raise RuntimeError('roidb not meant for skipping frames,'
+                               'and skipping empty simultaneously ')
+
+        for idx, (t,ch,data) in enumerate(self.iteritems(topics=TangoFile.RGB_CHANNEL)): 
+
+            if idx % every_k_frames != 0: 
+                continue
+
+            # Should probably change this to be 
+            # handled in a nicer way
+            # try: 
             bboxes = data.annotation.bboxes
             if not len(bboxes) and skip_empty: 
                 continue
             targets = data.annotation.pretty_names
             yield data.img, bboxes, targets
+            # except: 
+            #     yield data, np.zeros(shape=(0,4)), []
 
     @property
     def annotated_indices(self): 
