@@ -34,7 +34,11 @@ def progressbar(it, prefix = "", size=100, verbose=True, width=100):
     Optional progress bar, if verbose == True
     """
     def _show(_i):
-        x = int(_i * (width * 1.0 / size))
+        print size
+        try: 
+            x = int(_i * (width * 1.0 / size))
+        except: 
+            x = 0
         sys.stdout.write(color_green("%s[%s%s] %i/%i\n" % (prefix, "#"*x, "."*(width-x), _i, size)))
         sys.stdout.flush()
     

@@ -264,10 +264,16 @@ class SUN3DAnnotationDB(object):
         return np.int64([self.target_hash_[self.object_unhash_[oid]] for oid in frame.object_ids])
 
     def _get_scaled_polygons(self, frame): 
-        return [(p * self.scale).astype(np.int64) for p in frame.unscaled_polygons]
+        try: 
+            return np.vstack([(p * self.scale).astype(np.int64) for p in frame.unscaled_polygons])
+        except: 
+            return np.empty(shape=(0,2), dtype=np.int64)
 
     def _get_scaled_bboxes(self, frame): 
-        return [(bbox * self.scale).astype(np.int64) for bbox in frame.unscaled_bboxes]
+        try: 
+            return np.vstack([(bbox * self.scale).astype(np.int64) for bbox in frame.unscaled_bboxes])
+        except: 
+            return np.empty(shape=(0,4), dtype=np.int64)
 
     def decorate_frame(self, aframe): 
         aframe.bboxes = self._get_scaled_bboxes(aframe)
