@@ -89,14 +89,16 @@ def TangoOdomDecoder(channel, every_k_frames=1, noise=[0,0]):
     # ID = RigidTransform(Quaternion.from_wxyz([0.702596, -0.079740, -0.079740, 0.702596]), tvec=[0.000000, 0.000000, 0.000000])
     # IC = RigidTransform(Quaternion.from_wxyz([0.000585, 0.707940, 0.706271, 0.001000]), tvec=[0.000339, 0.061691, 0.002792])
 
-    p_IF = RigidTransform(tvec=[0.000662555, 0.011257, 0.0041772], xyzw=[0.70492326,  0.7092538 , -0.00595375,  0.00259168])
+
     # p_ID = RigidTransform(tvec=[0,0,0], xyzw=[-0.079740, -0.079740, 0.706271, 0.706271]) # Jan 2016
     p_ID = RigidTransform(tvec=[0,0,0], xyzw=[-0.079740, -0.079740, 0.702596, 0.702596]) # May 2016
+    p_IF = RigidTransform(tvec=[0.000662555, 0.011257, 0.0041772], xyzw=[0.70492326,  0.7092538 , -0.00595375,  0.00259168])
     p_IC = RigidTransform(tvec=[0.000339052, 0.0616911, 0.00279207], xyzw=[0.707940, 0.706271, 0.001000, 0.000585])
     p_DC = p_ID.inverse() * p_IC
     p_DF = p_ID.inverse() * p_IF
-    print('\nCalibration\n==============')
-    print('\tp_ID: {}, \n\tp_IC: {}, \n\tp_DC: {}, \n\tp_DF: {}'.format(p_ID, p_IC, p_DC, p_DF))
+
+    # print('\nCalibration\n==============')
+    # print('\tp_ID: {}, \n\tp_IC: {}, \n\tp_DC: {}, \n\tp_DF: {}'.format(p_ID, p_IC, p_DC, p_DF))
 
     # SS->CAM
     p_S_CAM = RigidTransform.from_roll_pitch_yaw_x_y_z(-np.pi/2, 0, 0, 
@@ -168,8 +170,10 @@ class TangoGroundTruthImageDecoder(TangoImageDecoder):
         if not os.path.exists(self.filename_): 
             raise IOError('Cannot load ground truth file {:}'.format(self.filename_))
         
-        TangoImageDecoder.__init__(self, directory, channel=channel, color=color, 
-                                   every_k_frames=every_k_frames, shape=shape)
+        TangoImageDecoder.__init__(self, directory, channel=channel,
+                                   color=color,
+                                   every_k_frames=every_k_frames,
+                                   shape=shape)
 
         self.meta_ = annotationdb
 
@@ -421,55 +425,38 @@ class TangoLogReader(LogReader):
         
         return False, (None, None, None)
 
-    def iteritems(self, topics=[], reverse=False): 
+    def itercursors(self, topics=[], reverse=False): 
         if self.index is not None: 
             raise NotImplementedError('Cannot provide items indexed')
         
         if reverse: 
-            raise RuntimeError('Cannot provide items in reverse when file is not indexed')
+            raise NotImplementedError('Cannot provide items in reverse when file is not indexed')
 
         # Decode only messages that are supposed to be decoded 
         print('Reading TangoFile from index={:} onwards'.format(self.start_idx_))
         for self.idx, (channel, msg, t) in enumerate(self.log.read_messages(topics=topics)):
             if self.idx < self.start_idx_: 
                 continue
+            yield (t, channel, msg)
+
+    def iteritems(self, topics=[], reverse=False): 
+        for (t, channel, msg) in self.itercursors(topics=topics, reverse=reverse): 
             try: 
                 res, (t, ch, data) = self.decode_msg(channel, msg, t)
                 if res: 
                     yield (t, ch, data)
             except Exception, e: 
                 print('TangLog.iteritems() :: {:}'.format(e))
-                pass
 
-    def iterframes(self, topics=[], reverse=False): 
-        """
-        Ground truth reader interface
-        Overload decode msg to lookup corresponding annotation
-        """
-        if self.index is not None: 
-            raise NotImplementedError('Cannot provide items indexed')
+    # def iterframes(self, topics=[], reverse=False): 
+    #     """
+    #     Ground truth reader interface
+    #     Overload decode msg to lookup corresponding annotation
+    #     """
+    #     if not hasattr(self, 'gt_'): 
+    #         raise RuntimeError('Cannot iterate, ground truth dataset not loaded')
 
-        if reverse: 
-            raise RuntimeError('Cannot provide items in reverse when file is not indexed')
-
-        if not hasattr(self, 'gt_'): 
-            raise RuntimeError('Cannot iterate, ground truth dataset not loaded')
-
-        # Decode only messages that are supposed to be decoded 
-        print('Reading TangoFile from index={:} onwards'.format(self.start_idx_))
-        for self.idx, (channel, msg, t) in enumerate(self.log.read_messages(topics=topics)):
-            if self.idx < self.start_idx_: 
-                continue
-            try: 
-                res, (t, ch, data) = self.decode_msg(channel, msg, t)
-                if res: 
-                    yield (t, ch, data)
-            except Exception, e: 
-                print('TangLog.iteritems() :: {:}'.format(e))
-                pass
-
-    def iter_frames(self, topics=[]):
-        return self.iteritems(topics=topics)
+    #     return self.iterframes(topics=topics, reverse=reverse)
 
     def roidb(self, every_k_frames=1, verbose=True, skip_empty=True): 
         """
@@ -498,6 +485,39 @@ def iter_tango_logs(directory, logs, topics=[]):
             bboxes = item.bboxes
             targets = item.coords
 
+class LogDB(object): 
+    def __init__(self, dataset): 
+        self.dataset_ = dataset
+        self._index()
+
+    def _index(self): 
+        for (t,ch,data) in self.dataset_.itercursors(topics=[]): 
+            print t, ch, data
+
+    
+
+class TangoDB(LogDB): 
+    def __init__(self, dataset): 
+        LogDB.__init__(self, dataset)
+
+    def _build_graph(self): 
+        # Keep a queue of finite length to ensure 
+        # time-sync with RGB and IMU
+        self.__pose_q = deque(maxlen=10)
+
+        self.nodes_ = []
+
+        for (t,ch,data) in self.dataset_.itercursors(topics=[]): 
+            if ch == TangoFile.VIO_CHANNEL: 
+                self.__pose_q.append(data)
+                continue
+            
+            if not len(self.__pose_q): 
+                continue
+
+            assert(ch == TangoFile.RGB_CHANNEL)
+            self.nodes_.append(dict(img=data, pose=self.__pose_q[-1]))
+            
 
 # Basic type for tango frame (includes pose, image, timestamp)
 Frame = namedtuple('Frame', ['img', 'pose', 't_pose', 't_img'])
