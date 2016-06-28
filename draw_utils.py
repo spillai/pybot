@@ -34,7 +34,7 @@ def draw_matches(out, pts1, pts2, colors=None, thickness=1, size=2):
     out = draw_features(out, pts2, colors=colors, size=size)
     return out
 
-def draw_bboxes(vis, bboxes, ellipse=False, colored=True):
+def draw_bboxes(vis, bboxes, texts=None, ellipse=False, colored=True):
     if not len(bboxes): 
         return vis
 
@@ -45,19 +45,22 @@ def draw_bboxes(vis, bboxes, ellipse=False, colored=True):
         cwheel = colormap(np.linspace(0, 1, N))
         cols = np.vstack([cwheel[idx % N] for idx, _ in enumerate(bboxes)])            
 
-    for col, b in zip(cols, bboxes): 
+    texts = [None] * len(bboxes) if texts is None else texts
+    for col, b, t in zip(cols, bboxes, texts): 
         if ellipse: 
             cv2.ellipse(vis, ((b[0]+b[2])/2, (b[1]+b[3])/2), ((b[2]-b[0])/2, (b[3]-b[1])/2), 0, 0, 360, 
                         color=tuple(col), thickness=1)
         else: 
             cv2.rectangle(vis, (b[0], b[1]), (b[2], b[3]), tuple(col), 2)
+        if t: 
+            annotate_bbox(vis, b, title=t)
     return vis
 
 def annotate_bbox(vis, coords, color=(0,200,0), title=''): 
     # Bounding Box and top header
     icoords = coords.astype(np.int32)
     cv2.rectangle(vis, (icoords[0], icoords[1]), (icoords[2], icoords[3]), color, 2)
-    cv2.rectangle(vis, (icoords[0]-1, icoords[1]-15), (icoords[2]+1, icoords[1]), color, -1)
+    # cv2.rectangle(vis, (icoords[0]-1, icoords[1]-15), (icoords[2]+1, icoords[1]), color, -1)
     cv2.putText(vis, '{}'.format(title), (icoords[0], icoords[1]-5), 
                 cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), thickness=1, lineType=cv2.CV_AA)
     return vis
