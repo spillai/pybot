@@ -8,6 +8,7 @@ from bot_utils.db_utils import load_json_dict, save_json_dict
 def frame_to_json(bboxes, targets): 
     """
     {'polygon': [{'x': [1,2,3], 'y': [2,3,4], 'object': 3}]}
+    Also decorated (see decorate_frame with pretty_names, polygons, targets)
     """
 
     assert(len(bboxes) == len(targets))

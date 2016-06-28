@@ -52,7 +52,8 @@ class UWRGBDDataset(object):
                    "greens", "hand_towel", "instant_noodles", "keyboard", "kleenex", "lemon", "lightbulb", 
                    "lime", "marker", "mushroom", "notebook", "onion", "orange", "peach", "pear", "pitcher", 
                    "plate", "pliers", "potato", "rubber_eraser", "scissors", "shampoo", "soda_can", 
-                   "sponge", "stapler", "tomato", "toothbrush", "toothpaste", "water_bottle", "background", "sofa", "table", "office_chair", "coffee_table"]
+                   "sponge", "stapler", "tomato", "toothbrush", "toothpaste", "water_bottle", "background", 
+                   "sofa", "table", "office_chair", "coffee_table"]
 
     # Added more v2 objects into v1
     class_ids = np.arange(len(class_names), dtype=np.int)    
