@@ -463,9 +463,10 @@ class NegativeMiningGenerator(object):
                                     match_func=lambda x,y: intersection_over_union(x,y))
             # print('Detected {}, {}, {}'.format(iou.shape, len(gt_bboxes), len(bboxes))) # , np.max(iou, axis=1)
             overlap_inds, = np.where(np.max(iou, axis=1) < 0.1)
-            bboxes = bboxes[overlap_inds[:self.num_proposals_]]
+            bboxes = bboxes[overlap_inds]
             # print('Remaining non-overlapping {}'.format(len(bboxes)))
 
+        bboxes = bboxes[:self.num_proposals_]
         targets = self.generate_targets(len(bboxes))
         return bboxes, targets
 
