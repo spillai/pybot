@@ -164,41 +164,6 @@ class TangoImageDecoder(Decoder):
 # Basic type for image annotations
 AnnotatedImage = namedtuple('AnnotatedImage', ['img', 'annotation'])
 
-class TangoGroundTruthImageDecoder(TangoImageDecoder):
-    def __init__(self, annotationdb, directory, filename, channel='RGB', color=True, every_k_frames=1, shape=(1280,720)): 
-        self.filename_ = os.path.join(directory, filename)
-        if not os.path.exists(self.filename_): 
-            raise IOError('Cannot load ground truth file {:}'.format(self.filename_))
-        
-        TangoImageDecoder.__init__(self, directory, channel=channel,
-                                   color=color,
-                                   every_k_frames=every_k_frames,
-                                   shape=shape)
-
-        self.meta_ = annotationdb
-
-    def decode(self, msg): 
-        """
-        Look up annotations based on basename of image
-        """
-        # print('Retrieving annotations for {:}'.format(msg))
-        try: 
-            annotation = self.meta_[msg]
-        except Exception as e: 
-            raise Exception(e)
-            return
-
-        # if not annotation.is_annotated: 
-        #     raise Exception('No annotation')
-
-        # print('Retrieving image for {:}'.format(msg))
-        im = TangoImageDecoder.decode(self, msg)
-
-        # Annotations
-        # Available entries: polygon, bbox, class_label, class_id, instance_id
-        H, W = im.shape[:2]
-        return AnnotatedImage(img=im, annotation=annotation)
-
 class TangoFile(object): 
 
     RGB_CHANNEL = 'RGB'
@@ -357,32 +322,21 @@ class TangoLogReader(LogReader):
         H, W = self.shape_
 
         # Load ground truth filename
-        self.with_ground_truth_ = with_ground_truth
-        if with_ground_truth: 
-
-            # Read annotations from index.json {fn -> annotations}
-            self.meta_ = SUN3DAnnotationDB.load(self.directory_, shape=(W,H))
-            print('\nGround Truth\n========\n'
-                  '\tAnnotations: {}\n'
-                  '\tObjects: {}'.format(self.meta_.num_annotations, 
-                                         self.meta_.num_objects))
-
-            im_dec = TangoGroundTruthImageDecoder(
-                self.meta_, self.directory_, filename='annotation/index.json', 
-                channel=TangoFile.RGB_CHANNEL, color=True, 
-                shape=(W,H), every_k_frames=every_k_frames)
-        else: 
-            self.meta_ = None
-            im_dec = TangoImageDecoder(
-                self.directory_, channel=TangoFile.RGB_CHANNEL, color=True, 
-                shape=(W,H), every_k_frames=every_k_frames)
+        # Read annotations from index.json {fn -> annotations}
+        self.meta_ = SUN3DAnnotationDB.load(self.directory_, shape=(W,H)) if with_ground_truth else None
+        print('\nGround Truth\n========\n'
+              '\tAnnotations: {}\n'
+              '\tObjects: {}'.format(self.meta_.num_annotations, 
+                                     self.meta_.num_objects))
 
         # Setup log (calls load_log, and initializes decoders)
         super(TangoLogReader, self).__init__(
             self.filename_, 
             decoder=[
                 TangoOdomDecoder(channel=TangoFile.VIO_CHANNEL, every_k_frames=every_k_frames, noise=noise), 
-                im_dec
+                TangoImageDecoder(
+                    self.directory_, channel=TangoFile.RGB_CHANNEL, color=True, 
+                    shape=(W,H), every_k_frames=every_k_frames)
             ])
         
         if isinstance(self.start_idx_, float):
@@ -390,7 +344,11 @@ class TangoLogReader(LogReader):
 
     @property
     def ground_truth_available(self): 
-        return self.with_ground_truth_
+        return self.meta_ is not None
+
+    def _check_ground_truth_availability(self):
+        if not self.ground_truth_available: 
+            raise RuntimeError('Ground truth dataset not loaded')
 
     @property
     def directory(self): 
@@ -448,27 +406,46 @@ class TangoLogReader(LogReader):
             except Exception, e: 
                 print('TangLog.iteritems() :: {:}'.format(e))
 
-    # def iterframes(self, topics=[], reverse=False): 
-    #     """
-    #     Ground truth reader interface
-    #     Overload decode msg to lookup corresponding annotation
-    #     """
-    #     if not hasattr(self, 'gt_'): 
-    #         raise RuntimeError('Cannot iterate, ground truth dataset not loaded')
+    def iterframes(self, reverse=False): 
+        """
+        Ground truth reader interface for 
+        Images [with time, pose, annotation]  
+        : lookup corresponding annotation, and 
+        fill in poses from previous timestamp
+        """
+        self._check_ground_truth_availability()
 
-    #     return self.iterframes(topics=topics, reverse=reverse)
+        # Iterate through both poses and images, and construct frames
+        # with look up table for filename str -> (timestamp, pose, annotation) 
+        for (t, channel, msg) in self.itercursors(topics=TangoFile.RGB_CHANNEL, reverse=reverse): 
+            try: 
+                res, (t, ch, data) = self.decode_msg(channel, msg, t)
+
+                if res: 
+
+                    # Annotations
+                    # Available entries: polygon, bbox, class_label, class_id, instance_id
+                    if msg in self.meta_: 
+                        yield (t, ch, AnnotatedImage(img=data, annotation=self.meta_[msg]))
+                    else: 
+                        yield (t, ch, data)
+
+            except Exception, e: 
+                print('TangLog.iteritems() :: {:}'.format(e))
 
     def roidb(self, target_hash, targets=[], every_k_frames=1, verbose=True, skip_empty=True): 
         """
         Returns (img, bbox, targets [unique text])
         """
+
+        self._check_ground_truth_availability()
+
         if every_k_frames > 1 and skip_empty: 
             raise RuntimeError('roidb not meant for skipping frames,'
                                'and skipping empty simultaneously ')
 
-
         # Iterate through all images
-        for idx, (t,ch,data) in enumerate(self.iteritems(topics=TangoFile.RGB_CHANNEL)): 
+        for idx, (t,ch,data) in enumerate(self.iterframes()): 
 
             # Skip every k frames, if requested
             if idx % every_k_frames != 0: 
