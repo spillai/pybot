@@ -82,6 +82,23 @@ def multilabel_precision_recall(y_score, y_test, clf_target_ids, clf_target_name
     return precision, recall, average_precision
 
 
+def plot_confusion_matrix(cm, clf_target_names, title='Confusion matrix', cmap=plt.cm.jet):
+    target_names = map(lambda key: key.replace('_','-'), clf_target_names)
+
+    for idx in range(len(cm)): 
+        cm[idx,:] = (cm[idx,:] * 100.0 / np.sum(cm[idx,:])).astype(np.int)
+
+    plt.imshow(cm, interpolation='nearest', cmap=cmap)
+    # plt.matshow(cm)
+    plt.title(title)
+    plt.colorbar()
+    tick_marks = np.arange(len(clf_target_names))
+    plt.xticks(tick_marks, target_names, rotation=45)
+    plt.yticks(tick_marks, target_names)
+    # plt.tight_layout()
+    plt.ylabel('True label')
+    plt.xlabel('Predicted label')
+
 def plot_precision_recall(y_score, y_test, clf_target_ids, clf_target_names, title='Precision-Recall curve'): 
 
     # Get multilabel precision recall curve
@@ -395,6 +412,32 @@ class HistogramClassifier(object):
         print(' Report (Training):\n {}'.format(classification_report(y, y_pred, 
                                                                       labels=self.target_map_.keys(), 
                                                                       target_names=self.target_map_.values())))
+        cmatrix = metrics.confusion_matrix(y, y_pred, labels=self.target_map_.keys())
+
+        N = len(cmatrix)
+        xs, ys = np.meshgrid(range(N), range(N))
+        xyc = np.dstack([xs, ys, cmatrix]).reshape(-1,3)
+
+        inds = np.argsort(xyc[:,2])[-20:]
+        xyc_top = xyc[inds,:]
+
+        print('-------------------------------')
+        print(' Confusion table (top 20 entries)')
+        for xyct in xyc_top: 
+            print('confusion: {}\t{}\t{}'.format(xyct[2], self.target_map_.values()[xyct[0]], 
+                                                  self.target_map_.values()[xyct[1]]))        
+        print('\n')
+
+        # import ipdb; ipdb.set_trace()
+
+        # print ' Confusion matrix (Test): \n%s' % (pd.DataFrame(cmatrix, 
+        #                                                        columns=self.target_map_.values(), 
+        #                                                        index=self.target_map_.values()))
+
+        
+        # plot_confusion_matrix(cmatrix, self.target_map_.values())
+        # plt.savefig('confusion_matrix.pdf')
+
         if background is not None: 
             inds = y != background
             target_map = self.target_map_
@@ -403,6 +446,11 @@ class HistogramClassifier(object):
             print(' Report (Training without background):\n {}'.format(classification_report(y[inds], y_pred[inds], 
                                                                                              labels=target_map.keys(),
                                                                                              target_names=target_map.values())))
+            cmatrix = metrics.confusion_matrix(y[inds], y_pred[inds], labels=target_map.keys())
+            # print ' Confusion matrix (Test): \n%s' % (pd.DataFrame(cmatrix, 
+            #                                                        columns=target_map.values(), 
+            #                                                        index=target_map.values()))
+
         print('Training Classifier took {}'.format(format_time(time.time() - self.st_time_)))              
 
     def get_categories(self): 
