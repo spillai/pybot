@@ -458,7 +458,7 @@ class TangoLogReader(LogReader):
 
     #     return self.iterframes(topics=topics, reverse=reverse)
 
-    def roidb(self, target_hash, every_k_frames=1, verbose=True, skip_empty=True): 
+    def roidb(self, target_hash, targets=[], every_k_frames=1, verbose=True, skip_empty=True): 
         """
         Returns (img, bbox, targets [unique text])
         """
@@ -481,6 +481,14 @@ class TangoLogReader(LogReader):
             if not len(bboxes) and skip_empty: 
                 continue
             target_names = data.annotation.pretty_names
+
+            if len(targets): 
+                inds, = np.where([np.any([t in name for t in targets]) for name in target_names])
+
+                target_names = [target_names[ind] for ind in inds]
+                bboxes = bboxes[inds]
+
+            print target_names, bboxes.shape
             yield data.img, bboxes, np.int32(map(lambda key: target_hash[key], target_names))
 
     @property
