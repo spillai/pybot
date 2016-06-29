@@ -193,14 +193,10 @@ class TangoFile(object):
                   self.filename_, 
                   self.topics_, messages_str, 
                   distance, np.max(ts)-np.min(ts)))
-
-        # Initialize dataset
-        self.init()
         
     def _get_distance_travelled(self): 
         " Retrieve distance traveled through relative motion "
 
-        self.init()
         prev_pose, tvec = None, 0
         for (_,pose_str,_) in self.read_messages(topics=TangoFile.VIO_CHANNEL): 
             try: 
@@ -237,9 +233,10 @@ class TangoFile(object):
     def length(self): 
         return self.length_
 
-    def init(self): 
-        """ Open the tango meta data file """
-        self.meta_ =  open(self.filename, 'r')
+    @property
+    def fd(self): 
+        """ Open the tango meta data file as a file descriptor """
+        return open(self.filename, 'r')
         
     def read_messages(self, topics=[], start_time=0): 
         """
@@ -258,7 +255,7 @@ class TangoFile(object):
         # Push messages onto the heap and pop such that 
         # the order of timestamps is ensured to be increasing.
         p_t = 0
-        for l in self.meta_:
+        for l in self.fd: 
             try: 
                 t, ch, data = l.replace('\n', '').split('\t')
             except: 
@@ -299,6 +296,10 @@ class TangoLogReader(LogReader):
     #     shape=(480, 640)
     # )
     """
+    TangoLogReader that uses TangoFile as a log to read and decode
+    text strings from tango_data.txt and convert to appropriate 
+    objects for log reading. 
+
     TODO: 
     1. Support for every_k_frames in iteritems
     """
@@ -323,11 +324,14 @@ class TangoLogReader(LogReader):
 
         # Load ground truth filename
         # Read annotations from index.json {fn -> annotations}
-        self.meta_ = SUN3DAnnotationDB.load(self.directory_, shape=(W,H)) if with_ground_truth else None
-        print('\nGround Truth\n========\n'
-              '\tAnnotations: {}\n'
-              '\tObjects: {}'.format(self.meta_.num_annotations, 
-                                     self.meta_.num_objects))
+        if with_ground_truth: 
+            self.meta_ = SUN3DAnnotationDB.load(self.directory_, shape=(W,H))
+            print('\nGround Truth\n========\n'
+                  '\tAnnotations: {}\n'
+                  '\tObjects: {}'.format(self.meta_.num_annotations, 
+                                         self.meta_.num_objects))
+        else: 
+            self.meta_ = None
 
         # Setup log (calls load_log, and initializes decoders)
         super(TangoLogReader, self).__init__(
@@ -421,14 +425,11 @@ class TangoLogReader(LogReader):
             try: 
                 res, (t, ch, data) = self.decode_msg(channel, msg, t)
 
+                # Annotations
+                # Available entries: polygon, bbox, class_label, class_id, instance_id
                 if res: 
-
-                    # Annotations
-                    # Available entries: polygon, bbox, class_label, class_id, instance_id
-                    if msg in self.meta_: 
-                        yield (t, ch, AnnotatedImage(img=data, annotation=self.meta_[msg]))
-                    else: 
-                        yield (t, ch, data)
+                    assert(msg in self.meta_)
+                    yield (t, ch, AnnotatedImage(img=data, annotation=self.meta_[msg]))
 
             except Exception, e: 
                 print('TangLog.iteritems() :: {:}'.format(e))
@@ -468,6 +469,90 @@ class TangoLogReader(LogReader):
             print target_names, bboxes.shape
             yield data.img, bboxes, np.int32(map(lambda key: target_hash[key], target_names))
 
+    def _pose_index(self, valid): 
+        """
+        Looks up closest True for each False and returns
+        indices for fill-in-lookup
+        In: [True, False, True, ... , False, True]
+        Out: [0, 0, 2, ..., 212, 212]
+        """
+        
+        valid_inds,  = np.where(valid)
+        invalid_inds,  = np.where(~valid)
+
+        all_inds = np.arange(len(valid))
+        all_inds[invalid_inds] = -1
+
+        for j in range(10): 
+            fwd_inds = valid_inds + j
+            bwd_inds = valid_inds - j
+
+            invalid_inds, = np.where(all_inds < 0)
+            fwd_fill_inds = np.intersect1d(fwd_inds, invalid_inds)
+            all_inds[fwd_fill_inds] = all_inds[fwd_fill_inds-j]
+
+            invalid_inds, = np.where(all_inds < 0)
+            if not len(invalid_inds): break
+            bwd_fill_inds = np.intersect1d(bwd_inds, invalid_inds)
+            all_inds[bwd_fill_inds] = all_inds[bwd_fill_inds+j]
+
+            invalid_inds, = np.where(all_inds < 0)
+            if not len(invalid_inds): break
+
+        # np.set_printoptions(threshold=np.nan)
+
+        # print valid.astype(np.int)
+        # print np.array_str(all_inds)
+        # print np.where(all_inds < 0)
+
+        return all_inds
+
+    def indexdb(self): 
+
+        self._check_ground_truth_availability()
+        
+        # Iterate through both poses and images, and construct frames
+        # with look up table for filename str -> (timestamp, pose, annotation) 
+        pose_msgs = [msg if channel == TangoFile.VIO_CHANNEL else None\
+                     for idx, (t, channel, msg) in enumerate(self.itercursors(topics=[]))]
+
+        # Find valid and missing poses
+        valid_arr = np.array(map(lambda item: item is not None, pose_msgs), dtype=np.bool)
+        pose_inds = self._pose_index(valid_arr)
+
+        print 'reading again'
+        # Create frame msgs from indexed pose_msgs and itercursors
+        # for idx, (t, channel, msg) in enumerate(self.itercursors(topics=[])): 
+        #     print idx
+
+        frame_msgs = [dict(t=t, img=msg, pose=pose_msgs[pose_inds[idx]]) \
+                      for idx, (t, channel, msg) in enumerate(self.itercursors(topics=[])) \
+                      if channel == TangoFile.RGB_CHANNEL]
+        
+        print len(frame_msgs)
+        
+
+
+        # print pose_inds, fill_inds
+        # print len(self.indexes_)
+        # self.indexes_ = [msg for idx, (t, channel, msg) in enumerate(self.itercursors(topics=TangoFile.RGB_CHANNEL, reverse=reverse))]
+
+            # self.index_db_
+            # try: 
+            #     res, (t, ch, data) = self.decode_msg(channel, msg, t)
+
+            #     # Annotations
+            #     # Available entries: polygon, bbox, class_label, class_id, instance_id
+            #     if res: 
+            #         assert(msg in self.meta_)
+            #         yield (t, ch, AnnotatedImage(img=data, annotation=self.meta_[msg]))
+
+            # except Exception, e: 
+            #     print('TangLog.iteritems() :: {:}'.format(e))
+
+            
+
+
     @property
     def annotated_indices(self): 
         assert(self.ground_truth_available)
@@ -492,7 +577,6 @@ class LogDB(object):
     def _index(self): 
         for (t,ch,data) in self.dataset_.itercursors(topics=[]): 
             print t, ch, data
-
     
 
 class TangoDB(LogDB): 
