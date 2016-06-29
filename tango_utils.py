@@ -333,6 +333,9 @@ class TangoLogReader(LogReader):
         else: 
             self.meta_ = None
 
+        # IndexDB (not initialized)
+        # TODO
+
         # Setup log (calls load_log, and initializes decoders)
         super(TangoLogReader, self).__init__(
             self.filename_, 
@@ -520,35 +523,15 @@ class TangoLogReader(LogReader):
         valid_arr = np.array(map(lambda item: item is not None, pose_msgs), dtype=np.bool)
         pose_inds = self._pose_index(valid_arr)
 
-        print 'reading again'
-        # Create frame msgs from indexed pose_msgs and itercursors
-        # for idx, (t, channel, msg) in enumerate(self.itercursors(topics=[])): 
-        #     print idx
-
-        frame_msgs = [dict(t=t, img=msg, pose=pose_msgs[pose_inds[idx]]) \
-                      for idx, (t, channel, msg) in enumerate(self.itercursors(topics=[])) \
-                      if channel == TangoFile.RGB_CHANNEL]
+        self.indexed_frame_msgs_ = [dict(t=t, img=msg, pose=pose_msgs[pose_inds[idx]]) \
+                                    for idx, (t, channel, msg) in enumerate(self.itercursors(topics=[])) \
+                                    if channel == TangoFile.RGB_CHANNEL]
         
-        print len(frame_msgs)
-        
-
-
-        # print pose_inds, fill_inds
-        # print len(self.indexes_)
-        # self.indexes_ = [msg for idx, (t, channel, msg) in enumerate(self.itercursors(topics=TangoFile.RGB_CHANNEL, reverse=reverse))]
-
-            # self.index_db_
-            # try: 
-            #     res, (t, ch, data) = self.decode_msg(channel, msg, t)
-
-            #     # Annotations
-            #     # Available entries: polygon, bbox, class_label, class_id, instance_id
-            #     if res: 
-            #         assert(msg in self.meta_)
-            #         yield (t, ch, AnnotatedImage(img=data, annotation=self.meta_[msg]))
-
-            # except Exception, e: 
-            #     print('TangLog.iteritems() :: {:}'.format(e))
+        print('\nTango IndexDB \n========\n'
+              '\tFrames: {:}\n'
+              '\tPoses: {:}\n'
+              .format(len(self.indexed_frame_msgs_), 
+                      len(pose_msgs)))
 
             
 
