@@ -282,6 +282,9 @@ class SUN3DAnnotationDB(object):
         # aframe.targets = self._get_targets(aframe)
         return aframe
 
+    def __contains__(self, basename): 
+        return basename in self.index_
+
     def __getitem__(self, basename): 
         index = self.index_[basename]
         frame = SUN3DAnnotationFrame(self.data_['frames'][index])
