@@ -357,6 +357,12 @@ class TangoLogReader(LogReader):
             TangoFrame to allow for indexed look up with minimal 
             memory overhead; images are only decoded and held in 
             memory only at request, and not when indexed
+
+            TangoFrame: 
+               .img [np.arr (in-memory only on request)]
+               .pose [RigidTransform]
+               .annotation [SUN3DAnntotaionFrame]
+
             """
 
             def __init__(self, t, img_msg, pose_msg, annotation): 
@@ -376,6 +382,10 @@ class TangoLogReader(LogReader):
             @property
             def pose(self): 
                 return self.pose_
+
+            @property
+            def is_annotated(self): 
+                return self.annotation_.is_annotated
 
             @property
             def annotation(self): 
@@ -551,10 +561,6 @@ class LogDB(object):
 class TangoDB(LogDB): 
     def __init__(self, dataset): 
         """
-        TangoFrame: 
-           .img [np.arr (in-memory only on request)]
-           .pose [RigidTransform]
-           .annotation [SUN3DAnntotaionFrame]
         """
         LogDB.__init__(self, dataset)
 
@@ -581,6 +587,9 @@ class TangoDB(LogDB):
             for idx, (t, ch, img_msg) in enumerate(self.dataset.itercursors()) \
                                     if ch == TangoFile.RGB_CHANNEL]
         assert(dataset.num_frames == len(self.frame_index_))
+
+    def __getitem__(self, frame_index): 
+        return self.frame_index_[frame_index_]
 
 
     @property
