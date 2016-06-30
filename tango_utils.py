@@ -333,21 +333,64 @@ class TangoLogReader(LogReader):
         else: 
             self.meta_ = None
 
-        # IndexDB (not initialized)
-        # TODO
-
         # Setup log (calls load_log, and initializes decoders)
-        super(TangoLogReader, self).__init__(
-            self.filename_, 
-            decoder=[
-                TangoOdomDecoder(channel=TangoFile.VIO_CHANNEL, every_k_frames=every_k_frames, noise=noise), 
-                TangoImageDecoder(
-                    self.directory_, channel=TangoFile.RGB_CHANNEL, color=True, 
-                    shape=(W,H), every_k_frames=every_k_frames)
-            ])
+        pose_decoder = TangoOdomDecoder(channel=TangoFile.VIO_CHANNEL, 
+                                        every_k_frames=every_k_frames, 
+                                        noise=noise)
+        img_decoder = TangoImageDecoder(
+            self.directory_, channel=TangoFile.RGB_CHANNEL, color=True, 
+            shape=(W,H), every_k_frames=every_k_frames)
+
+        super(TangoLogReader, self).\__init__(
+            self.filename_, decoder=[pose_decoder, img_decoder]
+        )
         
+        # Check start index
         if isinstance(self.start_idx_, float):
-            raise ValueError('start_idx in TangoReader expects an integer, provided {:}'.format(self.start_idx_))
+            raise ValueError('start_idx in TangoReader expects an integer,'
+                             'provided {:}'.format(self.start_idx_))
+
+
+        # Define tango frame for known decoders
+        class TangoFrame(object): 
+            """
+            TangoFrame to allow for indexed look up with minimal 
+            memory overhead; images are only decoded and held in 
+            memory only at request, and not when indexed
+            """
+
+            def __init__(self, t, img_msg, pose_msg, annotation): 
+                print 'should be tangoframe self: ', self
+                print 'pose_decoder', pose_decoder
+                print 'img_decoder', img_decoder
+
+                self.t_ = t
+                self.img_msg_ = img_msg
+                self.pose_ = pose_decoder.decode(pose_msg)
+                self.annotation_ = annotation
+
+            @property
+            def timestamp(self): 
+                return self.t_
+
+            @property
+            def pose(self): 
+                return self.pose_
+
+            @property
+            def annotation(self): 
+                return self.annotation_
+
+            @property
+            def img(self): 
+                """
+                Decoded only at request, avoids in-memory storage
+                """
+                return img_decoder.decode(self.img_msg_)
+
+    @property
+    def annotationdb(self): 
+        return self.meta_
 
     @property
     def ground_truth_available(self): 
@@ -386,7 +429,6 @@ class TangoLogReader(LogReader):
             # print e
             # raise RuntimeError('Failed to decode data from channel: %s, mis-specified decoder?' % channel)
             pass
-            
         
         return False, (None, None, None)
 
@@ -424,7 +466,8 @@ class TangoLogReader(LogReader):
 
         # Iterate through both poses and images, and construct frames
         # with look up table for filename str -> (timestamp, pose, annotation) 
-        for (t, channel, msg) in self.itercursors(topics=TangoFile.RGB_CHANNEL, reverse=reverse): 
+        for (t, channel, msg) in self.itercursors(topics=TangoFile.RGB_CHANNEL, 
+reverse=reverse): 
             try: 
                 res, (t, ch, data) = self.decode_msg(channel, msg, t)
 
@@ -472,70 +515,6 @@ class TangoLogReader(LogReader):
             print target_names, bboxes.shape
             yield data.img, bboxes, np.int32(map(lambda key: target_hash[key], target_names))
 
-    def _pose_index(self, valid): 
-        """
-        Looks up closest True for each False and returns
-        indices for fill-in-lookup
-        In: [True, False, True, ... , False, True]
-        Out: [0, 0, 2, ..., 212, 212]
-        """
-        
-        valid_inds,  = np.where(valid)
-        invalid_inds,  = np.where(~valid)
-
-        all_inds = np.arange(len(valid))
-        all_inds[invalid_inds] = -1
-
-        for j in range(10): 
-            fwd_inds = valid_inds + j
-            bwd_inds = valid_inds - j
-
-            invalid_inds, = np.where(all_inds < 0)
-            fwd_fill_inds = np.intersect1d(fwd_inds, invalid_inds)
-            all_inds[fwd_fill_inds] = all_inds[fwd_fill_inds-j]
-
-            invalid_inds, = np.where(all_inds < 0)
-            if not len(invalid_inds): break
-            bwd_fill_inds = np.intersect1d(bwd_inds, invalid_inds)
-            all_inds[bwd_fill_inds] = all_inds[bwd_fill_inds+j]
-
-            invalid_inds, = np.where(all_inds < 0)
-            if not len(invalid_inds): break
-
-        # np.set_printoptions(threshold=np.nan)
-
-        # print valid.astype(np.int)
-        # print np.array_str(all_inds)
-        # print np.where(all_inds < 0)
-
-        return all_inds
-
-    def indexdb(self): 
-
-        self._check_ground_truth_availability()
-        
-        # Iterate through both poses and images, and construct frames
-        # with look up table for filename str -> (timestamp, pose, annotation) 
-        pose_msgs = [msg if channel == TangoFile.VIO_CHANNEL else None\
-                     for idx, (t, channel, msg) in enumerate(self.itercursors(topics=[]))]
-
-        # Find valid and missing poses
-        valid_arr = np.array(map(lambda item: item is not None, pose_msgs), dtype=np.bool)
-        pose_inds = self._pose_index(valid_arr)
-
-        self.indexed_frame_msgs_ = [dict(t=t, img=msg, pose=pose_msgs[pose_inds[idx]]) \
-                                    for idx, (t, channel, msg) in enumerate(self.itercursors(topics=[])) \
-                                    if channel == TangoFile.RGB_CHANNEL]
-        
-        print('\nTango IndexDB \n========\n'
-              '\tFrames: {:}\n'
-              '\tPoses: {:}\n'
-              .format(len(self.indexed_frame_msgs_), 
-                      len(pose_msgs)))
-
-            
-
-
     @property
     def annotated_indices(self): 
         assert(self.ground_truth_available)
@@ -555,34 +534,149 @@ def iter_tango_logs(directory, logs, topics=[]):
 class LogDB(object): 
     def __init__(self, dataset): 
         self.dataset_ = dataset
+        self.frame_index_ = None
         self._index()
+        self.print_index_info()
 
     def _index(self): 
-        for (t,ch,data) in self.dataset_.itercursors(topics=[]): 
-            print t, ch, data
-    
+        raise NotImplementedError()
+
+    def print_index_info(): 
+        raise NotImplementedError()
+
+    @property
+    def dataset(self): 
+        return self.dataset_
 
 class TangoDB(LogDB): 
     def __init__(self, dataset): 
+        """
+        TangoFrame: 
+           .img [np.arr (in-memory only on request)]
+           .pose [RigidTransform]
+           .annotation [SUN3DAnntotaionFrame]
+        """
         LogDB.__init__(self, dataset)
 
-    def _build_graph(self): 
-        # Keep a queue of finite length to ensure 
-        # time-sync with RGB and IMU
-        self.__pose_q = deque(maxlen=10)
+    @property
+    def index(self): 
+        return self.frame_index_
 
-        self.nodes_ = []
+    def _index(self): 
 
-        for (t,ch,data) in self.dataset_.itercursors(topics=[]): 
-            if ch == TangoFile.VIO_CHANNEL: 
-                self.__pose_q.append(data)
-                continue
+        # Iterate through both poses and images, and construct frames
+        # with look up table for filename str -> (timestamp, pose, annotation) 
+        pose_msgs = [msg if ch == TangoFile.VIO_CHANNEL else None\
+                     for idx, (t, ch, msg) in enumerate(self.dataset.itercursors())]
+
+        # Find valid and missing poses
+        valid_arr = np.array(
+            map(lambda item: item is not None, pose_msgs), dtype=np.bool)
+        pose_inds = TangoDB._pose_index(valid_arr)
+
+        # Create indexed frames for lookup        
+        self.frame_index_ = [
+            TangoFrame(t, img_msg, pose_msgs[pose_inds[idx]], 
+                       dataset.annotationdb[img_msg]) \
+            for idx, (t, ch, img_msg) in enumerate(self.dataset.itercursors()) \
+                                    if ch == TangoFile.RGB_CHANNEL]
+        assert(dataset.num_frames == len(self.frame_index_))
+
+
+    def find_annotated_inds(self): 
+        " Select all frames that are annotated "
+        inds, = np.where(self.dataset.annotationdb.annotation_sizes > 0)
+        return inds
+
+    def list_annotations(self, target_name=None): 
+        " List of lists"
+        inds = self.find_annotated_inds()
+        filtered_names = 
+        return [ filter(
+            lambda name: 
+            target_name is None or name is in target_name, 
+            self.dataset.annotationdb[ind].pretty_names) for ind in inds ]
+
+    def print_index_info(self): 
+        # Retrieve ground truth information
+        gt_str = '{} frames annotated ({} total annotations)'
+        .format(self.dataset.annotationdb.num_frame_annotations, 
+                self.dataset.annotationdb.num_annotations) \
+            if self.dataset.ground_truth_available else 'Not Available'
+
+        # Pretty print IndexDB description 
+        print('\nTango IndexDB \n========\n'
+              '\tFrames: {:}\n'
+              '\tPoses: {:}\n'
+              '\tGround Truth: {:}\n'
+              .format(len(self.frame_index_), 
+                      len(pose_msgs), gt_str)) 
+                      
+
+    @staticmethod
+    def _pose_index(valid): 
+        """
+        Looks up closest True for each False and returns
+        indices for fill-in-lookup
+        In: [True, False, True, ... , False, True]
+        Out: [0, 0, 2, ..., 212, 212]
+        """
+        
+        valid_inds,  = np.where(valid)
+        invalid_inds,  = np.where(~valid)
+
+        all_inds = np.arange(len(valid))
+        all_inds[invalid_inds] = -1
+
+        for j in range(10): 
+            fwd_inds = valid_inds + j
+            bwd_inds = valid_inds - j
+
+            # Forward fill
+            invalid_inds, = np.where(all_inds < 0)
+            fwd_fill_inds = np.intersect1d(fwd_inds, invalid_inds)
+            all_inds[fwd_fill_inds] = all_inds[fwd_fill_inds-j]
+
+            # Backward fill
+            invalid_inds, = np.where(all_inds < 0)
+            if not len(invalid_inds): break
+            bwd_fill_inds = np.intersect1d(bwd_inds, invalid_inds)
+            all_inds[bwd_fill_inds] = all_inds[bwd_fill_inds+j]
+
+            # Check if any missing 
+            invalid_inds, = np.where(all_inds < 0)
+            if not len(invalid_inds): break
+
+        # np.set_printoptions(threshold=np.nan)
+
+        # print valid.astype(np.int)
+        # print np.array_str(all_inds)
+        # print np.where(all_inds < 0)
+
+        return all_inds
+
+    @property
+    def index(self): 
+        return self.frame_index_
+
+
+    # def _build_graph(self): 
+    #     # Keep a queue of finite length to ensure 
+    #     # time-sync with RGB and IMU
+    #     self.__pose_q = deque(maxlen=10)
+
+    #     self.nodes_ = []
+
+    #     for (t,ch,data) in self.dataset_.itercursors(topics=[]): 
+    #         if ch == TangoFile.VIO_CHANNEL: 
+    #             self.__pose_q.append(data)
+    #             continue
             
-            if not len(self.__pose_q): 
-                continue
+    #         if not len(self.__pose_q): 
+    #             continue
 
-            assert(ch == TangoFile.RGB_CHANNEL)
-            self.nodes_.append(dict(img=data, pose=self.__pose_q[-1]))
+    #         assert(ch == TangoFile.RGB_CHANNEL)
+    #         self.nodes_.append(dict(img=data, pose=self.__pose_q[-1]))
             
 
 # Basic type for tango frame (includes pose, image, timestamp)
