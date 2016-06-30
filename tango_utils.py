@@ -583,19 +583,16 @@ class TangoDB(LogDB):
         assert(dataset.num_frames == len(self.frame_index_))
 
 
-    def find_annotated_inds(self): 
-        " Select all frames that are annotated "
-        inds, = np.where(self.dataset.annotationdb.annotation_sizes > 0)
-        return inds
+    @property
+    def annotated_inds(self): 
+        return self.dataset.annotationdb.annotated_inds
 
-    def list_annotations(self, target_name=None): 
-        " List of lists"
-        inds = self.find_annotated_inds()
-        filtered_names = 
-        return [ filter(
-            lambda name: 
-            target_name is None or name is in target_name, 
-            self.dataset.annotationdb[ind].pretty_names) for ind in inds ]
+    # def list_annotations(self, target_name=None): 
+    #     " List of lists"
+    #     inds = self.annotated_inds
+    #     return [ filter(lambda frame: 
+    #                     target_name is None or name is in target_name, 
+    #                     self.dataset.annotationdb.iterframes(inds))
 
     def print_index_info(self): 
         # Retrieve ground truth information
