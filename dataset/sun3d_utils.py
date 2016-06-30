@@ -1,6 +1,7 @@
 import os
 import numpy as np
 
+from collections import izip
 from datetime import datetime
 from bot_utils.io_utils import find_files
 from bot_utils.db_utils import load_json_dict, save_json_dict
@@ -152,10 +153,17 @@ class SUN3DAnnotationDB(object):
         assert(self.data_ is not None)
 
         # Generate lookup tables for targets
+        # object_name->object_id lookup
+        # object_id->object_name lookup
         self._index_objects()
 
-        # Object lookup
+        # Generate lookup tables for filenames
+        # img_filename->index (in data['frames']/data['fileList'])
         self._index_files()
+
+        # Generate lookup tables for object annotations
+        # object_name->[(frame_index, polygon_index), ... ]
+        self._index_object_annotations()
 
     def set_files(self, files):
         self.data_['fileList'] = files
@@ -184,15 +192,36 @@ class SUN3DAnnotationDB(object):
     def set_frame(self, basename, bboxes, targets):
         index = self.index_[basename]
         self.data_['frames'][index] = frame_to_json(bboxes, targets)
-
+        
     @property
     def annotation_sizes(self): 
-        return [len(f['polygon']) if 'polygon' in f else 0 \
-                for f in self.data_['frames'] ]
+        return np.int32([len(f['polygon']) if 'polygon' in f else 0 \
+                         for f in self.data_['frames'] ])
 
     @property
+    def annotated_inds(self): 
+        " Select all frames that are annotated "
+        inds, = np.where(self.annotation_sizes > 0)
+        return inds
+
+    @property
+    def num_frames(self): 
+        return len(self.data_['frames'])
+
+    # @property
+    # def has_annotation(self, basename): 
+    #     index = self.index_[basename]
+    #     frame = self.data_['frames'][index]
+        
+    @property
     def num_annotations(self): 
+        "Return the total number of annotations across all frames" 
         return sum(self.annotation_sizes, 0)
+
+    @property
+    def num_frame_annotations(self): 
+        "Return the number of frames that have at least 1 annotation" 
+        return sum(np.array(self.annotation_sizes, dtype=np.bool).astype(np.int), 0)
 
     def has_object_name(self, object_name): 
         return object_name in self.object_hash_
@@ -203,22 +232,22 @@ class SUN3DAnnotationDB(object):
     def get_object_id(self, object_name): 
         return self.object_hash_[object_name]
 
-    def _get_object_info(self, object_id): 
-        """
-        Get the object information from the object ID in the 
-        annotations file. Ideally, the object_id should lookup
-        pretty-name and the expectaion is that the aggregated
-        pretty-name across datasets are consistent. 
+    # def _get_object_info(self, object_id): 
+    #     """
+    #     Get the object information from the object ID in the 
+    #     annotations file. Ideally, the object_id should lookup
+    #     pretty-name and the expectaion is that the aggregated
+    #     pretty-name across datasets are consistent. 
 
-        TODO: need to spec this
-        """
-        # Trailing number after hyphen is instance id
-        pretty_name = self.object_unhash_[object_id]
-        pretty_class_name = ''.join(pretty_name.split('-')[:-1])
-        # instance_name = self.object_unhash_[object_id].split('-')[-1]
+    #     TODO: need to spec this
+    #     """
+    #     # Trailing number after hyphen is instance id
+    #     pretty_name = self.object_unhash_[object_id]
+    #     pretty_class_name = ''.join(pretty_name.split('-')[:-1])
+    #     # instance_name = self.object_unhash_[object_id].split('-')[-1]
 
-        return dict(pretty_name=pretty_name, pretty_class_name=pretty_class_name, 
-                    class_id=-1, instance_name=instance_name)
+    #     return dict(pretty_name=pretty_name, pretty_class_name=pretty_class_name, 
+    #                 class_id=-1, instance_name=instance_name)
 
     @property
     def scale(self): 
@@ -295,8 +324,67 @@ class SUN3DAnnotationDB(object):
         assert(isinstance(frame, SUN3DAnnotationFrame))
         index = self.index_[basename]
         # self.data_['frames'][index]
-        
         pass
+
+    def _index_object_annotations(self): 
+        """
+        Generate look up tables for object
+        annotations from the DB. 
+        obj_name->[(frame_index,polygon_index), ...]
+        """
+        self.object_annotations_index_ = defaultdict(list)
+        for frame_index in self.iterframes(self.annotated_inds): 
+            for polygon_index, obj_name in enumerate(frame.pretty_names): 
+                self.object_annotations_index_[obj_name].\
+                    append((frame_index, polygon_index))
+
+    @property
+    def object_annotations(self): 
+        return self.object_annotations_index_
+
+    def iterframes(self, frame_inds): 
+        return (SUN3DAnnotationFrame(self.data_['frames'][ind]) \
+                 for ind in frame_inds)
+
+    # def iterannotations(self, frame_inds, polygon_inds): 
+    #     return (frame.bboxes[pind] 
+    #             for pind, frame in izip(polygon_inds, self.iterframes(frame_inds))    
+
+    def filter_target_name(self, pretty_names, target_name=None): 
+        return \
+            filter(lambda name: target_name in name, pretty_names) \
+            if target_name is not None else pretty_names
+
+    def find_object_annotations(self, target_name): 
+        """
+        Find annotations by target_name/pretty_name. 
+        Returns the index and the associated polygon index, 
+        for bbox lookup. [(frame_index, polygon_index), ... ]
+        returns: frame_inds, polygon_inds
+        """
+        if self.object_annotations_index_ is None: 
+            raise RuntimeError('Cannot find annotations,'
+                               'objectdb has not been indexed yet')
+
+        if not isinstance(target_name, str): 
+            raise TypeError('target_name has to be str: provided {}'\
+                            .format(type(target_name)))
+        
+        frame_inds, polygon_inds = [], []
+        for object_name, items in self.object_annotations_index_: 
+            if target_name in object_name:
+                finds, pinds = zip(*items)
+                frame_inds.extend(finds)
+                polygon_inds.extend(pinds)
+        
+        return frame_inds, polygon_inds
+
+    def list_annotations(self, target_name=None): 
+        inds = self.annotated_inds
+        return [ filter(
+            lambda frame: 
+            filter_target_name(frame.pretty_names, target_name=target_name)
+            self.iterframes(inds)) ]
 
     @property
     def frames(self): 
