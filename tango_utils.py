@@ -341,7 +341,7 @@ class TangoLogReader(LogReader):
             self.directory_, channel=TangoFile.RGB_CHANNEL, color=True, 
             shape=(W,H), every_k_frames=every_k_frames)
 
-        super(TangoLogReader, self).\__init__(
+        super(TangoLogReader, self).__init__(
             self.filename_, decoder=[pose_decoder, img_decoder]
         )
         
@@ -349,54 +349,6 @@ class TangoLogReader(LogReader):
         if isinstance(self.start_idx_, float):
             raise ValueError('start_idx in TangoReader expects an integer,'
                              'provided {:}'.format(self.start_idx_))
-
-
-        # Define tango frame for known decoders
-        class TangoFrame(object): 
-            """
-            TangoFrame to allow for indexed look up with minimal 
-            memory overhead; images are only decoded and held in 
-            memory only at request, and not when indexed
-
-            TangoFrame: 
-               .img [np.arr (in-memory only on request)]
-               .pose [RigidTransform]
-               .annotation [SUN3DAnntotaionFrame]
-
-            """
-
-            def __init__(self, t, img_msg, pose_msg, annotation): 
-                print 'should be tangoframe self: ', self
-                print 'pose_decoder', pose_decoder
-                print 'img_decoder', img_decoder
-
-                self.t_ = t
-                self.img_msg_ = img_msg
-                self.pose_ = pose_decoder.decode(pose_msg)
-                self.annotation_ = annotation
-
-            @property
-            def timestamp(self): 
-                return self.t_
-
-            @property
-            def pose(self): 
-                return self.pose_
-
-            @property
-            def is_annotated(self): 
-                return self.annotation_.is_annotated
-
-            @property
-            def annotation(self): 
-                return self.annotation_
-
-            @property
-            def img(self): 
-                """
-                Decoded only at request, avoids in-memory storage
-                """
-                return img_decoder.decode(self.img_msg_)
 
     @property
     def annotationdb(self): 
@@ -558,6 +510,54 @@ class LogDB(object):
     def dataset(self): 
         return self.dataset_
 
+# Define tango frame for known decoders
+class TangoFrame(object): 
+    """
+    TangoFrame to allow for indexed look up with minimal 
+    memory overhead; images are only decoded and held in 
+    memory only at request, and not when indexed
+
+    TangoFrame: 
+       .img [np.arr (in-memory only on request)]
+       .pose [RigidTransform]
+       .annotation [SUN3DAnntotaionFrame]
+
+    """
+
+    def __init__(self, index, t, img_msg, pose, annotation, img_decode): 
+        # print 'should be tangoframe self: ', self
+        # print 'img_decoder', img_decode
+        self.index_ = index
+        self.t_ = t
+        self.img_msg_ = img_msg
+        self.pose_ = pose
+        self.annotation_ = annotation
+
+        self.img_decode = img_decode
+
+    @property
+    def timestamp(self): 
+        return self.t_
+
+    @property
+    def pose(self): 
+        return self.pose_
+
+    @property
+    def is_annotated(self): 
+        return self.annotation_.is_annotated
+
+    @property
+    def annotation(self): 
+        return self.annotation_
+
+    @property
+    def img(self): 
+        """
+        Decoded only at request, avoids in-memory storage
+        """
+        return self.img_decode(self.img_msg_)
+
 class TangoDB(LogDB): 
     def __init__(self, dataset): 
         """
@@ -572,29 +572,56 @@ class TangoDB(LogDB):
 
         # Iterate through both poses and images, and construct frames
         # with look up table for filename str -> (timestamp, pose, annotation) 
-        pose_msgs = [msg if ch == TangoFile.VIO_CHANNEL else None\
-                     for idx, (t, ch, msg) in enumerate(self.dataset.itercursors())]
+        poses = []
+        pose_decode = lambda msg_item: \
+                      self.dataset.decoder[TangoFile.VIO_CHANNEL].decode(msg_item)
+        for idx, (t, ch, msg) in enumerate(self.dataset.itercursors()): 
+            pose = None
+            if ch == TangoFile.VIO_CHANNEL: 
+                try: 
+                    pose = pose_decode(msg)
+                except: 
+                    pose = None
+            poses.append(pose)
+                
 
         # Find valid and missing poses
         valid_arr = np.array(
-            map(lambda item: item is not None, pose_msgs), dtype=np.bool)
+            map(lambda item: item is not None, poses), dtype=np.bool)
         pose_inds = TangoDB._pose_index(valid_arr)
 
         # Create indexed frames for lookup        
-        self.frame_index_ = [
-            TangoFrame(t, img_msg, pose_msgs[pose_inds[idx]], 
-                       dataset.annotationdb[img_msg]) \
+        # self.frame_index_:  rgb/img.png -> TangoFrame
+        # self.frame_lut_: idx -> rgb/img.png
+        img_decode = lambda msg_item: \
+                    self.dataset.decoder[TangoFile.RGB_CHANNEL].decode(msg_item)
+        self.frame_index_ = {
+            img_msg: TangoFrame(idx, t, img_msg, poses[pose_inds[idx]], 
+                                self.dataset.annotationdb[img_msg], img_decode)
             for idx, (t, ch, img_msg) in enumerate(self.dataset.itercursors()) \
-                                    if ch == TangoFile.RGB_CHANNEL]
-        assert(dataset.num_frames == len(self.frame_index_))
+            if ch == TangoFile.RGB_CHANNEL 
+        }
+        self.frame_lut_ = {
+            idx: k for idx, k in enumerate(self.frame_index_.keys())
+        }
 
-    def __getitem__(self, frame_index): 
-        return self.frame_index_[frame_index_]
-
+    def __getitem__(self, basename): 
+        return self.frame_index_[basename]
 
     @property
     def annotated_inds(self): 
         return self.dataset.annotationdb.annotated_inds
+
+    @property
+    def object_annotations(self): 
+        return self.dataset.annotationdb.object_annotations
+
+    @property
+    def objects(self): 
+        return self.dataset.annotationdb.objects
+
+    def find_object_annotations(self, target_name): 
+        return self.dataset.annotationdb.find_object_annotations(target_name)
 
     # def list_annotations(self, target_name=None): 
     #     " List of lists"
@@ -605,18 +632,16 @@ class TangoDB(LogDB):
 
     def print_index_info(self): 
         # Retrieve ground truth information
-        gt_str = '{} frames annotated ({} total annotations)'
-        .format(self.dataset.annotationdb.num_frame_annotations, 
-                self.dataset.annotationdb.num_annotations) \
+        gt_str = '{} frames annotated ({} total annotations)'\
+            .format(self.dataset.annotationdb.num_frame_annotations, 
+                    self.dataset.annotationdb.num_annotations) \
             if self.dataset.ground_truth_available else 'Not Available'
 
         # Pretty print IndexDB description 
         print('\nTango IndexDB \n========\n'
               '\tFrames: {:}\n'
-              '\tPoses: {:}\n'
               '\tGround Truth: {:}\n'
-              .format(len(self.frame_index_), 
-                      len(pose_msgs), gt_str)) 
+              .format(len(self.frame_index_), gt_str)) 
                       
 
     @staticmethod
