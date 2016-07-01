@@ -1,7 +1,8 @@
 import os
 import numpy as np
 
-from collections import izip
+from itertools import izip
+from collections import defaultdict
 from datetime import datetime
 from bot_utils.io_utils import find_files
 from bot_utils.db_utils import load_json_dict, save_json_dict
@@ -50,6 +51,9 @@ class SUN3DAnnotationFrame(object):
             # Object ID (from local annotation file)
             object_id = poly['object']
             self.add(poly['object'], xy)
+
+    # def __repr__(self): 
+    #     return self.annotations_
             
     def add(self, object_id, xy, bbox=None): 
         if bbox is None: 
@@ -151,6 +155,7 @@ class SUN3DAnnotationDB(object):
 
         # Data integrity check
         assert(self.data_ is not None)
+        assert(len(self.data_['fileList']) == len(self.data_['frames']))
 
         # Generate lookup tables for targets
         # object_name->object_id lookup
@@ -311,13 +316,19 @@ class SUN3DAnnotationDB(object):
         # aframe.targets = self._get_targets(aframe)
         return aframe
 
+    def get_name(self, index): 
+        return self.data_['fileList'][index]
+
+    def get_frame(self, index): 
+        frame = SUN3DAnnotationFrame(self.data_['frames'][index])
+        return self.decorate_frame(frame)
+
     def __contains__(self, basename): 
         return basename in self.index_
 
     def __getitem__(self, basename): 
         index = self.index_[basename]
-        frame = SUN3DAnnotationFrame(self.data_['frames'][index])
-        return self.decorate_frame(frame)
+        return self.get_frame(index)
 
     def __setitem__(self, basename, frame): 
         " Write back to data_['frames'] "
@@ -333,18 +344,18 @@ class SUN3DAnnotationDB(object):
         obj_name->[(frame_index,polygon_index), ...]
         """
         self.object_annotations_index_ = defaultdict(list)
-        for frame_index in self.iterframes(self.annotated_inds): 
+        for frame_index, frame in izip(self.annotated_inds, 
+                                       self.iterframes(self.annotated_inds)): 
             for polygon_index, obj_name in enumerate(frame.pretty_names): 
                 self.object_annotations_index_[obj_name].\
-                    append((frame_index, polygon_index))
+                    append((self.get_name(frame_index), polygon_index))
 
     @property
     def object_annotations(self): 
-        return self.object_annotations_index_
+        return dict(self.object_annotations_index_)
 
     def iterframes(self, frame_inds): 
-        return (SUN3DAnnotationFrame(self.data_['frames'][ind]) \
-                 for ind in frame_inds)
+        return (self.get_frame(ind) for ind in frame_inds)
 
     # def iterannotations(self, frame_inds, polygon_inds): 
     #     return (frame.bboxes[pind] 
@@ -370,20 +381,20 @@ class SUN3DAnnotationDB(object):
             raise TypeError('target_name has to be str: provided {}'\
                             .format(type(target_name)))
         
-        frame_inds, polygon_inds = [], []
-        for object_name, items in self.object_annotations_index_: 
+        frame_keys, polygon_inds = [], []
+        for object_name, items in self.object_annotations_index_.iteritems(): 
             if target_name in object_name:
-                finds, pinds = zip(*items)
-                frame_inds.extend(finds)
+                fkeys, pinds = zip(*items)
+                frame_keys.extend(fkeys)
                 polygon_inds.extend(pinds)
         
-        return frame_inds, polygon_inds
+        return frame_keys, polygon_inds
 
     def list_annotations(self, target_name=None): 
         inds = self.annotated_inds
         return [ filter(
             lambda frame: 
-            filter_target_name(frame.pretty_names, target_name=target_name)
+            filter_target_name(frame.pretty_names, target_name=target_name), 
             self.iterframes(inds)) ]
 
     @property
