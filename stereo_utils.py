@@ -342,7 +342,7 @@ def stereo_dataset(filename, channel='CAMERA', start_idx=0, every_k_frames=1, ma
                            decoder=StereoImageDecoder(channel=channel,
                                                       scale=scale, split=split))
     
-    def iter_frames(*args, **kwargs):
+    def iterframes(*args, **kwargs):
         for (t, ch, (l,r)) in dataset.iteritems(*args, **kwargs):
             yield AttrDict(left=l, right=r)
 
@@ -358,7 +358,7 @@ def stereo_dataset(filename, channel='CAMERA', start_idx=0, every_k_frames=1, ma
             disp = gt.process(l,r)
             yield AttrDict(left=l, right=r, noc=disp, occ=disp)
             
-    dataset.iter_frames = iter_frames
+    dataset.iterframes = iterframes
     dataset.iter_stereo_frames = iter_stereo_frames
     dataset.iter_gt_frames = iter_gt_frames
     return dataset
