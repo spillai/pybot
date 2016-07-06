@@ -49,6 +49,22 @@ def progressbar(it, prefix = "", size=100, verbose=True, width=100):
     sys.stdout.write("\n")
     sys.stdout.flush()
 
+class OneHotLabeler(dict):
+    def __init__(self, *args, **kwargs):
+        dict.__init__(self, *args, **kwargs)
+
+    def __getitem__(self, key):
+        try:
+            return dict.__getitem__(self, key)
+        except KeyError:
+            return self.__missing__(key)
+
+    def __missing__(self, key):
+        self[key] = value = len(self)
+        return value
+
+    def __repr__(self):
+        return 'OneHotLabeler(%s)' % (dict.__repr__(self))
 
 class Counter(object): 
     def __init__(self): 
