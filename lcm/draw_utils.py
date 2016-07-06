@@ -726,26 +726,31 @@ def draw_camera(pose, zmin=0.0, zmax=0.1, fov=np.deg2rad(60)):
     frustum = Frustum(pose, zmin=zmin, zmax=zmax, fov=fov)
     nll, nlr, nur, nul, fll, flr, fur, ful = frustum.get_vertices()
 
-    # Triangles: Front Face
     faces = []
+
+    # Triangles: Front Face
     faces.extend([ful, fur, flr])
     faces.extend([flr, ful, fll])
 
-    # Triangles: Four walls 
-    left, top, right, bottom = [fll, frustum.p0, ful], \
-                               [ful, frustum.p0, fur], \
-                               [fur, frustum.p0, flr], \
-                               [flr, frustum.p0, fll]
+    # Triangles: Back Face
+    faces.extend([nul, nur, nlr])
+    faces.extend([nlr, nul, nll])
+
+    # Triangles: Four walls (2-triangles per face)
+    left, top, right, bottom = [fll, nll, ful, ful, nll, nul], \
+                               [ful, nul, fur, fur, nul, nur], \
+                               [fur, nur, flr, flr, nur, nlr], \
+                               [flr, nlr, fll, fll, nlr, nll]
     faces.extend([left, top, right, bottom]) # left, top, right, bottom wall
     faces = np.vstack(faces)
 
-    # Lines: Face
+    # Lines: zmin-zmax
     pts = []
     pts.extend([ful, fur, flr, fll, ful])
-    pts.extend([left, left[0]])
-    pts.extend([top, top[0]])
-    pts.extend([right, right[0]])
-    pts.extend([bottom, bottom[0]])
+    pts.extend([ful, fll, nll, nul, ful])
+    pts.extend([ful, nul, nur, fur, ful])
+    pts.extend([fur, nur, nlr, flr, fur])
+    pts.extend([flr, nlr, nll, fll, flr])
     pts = np.vstack(pts)
     
     return (faces, np.hstack([pts[:-1], pts[1:]]).reshape((-1,3)))
@@ -779,9 +784,10 @@ def publish_quads(pub_channel, quads, frame_id='camera', reset=True):
     
 def publish_cameras(pub_channel, poses, c='y', texts=[], covars=[], frame_id='camera', 
                     draw_faces=False, draw_edges=True, draw_nodes=False, size=1, zmin=0.01, zmax=0.3, reset=True):
-    cam_feats = [draw_camera(pose, zmax=zmax * size) for pose in poses]
+    cam_feats = [draw_camera(pose, zmin=zmin * size, zmax=zmax * size) for pose in poses]
     cam_faces = map(lambda x: x[0], cam_feats)
     cam_edges = map(lambda x: x[1], cam_feats)
+    print zmin, zmax
 
     # Publish pose, and corresponding texts
     publish_pose_list(pub_channel, poses, texts=texts, covars=covars, frame_id=frame_id, reset=reset)
