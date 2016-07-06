@@ -60,7 +60,7 @@ class StereoPOVDatasetReader(object):
         print 'Initialized stereo dataset reader with %f scale' % scale
     
 
-    def iter_frames(self, *args, **kwargs): 
+    def iterframes(self, *args, **kwargs): 
         for (left, right), pose in izip(self.iter_stereo_frames(*args, **kwargs), self.poses): 
             yield AttrDict(left=left, right=right, velodyne=None, pose=pose)
 
@@ -91,7 +91,7 @@ if __name__ == "__main__":
     from bot_vision.image_utils import to_gray
 
     dataset = StereoPOVDatasetReader(directory='~/data/stereo-poses/livingroom20_data')
-    for f in dataset.iter_frames():
+    for f in dataset.iterframes():
         lim, rim = to_gray(f.left), to_gray(f.right)
         out = np.dstack([np.zeros_like(lim), lim, rim])
         imshow_cv('left/right', out)

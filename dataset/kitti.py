@@ -113,7 +113,7 @@ class KITTIDatasetReader(object):
                     self.right.iteritems(*args, **kwargs), 
                     self.velodyne.iteritems(*args, **kwargs))
 
-    def iter_frames(self, *args, **kwargs): 
+    def iterframes(self, *args, **kwargs): 
         for (left, right), pose in izip(self.iter_stereo_frames(*args, **kwargs), self.poses.iteritems(*args, **kwargs)): 
             yield AttrDict(left=left, right=right, velodyne=None, pose=pose)
 
@@ -222,7 +222,7 @@ class KITTIStereoGroundTruthDatasetReader(object):
     def iter_stereo_frames(self, *args, **kwargs): 
         return self.stereo.iteritems(*args, **kwargs)
 
-    def iter_frames(self, *args, **kwargs): 
+    def iterframes(self, *args, **kwargs): 
         for (left, right), pose in izip(self.iter_stereo_frames(*args, **kwargs), self.poses.iteritems(*args, **kwargs)): 
             yield AttrDict(left=left, right=right, velodyne=None, pose=pose)
 
@@ -280,7 +280,7 @@ class KITTIRawDatasetReader(KITTIDatasetReader):
         except Exception as e:
             self.oxts = repeat(None)
         
-    def iter_frames(self, *args, **kwargs): 
+    def iterframes(self, *args, **kwargs): 
         for (left, right), pose, oxt in izip(self.iter_stereo_frames(*args, **kwargs), 
                                              self.poses.iteritems(*args, **kwargs), 
                                              self.oxts.iteritems(*args, **kwargs)): 

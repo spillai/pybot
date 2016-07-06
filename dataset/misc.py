@@ -50,7 +50,7 @@ class VaFRICDatasetReader(object):
         for rgb_im, gt_info in izip(self.rgb.iteritems(*args, **kwargs), self.gt.iteritems(*args, **kwargs)): 
             yield AttrDict(img=rgb_im, gt=gt_info, pose=VaFRICDatasetReader.read_pose(gt_info))
 
-    def iter_frames(self, *args, **kwargs): 
+    def iterframes(self, *args, **kwargs): 
         return self.rgb.iteritems(*args, **kwargs)
 
 class NewCollegeDatasetReader(object): 

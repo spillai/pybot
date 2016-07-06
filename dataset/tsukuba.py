@@ -85,7 +85,7 @@ class TsukubaStereo2012Reader(object):
         return lambda fn: im_resize(cv2.imread(fn, cv2.IMREAD_UNCHANGED), scale=scale) * scale
 
 
-    def iter_frames(self, *args, **kwargs): 
+    def iterframes(self, *args, **kwargs): 
         for (left, right), pose in izip(self.iter_stereo_frames(*args, **kwargs), 
                                                self.poses.iteritems(*args, **kwargs)):
             yield AttrDict(left=left, right=right, pose=pose)
@@ -114,7 +114,7 @@ if __name__ == "__main__":
     from bot_vision.image_utils import to_gray
 
     dataset = tsukuba_stereo_dataset()
-    for f in dataset.iter_frames():
+    for f in dataset.iterframes():
         lim, rim = to_gray(f.left), to_gray(f.right)
         out = np.dstack([np.zeros_like(lim), lim, rim])
         imshow_cv('left/right', out)
