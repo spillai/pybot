@@ -161,6 +161,7 @@ class LogController(object):
         self.init()
 
         # Run
+        print('{:}: run::Reading log {:}'.format(self.__class__.__name__, self.filename))
         for self.ctrl_idx_, (t, ch, data) in enumerate(self.dataset_.iterframes()): 
             if ch in self.ctrl_cb_: 
                 self.ctrl_cb_[ch](t, data)
@@ -172,13 +173,13 @@ class LogController(object):
         """
         Pre-processing for inherited controllers
         """
-        print('{:}: Reading log {:}'.format(self.__class__.__name__, self.filename))
+        print('{:}: init::Initializing controller {:}'.format(self.__class__.__name__, self.filename))
        
     def finish(self): 
         """
         Post-processing for inherited controllers
         """
-        print('{:}: Finished reading log {:}'.format(self.__class__.__name__, self.filename))
+        print('{:}: finish::Finishing controller {:}'.format(self.__class__.__name__, self.filename))
 
     @property
     def index(self): 
