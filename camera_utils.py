@@ -940,6 +940,25 @@ class Frustum(object):
         nll, nlr, nur, nul, fll, flr, fur, ful = self.pose * np.vstack(arr)
         return nll, nlr, nur, nul, fll, flr, fur, ful
 
+    def get_planes(self): 
+        """
+        Returns the point/normals parametrization for planes, 
+        including clipped zmin and zmax frustums
+        """
+        nll, nlr, nur, nul, fll, flr, fur, ful = self.get_vertices()
+        
+        pts = np.vstack([nll, nul, nur, nlr, nul, ful])
+        
+        vx = np.vstack([fll-nll, ful-nul, fur-nur, flr-nlr, nur-nul, fll-ful])
+        vy = np.vstack([nul-nll, nur-nul, nlr-nur, nll-nlr, nll-nul, fur-ful])
+        
+        vx /= np.linalg.norm(vx, axis=1).reshape(-1,1)
+        vy /= np.linalg.norm(vy, axis=1).reshape(-1,1)
+        
+        normals = np.cross(vx, vy)
+        normals /= np.linalg.norm(normals, axis=1).reshape(-1,1)
+        return pts, normals        
+
 def test_Frustum(): 
     pass
 
