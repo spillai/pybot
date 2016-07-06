@@ -787,7 +787,6 @@ def publish_cameras(pub_channel, poses, c='y', texts=[], covars=[], frame_id='ca
     cam_feats = [draw_camera(pose, zmin=zmin * size, zmax=zmax * size) for pose in poses]
     cam_faces = map(lambda x: x[0], cam_feats)
     cam_edges = map(lambda x: x[1], cam_feats)
-    print zmin, zmax
 
     # Publish pose, and corresponding texts
     publish_pose_list(pub_channel, poses, texts=texts, covars=covars, frame_id=frame_id, reset=reset)
