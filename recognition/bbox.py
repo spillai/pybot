@@ -1,6 +1,12 @@
 import numpy as np
 from cython_bbox import bbox_overlaps as brute_force_iou
 
+def bbox_pts(bbox): 
+    return np.vstack([[bbox[0], bbox[1]], 
+                      [bbox[0], bbox[3]], 
+                      [bbox[2], bbox[3]], 
+                      [bbox[2], bbox[1]]])
+
 def bbox_area(bbox): 
     return (bbox[3] - bbox[1]) * (bbox[2] - bbox[0])
 
