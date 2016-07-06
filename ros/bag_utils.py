@@ -381,7 +381,7 @@ class ROSBagReader(LogReader):
                     
         return False, (None, None, None)
 
-    def iter_frames(self):
+    def iterframes(self):
         return self.iteritems()
 
 class ROSBagController(object): 
@@ -401,7 +401,7 @@ class ROSBagController(object):
         if not len(self.ctrl_cb_): 
             raise RuntimeError('No callbacks registered yet, subscribe to channels first!')
 
-        for self.ctrl_idx_, (t, ch, data) in enumerate(self.dataset_.iter_frames()): 
+        for self.ctrl_idx_, (t, ch, data) in enumerate(self.dataset_.iterframes()): 
             if ch in self.ctrl_cb_: 
                 self.ctrl_cb_[ch](t, data)
 

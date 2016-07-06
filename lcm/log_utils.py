@@ -252,7 +252,7 @@ class LCMLogReader(LogReader):
                 #     if idx % self.every_k_frames == 0: 
                 #         yield self.decoder.decode(ev.data)
 
-    def iter_frames(self):
+    def iterframes(self):
         return self.iteritems()
 
     def get_first_frame(self): 

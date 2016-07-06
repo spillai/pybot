@@ -489,7 +489,7 @@ def iter_tango_logs(directory, logs, topics=[]):
         directory = os.path.expanduser(os.path.join(args.directory, log))
         print('Accessing Tango directory {:}'.format(directory))
         dataset = TangoLogReader(directory=directory, scale=im_scale) 
-        for item in dataset.iter_frames(topics=topics): 
+        for item in dataset.iterframes(topics=topics): 
             bboxes = item.bboxes
             targets = item.coords
 

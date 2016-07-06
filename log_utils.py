@@ -97,7 +97,7 @@ class LogReader(object):
     def iteritems(self): 
         raise NotImplementedError()
 
-    def iter_frames(self): 
+    def iterframes(self): 
         raise NotImplementedError()
 
     def run(self):
@@ -108,7 +108,7 @@ class LogReader(object):
         self.init()
 
         # Run
-        iterator = take(self.iter_frames(), max_length=self.max_length)
+        iterator = take(self.iterframes(), max_length=self.max_length)
         for self.idx, (t, ch, data) in enumerate(iterator): 
             try: 
                 self.cb_[ch](t, data)
@@ -161,7 +161,7 @@ class LogController(object):
         self.init()
 
         # Run
-        for self.ctrl_idx_, (t, ch, data) in enumerate(self.dataset_.iter_frames()): 
+        for self.ctrl_idx_, (t, ch, data) in enumerate(self.dataset_.iterframes()): 
             if ch in self.ctrl_cb_: 
                 self.ctrl_cb_[ch](t, data)
 
