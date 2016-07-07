@@ -608,7 +608,10 @@ class TangoDB(LogDB):
         }
 
     def __getitem__(self, basename): 
-        return self.frame_index_[basename]
+        try: 
+            return self.frame_index_[basename]
+        except KeyError, e: 
+            raise KeyError('Missing key in TangoDB {}'.format(basename))
 
     @property
     def annotated_inds(self): 
