@@ -354,7 +354,8 @@ def publish_quads(pub_channel, quads, frame_id='camera', reset=True):
 def draw_camera(pose, zmin=0.0, zmax=0.1, fov=np.deg2rad(60)): 
 
     frustum = Frustum(pose, zmin=zmin, zmax=zmax, fov=fov)
-    nll, nlr, nur, nul, fll, flr, fur, ful = frustum.get_vertices()
+    nul, nll, nlr, nur, ful, fll, flr, fur = frustum.vertices
+    # nll, nlr, nur, nul, fll, flr, fur, ful = frustum.vertices
 
     faces = []
 
