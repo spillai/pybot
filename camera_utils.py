@@ -164,7 +164,7 @@ class CameraIntrinsic(object):
         """
         Simulate a 640x480 camera with 500 focal length
         """
-        return cls.from_calib_params(500., 500., 320., 240.)
+        return cls.from_calib_params(500., 500., 320., 240., shape=(480,640))
 
     @classmethod
     def from_calib_params(cls, fx, fy, cx, cy, k1=0, k2=0, k3=0, p1=0, p2=0, shape=None): 
@@ -496,6 +496,10 @@ class Camera(CameraIntrinsic, CameraExtrinsic):
 
     def triangulate(self, pts, other_cam, other_pts): 
         return triangulate_points(self, pts, other_cam, other_pts)
+
+    def frustum(self, zmin=0.01, zmax=0.1, pts=None): 
+        assert(self.shape is not None)
+        return Frustum.from_camera(self, zmin=zmin, zmax=zmax, pts=pts)
 
     def save(self, filename): 
         raise NotImplementedError()
@@ -912,52 +916,79 @@ def test_HalfPlane():
     pass
 
 class Frustum(object): 
-    def __init__(self, pose, zmin=0.0, zmax=0.1, fov=np.deg2rad(60)): 
+    def __init__(self, vertices): 
+        """
+        Vertices: nll, nlr, nur, nul, fll, flr, fur, ful
+        """
+        self.vertices_ = vertices
+
+    @classmethod
+    def from_pose(cls, pose, zmin=0.01, zmax=0.1, fov=np.deg2rad(60)): 
         if fov >= np.pi: 
             raise ValueError('Frustum fov cannot be {} radians'.format(fov))
+        if zmin < 0.01: 
+            raise ValueError('zmin needs to be finite > 0.01')
 
-        self.p0 = np.array([0,0,0])
-        self.near, self.far = np.array([0,0,zmin]), np.array([0,0,zmax])
-        self.near_off, self.far_off = np.tan(fov / 2) * zmin, np.tan(fov / 2) * zmax
-        self.zmin = zmin
-        self.zmax = zmax
-        self.fov = fov
+        near, far = np.array([0,0,zmin]), np.array([0,0,zmax])
+        near_off, far_off = np.tan(fov / 2) * zmin, np.tan(fov / 2) * zmax
         
-        self.pose = pose
-        self.p0 = pose.tvec
-
-    def get_vertices(self): 
-        arr = [self.near + np.array([-1, -1, 0]) * self.near_off, 
-               self.near + np.array([1, -1, 0]) * self.near_off, 
-               self.near + np.array([1, 1, 0]) * self.near_off, 
-               self.near + np.array([-1, 1, 0]) * self.near_off, 
+        # Determine vertices from fov, zmin and zmax
+        # Order: nll, nlr, nur, nul, fll, flr, fur, ful
+        arr = [near + np.array([-1, -1,  0]) * near_off, 
+               near + np.array([ 1, -1,  0]) * near_off, 
+               near + np.array([ 1,  1,  0]) * near_off, 
+               near + np.array([-1,  1,  0]) * near_off, 
                
-               self.far + np.array([-1, -1, 0]) * self.far_off, 
-               self.far + np.array([1, -1, 0]) * self.far_off, 
-               self.far + np.array([1, 1, 0]) * self.far_off, 
-               self.far + np.array([-1, 1, 0]) * self.far_off]
+               far +  np.array([-1, -1,  0]) * far_off, 
+               far +  np.array([ 1, -1,  0]) * far_off, 
+               far +  np.array([ 1,  1,  0]) * far_off, 
+               far +  np.array([-1,  1,  0]) * far_off]
 
-        nll, nlr, nur, nul, fll, flr, fur, ful = self.pose * np.vstack(arr)
-        return nll, nlr, nur, nul, fll, flr, fur, ful
+        return cls(pose * np.vstack(arr))
 
-    def get_planes(self): 
+    @classmethod
+    def from_camera(cls, c, zmin=0.01, zmax=0.1, pts=None):
+        if not isinstance(c, Camera): 
+            raise TypeError('c is not of Camera type, cannot instantiate frustum')
+        if zmin < 0.01: 
+            raise ValueError('zmin needs to be finite > 0.01')
+
+        # Construct frustum for full camera field-of-view 
+        if pts is None: 
+            H, W = c.shape
+            pts = np.vstack([[0, 0], [W-1,0], [W-1,H-1], [0,H-1]])
+
+        rays = c.ray(pts, undistort=False, rotate=False)
+        return cls(c.c2w(np.vstack([rays * zmin, rays * zmax])))           
+
+    @property
+    def vertices(self): 
+        return self.vertices_
+
+    @property
+    def planes(self): 
         """
         Returns the point/normals parametrization for planes, 
         including clipped zmin and zmax frustums
         """
-        nll, nlr, nur, nul, fll, flr, fur, ful = self.get_vertices()
+        nll, nlr, nur, nul, fll, flr, fur, ful = self.vertices
         
         pts = np.vstack([nll, nul, nur, nlr, nul, ful])
         
         vx = np.vstack([fll-nll, ful-nul, fur-nur, flr-nlr, nur-nul, fll-ful])
         vy = np.vstack([nul-nll, nur-nul, nlr-nur, nll-nlr, nll-nul, fur-ful])
-        
+
+        # vx += 1e-12
+        # vy += 1e-12
+
         vx /= np.linalg.norm(vx, axis=1).reshape(-1,1)
         vy /= np.linalg.norm(vy, axis=1).reshape(-1,1)
         
         normals = np.cross(vx, vy)
         normals /= np.linalg.norm(normals, axis=1).reshape(-1,1)
         return pts, normals        
+
+
 
 def test_Frustum(): 
     pass
