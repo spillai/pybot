@@ -929,8 +929,6 @@ class Frustum(object):
         if zmin < 0.01: 
             raise ValueError('zmin needs to be finite > 0.01')
 
-        near, far = np.array([0,0,zmin]), np.array([0,0,zmax])
-        near_off, far_off = np.tan(fov / 2) * zmin, np.tan(fov / 2) * zmax
         
         # Determine vertices from fov, zmin and zmax
         # 
@@ -942,15 +940,32 @@ class Frustum(object):
         #      nll ---  nlr
         # 
         # Order: nul, nll, nlr, nur, ful, fll, flr, fur
-        arr = [near + np.array([-1, -1,  0]) * near_off, 
-               near + np.array([-1,  1,  0]) * near_off, 
-               near + np.array([ 1,  1,  0]) * near_off, 
-               near + np.array([ 1, -1,  0]) * near_off, 
+
+        # near, far = np.array([0,0,zmin]), np.array([0,0,zmax])
+        # near_off, far_off = np.tan(fov / 2) * zmin, np.tan(fov / 2) * zmax
+        # arr = [near + np.array([-1, -1,  0]) * near_off, 
+        #        near + np.array([-1,  1,  0]) * near_off, 
+        #        near + np.array([ 1,  1,  0]) * near_off, 
+        #        near + np.array([ 1, -1,  0]) * near_off, 
                
-               far +  np.array([-1, -1,  0]) * far_off, 
-               far +  np.array([-1,  1,  0]) * far_off, 
-               far +  np.array([ 1,  1,  0]) * far_off, 
-               far +  np.array([ 1, -1,  0]) * far_off]
+        #        far +  np.array([-1, -1,  0]) * far_off, 
+        #        far +  np.array([-1,  1,  0]) * far_off, 
+        #        far +  np.array([ 1,  1,  0]) * far_off, 
+        #        far +  np.array([ 1, -1,  0]) * far_off]
+
+        # FoV derived from fx,fy,cx,cy=500,500,320,240
+        # fovx, fovy = 65.23848614  51.28201165
+        rx, ry = 0.638, 0.478
+        arr = [np.array([-rx, -ry, 1.]) * zmin,
+               np.array([-rx,  ry, 1.]) * zmin,
+               np.array([ rx,  ry, 1.]) * zmin,
+               np.array([ rx, -ry, 1.]) * zmin,
+
+               np.array([-rx, -ry, 1.]) * zmax,
+               np.array([-rx,  ry, 1.]) * zmax,
+               np.array([ rx,  ry, 1.]) * zmax,
+               np.array([ rx, -ry, 1.]) * zmax]
+
 
         return cls(pose * np.vstack(arr))
 
