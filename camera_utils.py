@@ -933,16 +933,24 @@ class Frustum(object):
         near_off, far_off = np.tan(fov / 2) * zmin, np.tan(fov / 2) * zmax
         
         # Determine vertices from fov, zmin and zmax
-        # Order: nll, nlr, nur, nul, fll, flr, fur, ful
+        # 
+        #    ful --- fur
+        #    |\       |\
+        #    | nul ---| nur
+        #    fll| --- flr |
+        #     \ |       \ |
+        #      nll ---  nlr
+        # 
+        # Order: nul, nll, nlr, nur, ful, fll, flr, fur
         arr = [near + np.array([-1, -1,  0]) * near_off, 
-               near + np.array([ 1, -1,  0]) * near_off, 
-               near + np.array([ 1,  1,  0]) * near_off, 
                near + np.array([-1,  1,  0]) * near_off, 
+               near + np.array([ 1,  1,  0]) * near_off, 
+               near + np.array([ 1, -1,  0]) * near_off, 
                
                far +  np.array([-1, -1,  0]) * far_off, 
-               far +  np.array([ 1, -1,  0]) * far_off, 
+               far +  np.array([-1,  1,  0]) * far_off, 
                far +  np.array([ 1,  1,  0]) * far_off, 
-               far +  np.array([-1,  1,  0]) * far_off]
+               far +  np.array([ 1, -1,  0]) * far_off]
 
         return cls(pose * np.vstack(arr))
 
@@ -956,8 +964,8 @@ class Frustum(object):
         # Construct frustum for full camera field-of-view 
         if pts is None: 
             H, W = c.shape
-            pts = np.vstack([[0, 0], [W-1,0], [W-1,H-1], [0,H-1]])
-
+            pts = np.vstack([[0, 0], [0,H-1], [W-1,H-1], [W-1,0]])
+          
         rays = c.ray(pts, undistort=False, rotate=False)
         return cls(c.c2w(np.vstack([rays * zmin, rays * zmax])))           
 
@@ -971,12 +979,12 @@ class Frustum(object):
         Returns the point/normals parametrization for planes, 
         including clipped zmin and zmax frustums
         """
-        nll, nlr, nur, nul, fll, flr, fur, ful = self.vertices
+        nul, nll, nlr, nur, ful, fll, flr, fur = self.vertices
+        
+        vx = np.vstack([nul-nll, nur-nul, nlr-nur, nll-nlr, nll-nul, fur-ful])
+        vy = np.vstack([fll-nll, ful-nul, fur-nur, flr-nlr, nur-nul, fll-ful])
         
         pts = np.vstack([nll, nul, nur, nlr, nul, ful])
-        
-        vx = np.vstack([fll-nll, ful-nul, fur-nur, flr-nlr, nur-nul, fll-ful])
-        vy = np.vstack([nul-nll, nur-nul, nlr-nur, nll-nlr, nll-nul, fur-ful])
 
         # vx += 1e-12
         # vy += 1e-12
