@@ -78,6 +78,7 @@ def draw_ellipses(im, ellipses):
     return im
 
 def draw_hulls(im, hulls): 
+    assert(isinstance(hulls, list))
     cv2.polylines(im, hulls, 1, (0, 255, 0) if im.ndim == 3 else 255, thickness=1)       
     return im
 
