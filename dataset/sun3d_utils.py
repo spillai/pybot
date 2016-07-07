@@ -78,9 +78,9 @@ class SUN3DAnnotationFrame(object):
     @property
     def unscaled_polygons(self): 
         try: 
-            return np.vstack([ann['xy'] for ann in self.annotations_])
+            return [np.vstack(ann['xy']) for ann in self.annotations_]
         except: 
-            return np.empty(shape=(0,2), dtype=np.int64)
+            return [np.empty(shape=(0,2), dtype=np.int64) for ann in self.annotations_]
 
     # @bboxes.setter
     # def bboxes(self, bboxes):
@@ -299,9 +299,9 @@ class SUN3DAnnotationDB(object):
 
     def _get_scaled_polygons(self, frame): 
         try: 
-            return np.vstack([(p * self.scale).astype(np.int64) for p in frame.unscaled_polygons])
+            return [(p * self.scale).astype(np.int64) for p in frame.unscaled_polygons]
         except: 
-            return np.empty(shape=(0,2), dtype=np.int64)
+            return [np.empty(shape=(0,2), dtype=np.int64) for p in frame.unscaled_polygons]
 
     def _get_scaled_bboxes(self, frame): 
         try: 
