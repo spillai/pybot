@@ -24,11 +24,12 @@ def format_time(t):
 def mkdir_p(path):
     try:
         os.makedirs(os.path.expanduser(path))
-    except : 
-        print 'Failed to create path %s' % path 
+    except Exception,e : 
+        print '{}: Failed to create path {}'.format(e,path)
 
 def path_exists(path): 
-    return os.path.exists(os.path.expanduser(path))
+    return os.path.exists(os.path.expanduser(path)) \
+        or not len(path)
 
 def create_directory_if_not_exists(dir_path): 
     """ Create directory path if it doesn't exist """
