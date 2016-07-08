@@ -19,7 +19,7 @@ def convex_hull(pts, ccw=True):
 def boxify_pts(pts): 
     xmin, xmax = np.min(pts[:,0]), np.max(pts[:,0])
     ymin, ymax = np.min(pts[:,1]), np.max(pts[:,1])
-    return [xmin, ymin, xmax, ymax]
+    return np.float32([xmin, ymin, xmax, ymax])
 
 
 def bbox_pts(bbox, ccw=True):

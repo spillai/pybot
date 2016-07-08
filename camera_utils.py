@@ -501,6 +501,14 @@ class Camera(CameraIntrinsic, CameraExtrinsic):
         assert(self.shape is not None)
         return Frustum.from_camera(self, zmin=zmin, zmax=zmax, pts=pts)
 
+    def check_visibility(self, pts, zmin=0, zmax=100): 
+        """
+        Check if points are visible given fov of camera
+
+        camera: type Camera
+        """
+        return check_visibility(self, pts, zmin=zmin, zmax=zmax)
+
     def save(self, filename): 
         raise NotImplementedError()
 
@@ -742,7 +750,7 @@ def compute_essential(F, K):
     """ Compute the Essential matrix, and R1, R2 """
     return (K.T).dot(npm.mat(F)).dot(K)
 
-def check_visibility(camera, pts_w): 
+def check_visibility(camera, pts_w, zmin=0, zmax=100): 
     """
     Check if points are visible given fov of camera
     
@@ -757,11 +765,12 @@ def check_visibility(camera, pts_w):
 
     # Determine look-at vector, and check angle 
     # subtended with camera's z-vector (3rd column)
+    z = pts_c[:,2]
     v = pts_c / np.linalg.norm(pts_c, axis=1).reshape(-1, 1)
     thetas = np.arccos(v[:,2])
 
     # Provides inds mask for all points that are within fov
-    return thetas < hfov
+    return thetas < hfov and z >= zmin and z <= zmax
 
 def get_median_depth(camera, pts, subsample=10): 
     """ 
