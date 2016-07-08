@@ -759,24 +759,23 @@ def check_visibility(camera, pts_w, zmin=0, zmax=100):
     """
     # Transform points in to camera's reference
     # Camera: p_cw
-    pts_c = camera * pts_w.reshape(-1, 3)
+    pts_c = camera.c2w(pts_w.reshape(-1, 3))
+    # from bot_geometry.rigid_transform import Pose
+    # from bot_externals.draw_utils import publish_cloud, publish_pose_list
 
-    # TODO/FIX: Only check max of the fovs
-    hfov = np.max(camera.fov) / 2
-
+    # publish_pose_list('curr_cam', [Pose.from_rigid_transform(0, camera.inverse())], reset=False)
+    # publish_cloud('pts_wrt_camera', [pts_c], c='b', frame_id='curr_cam', element_id=[0], reset=True)
+    
     # Determine look-at vector, and check angle 
     # subtended with camera's z-vector (3rd column)
     z = pts_c[:,2]
     v = pts_c / np.linalg.norm(pts_c, axis=1).reshape(-1, 1)
-    hangle, vangle = np.arctan2(v[:,0], v[:,2]), np.arctan2(v[:,1], v[:,2])
-    # hangle = np.rad2deg(np.arctan2(v[:,2], v[:,0]))
-    # vangle = np.rad2deg(np.arctan2(v[:,2], v[:,1]))
-    print np.rad2deg(hangle), np.rad2deg(vangle), np.fabs(hangle) < camera.fov[0]/2 and np.fabs(vangle) < camera.fov[1]/2
-    print np.rad2deg(camera.fov)
-    thetas = np.arccos(v[:,2])
+    hangle, vangle = np.arctan2(v[:,0], v[:,2]), np.arctan2(-v[:,1], v[:,2])
 
     # Provides inds mask for all points that are within fov
-    return thetas < hfov and z >= zmin and z <= zmax
+    return np.fabs(hangle) < camera.fov[0] * 0.5 and \
+        np.fabs(vangle) < camera.fov[1] * 0.5 and \
+        z >= zmin and z <= zmax
 
 def get_median_depth(camera, pts, subsample=10): 
     """ 

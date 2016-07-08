@@ -16,6 +16,12 @@ def convex_hull(pts, ccw=True):
 # ===========================================================================
 # BBOX-functions
 
+def bbox_inbounds(bb, shape): 
+    assert(shape[1] > shape[0] and bb.shape[1] == 4)
+    return np.all(np.bitwise_and(np.bitwise_and(bb[:,0] >= 0, bb[:,2] < shape[1]), \
+                                 np.bitwise_and(bb[:,1] >= 0, bb[:,3] < shape[0])))
+
+
 def boxify_pts(pts): 
     xmin, xmax = np.min(pts[:,0]), np.max(pts[:,0])
     ymin, ymax = np.min(pts[:,1]), np.max(pts[:,1])
