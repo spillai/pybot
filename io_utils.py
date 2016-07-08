@@ -7,11 +7,9 @@ General purpose IO utils for pybot
 import cv2
 import sys
 import argparse
-import ConfigParser
 import os
 import numpy as np
 
-import joblib
 from cStringIO import StringIO
 from bot_vision.image_utils import im_resize
 
@@ -65,6 +63,7 @@ def read_config(conf_path, section):
     """
     # Try reading the conf file
     try: 
+        import ConfigParser
         config = ConfigParser.SafeConfigParser()
         config.read([conf_path])
         defaults = dict(config.items(section))
@@ -89,6 +88,7 @@ def config_and_args_parser(conf_path, section, description=''):
 
     # Try reading the conf file
     try: 
+        import ConfigParser
         config = ConfigParser.SafeConfigParser()
         config.read([args.conf_file])
         defaults = dict(config.items(section))
@@ -102,6 +102,7 @@ def config_and_args_parser(conf_path, section, description=''):
 
 
 def joblib_dump(item, path): 
+    import joblib
     create_path_if_not_exists(path)
     joblib.dump(item, path)
     
