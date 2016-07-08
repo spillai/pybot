@@ -474,6 +474,10 @@ class TangoLogReader(LogReader):
             yield data.img, bboxes, np.int32(map(lambda key: target_hash[key], target_names))
 
     @property
+    def db(self): 
+        return TangoDB(self)
+
+    @property
     def annotated_indices(self): 
         assert(self.ground_truth_available)
         assert(self.start_idx_ == 0)
@@ -553,6 +557,14 @@ class TangoFrame(object):
         Decoded only at request, avoids in-memory storage
         """
         return self.img_decode(self.img_msg_)
+
+    # def __repr__(self): 
+    #     return 'img={}, t={}, pose={}'.format(self.img_msg_, self.timestamp, self.pose)
+
+    def __repr__(self): 
+        return 'img={}'.format(self.img_msg_)
+
+
 
 class TangoDB(LogDB): 
     def __init__(self, dataset): 
