@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 
+from itertools import imap
 from bot_utils.plot_utils import colormap
 from bot_vision.image_utils import to_color
 
@@ -79,6 +80,6 @@ def draw_ellipses(im, ellipses):
 
 def draw_hulls(im, hulls): 
     assert(isinstance(hulls, list))
-    cv2.polylines(im, hulls, 1, (0, 255, 0) if im.ndim == 3 else 255, thickness=1)       
+    cv2.polylines(im, map(lambda hull: hull.astype(np.int32), hulls), 1, (0, 255, 0) if im.ndim == 3 else 255, thickness=1)       
     return im
 
