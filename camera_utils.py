@@ -922,6 +922,11 @@ class Frustum(object):
         """
         self.vertices_ = vertices
 
+    @property
+    def _front_back_vertices(self): 
+        N = len(self.vertices_)
+        return self.vertices_[:N/2], self.vertices_[N/2:]
+
     @classmethod
     def from_pose(cls, pose, zmin=0.01, zmax=0.1, fov=np.deg2rad(60)): 
         if fov >= np.pi: 
@@ -966,7 +971,6 @@ class Frustum(object):
                np.array([ rx,  ry, 1.]) * zmax,
                np.array([ rx, -ry, 1.]) * zmax]
 
-
         return cls(pose * np.vstack(arr))
 
     @classmethod
@@ -993,13 +997,17 @@ class Frustum(object):
         """
         Returns the point/normals parametrization for planes, 
         including clipped zmin and zmax frustums
+
+        Note: points need to be in CCW
         """
-        nul, nll, nlr, nur, ful, fll, flr, fur = self.vertices
-        
-        vx = np.vstack([nul-nll, nur-nul, nlr-nur, nll-nlr, nll-nul, fur-ful])
-        vy = np.vstack([fll-nll, ful-nul, fur-nur, flr-nlr, nur-nul, fll-ful])
-        
-        pts = np.vstack([nll, nul, nur, nlr, nul, ful])
+
+        nv1, fv1 = self._front_back_vertices
+        nv2 = np.roll(nv1, -1, axis=0)
+        fv2 = np.roll(fv1, -1, axis=0)
+
+        vx = np.vstack([fv1-nv1, nv2[0]-nv1[0], fv1[2]-fv1[1]])
+        vy = np.vstack([fv2-fv1, nv2[1]-nv2[0], fv1[1]-fv1[0]])
+        pts = np.vstack([fv1, nv1[0], fv1[1]])
 
         # vx += 1e-12
         # vy += 1e-12
@@ -1008,6 +1016,7 @@ class Frustum(object):
         vy /= np.linalg.norm(vy, axis=1).reshape(-1,1)
         
         normals = np.cross(vx, vy)
+
         normals /= np.linalg.norm(normals, axis=1).reshape(-1,1)
         return pts, normals        
 
