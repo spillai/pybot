@@ -552,6 +552,10 @@ class TangoFrame(object):
         return self.annotation_
 
     @property
+    def img_filename(self): 
+        return self.img_msg_
+
+    @property
     def img(self): 
         """
         Decoded only at request, avoids in-memory storage
