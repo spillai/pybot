@@ -333,7 +333,7 @@ def im_describe(*args, **kwargs):
 # General-purpose object recognition interfaces, and functions
 # ---------------------------------------------------------------------
 
-from bot_vision.recognition.bbox import brute_force_match, intersection_over_union
+from bot_vision.geom_utils import brute_force_match, intersection_over_union
 
 import sklearn.metrics as metrics
 from sklearn.svm import LinearSVC, SVC

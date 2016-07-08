@@ -33,7 +33,7 @@ from bot_utils.timer import timeitmethod
 from bot_vision.trackers import FeatureDetector, OpticalFlowTracker, LKTracker
 from bot_vision.trackers import finite_and_within_bounds, to_pts, \
     TrackManager, FeatureDetector, OpticalFlowTracker, LKTracker
-from bot_vision.recognition.bbox import brute_force_match, intersection_over_union
+# from bot_vision.geom_utils import brute_force_match, intersection_over_union
 
 class BaseKLT(object): 
     """
