@@ -15,7 +15,7 @@ def draw_features(im, pts, colors=None, size=2):
         tl = np.int32(pt - size)
         br = np.int32(pt + size)
         cv2.rectangle(out, (tl[0], tl[1]), (br[0], br[1]), tuple(col), -1)
-        # cv2.circle(out, tuple(map(int, pt)), 3, (0,255,0), -1, lineType=cv2.CV_AA)
+        # cv2.circle(out, tuple(map(int, pt)), size, tuple(col), -1, lineType=cv2.CV_AA)
     return out
 
 def draw_lines(im, pts1, pts2, colors=None, thickness=1): 
