@@ -8,22 +8,17 @@ import numpy as np
 import os.path
 import json
 
-from collections import deque, namedtuple, Counter
+from itertools import izip
+from collections import deque, namedtuple, Counter, OrderedDict
 from heapq import heappush, heappop
 from abc import ABCMeta, abstractmethod
 
-# from bot_vision.mapping.pose_utils import PoseAccumulator
+
 from bot_externals.log_utils import Decoder, LogReader, LogController
 from bot_vision.image_utils import im_resize
 from bot_geometry.rigid_transform import RigidTransform
 from bot_vision.camera_utils import CameraIntrinsic
 from bot_utils.dataset.sun3d_utils import SUN3DAnnotationDB
-
-# def test_coords(): 
-#     IF = RigidTransform(Quaternion.from_wxyz([0.002592, 0.704923, 0.709254, -0.005954]), tvec=[0.000663, 0.011257, 0.004177])
-#     ID = RigidTransform(Quaternion.from_wxyz([0.702596, -0.079740, -0.079740, 0.702596]), tvec=[0.000000, 0.000000, 0.000000])
-#     IC = RigidTransform(Quaternion.from_wxyz([0.000585, 0.707940, 0.706271, 0.001000]), tvec=[0.000339, 0.061691, 0.002792])
-#     DC = ID.inverse() * IC
 
 # Decode odometry
 def odom_decode(data): 
@@ -50,26 +45,20 @@ def TangoOdomDecoder(channel, every_k_frames=1, noise=[0,0]):
     May 2016
     base: IMU, target: FISHEYE
     frame->camera t: 0.000663, 0.011257, 0.004177 q: 0.002592, 0.704923, 0.709254, -0.005954
-
     base: IMU, target: DEVICE
     frame->camera t: 0.000000, 0.000000, 0.000000 q: 0.702596, -0.079740, -0.079740, 0.702596
-
     base: IMU, target: CAMERA_COLOR
     frame->camera t: 0.000339, 0.061691, 0.002792 q: 0.000585, 0.707940, 0.706271, 0.001000
-
     base: SS, target: DEVICE
     -0.005353, -0.000184, -0.004125 q: 0.814851, 0.578699, 0.019265, -0.027478
 
     Jan 2016
     STATIC base: IMU (I), target: CAMERA (C)
     t: 0.000339, 0.061691, 0.002792 q: (w) 0.000585, (x)0.707940, (y)0.706271, (z)0.001000
-
     STATIC base: IMU (I), target: DEVICE (D)
     t: 0.000000, 0.000000, 0.000000 q: (w) 0.702596, (x) -0.079740, (y) -0.079740, (z) 0.702596
-
     STATIC base: IMU (I), target: DEPTH (P)
     t: 0.000339, 0.061691, 0.002792 q: (w) 0.000585, 0.707940, 0.706271, 0.001000
-
     STATIC base: IMU (I), target: FISHEYE (F)
     t: 0.000663, 0.011257, 0.004177 q: (w) 0.002592, 0.704923, 0.709254, -0.005954
 
@@ -85,24 +74,21 @@ def TangoOdomDecoder(channel, every_k_frames=1, noise=[0,0]):
     a) (-90, 0, 0)   => LEFT (X), DOWN (Y), FWD (Z) => CAM
 
     """
-    # IF = RigidTransform(Quaternion.from_wxyz([0.002592, 0.704923, 0.709254, -0.005954]), tvec=[0.000663, 0.011257, 0.004177])
-    # ID = RigidTransform(Quaternion.from_wxyz([0.702596, -0.079740, -0.079740, 0.702596]), tvec=[0.000000, 0.000000, 0.000000])
-    # IC = RigidTransform(Quaternion.from_wxyz([0.000585, 0.707940, 0.706271, 0.001000]), tvec=[0.000339, 0.061691, 0.002792])
-
-
-    # p_ID = RigidTransform(tvec=[0,0,0], xyzw=[-0.079740, -0.079740, 0.706271, 0.706271]) # Jan 2016
-    p_ID = RigidTransform(tvec=[0,0,0], xyzw=[-0.079740, -0.079740, 0.702596, 0.702596]) # May 2016
-    p_IF = RigidTransform(tvec=[0.000662555, 0.011257, 0.0041772], xyzw=[0.70492326,  0.7092538 , -0.00595375,  0.00259168])
-    p_IC = RigidTransform(tvec=[0.000339052, 0.0616911, 0.00279207], xyzw=[0.707940, 0.706271, 0.001000, 0.000585])
+    p_ID = RigidTransform(tvec=[0,0,0], 
+                          xyzw=[-0.079740, -0.079740, 0.702596, 0.702596])
+    p_IF = RigidTransform(tvec=[0.000662555, 0.011257, 0.0041772], 
+                          xyzw=[0.70492326,  0.7092538 , -0.00595375,  0.00259168])
+    p_IC = RigidTransform(tvec=[0.000339052, 0.0616911, 0.00279207], 
+                          xyzw=[0.707940, 0.706271, 0.001000, 0.000585])
     p_DC = p_ID.inverse() * p_IC
     p_DF = p_ID.inverse() * p_IF
-
     # print('\nCalibration\n==============')
-    # print('\tp_ID: {}, \n\tp_IC: {}, \n\tp_DC: {}, \n\tp_DF: {}'.format(p_ID, p_IC, p_DC, p_DF))
+    # print('\tp_ID: {}, \n\tp_IC: {}, \n\tp_DC: {}, \n\tp_DF: {}'
+    #       .format(p_ID, p_IC, p_DC, p_DF))
 
     # SS->CAM
-    p_S_CAM = RigidTransform.from_roll_pitch_yaw_x_y_z(-np.pi/2, 0, 0, 
-                                                    0, 0, 0, axes='sxyz')
+    p_S_CAM = RigidTransform.from_roll_pitch_yaw_x_y_z(
+        -np.pi/2, 0, 0, 0, 0, 0, axes='sxyz')
     p_CAM_S = p_S_CAM.inverse()
 
     # Decode odometry
@@ -115,9 +101,12 @@ def TangoOdomDecoder(channel, every_k_frames=1, noise=[0,0]):
     np.random.seed(1)
     noise = np.float32(noise)
     def get_noise(): 
-        xyz = np.random.normal(0, noise[0], size=3) if noise[0] > 0 else np.zeros(3)
-        rpy = np.random.normal(0, noise[1], size=3) if noise[1] > 0 else np.zeros(3)
-        return RigidTransform.from_roll_pitch_yaw_x_y_z(rpy[0], rpy[1], rpy[2], xyz[0], xyz[1], xyz[2])
+        xyz = np.random.normal(0, noise[0], size=3) \
+              if noise[0] > 0 else np.zeros(3)
+        rpy = np.random.normal(0, noise[1], size=3) \
+              if noise[1] > 0 else np.zeros(3)
+        return RigidTransform.from_roll_pitch_yaw_x_y_z(
+            rpy[0], rpy[1], rpy[2], xyz[0], xyz[1], xyz[2])
 
     # Noise injection
     inject_noise = (noise[0] > 0 or noise[1] > 0)
@@ -129,24 +118,29 @@ def TangoOdomDecoder(channel, every_k_frames=1, noise=[0,0]):
             if len(p_accumulator) == 1:
                 p_accumulator_noisy.append(p_accumulator[-1])
             else: 
-                p21 = get_noise() * (p_accumulator[-2].inverse() * p_accumulator[-1])
+                p21 = get_noise() * \
+                      (p_accumulator[-2].inverse() * p_accumulator[-1])
                 last = p_accumulator_noisy[-1]
                 p_accumulator_noisy.append(last.oplus(p21))
 
             return p_accumulator_noisy[-1]
 
-        decode_cb = lambda data: odom_decode_with_noise(calibrated_odom_decode(data))
+        decode_cb = lambda data: \
+                odom_decode_with_noise(calibrated_odom_decode(data))
 
-    return Decoder(channel=channel, every_k_frames=every_k_frames, decode_cb=decode_cb)
+    return Decoder(channel=channel, every_k_frames=every_k_frames, 
+                   decode_cb=decode_cb)
 
 class TangoImageDecoder(Decoder): 
     """
     """
-    def __init__(self, directory, channel='RGB', color=True, every_k_frames=1, shape=(1280,720)): 
+    def __init__(self, directory, channel='RGB', color=True, 
+                 every_k_frames=1, shape=(1280,720)): 
         Decoder.__init__(self, channel=channel, every_k_frames=every_k_frames)
         self.shape_ = shape 
         if self.shape_[0] < self.shape_[1]: 
-            raise RuntimeError('W > H requirement failed, W: {}, H: {}'.format(self.shape_[0], self.shape_[1]))
+            raise RuntimeError('W > H requirement failed, W: {}, H: {}'
+                               .format(self.shape_[0], self.shape_[1]))
         self.directory_ = directory
         self.color_ = color
 
@@ -304,7 +298,6 @@ class TangoLogReader(LogReader):
     1. Support for every_k_frames in iteritems
     """
 
-    # fisheye_cam = CameraIntrinsic(K=)
     def __init__(self, directory, scale=1., start_idx=0, every_k_frames=1, 
                  noise=[0,0], with_ground_truth=False): 
 
@@ -344,11 +337,12 @@ class TangoLogReader(LogReader):
         super(TangoLogReader, self).__init__(
             self.filename_, decoder=[pose_decoder, img_decoder]
         )
-        
+
         # Check start index
         if isinstance(self.start_idx_, float):
             raise ValueError('start_idx in TangoReader expects an integer,'
                              'provided {:}'.format(self.start_idx_))
+
 
     @property
     def annotationdb(self): 
@@ -571,12 +565,23 @@ class TangoDB(LogDB):
         return self.frame_index_
 
     def _index(self): 
+        """
+        Constructs a look up table for the following variables: 
+        
+            self.frame_index_:  rgb/img.png -> TangoFrame
+            self.frame_lut_: idx -> rgb/img.png
 
-        # Iterate through both poses and images, and construct frames
+        where TangoFrame (index_in_the_dataset, timestamp, )
+        """
+
+        # 1. Iterate through both poses and images, and construct frames
         # with look up table for filename str -> (timestamp, pose, annotation) 
         poses = []
         pose_decode = lambda msg_item: \
                       self.dataset.decoder[TangoFile.VIO_CHANNEL].decode(msg_item)
+
+        # Note: Control flow for idx is critical since start_idx could
+        # potentially change the offset and destroy the pose_index
         for idx, (t, ch, msg) in enumerate(self.dataset.itercursors()): 
             pose = None
             if ch == TangoFile.VIO_CHANNEL: 
@@ -585,27 +590,41 @@ class TangoDB(LogDB):
                 except: 
                     pose = None
             poses.append(pose)
-                
 
         # Find valid and missing poses
+        # pose_inds: log_index -> closest_valid_index
         valid_arr = np.array(
             map(lambda item: item is not None, poses), dtype=np.bool)
-        pose_inds = TangoDB._pose_index(valid_arr)
+        pose_inds = TangoDB._nn_pose_fill(valid_arr)
 
         # Create indexed frames for lookup        
         # self.frame_index_:  rgb/img.png -> TangoFrame
         # self.frame_lut_: idx -> rgb/img.png
         img_decode = lambda msg_item: \
                     self.dataset.decoder[TangoFile.RGB_CHANNEL].decode(msg_item)
-        self.frame_index_ = {
-            img_msg: TangoFrame(idx, t, img_msg, poses[pose_inds[idx]], 
-                                self.dataset.annotationdb[img_msg], img_decode)
+        self.frame_index_ = OrderedDict([
+            (img_msg, TangoFrame(idx, t, img_msg, poses[pose_inds[idx]], 
+                                 self.dataset.annotationdb[img_msg], img_decode))
             for idx, (t, ch, img_msg) in enumerate(self.dataset.itercursors()) \
-            if ch == TangoFile.RGB_CHANNEL 
-        }
-        self.frame_lut_ = {
-            idx: k for idx, k in enumerate(self.frame_index_.keys())
-        }
+            if ch == TangoFile.RGB_CHANNEL
+        ])
+        self.frame_lut_ = OrderedDict([
+            (idx, k) for idx, k in enumerate(self.frame_index_.keys())
+        ])
+
+    def iterframes(self, reverse=False): 
+        """
+        Ground truth reader interface for Images [with time, pose,
+        annotation] : lookup corresponding annotation, and filled in
+        poses from nearest available timestamp
+        """
+        # self._check_ground_truth_availability()
+
+        # Iterate through both poses and images, and construct frames
+        # with look up table for filename str -> (timestamp, pose, annotation) 
+        assert(reverse is False)
+        for img_msg, frame in self.frame_index_.iteritems(): 
+            yield (frame.timestamp, img_msg, frame)
 
     def __getitem__(self, basename): 
         try: 
@@ -625,9 +644,17 @@ class TangoDB(LogDB):
     def objects(self): 
         return self.dataset.annotationdb.objects
 
-    def find_object_annotations(self, target_name): 
-        return self.dataset.annotationdb.find_object_annotations(target_name)
-
+    def iter_object_annotations(self, target_name): 
+        frame_keys, polygon_inds = self.dataset.annotationdb.find_object_annotations(target_name)
+        for idx, (fkey,pind) in enumerate(izip(frame_keys, polygon_inds)): 
+            try: 
+                f = self[fkey]
+            except KeyError, e: 
+                print(e)
+                continue
+            assert(f.is_annotated)
+            yield f, pind
+        
     # def list_annotations(self, target_name=None): 
     #     " List of lists"
     #     inds = self.annotated_inds
@@ -650,7 +677,7 @@ class TangoDB(LogDB):
                       
 
     @staticmethod
-    def _pose_index(valid): 
+    def _nn_pose_fill(valid): 
         """
         Looks up closest True for each False and returns
         indices for fill-in-lookup
@@ -741,13 +768,17 @@ class TangoLogController(LogController):
         if not len(self.__pose_q):
             return
         t_pose, pose = self.__pose_q[-1]
-        self.on_frame(AnnotatedFrame(img=ann_img.img, pose=pose, t_pose=t_pose, t_img=t_img, bboxes=ann_img.annotation.bboxes))
+        self.on_frame(AnnotatedFrame(img=ann_img.img, pose=pose, 
+                                     t_pose=t_pose, t_img=t_img, 
+                                     bboxes=ann_img.annotation.bboxes))
         
     def on_rgb(self, t_img, img): 
         if not len(self.__pose_q):
             return
         t_pose, pose = self.__pose_q[-1]
-        self.on_frame(AnnotatedFrame(img=img, pose=pose, t_pose=t_pose, t_img=t_img, bboxes=[]))
+        self.on_frame(AnnotatedFrame(img=img, pose=pose, 
+                                     t_pose=t_pose, t_img=t_img, 
+                                     bboxes=[]))
 
     def on_pose(self, t, pose): 
         # self.__item_q.append((1, t, pose))
