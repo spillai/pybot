@@ -207,7 +207,6 @@ class CameraIntrinsic(object):
         """
         Returns the field of view for each axis
         """
-        return np.array([np.arctan(self.cx / self.fx), np.arctan(self.cy / self.fy)]) * 2
         return np.float32([np.arctan(self.shape[1] * 0.5 / self.fx), 
                            np.arctan(self.shape[0] * 0.5 / self.fy)]) * 2.0
 
@@ -769,6 +768,11 @@ def check_visibility(camera, pts_w, zmin=0, zmax=100):
     # subtended with camera's z-vector (3rd column)
     z = pts_c[:,2]
     v = pts_c / np.linalg.norm(pts_c, axis=1).reshape(-1, 1)
+    hangle, vangle = np.arctan2(v[:,0], v[:,2]), np.arctan2(v[:,1], v[:,2])
+    # hangle = np.rad2deg(np.arctan2(v[:,2], v[:,0]))
+    # vangle = np.rad2deg(np.arctan2(v[:,2], v[:,1]))
+    print np.rad2deg(hangle), np.rad2deg(vangle), np.fabs(hangle) < camera.fov[0]/2 and np.fabs(vangle) < camera.fov[1]/2
+    print np.rad2deg(camera.fov)
     thetas = np.arccos(v[:,2])
 
     # Provides inds mask for all points that are within fov
