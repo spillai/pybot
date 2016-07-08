@@ -208,6 +208,8 @@ class CameraIntrinsic(object):
         Returns the field of view for each axis
         """
         return np.array([np.arctan(self.cx / self.fx), np.arctan(self.cy / self.fy)]) * 2
+        return np.float32([np.arctan(self.shape[1] * 0.5 / self.fx), 
+                           np.arctan(self.shape[0] * 0.5 / self.fy)]) * 2.0
 
     def scaled(self, scale): 
         """
