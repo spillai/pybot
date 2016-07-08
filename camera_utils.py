@@ -606,7 +606,6 @@ class StereoCamera(Camera):
         Computes the disparity image from expected height for each of
         the provided rows
         """
-
         Z = height * self.left.fy  /  (np.arange(rows) - self.left.cy + 1e-9)
         return self.left.fx * self.baseline / Z 
 
@@ -986,7 +985,7 @@ class Frustum(object):
             pts = np.vstack([[0, 0], [0,H-1], [W-1,H-1], [W-1,0]])
           
         rays = c.ray(pts, undistort=False, rotate=False)
-        return cls(c.c2w(np.vstack([rays * zmin, rays * zmax])))           
+        return cls(c.w2c(np.vstack([rays * zmin, rays * zmax])))           
 
     @property
     def vertices(self): 
