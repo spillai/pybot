@@ -753,18 +753,14 @@ def compute_essential(F, K):
 
 def check_visibility(camera, pts_w, zmin=0, zmax=100): 
     """
-    Check if points are visible given fov of camera
-    
+    Check if points are visible given fov of camera. 
+    This method checks for both horizontal and vertical
+    fov.     
     camera: type Camera
     """
     # Transform points in to camera's reference
     # Camera: p_cw
     pts_c = camera.c2w(pts_w.reshape(-1, 3))
-    # from bot_geometry.rigid_transform import Pose
-    # from bot_externals.draw_utils import publish_cloud, publish_pose_list
-
-    # publish_pose_list('curr_cam', [Pose.from_rigid_transform(0, camera.inverse())], reset=False)
-    # publish_cloud('pts_wrt_camera', [pts_c], c='b', frame_id='curr_cam', element_id=[0], reset=True)
     
     # Determine look-at vector, and check angle 
     # subtended with camera's z-vector (3rd column)
@@ -1033,29 +1029,12 @@ class Frustum(object):
         normals /= np.linalg.norm(normals, axis=1).reshape(-1,1)
         return pts, normals        
 
-
-
 def test_Frustum(): 
     pass
 
 
 if __name__ == "__main__": 
-    cam = CameraIntrinsic.from_calib_params(718.856, 718.856, 607.1928, 185.2157, shape=np.int32([1241,376]))
+    cam = Camera.from_intrinsics_extrinsics(CameraIntrinsic.simulate(), 
+                                            CameraExtrinsic.simulate())
     print cam.shape
-    cam.save('kitti00-02.yaml')
-
-    
-
-#   m, n = im.shape[:2]
-#   line = numpy.dot(F, x)
-
-#   t = numpy.linspace(0, n, 100)
-#   lt = numpy.array([(line[2] + line[0] * tt) / (-line[1]) for tt in t])
-
-#   ndx = (lt >= 0) & (lt < m)
-#   pylab.plot(t[ndx], lt[ndx], linewidth=2)
-
-#   if show_epipole:
-#     if epipole is None:
-#       epipole = compute_right_epipole(F)
-#     pylab.plot(epipole[0] / epipole[2], epipole[1] / epipole[2], 'r*')
+    cam.save('cam_test.yaml')
