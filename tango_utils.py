@@ -493,22 +493,6 @@ def iter_tango_logs(directory, logs, topics=[]):
             bboxes = item.bboxes
             targets = item.coords
 
-class LogDB(object): 
-    def __init__(self, dataset): 
-        self.dataset_ = dataset
-        self.frame_index_ = None
-        self._index()
-        self.print_index_info()
-
-    def _index(self): 
-        raise NotImplementedError()
-
-    def print_index_info(): 
-        raise NotImplementedError()
-
-    @property
-    def dataset(self): 
-        return self.dataset_
 
 # Define tango frame for known decoders
 class TangoFrame(object): 
@@ -566,9 +550,37 @@ class TangoFrame(object):
     #     return 'img={}, t={}, pose={}'.format(self.img_msg_, self.timestamp, self.pose)
 
     def __repr__(self): 
-        return 'img={}'.format(self.img_msg_)
+        return 'TangoFrame::img={}'.format(self.img_msg_)
 
+class LogDB(object): 
+    def __init__(self, dataset): 
+        self.dataset_ = dataset
+        self.frame_index_ = None
+        self._index()
+        self.print_index_info()
 
+    @property
+    def index(self): 
+        return self.frame_index_
+
+    def _index(self): 
+        raise NotImplementedError()
+
+    def print_index_info(): 
+        raise NotImplementedError()
+
+    def iterframes(self, reverse=False): 
+        raise NotImplementedError()
+
+    def __getitem__(self, basename): 
+        try: 
+            return self.frame_index_[basename]
+        except KeyError, e: 
+            raise KeyError('Missing key in LogDB {}'.format(basename))
+
+    @property
+    def dataset(self): 
+        return self.dataset_
 
 class TangoDB(LogDB): 
     def __init__(self, dataset): 
@@ -577,9 +589,9 @@ class TangoDB(LogDB):
         LogDB.__init__(self, dataset)
 
     @property
-    def index(self): 
-        return self.frame_index_
-
+    def poses(self): 
+        return [v.pose for k,v in self.frame_index_.iteritems()]
+        
     def _index(self): 
         """
         Constructs a look up table for the following variables: 
@@ -642,12 +654,6 @@ class TangoDB(LogDB):
         for img_msg, frame in self.frame_index_.iteritems(): 
             yield (frame.timestamp, img_msg, frame)
 
-    def __getitem__(self, basename): 
-        try: 
-            return self.frame_index_[basename]
-        except KeyError, e: 
-            raise KeyError('Missing key in TangoDB {}'.format(basename))
-
     @property
     def annotated_inds(self): 
         return self.dataset.annotationdb.annotated_inds
@@ -660,7 +666,7 @@ class TangoDB(LogDB):
     def objects(self): 
         return self.dataset.annotationdb.objects
 
-    def iter_object_annotations(self, target_name): 
+    def iter_object_annotations(self, target_name=''): 
         frame_keys, polygon_inds = self.dataset.annotationdb.find_object_annotations(target_name)
         for idx, (fkey,pind) in enumerate(izip(frame_keys, polygon_inds)): 
             try: 
