@@ -1017,7 +1017,7 @@ class Frustum(object):
         return self.vertices_
 
     @property
-    def planes(self): 
+    def points_and_normals(self): 
         """
         Returns the point/normals parametrization for planes, 
         including clipped zmin and zmax frustums
@@ -1040,9 +1040,15 @@ class Frustum(object):
         vy /= np.linalg.norm(vy, axis=1).reshape(-1,1)
         
         normals = np.cross(vx, vy)
-
         normals /= np.linalg.norm(normals, axis=1).reshape(-1,1)
         return pts, normals        
+
+    @property
+    def planes(self): 
+        # plane parameters : [n, -n.p]
+        pts, normals = self.points_and_normals
+        return np.hstack([normals, -np.sum(np.multiply(pts, normals), axis=1).reshape(-1,1)])
+
 
 def test_Frustum(): 
     pass
