@@ -394,7 +394,7 @@ class Camera(CameraIntrinsic, CameraExtrinsic):
     def extrinsics(self): 
         return CameraExtrinsic(self.R, self.t)
 
-    def project(self, X, check_bounds=False, return_depth=False):
+    def project(self, X, check_bounds=False, return_depth=False, min_depth=0.1):
         """
         Project [Nx3] points onto 2-D image plane [Nx2]
         """
@@ -402,20 +402,26 @@ class Camera(CameraIntrinsic, CameraExtrinsic):
 	rvec,_ = cv2.Rodrigues(R)
 	proj,_ = cv2.projectPoints(X, rvec, t, self.K, self.D)
         x = proj.reshape(-1,2)
-        
+
+        # Only return positive depths
+        depths = self.depth_from_projection(X)
+        valid = depths >= min_depth
+
         if check_bounds: 
             if self.shape is None: 
                 raise ValueError('check_bounds cannot proceed. Camera.shape is not set')
         
             # Only return points within-image bounds
-            valid = np.bitwise_and(np.bitwise_and(x[:,0] >= 0, x[:,0] < self.shape[1]), \
-                                   np.bitwise_and(x[:,1] >= 0, x[:,1] < self.shape[0]))
-            x, X = x[valid], X[valid]
-            
+            valid = np.bitwise_and(
+                valid, np.bitwise_and(
+                    np.bitwise_and(x[:,0] >= 0, x[:,0] < self.shape[1]), \
+                    np.bitwise_and(x[:,1] >= 0, x[:,1] < self.shape[0]))
+            )
+
         if return_depth: 
-            depths = self.depth_from_projection(X)
-            return x, depths
-        return x
+            return x[valid], depths[valid]
+
+        return x[valid]
 
     def depth_from_projection(self, X): 
         """
