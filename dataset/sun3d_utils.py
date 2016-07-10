@@ -362,11 +362,13 @@ class SUN3DAnnotationDB(object):
     #             for pind, frame in izip(polygon_inds, self.iterframes(frame_inds))    
 
     def filter_target_name(self, pretty_names, target_name=None): 
+        "Filter by target_name, optionally target_name is None, 
+        in which case no items are filtered"
         return \
             filter(lambda name: target_name in name, pretty_names) \
             if target_name is not None else pretty_names
 
-    def find_object_annotations(self, target_name): 
+    def find_object_annotations(self, target_name=''): 
         """
         Find annotations by target_name/pretty_name. 
         Returns the index and the associated polygon index, 
@@ -383,7 +385,7 @@ class SUN3DAnnotationDB(object):
         
         frame_keys, polygon_inds = [], []
         for object_name, items in self.object_annotations_index_.iteritems(): 
-            if target_name in object_name:
+            if target_name == '' or target_name in object_name:
                 fkeys, pinds = zip(*items)
                 frame_keys.extend(fkeys)
                 polygon_inds.extend(pinds)
