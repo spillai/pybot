@@ -298,6 +298,12 @@ class CameraExtrinsic(RigidTransform):
         """
         p = RigidTransform.from_Rt(R, t)
         RigidTransform.__init__(self, xyzw=p.quat.to_xyzw(), tvec=p.tvec)
+        self.__cached_inverse = None
+
+    def inverse(self): 
+        if self.__cached_inverse is None: 
+            self.__cached_inverse = super(RigidTransform, self).inverse()
+        return self.__cached_inverse
 
     def __repr__(self): 
         return 'CameraExtrinsic =======>\npose = {:}'.format(RigidTransform.__repr__(self))
