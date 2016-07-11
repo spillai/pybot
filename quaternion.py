@@ -39,7 +39,7 @@ class Quaternion(object):
         if isinstance(other, float): 
             return Quaternion(self.q * other)
         elif isinstance(other, Quaternion): 
-            return tf.quaternion_multiply(self.q, other.q)
+            return Quaternion(tf.quaternion_multiply(self.q, other.q))
         else: 
             raise TypeError('Quaternion multiply error')
 
@@ -133,7 +133,7 @@ class Quaternion(object):
         """ Return (x,y,z,w) representation """
         return self.q
 
-    def to_roll_pitch_yaw (self, axes='rxyz'):
+    def to_roll_pitch_yaw(self, axes='rxyz'):
         """ Return Euler angle with XYZ convention """
         return np.array(tf.euler_from_quaternion(self.q, axes=axes))
 

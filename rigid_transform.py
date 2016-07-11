@@ -241,6 +241,10 @@ class RigidTransform(object):
         return self.tvec
 
     @property
+    def orientation(self): 
+        return self.quat
+
+    @property
     def rotation(self): 
         return self.quat
 
