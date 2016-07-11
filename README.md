@@ -7,7 +7,7 @@ Bot Viewer capabilities in Python<br>
 
 Dependencies
 ---
-[bot_geometry](https://github.com/spillai/pybot_geometry), [NumPy](https://github.com/numpy/numpy), [lcm](https://github.com/lcm-proj/lcm), [collections viewer](https://github.com/openhumanoids/pronto/tree/master/visualization), [libbot](https://github.com/RobotLocomotion/libbot)
+[bot_geometry](https://github.com/spillai/pybot_geometry), [NumPy](https://github.com/numpy/numpy), [lcm](https://github.com/lcm-proj/lcm), [collections viewer](https://github.mit.edu/mrg/visualization-pod), [libbot](https://github.com/RobotLocomotion/libbot)
 
 All the dependencies need to be available in the `PYTHONPATH`. 
 
