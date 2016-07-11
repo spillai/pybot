@@ -21,7 +21,15 @@ def bbox_inbounds(bb, shape):
     return np.all(np.bitwise_and(np.bitwise_and(bb[:,0] >= 0, bb[:,2] < shape[1]), \
                                  np.bitwise_and(bb[:,1] >= 0, bb[:,3] < shape[0])))
 
+def scale_bbox(bb, scale=1.0): 
+    c = np.float32([bb[0]+bb[2], bb[1]+bb[3]]) * 0.5
+    s = scale
+    return np.float32([(bb[0]-c[0]) * s + c[0], (bb[1]-c[1]) * s + c[1], 
+                       (bb[2]-c[0]) * s + c[0], (bb[3]-c[1]) * s + c[1]])                       
 
+def scale_bboxes(bboxes, scale=1.0): 
+    return np.vstack([ scale_bbox(bb, scale=scale) for bb in bboxes])
+    
 def boxify_pts(pts): 
     xmin, xmax = np.min(pts[:,0]), np.max(pts[:,0])
     ymin, ymax = np.min(pts[:,1]), np.max(pts[:,1])

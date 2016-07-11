@@ -151,6 +151,8 @@ class BaseKLT(object):
             cv2.rectangle(out, tuple(map(int, pt-2)), tuple(map(int, pt+2)), 
                           tuple(map(int, cols[tid % N])) if colored else (0,240,0), -1)
 
+        return out
+
     def matches(self, index1=-2, index2=-1): 
         tids, p1, p2 = [], [], []
         for tid, pts in self.tm_.tracks.iteritems(): 
@@ -253,7 +255,7 @@ class MeshKLT(OpenCVKLT):
         from pybot_vision import DelaunayTriangulation
         self.dt_ = DelaunayTriangulation()
 
-    @timeitmethod
+    # @timeitmethod
     def process(self, im, detected_pts=None): 
         ids, pts = OpenCVKLT.process(self, im, detected_pts=detected_pts)
         # # Mesh KLT over confident tracks 
@@ -313,7 +315,7 @@ class BoundingBoxKLT(OpenCVKLT):
     def initialized(self): 
         return len(self.bboxes_) > 0
 
-    @timeitmethod
+    # @timeitmethod
     def process(self, im, bboxes=None): 
         """
         Propagate bounding boxes based on feature tracks
@@ -340,7 +342,7 @@ class BoundingBoxKLT(OpenCVKLT):
 
             # Update the hull to the latest points
             # TODO: can update the ids as well so that 
-            # the tracking is more proloned
+            # the tracking is more prolonged
             vpts = pts[common_inds]
             vbox = get_bbox(vpts)
             valid_pts = inside_bboxes(pts, [vbox])
@@ -366,30 +368,48 @@ class BoundingBoxKLT(OpenCVKLT):
         valid_mask = inside_bboxes(pts, bboxes)
         for bidx, valid in enumerate(valid_mask):
             vids, vpts = ids[valid], pts[valid], 
+            # vis = to_color(im)
+            # vis = draw_features(vis, vpts)
+            # imshow_cv('bbox_feats', vis, block=True)
             if len(vpts): 
                 self.hulls_[max_id + bidx] = AttrDict(ids=vids, pts=vpts, bbox=get_bbox(vpts)) # bbox=bboxes[bidx])
 
-        # Return hulls, and corresponding ids
+        return self.ids, self.bboxes
+
+    @property
+    def bboxes(self): 
+        try: 
+            hboxes = np.vstack([ hull.bbox for hull in self.hulls_.itervalues() ]).reshape(-1,4)
+        except: 
+            hboxes = np.empty(shape=(0,4), dtype=np.int32)
+        return hboxes
+
+    @property
+    def ids(self): 
         try: 
             hids = self.hulls_.keys()
-            hboxes = np.vstack([ hull.bbox for hull in self.hulls_.itervalues() ])
         except: 
-            hids, hboxes = [], []
-        return hids, hboxes
+            hids = []
+        return hids
 
     def visualize(self, vis, colored=True): 
 
         try: 
-            tids = set(np.hstack([hull.ids for hull in self.hulls_.itervalues()]))
+            tids = set(self.ids)
         except: 
             return vis
 
-        for tid, pts in self.tm_.tracks.iteritems(): 
-            if tid not in tids: continue
-            cv2.polylines(vis, [np.vstack(pts.items).astype(np.int32)[-4:]], False, 
-                          (0,255,0), thickness=1)
-            tl, br = np.int32(pts.latest_item)-2, np.int32(pts.latest_item)+2
-            cv2.rectangle(vis, (tl[0], tl[1]), (br[0], br[1]), (0,255,0), -1)
+        for hid, hbox in izip(self.ids, self.bboxes): 
+            cv2.rectangle(vis, (hbox[0], hbox[1]), (hbox[2], hbox[3]), (0,255,0), 1)
+
+        vis = super(BoundingBoxKLT, self).viz(vis, colored=colored)
+
+        # for tid, pts in self.tm_.tracks.iteritems(): 
+        #     if tid not in tids: continue
+        #     cv2.polylines(vis, [np.vstack(pts.items).astype(np.int32)[-4:]], False, 
+        #                   (0,255,0), thickness=1)
+        #     tl, br = np.int32(pts.latest_item)-2, np.int32(pts.latest_item)+2
+        #     cv2.rectangle(vis, (tl[0], tl[1]), (br[0], br[1]), (0,255,0), -1)
 
         # OpenCVKLT.draw_tracks(self, vis, colored=colored, max_track_length=10)
         return vis

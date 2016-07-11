@@ -201,7 +201,7 @@ class LKTracker(OpticalFlowTracker):
         OpticalFlowTracker.__init__(self, fb_check=fb_check)
         self.lk_params_ = AttrDict(winSize=winSize, maxLevel=maxLevel)
 
-    @timeitmethod
+    # @timeitmethod
     def track(self, im0, im1, p0): 
         """
         Main tracking method using sparse optical flow (LK)
@@ -236,7 +236,7 @@ class FarnebackTracker(OpticalFlowTracker):
         self.farneback_params_ = AttrDict(pyr_scale=pyr_scale, levels=levels, winsize=winsize, 
                                           iterations=iterations, poly_n=poly_n, poly_sigma=poly_sigma, flags=flags)
 
-    @timeitmethod
+    # @timeitmethod
     def track(self, im0, im1, p0): 
         if p0 is None or not len(p0): 
             return np.array([])

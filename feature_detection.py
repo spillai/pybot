@@ -146,7 +146,7 @@ class FeatureDetector(object):
     @classmethod
     def from_params(cls, method='fast', grid=(12,10), max_corners=1200, 
                  max_levels=4, subpixel=False, params=fast_params):
-        pass
+        raise NotImplementedError()
 
     def check_detector(self): 
         # Check detector
