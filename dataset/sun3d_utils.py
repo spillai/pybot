@@ -362,8 +362,10 @@ class SUN3DAnnotationDB(object):
     #             for pind, frame in izip(polygon_inds, self.iterframes(frame_inds))    
 
     def filter_target_name(self, pretty_names, target_name=None): 
-        "Filter by target_name, optionally target_name is None, 
-        in which case no items are filtered"
+        """
+        Filter by target_name, optionally target_name is None, 
+        in which case no items are filtered
+        """
         return \
             filter(lambda name: target_name in name, pretty_names) \
             if target_name is not None else pretty_names
