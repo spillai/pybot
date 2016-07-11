@@ -105,8 +105,12 @@ class Sampler(object):
     def latest_sample(self): 
         return self.q_[-1]
 
+    @classmethod
+    def from_items(cls, items, lookup_history=10):
+        raise NotImplementedError()
+
 class PoseSampler(Sampler): 
-    def __init__(self, theta=20, displacement=0.25, lookup_history=10, 
+    def __init__(self, theta=np.deg2rad(20), displacement=0.25, lookup_history=10, 
                  get_sample=lambda item: item, 
                  on_sampled_cb=lambda index, item: None, verbose=False): 
         Sampler.__init__(self, lookup_history=lookup_history, 
@@ -114,7 +118,12 @@ class PoseSampler(Sampler):
                          on_sampled_cb=on_sampled_cb, verbose=verbose)
 
         self.displacement_ = displacement
-        self.theta_ = np.deg2rad(theta)
+        self.theta_ = theta
+
+    @classmethod
+    def from_items(cls, items, theta=np.deg2rad(20), displacement=0.25, lookup_history=10):
+        c = cls(theta=theta, displacement=displacement, lookup_history=lookup_history)
+        return [c.latest_sample for item in items if c.append(item)]
         
     def check_sample(self, item):
         if self.force_check(): 
@@ -128,7 +137,6 @@ class PoseSampler(Sampler):
         for p in reversed(self.q_): 
             newp = pinv * self.get_sample(p)
             d, r = np.linalg.norm(newp.tvec), np.fabs(newp.to_roll_pitch_yaw_x_y_z()[:3])
-            # print r, d < self.displacement_, (r < self.theta_).all(), newp
             if d < self.displacement_ and (r < self.theta_).all(): 
                 return False
 
@@ -238,7 +246,7 @@ class FrustumVolumeIntersectionPoseSampler(Sampler):
 Keyframe = namedtuple('Keyframe', ['img', 'pose', 'index'], verbose=False)
 
 class KeyframeSampler(PoseSampler):
-    def __init__(self, theta=20, displacement=0.25, lookup_history=10, 
+    def __init__(self, theta=np.deg2rad(20), displacement=0.25, lookup_history=10, 
                  get_sample=lambda item: item.pose,  
                  on_sampled_cb=lambda index, item: None, verbose=False): 
         PoseSampler.__init__(self, displacement=displacement, theta=theta, 
