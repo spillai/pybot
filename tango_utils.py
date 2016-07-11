@@ -652,7 +652,7 @@ class TangoDB(LogDB):
             (k, idx) for idx, k in enumerate(self.frame_index_.keys())
         ])
 
-    def iterframes(self, reverse=False): 
+    def iterframes(self): 
         """
         Ground truth reader interface for Images [with time, pose,
         annotation] : lookup corresponding annotation, and filled in
@@ -662,9 +662,21 @@ class TangoDB(LogDB):
 
         # Iterate through both poses and images, and construct frames
         # with look up table for filename str -> (timestamp, pose, annotation) 
-        assert(reverse is False)
         for img_msg, frame in self.frame_index_.iteritems(): 
             yield (frame.timestamp, img_msg, frame)
+
+    def iterframes_indices(self, inds): 
+        for ind in inds: 
+            img_msg = self.frame_idx2name_[ind]
+            frame = self.frame_index_[img_msg]
+            yield (frame.timestamp, img_msg, frame)
+
+    def iterframes_range(self, ind_range): 
+        assert(isinstance(ind_range, tuple) and len(ind_range) == 2)
+        st, end = ind_range
+        inds = np.arange(0 if st < 0 else st, 
+                         len(self.frame_index_) if end < 0 else end+1)
+        return self.iterframes_indices(inds)
 
     @property
     def annotated_inds(self): 
