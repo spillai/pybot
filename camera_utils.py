@@ -302,7 +302,7 @@ class CameraExtrinsic(RigidTransform):
 
     def inverse(self): 
         if self.__cached_inverse is None: 
-            self.__cached_inverse = super(RigidTransform, self).inverse()
+            self.__cached_inverse = super(CameraExtrinsic, self).inverse()
         return self.__cached_inverse
 
     def __repr__(self): 
