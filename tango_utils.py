@@ -556,6 +556,7 @@ class LogDB(object):
     def __init__(self, dataset): 
         self.dataset_ = dataset
         self.frame_index_ = None
+        self.frame_name2idx_, self.frame_idx2name_ = None, None
         self._index()
         self.print_index_info()
 
@@ -578,6 +579,12 @@ class LogDB(object):
         except KeyError, e: 
             raise KeyError('Missing key in LogDB {}'.format(basename))
 
+    def find(self, basename): 
+        try: 
+            return self.frame_name2idx_[basename]
+        except KeyError, e: 
+            raise KeyError('Missing key in LogDB {}'.format(basename))
+
     @property
     def dataset(self): 
         return self.dataset_
@@ -597,7 +604,8 @@ class TangoDB(LogDB):
         Constructs a look up table for the following variables: 
         
             self.frame_index_:  rgb/img.png -> TangoFrame
-            self.frame_lut_: idx -> rgb/img.png
+            self.frame_idx2name_: idx -> rgb/img.png
+            self.frame_name2idx_: idx -> rgb/img.png
 
         where TangoFrame (index_in_the_dataset, timestamp, )
         """
@@ -627,7 +635,8 @@ class TangoDB(LogDB):
 
         # Create indexed frames for lookup        
         # self.frame_index_:  rgb/img.png -> TangoFrame
-        # self.frame_lut_: idx -> rgb/img.png
+        # self.frame_idx2name_: idx -> rgb/img.png
+        # self.frame_name2idx_: rgb/img.png -> idx
         img_decode = lambda msg_item: \
                     self.dataset.decoder[TangoFile.RGB_CHANNEL].decode(msg_item)
         self.frame_index_ = OrderedDict([
@@ -636,8 +645,11 @@ class TangoDB(LogDB):
             for idx, (t, ch, img_msg) in enumerate(self.dataset.itercursors()) \
             if ch == TangoFile.RGB_CHANNEL
         ])
-        self.frame_lut_ = OrderedDict([
+        self.frame_idx2name_ = OrderedDict([
             (idx, k) for idx, k in enumerate(self.frame_index_.keys())
+        ])
+        self.frame_name2idx_ = OrderedDict([
+            (k, idx) for idx, k in enumerate(self.frame_index_.keys())
         ])
 
     def iterframes(self, reverse=False): 
