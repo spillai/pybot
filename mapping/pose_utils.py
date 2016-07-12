@@ -121,10 +121,14 @@ class PoseSampler(Sampler):
         self.theta_ = theta
 
     @classmethod
-    def from_items(cls, items, theta=np.deg2rad(20), displacement=0.25, lookup_history=10):
+    def from_items(cls, items, theta=np.deg2rad(20), displacement=0.25, lookup_history=10, return_indices=False):
         c = cls(theta=theta, displacement=displacement, lookup_history=lookup_history)
-        return [c.latest_sample for item in items if c.append(item)]
-        
+        items = [(c.latest_sample, idx) for idx, item in enumerate(items) if c.append(item)]
+        poses, inds = zip(*items)
+        if return_indices: 
+            return poses, inds
+        return poses
+
     def check_sample(self, item):
         if self.force_check(): 
             return True
