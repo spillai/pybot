@@ -208,6 +208,7 @@ class LCMLogReader(LogReader):
                 # self.idx += 1
                 return True, (t, channel, dec.decode(data))
         except Exception as e:
+            print e
             pass
             # raise RuntimeError("""Failed to decode data from"""
             #                    """channel: {:}, mis-specified decoder"""
