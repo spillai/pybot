@@ -3,6 +3,7 @@ import numpy as np
 from collections import deque
 from scipy.interpolate import LinearNDInterpolator
 
+from bot_utils.timer import timeitmethod
 from bot_utils.db_utils import AttrDict
 
 from bot_vision.camera_utils import StereoCamera
@@ -96,6 +97,7 @@ class StereoBM:
 
         self.process = self.compute
 
+    @timeitmethod
     def compute(self, left, right): 
         return self.bm.compute(left, right).astype(np.float32) / 16.0
 
