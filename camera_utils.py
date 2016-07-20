@@ -552,6 +552,11 @@ class StereoCamera(Camera):
         self.right = rcamera
         self.baseline = baseline
 
+    @classmethod
+    def simulate(cls): 
+        cam = Camera.simulate()
+        return cls(cam, cam, baseline=0.1)
+
     @property
     def left(self): 
         return self
