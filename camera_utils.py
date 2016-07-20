@@ -387,7 +387,7 @@ class Camera(CameraIntrinsic, CameraExtrinsic):
         """
         Simulate camera intrinsics and extrinsics
         """
-        return cls.from_intrinsics_extrinsics(CameraIntrinsic.simluate(), CameraExtrinsic.simulate())
+        return cls.from_intrinsics_extrinsics(CameraIntrinsic.simulate(), CameraExtrinsic.simulate())
 
     @classmethod
     def from_intrinsics_extrinsics(cls, intrinsic, extrinsic): 
