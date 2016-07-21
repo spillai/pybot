@@ -544,6 +544,8 @@ class StereoCamera(Camera):
             raise TypeError('lcamera, rcamera are not Camera type')
 
         Camera.__init__(self, lcamera.K, lcamera.R, lcamera.t, D=lcamera.D, shape=lcamera.shape) 
+        if np.linalg.norm(lcamera.t-rcamera.t) < 1e-2:
+            raise ValueError('Right camera does not have an offset from the left camera')
 
         # CameraIntrinsic.__init__(self, K, D, shape=shape)
         # CameraExtrinsic.__init__(self, R, t)
@@ -555,7 +557,7 @@ class StereoCamera(Camera):
     @classmethod
     def simulate(cls): 
         cam = Camera.simulate()
-        return cls(cam, cam, baseline=0.1)
+        return cls.from_left_with_baseline(cam, baseline=0.1)
 
     @property
     def left(self): 
