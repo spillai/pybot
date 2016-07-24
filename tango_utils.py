@@ -14,7 +14,7 @@ from heapq import heappush, heappop
 from abc import ABCMeta, abstractmethod
 
 
-from bot_externals.log_utils import Decoder, LogReader, LogController
+from bot_externals.log_utils import Decoder, LogReader, LogController, LogDB
 from bot_vision.image_utils import im_resize
 from bot_geometry.rigid_transform import RigidTransform
 from bot_vision.camera_utils import CameraIntrinsic
@@ -551,43 +551,6 @@ class TangoFrame(object):
 
     def __repr__(self): 
         return 'TangoFrame::img={}'.format(self.img_msg_)
-
-class LogDB(object): 
-    def __init__(self, dataset): 
-        self.dataset_ = dataset
-        self.frame_index_ = None
-        self.frame_name2idx_, self.frame_idx2name_ = None, None
-        self._index()
-        self.print_index_info()
-
-    @property
-    def index(self): 
-        return self.frame_index_
-
-    def _index(self): 
-        raise NotImplementedError()
-
-    def print_index_info(): 
-        raise NotImplementedError()
-
-    def iterframes(self, reverse=False): 
-        raise NotImplementedError()
-
-    def __getitem__(self, basename): 
-        try: 
-            return self.frame_index_[basename]
-        except KeyError, e: 
-            raise KeyError('Missing key in LogDB {}'.format(basename))
-
-    def find(self, basename): 
-        try: 
-            return self.frame_name2idx_[basename]
-        except KeyError, e: 
-            raise KeyError('Missing key in LogDB {}'.format(basename))
-
-    @property
-    def dataset(self): 
-        return self.dataset_
 
 class TangoDB(LogDB): 
     def __init__(self, dataset): 

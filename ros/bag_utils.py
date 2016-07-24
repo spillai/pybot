@@ -20,7 +20,7 @@ from sensor_msgs.msg import Image
 from cv_bridge import CvBridge, CvBridgeError
 from tf2_msgs.msg import TFMessage
 
-from bot_externals.log_utils import Decoder, LogReader
+from bot_externals.log_utils import Decoder, LogReader, LogDB
 from bot_vision.image_utils import im_resize
 from bot_vision.imshow_utils import imshow_cv
 from bot_geometry.rigid_transform import RigidTransform
@@ -53,8 +53,12 @@ class CameraInfoDecoder(Decoder):
         Decoder.__init__(self, channel=channel)
 
     def decode(self, msg): 
-        print dir(msg), self.channel
-        return CameraIntrinsic(K=np.float64(msg.K).reshape(3,3), D=np.float64(msg.D).ravel(), 
+        # print dir(msg), self.channel
+        # 'D', 'K', 'P', 'R', 'binning_x', 'binning_y', 
+        # 'distortion_model', 'header', 'height', 'roi',
+        # 'width'
+        return CameraIntrinsic(K=np.float64(msg.K).reshape(3,3), 
+                               D=np.float64(msg.D).ravel(), 
                                shape=[msg.height, msg.width])
         
 class ImageDecoder(Decoder): 
@@ -243,7 +247,10 @@ class ROSBagReader(LogReader):
         return info.topics[topic].message_count
 
     def load_log(self, filename): 
-        return rosbag.Bag(filename, 'r', chunk_threshold=100 * 1024 * 1024)
+        print('Loading ROSBag {} ...'.format(filename))
+        bag = rosbag.Bag(filename, 'r', chunk_threshold=100 * 1024 * 1024)
+        print('Done loading {}'.format(filename))
+        return bag
 
     def tf(self, from_tf, to_tf): 
         try: 
@@ -296,6 +303,9 @@ class ROSBagReader(LogReader):
         
         return tfs 
 
+    def calib(self, channel=''):
+        return self.retrieve_camera_calibration(channel)
+
     def retrieve_tf_relations(self, relations): 
         """
         Perform a one-time look up of all the 
@@ -335,7 +345,7 @@ class ROSBagReader(LogReader):
         # Retrieve camera calibration
         dec = CameraInfoDecoder(channel=topic)
 
-        print('Retrieve camera calibration')
+        print('Retrieve camera calibration for {}'.format(topic))
         for self.idx, (channel, msg, t) in enumerate(self.log.read_messages(topics=topic)): 
             return dec.decode(msg) 
                     
@@ -384,6 +394,10 @@ class ROSBagReader(LogReader):
     def iterframes(self):
         return self.iteritems()
 
+    @property
+    def db(self): 
+        return BagDB(self)
+
 class ROSBagController(object): 
     def __init__(self, dataset): 
         """
@@ -420,4 +434,183 @@ class ROSBagController(object):
         should return the rosnode (for online/live callbacks)
         """
         return self.dataset_
+
+class BagDB(LogDB): 
+    def __init__(self, dataset): 
+        """
+        """
+        LogDB.__init__(self, dataset)
+
+    # @property
+    # def poses(self): 
+    #     return [v.pose for k,v in self.frame_index_.iteritems()]
+        
+    # def _index(self): 
+    #     """
+    #     Constructs a look up table for the following variables: 
+        
+    #         self.frame_index_:  rgb/img.png -> TangoFrame
+    #         self.frame_idx2name_: idx -> rgb/img.png
+    #         self.frame_name2idx_: idx -> rgb/img.png
+
+    #     where TangoFrame (index_in_the_dataset, timestamp, )
+    #     """
+
+    #     # 1. Iterate through both poses and images, and construct frames
+    #     # with look up table for filename str -> (timestamp, pose, annotation) 
+    #     poses = []
+    #     pose_decode = lambda msg_item: \
+    #                   self.dataset.decoder[TangoFile.VIO_CHANNEL].decode(msg_item)
+
+    #     # Note: Control flow for idx is critical since start_idx could
+    #     # potentially change the offset and destroy the pose_index
+    #     for idx, (t, ch, msg) in enumerate(self.dataset.itercursors()): 
+    #         pose = None
+    #         if ch == TangoFile.VIO_CHANNEL: 
+    #             try: 
+    #                 pose = pose_decode(msg)
+    #             except: 
+    #                 pose = None
+    #         poses.append(pose)
+
+    #     # Find valid and missing poses
+    #     # pose_inds: log_index -> closest_valid_index
+    #     valid_arr = np.array(
+    #         map(lambda item: item is not None, poses), dtype=np.bool)
+    #     pose_inds = BagDB._nn_pose_fill(valid_arr)
+
+    #     # Create indexed frames for lookup        
+    #     # self.frame_index_:  rgb/img.png -> TangoFrame
+    #     # self.frame_idx2name_: idx -> rgb/img.png
+    #     # self.frame_name2idx_: rgb/img.png -> idx
+    #     img_decode = lambda msg_item: \
+    #                 self.dataset.decoder[TangoFile.RGB_CHANNEL].decode(msg_item)
+    #     self.frame_index_ = OrderedDict([
+    #         (img_msg, TangoFrame(idx, t, img_msg, poses[pose_inds[idx]], 
+    #                              self.dataset.annotationdb[img_msg], img_decode))
+    #         for idx, (t, ch, img_msg) in enumerate(self.dataset.itercursors()) \
+    #         if ch == TangoFile.RGB_CHANNEL
+    #     ])
+    #     self.frame_idx2name_ = OrderedDict([
+    #         (idx, k) for idx, k in enumerate(self.frame_index_.keys())
+    #     ])
+    #     self.frame_name2idx_ = OrderedDict([
+    #         (k, idx) for idx, k in enumerate(self.frame_index_.keys())
+    #     ])
+
+    # def iterframes(self): 
+    #     """
+    #     Ground truth reader interface for Images [with time, pose,
+    #     annotation] : lookup corresponding annotation, and filled in
+    #     poses from nearest available timestamp
+    #     """
+    #     # self._check_ground_truth_availability()
+
+    #     # Iterate through both poses and images, and construct frames
+    #     # with look up table for filename str -> (timestamp, pose, annotation) 
+    #     for img_msg, frame in self.frame_index_.iteritems(): 
+    #         yield (frame.timestamp, img_msg, frame)
+
+    # def iterframes_indices(self, inds): 
+    #     for ind in inds: 
+    #         img_msg = self.frame_idx2name_[ind]
+    #         frame = self.frame_index_[img_msg]
+    #         yield (frame.timestamp, img_msg, frame)
+
+    # def iterframes_range(self, ind_range): 
+    #     assert(isinstance(ind_range, tuple) and len(ind_range) == 2)
+    #     st, end = ind_range
+    #     inds = np.arange(0 if st < 0 else st, 
+    #                      len(self.frame_index_) if end < 0 else end+1)
+    #     return self.iterframes_indices(inds)
+
+    # @property
+    # def annotated_inds(self): 
+    #     return self.dataset.annotationdb.annotated_inds
+
+    # @property
+    # def object_annotations(self): 
+    #     return self.dataset.annotationdb.object_annotations
+
+    # @property
+    # def objects(self): 
+    #     return self.dataset.annotationdb.objects
+
+    # def iter_object_annotations(self, target_name=''): 
+    #     frame_keys, polygon_inds = self.dataset.annotationdb.find_object_annotations(target_name)
+    #     for idx, (fkey,pind) in enumerate(izip(frame_keys, polygon_inds)): 
+    #         try: 
+    #             f = self[fkey]
+    #         except KeyError, e: 
+    #             print(e)
+    #             continue
+    #         assert(f.is_annotated)
+    #         yield f, pind
+        
+    # # def list_annotations(self, target_name=None): 
+    # #     " List of lists"
+    # #     inds = self.annotated_inds
+    # #     return [ filter(lambda frame: 
+    # #                     target_name is None or name is in target_name, 
+    # #                     self.dataset.annotationdb.iterframes(inds))
+
+    # def print_index_info(self): 
+    #     # Retrieve ground truth information
+    #     gt_str = '{} frames annotated ({} total annotations)'\
+    #         .format(self.dataset.annotationdb.num_frame_annotations, 
+    #                 self.dataset.annotationdb.num_annotations) \
+    #         if self.dataset.ground_truth_available else 'Not Available'
+
+    #     # Pretty print IndexDB description 
+    #     print('\nTango IndexDB \n========\n'
+    #           '\tFrames: {:}\n'
+    #           '\tGround Truth: {:}\n'
+    #           .format(len(self.frame_index_), gt_str)) 
+                      
+
+    # @staticmethod
+    # def _nn_pose_fill(valid): 
+    #     """
+    #     Looks up closest True for each False and returns
+    #     indices for fill-in-lookup
+    #     In: [True, False, True, ... , False, True]
+    #     Out: [0, 0, 2, ..., 212, 212]
+    #     """
+        
+    #     valid_inds,  = np.where(valid)
+    #     invalid_inds,  = np.where(~valid)
+
+    #     all_inds = np.arange(len(valid))
+    #     all_inds[invalid_inds] = -1
+
+    #     for j in range(10): 
+    #         fwd_inds = valid_inds + j
+    #         bwd_inds = valid_inds - j
+
+    #         # Forward fill
+    #         invalid_inds, = np.where(all_inds < 0)
+    #         fwd_fill_inds = np.intersect1d(fwd_inds, invalid_inds)
+    #         all_inds[fwd_fill_inds] = all_inds[fwd_fill_inds-j]
+
+    #         # Backward fill
+    #         invalid_inds, = np.where(all_inds < 0)
+    #         if not len(invalid_inds): break
+    #         bwd_fill_inds = np.intersect1d(bwd_inds, invalid_inds)
+    #         all_inds[bwd_fill_inds] = all_inds[bwd_fill_inds+j]
+
+    #         # Check if any missing 
+    #         invalid_inds, = np.where(all_inds < 0)
+    #         if not len(invalid_inds): break
+
+    #     # np.set_printoptions(threshold=np.nan)
+
+    #     # print valid.astype(np.int)
+    #     # print np.array_str(all_inds)
+    #     # print np.where(all_inds < 0)
+
+    #     return all_inds
+
+    # @property
+    # def index(self): 
+    #     return self.frame_index_
 

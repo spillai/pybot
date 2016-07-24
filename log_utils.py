@@ -82,6 +82,9 @@ class LogReader(object):
     def log(self): 
         return self.log_
 
+    def calib(self, channel=''): 
+        raise NotImplementedError()
+
     def load_log(self, filename): 
         raise NotImplementedError('load_log not implemented in LogReader')
 
@@ -197,3 +200,39 @@ class LogController(object):
         """
         return self.dataset_
 
+class LogDB(object): 
+    def __init__(self, dataset): 
+        self.dataset_ = dataset
+        self.frame_index_ = None
+        self.frame_name2idx_, self.frame_idx2name_ = None, None
+        self._index()
+        self.print_index_info()
+
+    @property
+    def index(self): 
+        return self.frame_index_
+
+    def _index(self): 
+        raise NotImplementedError()
+
+    def print_index_info(): 
+        raise NotImplementedError()
+
+    def iterframes(self, reverse=False): 
+        raise NotImplementedError()
+
+    def __getitem__(self, basename): 
+        try: 
+            return self.frame_index_[basename]
+        except KeyError, e: 
+            raise KeyError('Missing key in LogDB {}'.format(basename))
+
+    def find(self, basename): 
+        try: 
+            return self.frame_name2idx_[basename]
+        except KeyError, e: 
+            raise KeyError('Missing key in LogDB {}'.format(basename))
+
+    @property
+    def dataset(self): 
+        return self.dataset_
