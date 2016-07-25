@@ -562,7 +562,7 @@ class TangoDB(LogDB):
     def poses(self): 
         return [v.pose for k,v in self.frame_index_.iteritems()]
         
-    def _index(self): 
+    def _index(self, pose_channel=TangoFile.VIO_CHANNEL, rgb_channel=TangoFile.RGB_CHANNEL): 
         """
         Constructs a look up table for the following variables: 
         
@@ -577,13 +577,13 @@ class TangoDB(LogDB):
         # with look up table for filename str -> (timestamp, pose, annotation) 
         poses = []
         pose_decode = lambda msg_item: \
-                      self.dataset.decoder[TangoFile.VIO_CHANNEL].decode(msg_item)
+                      self.dataset.decoder[pose_channel].decode(msg_item)
 
         # Note: Control flow for idx is critical since start_idx could
         # potentially change the offset and destroy the pose_index
         for idx, (t, ch, msg) in enumerate(self.dataset.itercursors()): 
             pose = None
-            if ch == TangoFile.VIO_CHANNEL: 
+            if ch == pose_channel: 
                 try: 
                     pose = pose_decode(msg)
                 except: 
@@ -601,12 +601,12 @@ class TangoDB(LogDB):
         # self.frame_idx2name_: idx -> rgb/img.png
         # self.frame_name2idx_: rgb/img.png -> idx
         img_decode = lambda msg_item: \
-                    self.dataset.decoder[TangoFile.RGB_CHANNEL].decode(msg_item)
+                    self.dataset.decoder[rgb_channel].decode(msg_item)
         self.frame_index_ = OrderedDict([
             (img_msg, TangoFrame(idx, t, img_msg, poses[pose_inds[idx]], 
                                  self.dataset.annotationdb[img_msg], img_decode))
             for idx, (t, ch, img_msg) in enumerate(self.dataset.itercursors()) \
-            if ch == TangoFile.RGB_CHANNEL
+            if ch == rgb_channel
         ])
         self.frame_idx2name_ = OrderedDict([
             (idx, k) for idx, k in enumerate(self.frame_index_.keys())
@@ -684,48 +684,6 @@ class TangoDB(LogDB):
               '\tGround Truth: {:}\n'
               .format(len(self.frame_index_), gt_str)) 
                       
-
-    @staticmethod
-    def _nn_pose_fill(valid): 
-        """
-        Looks up closest True for each False and returns
-        indices for fill-in-lookup
-        In: [True, False, True, ... , False, True]
-        Out: [0, 0, 2, ..., 212, 212]
-        """
-        
-        valid_inds,  = np.where(valid)
-        invalid_inds,  = np.where(~valid)
-
-        all_inds = np.arange(len(valid))
-        all_inds[invalid_inds] = -1
-
-        for j in range(10): 
-            fwd_inds = valid_inds + j
-            bwd_inds = valid_inds - j
-
-            # Forward fill
-            invalid_inds, = np.where(all_inds < 0)
-            fwd_fill_inds = np.intersect1d(fwd_inds, invalid_inds)
-            all_inds[fwd_fill_inds] = all_inds[fwd_fill_inds-j]
-
-            # Backward fill
-            invalid_inds, = np.where(all_inds < 0)
-            if not len(invalid_inds): break
-            bwd_fill_inds = np.intersect1d(bwd_inds, invalid_inds)
-            all_inds[bwd_fill_inds] = all_inds[bwd_fill_inds+j]
-
-            # Check if any missing 
-            invalid_inds, = np.where(all_inds < 0)
-            if not len(invalid_inds): break
-
-        # np.set_printoptions(threshold=np.nan)
-
-        # print valid.astype(np.int)
-        # print np.array_str(all_inds)
-        # print np.where(all_inds < 0)
-
-        return all_inds
 
     @property
     def index(self): 

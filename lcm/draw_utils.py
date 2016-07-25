@@ -53,7 +53,7 @@ class VisualizationMsgsPub:
         self._sensor_pose[channel] = pose
 
     def reset_visualization(self): 
-        print('Reseting Visualizations')
+        print('{} :: Reseting Visualizations'.format(self.__class__.__name__))
         msg = vs.reset_collections_t()
         self.lc.publish("RESET_COLLECTIONS", msg.encode())
 

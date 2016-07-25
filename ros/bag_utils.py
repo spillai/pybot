@@ -5,9 +5,8 @@
 
 import sys
 import numpy as np
-import cv2, os.path, lcm, zlib
+import cv2
 
-import roslib
 import tf
 
 import rosbag
@@ -32,16 +31,16 @@ class GazeboDecoder(Decoder):
     """
     def __init__(self, every_k_frames=1): 
         Decoder.__init__(self, channel='/gazebo/model_states', every_k_frames=every_k_frames)
-        self.index = None
+        self.__gazebo_index = None
 
     def decode(self, msg): 
-        if self.index is None: 
+        if self.__gazebo_index is None: 
             for j, name in enumerate(msg.name): 
                 if name == 'mobile_base': 
-                    self.index = j
+                    self.__gazebo_index = j
                     break
 
-        pose = msg.pose[self.index]
+        pose = msg.pose[self.__gazebo_index]
         tvec, ori = pose.position, pose.orientation
         return RigidTransform(xyzw=[ori.x,ori.y,ori.z,ori.w], tvec=[tvec.x,tvec.y,tvec.z])
 
@@ -151,7 +150,7 @@ class LaserScanDecoder(Decoder):
             if (self.__cos_sin_map.shape[1] != N or
                self.__angle_min != msg.angle_min or
                 self.__angle_max != msg.angle_max):
-                print("No precomputed map given. Computing one.")
+                print("{} :: No precomputed map given. Computing one.".format(self.__class__.__name__))
 
                 self.__angle_min = msg.angle_min
                 self.__angle_max = msg.angle_max
@@ -247,9 +246,9 @@ class ROSBagReader(LogReader):
         return info.topics[topic].message_count
 
     def load_log(self, filename): 
-        print('Loading ROSBag {} ...'.format(filename))
+        print('{} :: Loading ROSBag {} ...'.format(self.__class__.__name__, filename))
         bag = rosbag.Bag(filename, 'r', chunk_threshold=100 * 1024 * 1024)
-        print('Done loading {}'.format(filename))
+        print('{} :: Done loading {}'.format(self.__class__.__name__, filename))
         return bag
 
     def tf(self, from_tf, to_tf): 
@@ -274,7 +273,7 @@ class ROSBagReader(LogReader):
         tf_dec = TfDecoderAndPublisher(channel='/tf')
 
         # Establish tf relations
-        print('Establishing tfs from ROSBag')
+        print('{} :: Establishing tfs from ROSBag'.format(self.__class__.__name__))
         for self.idx, (channel, msg, t) in enumerate(self.log.read_messages(topics='/tf')): 
             tf_dec.decode(msg)
 
@@ -299,7 +298,7 @@ class ROSBagReader(LogReader):
 
         except: 
             raise RuntimeError('Error concerning tf lookup')
-        print('Established {:} relations\n'.format(len(tfs)))
+        print('{} Established {:} relations\n'.format(self.__class__.__name__, len(tfs)))
         
         return tfs 
 
@@ -319,7 +318,7 @@ class ROSBagReader(LogReader):
         #     raise RuntimeError('Provided relations map is not a dict')
 
         # Check tf relations map
-        print('Checking tf relations in ROSBag')
+        print('{} :: Checking tf relations in ROSBag'.format(self.__class__.__name__))
         checked = set()
         relations_lut = dict((k,v) for (k,v) in relations)
 
@@ -338,24 +337,24 @@ class ROSBagReader(LogReader):
                 # Finish up
             if len(checked) == len(relations_lut):
                 break
-        print('Checked {:} relations\n'.format(len(checked)))
+        print('{} :: Checked {:} relations\n'.format(self.__class__.__name__, len(checked)))
         return  
 
     def retrieve_camera_calibration(self, topic):
         # Retrieve camera calibration
         dec = CameraInfoDecoder(channel=topic)
 
-        print('Retrieve camera calibration for {}'.format(topic))
+        print('{} :: Retrieve camera calibration for {}'.format(self.__class__.__name__, topic))
         for self.idx, (channel, msg, t) in enumerate(self.log.read_messages(topics=topic)): 
             return dec.decode(msg) 
                     
     def _index(self): 
         raise NotImplementedError()
 
-    def iteritems(self, topics=[], reverse=False): 
+    def itercursors(self, topics=[], reverse=False):
         if self.index is not None: 
             raise NotImplementedError('Cannot provide items indexed')
-
+        
         if reverse: 
             raise NotImplementedError('Cannot provide items in reverse when file is not indexed')
 
@@ -364,19 +363,21 @@ class ROSBagReader(LogReader):
         st, end = self.log.get_start_time(), self.log.get_end_time()
         start_t = Time(st + (end-st) * self.start_idx / 100.0)
 
-        print('Reading ROSBag from {:3.2f}% onwards'.format(self.start_idx))
-        for self.idx, (channel, msg, t) in enumerate(
-                self.log.read_messages(
-                    topics=self.decoder.keys() if not len(topics) else topics, 
-                    start_time=start_t
-                )
-        ):
+        print('{} :: Reading ROSBag from {:3.2f}% onwards'.format(self.__class__.__name__, self.start_idx))
+        for self.idx, (channel, msg, t) in \
+            enumerate(self.log.read_messages(
+                topics=self.decoder.keys() if not len(topics) else topics, 
+                start_time=start_t)):
+            yield (t, channel, msg)
 
-            if self.verbose: 
-                print('Channel: {:}, t: {:}'.format(channel, t))
-            res, msg = self.decode_msg(channel, msg, t)
-            if res: 
-                yield msg
+    def iteritems(self, topics=[], reverse=False): 
+        for (t, channel, msg) in self.itercursors(topics=topics, reverse=reverse): 
+            try: 
+                res, (t, ch, data) = self.decode_msg(channel, msg, t)
+                if res: 
+                    yield (t, ch, data)
+            except Exception, e: 
+                print('ROSBagReader.iteritems() :: {:}'.format(e))
 
     def decode_msg(self, channel, data, t): 
         try: 
@@ -445,7 +446,7 @@ class BagDB(LogDB):
     # def poses(self): 
     #     return [v.pose for k,v in self.frame_index_.iteritems()]
         
-    # def _index(self): 
+    # def _index(self, pose_channel='/odom', rgb_channel='/camera/rgb/image_raw'): 
     #     """
     #     Constructs a look up table for the following variables: 
         
@@ -459,16 +460,16 @@ class BagDB(LogDB):
     #     # 1. Iterate through both poses and images, and construct frames
     #     # with look up table for filename str -> (timestamp, pose, annotation) 
     #     poses = []
-    #     pose_decode = lambda msg_item: \
-    #                   self.dataset.decoder[TangoFile.VIO_CHANNEL].decode(msg_item)
+    #     # pose_decode = lambda msg_item: \
+    #     #               self.dataset.decoder[pose_channel].decode(msg_item)
 
     #     # Note: Control flow for idx is critical since start_idx could
     #     # potentially change the offset and destroy the pose_index
-    #     for idx, (t, ch, msg) in enumerate(self.dataset.itercursors()): 
+    #     for idx, (t, ch, data) in enumerate(self.dataset.iteritems()): 
     #         pose = None
-    #         if ch == TangoFile.VIO_CHANNEL: 
+    #         if ch == pose_channel: 
     #             try: 
-    #                 pose = pose_decode(msg)
+    #                 pose = data
     #             except: 
     #                 pose = None
     #         poses.append(pose)
@@ -566,49 +567,6 @@ class BagDB(LogDB):
     #           '\tFrames: {:}\n'
     #           '\tGround Truth: {:}\n'
     #           .format(len(self.frame_index_), gt_str)) 
-                      
-
-    # @staticmethod
-    # def _nn_pose_fill(valid): 
-    #     """
-    #     Looks up closest True for each False and returns
-    #     indices for fill-in-lookup
-    #     In: [True, False, True, ... , False, True]
-    #     Out: [0, 0, 2, ..., 212, 212]
-    #     """
-        
-    #     valid_inds,  = np.where(valid)
-    #     invalid_inds,  = np.where(~valid)
-
-    #     all_inds = np.arange(len(valid))
-    #     all_inds[invalid_inds] = -1
-
-    #     for j in range(10): 
-    #         fwd_inds = valid_inds + j
-    #         bwd_inds = valid_inds - j
-
-    #         # Forward fill
-    #         invalid_inds, = np.where(all_inds < 0)
-    #         fwd_fill_inds = np.intersect1d(fwd_inds, invalid_inds)
-    #         all_inds[fwd_fill_inds] = all_inds[fwd_fill_inds-j]
-
-    #         # Backward fill
-    #         invalid_inds, = np.where(all_inds < 0)
-    #         if not len(invalid_inds): break
-    #         bwd_fill_inds = np.intersect1d(bwd_inds, invalid_inds)
-    #         all_inds[bwd_fill_inds] = all_inds[bwd_fill_inds+j]
-
-    #         # Check if any missing 
-    #         invalid_inds, = np.where(all_inds < 0)
-    #         if not len(invalid_inds): break
-
-    #     # np.set_printoptions(threshold=np.nan)
-
-    #     # print valid.astype(np.int)
-    #     # print np.array_str(all_inds)
-    #     # print np.where(all_inds < 0)
-
-    #     return all_inds
 
     # @property
     # def index(self): 

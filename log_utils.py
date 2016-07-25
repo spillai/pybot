@@ -4,6 +4,7 @@
 # License: MIT
 
 import os.path
+import numpy as np
 from itertools import islice
 from abc import ABCMeta, abstractmethod
 
@@ -215,8 +216,8 @@ class LogDB(object):
     def _index(self): 
         raise NotImplementedError()
 
-    def print_index_info(): 
-        raise NotImplementedError()
+    def print_index_info(self): 
+        pass
 
     def iterframes(self, reverse=False): 
         raise NotImplementedError()
@@ -232,6 +233,48 @@ class LogDB(object):
             return self.frame_name2idx_[basename]
         except KeyError, e: 
             raise KeyError('Missing key in LogDB {}'.format(basename))
+
+    @staticmethod
+    def _nn_pose_fill(valid): 
+        """
+        Looks up closest True for each False and returns
+        indices for fill-in-lookup
+        In: [True, False, True, ... , False, True]
+        Out: [0, 0, 2, ..., 212, 212]
+        """
+        
+        valid_inds,  = np.where(valid)
+        invalid_inds,  = np.where(~valid)
+
+        all_inds = np.arange(len(valid))
+        all_inds[invalid_inds] = -1
+
+        for j in range(10): 
+            fwd_inds = valid_inds + j
+            bwd_inds = valid_inds - j
+
+            # Forward fill
+            invalid_inds, = np.where(all_inds < 0)
+            fwd_fill_inds = np.intersect1d(fwd_inds, invalid_inds)
+            all_inds[fwd_fill_inds] = all_inds[fwd_fill_inds-j]
+
+            # Backward fill
+            invalid_inds, = np.where(all_inds < 0)
+            if not len(invalid_inds): break
+            bwd_fill_inds = np.intersect1d(bwd_inds, invalid_inds)
+            all_inds[bwd_fill_inds] = all_inds[bwd_fill_inds+j]
+
+            # Check if any missing 
+            invalid_inds, = np.where(all_inds < 0)
+            if not len(invalid_inds): break
+
+        # np.set_printoptions(threshold=np.nan)
+
+        # print valid.astype(np.int)
+        # print np.array_str(all_inds)
+        # print np.where(all_inds < 0)
+
+        return all_inds
 
     @property
     def dataset(self): 
