@@ -78,6 +78,11 @@ class Sampler(object):
     @abstractmethod
     def check_sample(self, item): 
         raise NotImplementedError()
+
+    def iteritems(self, iterable): 
+        for item in iterable: 
+            if self.append(item): 
+                yield self.latest_sample
     
     def append(self, item): 
         """
