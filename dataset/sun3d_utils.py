@@ -52,8 +52,6 @@ class SUN3DAnnotationFrame(object):
             object_id = poly['object']
             self.add(poly['object'], xy)
 
-        print self.annotations_
-
     # def __repr__(self): 
     #     return self.annotations_
             
@@ -279,7 +277,7 @@ class SUN3DAnnotationDB(object):
     @property
     def objects(self): 
         return map(lambda item: str(item['name']) \
-                   if item is not None else None, 
+                   if item is not None else 'null', 
                    self.data_['objects'])
 
         # return map(lambda item: str(item['name']), 
@@ -441,7 +439,7 @@ class SUN3DObjectDB(object):
         self.objects_ = set(['background'])
         for d in directories: 
             basename = os.path.basename(d)
-            print 'Processing', basename, d
+            # print 'Processing', basename, d
 
             # Insert objects into unified set
             db = SUN3DAnnotationDB.load(d)
