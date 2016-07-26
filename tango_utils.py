@@ -19,6 +19,7 @@ from bot_vision.image_utils import im_resize
 from bot_geometry.rigid_transform import RigidTransform
 from bot_vision.camera_utils import CameraIntrinsic
 from bot_utils.dataset.sun3d_utils import SUN3DAnnotationDB
+from bot_vision.mapping.pose_utils import PoseSampler
 
 # Decode odometry
 def odom_decode(data): 
@@ -411,6 +412,35 @@ class TangoLogReader(LogReader):
             except Exception, e: 
                 print('TangLog.iteritems() :: {:}'.format(e))
 
+    # def iterframes(self, reverse=False): 
+    #     """
+    #     Ground truth reader interface for 
+    #     Images [with time, pose, annotation]  
+    #     : lookup corresponding annotation, and 
+    #     fill in poses from previous timestamp
+    #     """
+    #     # self._check_ground_truth_availability()
+
+    #     # Iterate through both poses and images, and construct frames
+    #     # with look up table for filename str -> (timestamp, pose, annotation) 
+    #     for (t, channel, msg) in self.itercursors(topics=TangoFile.RGB_CHANNEL, 
+    #                                               reverse=reverse): 
+    #         try: 
+    #             res, (t, ch, data) = self.decode_msg(channel, msg, t)
+
+    #             # Annotations
+    #             # Available entries: polygon, bbox, class_label, class_id, instance_id
+    #             if res: 
+    #                 if self.ground_truth_available: 
+    #                     assert(msg in self.meta_)
+    #                     yield (t, ch, AnnotatedImage(img=data, annotation=self.meta_[msg]))
+    #                 else: 
+    #                     yield (t, ch, AnnotatedImage(img=data, annotation=None))
+
+    #         except Exception, e: 
+    #             print('TangLog.iteritems() :: {:}'.format(e))
+
+
     def iterframes(self, reverse=False): 
         """
         Ground truth reader interface for 
@@ -418,26 +448,18 @@ class TangoLogReader(LogReader):
         : lookup corresponding annotation, and 
         fill in poses from previous timestamp
         """
-        # self._check_ground_truth_availability()
-
+        
         # Iterate through both poses and images, and construct frames
         # with look up table for filename str -> (timestamp, pose, annotation) 
-        for (t, channel, msg) in self.itercursors(topics=TangoFile.RGB_CHANNEL, 
-                                                  reverse=reverse): 
-            try: 
-                res, (t, ch, data) = self.decode_msg(channel, msg, t)
+        for (t, channel, frame) in self.db.iterframes(): 
+            yield (t, channel, frame)
 
-                # Annotations
-                # Available entries: polygon, bbox, class_label, class_id, instance_id
-                if res: 
-                    if self.ground_truth_available: 
-                        assert(msg in self.meta_)
-                        yield (t, ch, AnnotatedImage(img=data, annotation=self.meta_[msg]))
-                    else: 
-                        yield (t, ch, AnnotatedImage(img=data, annotation=None))
 
-            except Exception, e: 
-                print('TangLog.iteritems() :: {:}'.format(e))
+    def keyframedb(self, theta=np.deg2rad(20), displacement=0.25, lookup_history=10): 
+        sampler = PoseSampler(theta=theta, displacement=displacement, lookup_history=lookup_history, 
+                              get_sample=lambda (t, channel, frame): frame.pose, verbose=True)
+        self.iterframes = lambda: sampler.iteritems(self.db.iterframes())
+        return self
 
     def roidb(self, target_hash, targets=[], every_k_frames=1, verbose=True, skip_empty=True): 
         """
@@ -471,7 +493,7 @@ class TangoLogReader(LogReader):
                 target_names = [target_names[ind] for ind in inds]
                 bboxes = bboxes[inds]
 
-            yield data.img, bboxes, np.int32(map(lambda key: target_hash[key], target_names))
+            yield (data.img, bboxes, np.int32(map(lambda key: target_hash[key], target_names)))
 
     @property
     def db(self): 
