@@ -617,6 +617,9 @@ class TangoDB(LogDB):
         valid_arr = np.array(
             map(lambda item: item is not None, poses), dtype=np.bool)
         pose_inds = TangoDB._nn_pose_fill(valid_arr)
+        if np.any(pose_inds < 0): 
+            print('{} :: TangoDB poses are not fully synchronized, '
+                  'skipping few'.format(self.__class__.__name__))
 
         # Create indexed frames for lookup        
         # self.frame_index_:  rgb/img.png -> TangoFrame
@@ -628,7 +631,7 @@ class TangoDB(LogDB):
             (img_msg, TangoFrame(idx, t, img_msg, poses[pose_inds[idx]], 
                                  self.dataset.annotationdb[img_msg], img_decode))
             for idx, (t, ch, img_msg) in enumerate(self.dataset.itercursors()) \
-            if ch == rgb_channel
+            if ch == rgb_channel and pose_inds[idx] >= 0
         ])
         self.frame_idx2name_ = OrderedDict([
             (idx, k) for idx, k in enumerate(self.frame_index_.keys())
