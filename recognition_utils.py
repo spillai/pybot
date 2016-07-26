@@ -422,10 +422,12 @@ class HistogramClassifier(object):
         xyc_top = xyc[inds,:]
 
         print('-------------------------------')
-        print(' Confusion table (top 20 entries)')
+        print('{} :: Confusion table (top 20 entries)'.format(self.__class__.__name__))
         for xyct in xyc_top: 
-            print('confusion: {}\t{}\t{}'.format(xyct[2], self.target_map_.values()[xyct[0]], 
-                                                  self.target_map_.values()[xyct[1]]))        
+            if xyct[0] != xyct[1]: 
+                print('confusion: {}\t{}\t{}'.format(xyct[2], 
+                                                     self.target_map_.values()[xyct[0]], 
+                                                     self.target_map_.values()[xyct[1]]))        
         print('\n')
 
         # import ipdb; ipdb.set_trace()
