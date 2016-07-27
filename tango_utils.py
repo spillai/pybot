@@ -265,20 +265,6 @@ class TangoLogReader(LogReader):
 
     def load_log(self, filename): 
         return TangoFile(filename)
-                
-    def decode_msg(self, channel, msg, t): 
-        try: 
-            # Check if log index has reached desired start index, 
-            # and only then check if decode necessary  
-            dec = self.decoder[channel]
-            if dec.should_decode():
-                return True, (t, channel, dec.decode(msg))
-        except Exception as e:
-            # print e
-            # raise RuntimeError('Failed to decode data from channel: %s, mis-specified decoder?' % channel)
-            pass
-        
-        return False, (None, None, None)
 
     def itercursors(self, topics=[], reverse=False): 
         if self.index is not None: 

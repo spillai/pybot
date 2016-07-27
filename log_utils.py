@@ -190,8 +190,19 @@ class LogReader(object):
         else: 
             self.index = None
 
-        # # Create Look-up table for subscriptions
-        # self.cb_ = {}
+    def decode_msg(self, channel, data, t): 
+        try: 
+            dec = self.decoder_[channel]
+            if dec.should_decode():
+                return True, (t, channel, dec.decode(data))
+        except KeyError: 
+            pass
+        except Exception as e:
+            print('{} :: decode_msg :: {}'.format(self.__class__.__name__, e))
+            import traceback
+            traceback.print_exc()
+                    
+        return False, (None, None, None)
 
     @property
     def decoder(self): 
@@ -234,10 +245,6 @@ class LogReader(object):
     def length(self, channel): 
         raise NotImplementedError()
 
-    @property
-    def log(self): 
-        return self.log_
-
     def calib(self, channel=''): 
         raise NotImplementedError()
 
@@ -256,36 +263,17 @@ class LogReader(object):
     def iterframes(self): 
         raise NotImplementedError()
 
-    # def subscribe(self, channel, callback): 
-    #     self.cb_[channel] = callback
+    @property
+    def log(self): 
+        return self.log_
 
-    # def run(self):
-    #     if not len(self.cb_): 
-    #         raise RuntimeError('No callbacks registered yet, subscribe to channels first!')
+    @property
+    def controller(self): 
+        raise NotImplementedError()
 
-    #     # Initialize
-    #     self.init()
-
-    #     # Run
-    #     iterator = take(self.iterframes(), max_length=self.max_length)
-    #     for self.idx, (t, ch, data) in enumerate(iterator): 
-    #         try: 
-    #             self.cb_[ch](t, data)
-    #         except KeyError, e: 
-    #             print e
-    #         except Exception, e: 
-    #             import traceback
-    #             traceback.print_exc()
-    #             raise RuntimeError()
-
-    #     # Finish up
-    #     self.finish()
-
-    # def init(self): 
-    #     pass
-
-    # def finish(self): 
-    #     pass
+    @property
+    def db(self): 
+        raise NotImplementedError()
 
 class LogController(object): 
     __metaclass__ = ABCMeta

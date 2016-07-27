@@ -379,19 +379,6 @@ class ROSBagReader(LogReader):
             except Exception, e: 
                 print('ROSBagReader.iteritems() :: {:}'.format(e))
 
-    def decode_msg(self, channel, data, t): 
-        try: 
-            # Check if log index has reached desired start index, 
-            # and only then check if decode necessary  
-            dec = self.decoder[channel]
-            if dec.should_decode():
-                return True, (t, channel, dec.decode(data))
-        except: 
-            import traceback
-            traceback.print_exc()
-                    
-        return False, (None, None, None)
-
     def iterframes(self):
         return self.iteritems()
 

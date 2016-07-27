@@ -13,7 +13,7 @@ from itertools import islice
 from bot_vision.camera_utils import construct_K, DepthCamera
 from bot_vision.image_utils import im_resize
 
-from bot_externals.log_utils import take, Decoder, LogReader
+from bot_externals.log_utils import Decoder, LogReader, LogController
 
 import bot_core.image_t as image_t
 import bot_core.pose_t as pose_t
@@ -199,23 +199,6 @@ class LCMLogReader(LogReader):
         assert(idx >= 0 and idx < len(self.index))
         return self.get_frame_with_timestamp(self.index[idx])
 
-    def decode_msg(self, channel, data, t): 
-        try: 
-            # Check if log index has reached desired start index, 
-            # and only then check if decode necessary  
-            dec = self.decoder[channel]
-            if dec.should_decode():
-                # self.idx += 1
-                return True, (t, channel, dec.decode(data))
-        except Exception as e:
-            print e
-            pass
-            # raise RuntimeError("""Failed to decode data from"""
-            #                    """channel: {:}, mis-specified decoder"""
-            #                    """? errmsg: {:}""".format(channel, e))
-        
-        return False, (None, None)
-
     def iteritems(self, reverse=False): 
         # Indexed iteration
         if self.index is not None: 
@@ -258,6 +241,13 @@ class LCMLogReader(LogReader):
 
     def get_first_frame(self): 
         return self.get_frame_with_index(0)
+
+class LCMLogController(LogController): 
+    def __init__(self, dataset): 
+        """
+        See LogController
+        """
+        LogController.__init__(self, dataset)
 
 def KinectLCMLogReader(filename=None, every_k_frames=1, **kwargs): 
     return LCMLogReader(filename=filename, every_k_frames=every_k_frames, decoder=KinectDecoder(**kwargs))        
