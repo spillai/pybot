@@ -2,7 +2,7 @@ from itertools import *
 
 def take(iterable, n):
     "Return first n items of the iterable as a list"
-    return islice(iterable, n)
+    return islice(iterable, None, n)
 
 def tabulate(function, start=0):
     "Return function(0), function(1), ..."
