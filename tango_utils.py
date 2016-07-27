@@ -186,14 +186,22 @@ class TangoLogReader(LogReader):
 
     TODO: 
     1. Support for every_k_frames in iteritems
+
+    Calibration: 
+        https://developers.google.com/project-tango/apis/c/
+        reference/group/camera#group___camera_1ga61f047f290983da9d16522371977cecf
+
+        See /sdcard/config/calibration.xml
+        1043.75;   1043.69;   638.797;   357.991;   0.234583;   -0.689864;   0.679871
+
     """
 
     def __init__(self, directory, scale=1., start_idx=0, every_k_frames=1, 
-                 noise=[0,0], with_ground_truth=False): 
+                 noise=[0,0], with_ground_truth=False, meta_file='tango_data.txt'): 
 
         # Set directory and filename for time synchronized log reads 
         self.directory_ = os.path.expanduser(directory)
-        self.filename_ = os.path.join(self.directory_, 'tango_data.txt')
+        self.filename_ = os.path.join(self.directory_, meta_file)
             
         self.scale_ = scale
         self.calib_ = TangoLogReader.cam.scaled(self.scale_)
@@ -254,13 +262,6 @@ class TangoLogReader(LogReader):
 
     @property
     def calib(self): 
-        """
-        https://developers.google.com/project-tango/apis/c/
-        reference/group/camera#group___camera_1ga61f047f290983da9d16522371977cecf
-
-        See /sdcard/config/calibration.xml
-        1043.75;   1043.69;   638.797;   357.991;   0.234583;   -0.689864;   0.679871
-        """
         return self.calib_ 
 
     def load_log(self, filename): 

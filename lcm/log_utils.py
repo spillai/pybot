@@ -215,7 +215,6 @@ class LCMLogReader(LogReader):
         else: 
             if reverse: 
                 raise RuntimeError('Cannot provide items in reverse when file is not indexed')
-
             
             # iterator = take(self.log, max_length=self.max_length)
             max_length = 1e12 if self.max_length is None else self.max_length
