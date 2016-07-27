@@ -19,7 +19,7 @@ from sensor_msgs.msg import Image
 from cv_bridge import CvBridge, CvBridgeError
 from tf2_msgs.msg import TFMessage
 
-from bot_externals.log_utils import Decoder, LogReader, LogDB
+from bot_externals.log_utils import Decoder, LogReader, LogController, LogDB
 from bot_vision.image_utils import im_resize
 from bot_vision.imshow_utils import imshow_cv
 from bot_geometry.rigid_transform import RigidTransform
@@ -399,42 +399,12 @@ class ROSBagReader(LogReader):
     def db(self): 
         return BagDB(self)
 
-class ROSBagController(object): 
+class ROSBagController(LogController): 
     def __init__(self, dataset): 
         """
-        Setup channel => callbacks so that they are automatically called 
-        with appropriate decoded data and timestamp
+        See LogController
         """
-        self.dataset_ = dataset
-        self.ctrl_cb_ = {}
-        self.ctrl_idx_ = 0
-
-    def subscribe(self, channel, callback): 
-        self.ctrl_cb_[channel] = callback
-
-    def run(self):
-        if not len(self.ctrl_cb_): 
-            raise RuntimeError('No callbacks registered yet, subscribe to channels first!')
-
-        for self.ctrl_idx_, (t, ch, data) in enumerate(self.dataset_.iterframes()): 
-            if ch in self.ctrl_cb_: 
-                self.ctrl_cb_[ch](t, data)
-
-    @property
-    def index(self): 
-        return self.ctrl_idx_
-
-    @property
-    def filename(self): 
-        return self.dataset_.filename
-
-    @property
-    def controller(self): 
-        """
-        Should return the dataset (for offline bag-based callbacks), and 
-        should return the rosnode (for online/live callbacks)
-        """
-        return self.dataset_
+        LogController.__init__(self, dataset)
 
 class BagDB(LogDB): 
     def __init__(self, dataset): 

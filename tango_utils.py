@@ -9,12 +9,10 @@ import os.path
 import json
 
 from itertools import izip
-from collections import deque, namedtuple, Counter, OrderedDict
-from heapq import heappush, heappop
+from collections import deque, namedtuple, OrderedDict
 from abc import ABCMeta, abstractmethod
 
-
-from bot_externals.log_utils import Decoder, LogReader, LogController, LogDB
+from bot_externals.log_utils import Decoder, LogFile, LogReader, LogController, LogDB
 from bot_vision.image_utils import im_resize
 from bot_geometry.rigid_transform import RigidTransform
 from bot_vision.camera_utils import CameraIntrinsic
@@ -159,125 +157,16 @@ class TangoImageDecoder(Decoder):
 # Basic type for image annotations
 AnnotatedImage = namedtuple('AnnotatedImage', ['img', 'annotation'])
 
-class TangoFile(object): 
+class TangoFile(LogFile): 
 
     RGB_CHANNEL = 'RGB'
     VIO_CHANNEL = 'RGB_VIO'
 
     def __init__(self, filename): 
-        self.filename_ = filename
-
-        # Save topics and counts
-        ts, topics = self._get_stats()
-        c = Counter(topics)
-        self.topics_ = list(set(topics))
-        self.topic_lengths_ = dict(c.items())
-        self.length_ = sum(self.topic_lengths_.values())
-
-        # Get distance traveled (accumulate relative motion)
-        distance = self._get_distance_travelled()
-        
-        messages_str = ', '.join(['{:} ({:})'.format(k,v) 
-                                  for k,v in c.iteritems()])
-        print('\nTangoFile \n========\n'
-              '\tFile: {:}\n'
-              '\tTopics: {:}\n'
-              '\tMessages: {:}\n'
-              '\tDistance Travelled: {:.2f} m\n'
-              '\tDuration: {:} s\n'.format(
-                  self.filename_, 
-                  self.topics_, messages_str, 
-                  distance, np.max(ts)-np.min(ts)))
-        
-    def _get_distance_travelled(self): 
-        " Retrieve distance traveled through relative motion "
-
-        prev_pose, tvec = None, 0
-        for (_,pose_str,_) in self.read_messages(topics=TangoFile.VIO_CHANNEL): 
-            try: 
-                pose = odom_decode(pose_str)
-            except: 
-                continue
-
-            if prev_pose is not None: 
-                tvec += np.linalg.norm(prev_pose.tvec-pose.tvec)
-
-            prev_pose = pose
-
-        return tvec
-
-    def _get_stats(self): 
-        # Get stats
-        # Determine topics that have at least 3 items (timestamp,
-        # channel, data) separated by tabs
-        with open(self.filename, 'r') as f: 
-            data = filter(lambda ch: len(ch) == 3, 
-                          map(lambda l: l.replace('\n','').split('\t'), 
-                              filter(lambda l: '\n' in l, f.readlines())))
-
-            ts = map(lambda (t,ch, data): float(t) * 1e-9, data)
-            topics = map(lambda (t,ch,data): ch, data)
-
-        return ts, topics
-
-    @property
-    def filename(self): 
-        return self.filename_
-
-    @property
-    def length(self): 
-        return self.length_
-
-    @property
-    def fd(self): 
-        """ Open the tango meta data file as a file descriptor """
-        return open(self.filename, 'r')
-        
-    def read_messages(self, topics=[], start_time=0): 
-        """
-        Read messages with a heap so that the measurements are monotonic, 
-        decoded iteratively (or when needed).
-        """
-        N = 1000
-        heap = []
-        
-        if isinstance(topics, str): 
-            topics = [topics]
-
-        topics_set = set(topics)
-
-        # Read messages in ascending order of timestamps
-        # Push messages onto the heap and pop such that 
-        # the order of timestamps is ensured to be increasing.
-        p_t = 0
-        for l in self.fd: 
-            try: 
-                t, ch, data = l.replace('\n', '').split('\t')
-            except: 
-                continue
-
-            if len(topics_set) and ch not in topics_set: 
-                continue
-
-            if len(heap) == N: 
-                c_t, c_ch, c_data = heappop(heap)
-                # Check monotononic measurements
-                assert(c_t >= p_t)
-                p_t = c_t
-                yield c_ch, c_data, c_t
-            
-            heappush(heap, (int(t), ch, data))
-
-        # Pop the rest of the heap
-        for j in range(len(heap)): 
-            c_t, c_ch, c_data = heappop(heap)
-            # Check monotononic measurements
-            assert(c_t >= p_t)
-            p_t = c_t
-            yield c_ch, c_data, c_t
+        LogFile.__init__(self, filename)
 
 class TangoLogReader(LogReader): 
-
+    
     cam = CameraIntrinsic(
         K=np.float64([1043.75, 0, 638.797, 0, 1043.75, 357.991, 0, 0, 1]).reshape(3,3), 
         D=np.float64([0.234583, -0.689864, 0, 0, 0.679871]), 
@@ -328,15 +217,17 @@ class TangoLogReader(LogReader):
             self.meta_ = None
 
         # Setup log (calls load_log, and initializes decoders)
-        pose_decoder = TangoOdomDecoder(channel=TangoFile.VIO_CHANNEL, 
-                                        every_k_frames=every_k_frames, 
-                                        noise=noise)
-        img_decoder = TangoImageDecoder(
-            self.directory_, channel=TangoFile.RGB_CHANNEL, color=True, 
-            shape=(W,H), every_k_frames=every_k_frames)
-
+        # Initialize as a log reader with an associated filename
+        # (calls load_log on filename) and appropriate decoders
         super(TangoLogReader, self).__init__(
-            self.filename_, decoder=[pose_decoder, img_decoder]
+            self.filename_, 
+            decoder=[
+                TangoOdomDecoder(channel=TangoFile.VIO_CHANNEL, 
+                                 every_k_frames=every_k_frames, 
+                                 noise=noise), 
+                TangoImageDecoder(
+                    self.directory_, channel=TangoFile.RGB_CHANNEL, color=True, 
+                    shape=(W,H), every_k_frames=every_k_frames)]
         )
 
         # Check start index
