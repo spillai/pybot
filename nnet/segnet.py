@@ -8,18 +8,28 @@ import cv2
 import numpy as np
 np.random.seed(0)
 
-os.environ['KERAS_BACKEND'] = 'theano'
-# os.environ['KERAS_BACKEND'] = 'tensorflow'
-import keras.backend as K
-import keras.models as models
+# os.environ['KERAS_BACKEND'] = 'theano'
+os.environ['KERAS_BACKEND'] = 'tensorflow'
 
+import tensorflow as tf
+
+# # Creates a session with log_device_placement set to True.
+# sess = tf.Session(config=tf.ConfigProto(log_device_placement=True))
+
+from keras import backend as K
+# K.set_session(sess)
+
+import keras.models as models
 from keras.layers.noise import GaussianNoise
 from keras.layers.core import Layer, Dense, Dropout, Activation, Flatten, Reshape, Merge, Permute
 from keras.layers.convolutional import Convolution2D, MaxPooling2D, UpSampling2D, ZeroPadding2D
 from keras.layers.normalization import BatchNormalization
 from keras.utils import np_utils
 from keras.regularizers import ActivityRegularizer
-from keras.utils.visualize_util import plot
+from keras.callbacks import ModelCheckpoint
+from keras.callbacks import ModelCheckpoint
+
+# from keras.utils.visualize_util import plot
 
 # from keras.optimizers import SGD
 
@@ -151,15 +161,16 @@ def data_generator(path, num_classes):
         txt = f.readlines()
         txt = [line.split(' ') for line in txt]
 
-    for (x,y) in txt:
-        full_train_path = os.path.join(path, x[8:])
-        full_label_path = os.path.join(path, y[8:][:-1])
-        print full_train_path, full_label_path
+    while True: 
+        for (x,y) in txt:
+            full_train_path = os.path.join(path, x[8:])
+            full_label_path = os.path.join(path, y[8:][:-1])
+            print full_train_path, full_label_path
 
-        X = np.rollaxis(normalized(cv2.imread(full_train_path)),2)
-        Y = binarylab(cv2.imread(full_label_path)[:,:,0], num_classes)
-        yield X, Y
-
+            X = np.rollaxis(normalized(cv2.imread(full_train_path)),2)
+            Y = binarylab(cv2.imread(full_label_path)[:,:,0], num_classes)
+            yield np.asarray([X]), np.asarray([Y])
+        
 def chunked_data(iterable, batch_size=10):
     for batch in chunks(iterable, batch_size): 
         X, Y = zip(*batch)
@@ -179,23 +190,28 @@ if __name__ == "__main__":
     C, H, W = (3, 360, 480)
     num_classes = 12
     nb_epoch = 100
-    samples_per_epoch = 14
+    samples_per_epoch = 20
 
-    # model = segnet(input_shape=(C, H, W), num_classes=num_classes)
-    # model.compile(loss="categorical_crossentropy", optimizer='adadelta')
+    # with K.tf.device('/gpu:1'):
+    with tf.device('/gpu:1'):
 
-    current_dir = os.path.dirname(os.path.realpath(__file__))
-    model_path = os.path.join(current_dir, "model.png")
-    # plot(model_path, to_file=model_path, show_shapes=True)
+        model = segnet(input_shape=(C, H, W), num_classes=num_classes)
+        model.compile(loss="categorical_crossentropy", optimizer='adadelta')
 
-    datagen = data_generator(os.path.expanduser(args.directory), num_classes)
+        current_dir = os.path.dirname(os.path.realpath(__file__))
+        model_path = os.path.join(current_dir, "model.png")
+        # plot(model_path, to_file=model_path, show_shapes=True)
 
-    chunked_datagen = chunked_data(datagen, batch_size=samples_per_epoch)
-    chunked_X = imap(lambda item: item[0], chunked_datagen)
-    chunked_Y = imap(lambda item: item[1], chunked_datagen)
-    for (x,y) in datagen:
-        print x.shape, y.shape
-    # class_weight = [0.2595, 0.1826, 4.5640, 0.1417, 0.5051, 0.3826, 9.6446, 1.8418, 6.6823, 6.2478, 3.0, 7.3614]
-    # history = model.fit_generator(datagen, samples_per_epoch=samples_per_epoch, nb_epoch=nb_epoch,
-    #                               show_accuracy=True, verbose=2, class_weight=class_weight, nb_worker=6) 
+        datagen = data_generator(os.path.expanduser(args.directory), num_classes)
 
+        # chunked_datagen = chunked_data(datagen, batch_size=samples_per_epoch)
+        # chunked_X = imap(lambda item: item[0], chunked_datagen)
+        # chunked_Y = imap(lambda item: item[1], chunked_datagen)
+        # for (x,y) in datagen:
+        #     print x.shape, y.shape
+
+        class_weight = [0.2595, 0.1826, 4.5640, 0.1417, 0.5051, 0.3826, 9.6446, 1.8418, 6.6823, 6.2478, 3.0, 7.3614]
+
+        checkpointer = ModelCheckpoint(filepath="model_weights.hdf5", verbose=1, save_best_only=True)
+        history = model.fit_generator(datagen, samples_per_epoch=samples_per_epoch, nb_epoch=nb_epoch,
+                                      show_accuracy=True, verbose=2, class_weight=class_weight, callbacks=[checkpointer]) 
