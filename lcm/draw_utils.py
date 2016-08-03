@@ -31,10 +31,12 @@ class VisualizationMsgsPub:
         self.lc = lcm.LCM()
         camera_pose = RigidTransform.from_roll_pitch_yaw_x_y_z(-np.pi/2, 0, -np.pi/2, 
                                                                0, 0, 2, axes='sxyz')
+        xz_pose = RigidTransform.from_roll_pitch_yaw_x_y_z(np.pi/2, 0, 0, 0, 0, 0, axes='sxyz')
 
         self.reset_visualization()
         self.publish_sensor_frame('camera', pose=camera_pose)
         self.publish_sensor_frame('origin', pose=RigidTransform.identity())
+        self.publish_sensor_frame('origin_xz', pose=xz_pose)
         
     def channel_uid(self, channel): 
         uid = self._channel_uid.setdefault(channel, len(self._channel_uid))
