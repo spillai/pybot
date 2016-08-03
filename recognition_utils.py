@@ -409,9 +409,10 @@ class HistogramClassifier(object):
     def report(self, y, y_pred, background=None): 
         print('-------------------------------')
         print(' Accuracy score (Training): {:4.3f}'.format((metrics.accuracy_score(y, y_pred))))
-        print(' Report (Training):\n {}'.format(classification_report(y, y_pred, 
-                                                                      labels=self.target_map_.keys(), 
-                                                                      target_names=self.target_map_.values())))
+        print(' Report (Training):\n {}'.format(
+            classification_report(y, y_pred, 
+                                  labels=self.target_map_.keys(), 
+                                  target_names=self.target_map_.values())))
         cmatrix = metrics.confusion_matrix(y, y_pred, labels=self.target_map_.keys())
 
         N = len(cmatrix)
@@ -445,9 +446,10 @@ class HistogramClassifier(object):
             target_map = self.target_map_
             if background in target_map: 
                 del target_map[background]
-            print(' Report (Training without background):\n {}'.format(classification_report(y[inds], y_pred[inds], 
-                                                                                             labels=target_map.keys(),
-                                                                                             target_names=target_map.values())))
+            print(' Report (Training without background):\n {}'.format(
+                classification_report(y[inds], y_pred[inds], 
+                                      labels=target_map.keys(),
+                                      target_names=target_map.values())))
             cmatrix = metrics.confusion_matrix(y[inds], y_pred[inds], labels=target_map.keys())
             # print ' Confusion matrix (Test): \n%s' % (pd.DataFrame(cmatrix, 
             #                                                        columns=target_map.values(), 
