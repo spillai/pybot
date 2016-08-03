@@ -6,6 +6,7 @@
 import sys
 import numpy as np
 import cv2
+import time
 
 import tf
 
@@ -74,7 +75,8 @@ class ImageDecoder(Decoder):
 
     def decode(self, msg): 
         if self.compressed: 
-            im = cv2.imdecode(np.fromstring(msg.data, np.uint8), cv2.CV_LOAD_IMAGE_COLOR)
+            im = cv2.imdecode(np.fromstring(msg.data, np.uint8), 
+                              cv2.CV_LOAD_IMAGE_COLOR)
         else: 
             try: 
                 im = self.bridge.imgmsg_to_cv2(msg, self.encoding)
@@ -246,9 +248,10 @@ class ROSBagReader(LogReader):
         return info.topics[topic].message_count
 
     def load_log(self, filename): 
+        st = time.time()
         print('{} :: Loading ROSBag {} ...'.format(self.__class__.__name__, filename))
         bag = rosbag.Bag(filename, 'r', chunk_threshold=100 * 1024 * 1024)
-        print('{} :: Done loading {}'.format(self.__class__.__name__, filename))
+        print('{} :: Done loading {} in {:5.2f} seconds'.format(self.__class__.__name__, filename, time.time() - st))
         return bag
 
     def tf(self, from_tf, to_tf): 
