@@ -8,8 +8,10 @@ def flip_rb(im):
 def im_resize(im, shape=None, scale=0.5, interpolation=cv2.INTER_AREA): 
     if shape is not None: 
         return cv2.resize(im, dsize=shape, fx=0., fy=0., interpolation=interpolation)
-    else: 
-        if scale <= 1.0: 
+    else:
+        if np.fabs(scale-1.0) < 1e-2: 
+            return im
+        elif scale <= 1.0: 
             return cv2.resize(im, None, fx=scale, fy=scale, interpolation=interpolation)
         else: 
             shape = (int(im.shape[1]*scale), int(im.shape[0]*scale))
