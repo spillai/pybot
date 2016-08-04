@@ -27,14 +27,15 @@ from keras.layers.normalization import BatchNormalization
 from keras.utils import np_utils
 from keras.regularizers import ActivityRegularizer
 from keras.callbacks import ModelCheckpoint
-from keras.callbacks import ModelCheckpoint
-
 # from keras.utils.visualize_util import plot
-
 # from keras.optimizers import SGD
 
+from collections import OrderedDict
 from itertools import imap
 from bot_utils.itertools_recipes import chunks
+
+from bot_vision.image_utils import flip_rb
+from bot_vision.color_utils import get_random_colors, colormap
 
 class UnPooling2D(Layer):
     """A 2D Repeat layer"""
@@ -165,8 +166,6 @@ def data_generator(path, num_classes):
         for (x,y) in txt:
             full_train_path = os.path.join(path, x[15:])
             full_label_path = os.path.join(path, y[15:][:-1])
-            print full_train_path, full_label_path
-
             X = np.rollaxis(normalized(cv2.imread(full_train_path)),2)
             Y = binarylab(cv2.imread(full_label_path)[:,:,0], num_classes)
             yield np.asarray([X]), np.asarray([Y])
@@ -182,8 +181,17 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description='Train Segnet using TensorFlow')
     parser.add_argument(
-        '-d', '--directory', type=str, required=True, 
+        '-d', '--directory', type=str, 
+        default='', required=True, 
         help="Directory")
+    parser.add_argument(
+        '-m', '--model', type=str, 
+        default='', required=False, 
+        help="Model with weights")
+    parser.add_argument(
+        '-c', '--colors', type=str, 
+        default='', required=True, 
+        help="Colors file (camvid12.png)")
     args = parser.parse_args()
 
     # Setup Segnet training
@@ -192,28 +200,52 @@ if __name__ == "__main__":
     nb_epoch = 100
     samples_per_epoch = 20
 
-    # with K.tf.device('/gpu:1'):
-    with tf.device('/gpu:1'):
+    # Data Generator
+    datagen = data_generator(os.path.expanduser(args.directory), num_classes)
 
-        model = segnet(input_shape=(C, H, W), num_classes=num_classes)
-        model.compile(loss="categorical_crossentropy", optimizer='adadelta')
+    # chunked_datagen = chunked_data(datagen, batch_size=samples_per_epoch)
+    # chunked_X = imap(lambda item: item[0], chunked_datagen)
+    # chunked_Y = imap(lambda item: item[1], chunked_datagen)
+    # for (x,y) in datagen:
+    #     print x.shape, y.shape
+    
+    if len(args.model): 
+        model = models.load_model(os.path.expanduser(args.model))
+    else: 
+        with tf.device('/gpu:1'):
+            model = segnet(input_shape=(C, H, W), num_classes=num_classes)
+            model.compile(loss="categorical_crossentropy", optimizer='adadelta')
 
-        current_dir = os.path.dirname(os.path.realpath(__file__))
-        model_path = os.path.join(current_dir, "model.png")
-        # plot(model_path, to_file=model_path, show_shapes=True)
+            current_dir = os.path.dirname(os.path.realpath(__file__))
+            model_path = os.path.join(current_dir, "model.png")
+            # plot(model_path, to_file=model_path, show_shapes=True)
 
-        datagen = data_generator(os.path.expanduser(args.directory), num_classes)
+            class_weight = [0.2595, 0.1826, 4.5640, 0.1417, 0.5051, 0.3826, 9.6446, 1.8418, 6.6823, 6.2478, 3.0, 7.3614]
 
-        # chunked_datagen = chunked_data(datagen, batch_size=samples_per_epoch)
-        # chunked_X = imap(lambda item: item[0], chunked_datagen)
-        # chunked_Y = imap(lambda item: item[1], chunked_datagen)
-        # for (x,y) in datagen:
-        #     print x.shape, y.shape
+            checkpointer = ModelCheckpoint(filepath="weights.{epoch:02d}-{loss:.2f}.hdf5", 
+                                           verbose=1, monitor='loss', save_weights_only=False, save_best_only=False)
+            history = model.fit_generator(datagen, samples_per_epoch=samples_per_epoch, nb_epoch=nb_epoch,
+                                          show_accuracy=True, verbose=2, class_weight=class_weight, callbacks=[checkpointer]) 
+            model.save('model.hdf5')
 
-        class_weight = [0.2595, 0.1826, 4.5640, 0.1417, 0.5051, 0.3826, 9.6446, 1.8418, 6.6823, 6.2478, 3.0, 7.3614]
 
-        checkpointer = ModelCheckpoint(filepath="weights.{epoch:02d}-{loss:.2f}.hdf5", 
-                                       verbose=1, monitor='loss', save_best_only=False)
-        history = model.fit_generator(datagen, samples_per_epoch=samples_per_epoch, nb_epoch=nb_epoch,
-                                      show_accuracy=True, verbose=2, class_weight=class_weight, callbacks=[checkpointer]) 
-        model.save('weights.hdf5')
+    # Colors for camvid
+    colors = cv2.imread(args.colors).astype(np.uint8)
+    
+    print('Predict')
+    with tf.device('/gpu:0'): 
+        for idx, (im,target) in enumerate(datagen):
+            gt = np.squeeze(target).argmax(axis=1).reshape(H,W).astype(np.uint8)
+            
+            out = model.predict_classes(im)
+            out = np.squeeze(out).reshape(H,W).astype(np.uint8)
+            colored = cv2.LUT(np.dstack([out, out, out]), colors)
+            colored_gt = cv2.LUT(np.dstack([gt, gt, gt]), colors)
+            cv2.imwrite('colored-{:04d}.png'.format(idx),
+                        np.vstack([np.squeeze(im).transpose(1,2,0),
+                                   colored,
+                                   colored_gt]))
+
+            # colormap()
+            # colored = cv2.LUT(np.squeeze(out.astype(np.uint8)), colors)
+            # print('colored  {}'.format(colored.shape))
