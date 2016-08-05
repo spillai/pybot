@@ -721,15 +721,17 @@ class DepthCamera(CameraIntrinsic):
         fx_inv = 1.0 / self.fx;
 
         self.xs = (xs-self.cx) * fx_inv
-        self.xs = self.xs[::self.skip] # skip pixels
+        self.xs = self.xs[::self.skip]
         self.ys = (ys-self.cy) * fx_inv
-        self.ys = self.ys[::self.skip] # skip pixels
+        self.ys = self.ys[::self.skip]
 
         self.xs, self.ys = np.meshgrid(self.xs, self.ys);
 
     def reconstruct(self, depth): 
-        assert(depth.shape == self.xs.shape)
-        return np.dstack([self.xs * depth, self.ys * depth, depth])
+        s = self.skip
+        depth_sampled = depth[::s,::s]
+        assert(depth_sampled.shape == self.xs.shape)
+        return np.dstack([self.xs * depth_sampled, self.ys * depth_sampled, depth_sampled])
 
     def reconstruct_sparse(self, pts, depth): 
         return np.vstack([(pts[:,0] - self.cx) * 1.0 / self.fx * depth,
