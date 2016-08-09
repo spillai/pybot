@@ -147,7 +147,7 @@ class BaseKLT(object):
         cols = colormap(np.linspace(0, 1, N))
         valid = finite_and_within_bounds(self.latest_pts, out.shape)
 
-        for tid, pt in izip(self.tm_.ids[valid], self.latest_pts[valid]): 
+        for tid, pt in izip(self.latest_ids[valid], self.latest_pts[valid]): 
             cv2.rectangle(out, tuple(map(int, pt-2)), tuple(map(int, pt+2)), 
                           tuple(map(int, cols[tid % N])) if colored else (0,240,0), -1)
 
