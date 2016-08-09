@@ -6,7 +6,6 @@ from collections import defaultdict, deque
 from bot_utils.db_utils import AttrDict
 from bot_utils.timer import timeitmethod
 
-from bot_vision.feature_detection import FeatureDetector
 from bot_vision.feature_detection import to_kpt, to_kpts, to_pts, \
     finite_and_within_bounds
 
@@ -185,7 +184,7 @@ class OpticalFlowTracker(object):
             # Determine tracker type that implements track
             tracker = trackers[method](**params)
         except: 
-            raise RuntimeError('Unknown detector type: %s! Use from {:}'.format(FeatureDetector.detectors.keys()))
+            raise RuntimeError('Unknown detector type: %s! Use from {:}'.format(trackers.keys()))
         return tracker
 
     def track(self, im0, im1, p0):
