@@ -139,7 +139,7 @@ class BaseKLT(object):
             tl, br = np.int32(pts.latest_item)-2, np.int32(pts.latest_item)+2
             cv2.rectangle(out, (tl[0], tl[1]), (br[0], br[1]), tuple(col), -1)
 
-    def viz(self, out, colored=False): 
+    def visualize(self, out, colored=False): 
         if not len(self.latest_pts):
             return
 
