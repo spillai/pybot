@@ -115,7 +115,7 @@ def data_generator(path, num_classes, name='train.txt'):
             except: 
                 continue 
                 
-            X_ = normalized(full_train_img)[:,:,np.newaxis]
+            X_ = full_train_img[:,:,np.newaxis]
             X = np.rollaxis(X_, 2)
 
             Y = binarylab(full_label_img, num_classes)
@@ -211,19 +211,16 @@ if __name__ == "__main__":
     # # Colors for camvid
     # colors = cv2.imread(args.colors).astype(np.uint8)
     
-    # print('Predict')
-    # with tf.device(dev_str):
-    #     for idx, (im,target) in enumerate(datagen):
-    #         gt = np.squeeze(target).argmax(axis=1).reshape(H,W).astype(np.uint8)
-            
-    #         out = model.predict_classes(im)
-    #         out = np.squeeze(out).reshape(H,W).astype(np.uint8)
-    #         # colored = cv2.LUT(np.dstack([out, out, out]), colors)
-    #         # colored_gt = cv2.LUT(np.dstack([gt, gt, gt]), colors)
-    #         cv2.imwrite('debug/colored-{:04d}.png'.format(idx),
-    #                     np.vstack([np.squeeze(im).transpose(1,2,0),
-    #                                colored,
-    #                                colored_gt]))
+    print('Predict')
+    with tf.device(dev_str):
+        for idx, (im,target) in enumerate(datagen):
+            gt = np.squeeze(target).argmax(axis=1).reshape(H,W).astype(np.uint8)
+            out = model.predict_classes(im)
+            out = np.squeeze(out).reshape(H,W).astype(np.uint8) * 255
 
-    #         if idx == 360:
-    #             break
+            img = np.squeeze(im).reshape(H,W).astype(np.uint8)
+            cv2.imwrite('debug/colored-{:04d}.png'.format(idx),
+                        np.hstack([img, gt, out]))
+
+            if idx == 360:
+                break
