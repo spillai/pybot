@@ -54,9 +54,10 @@ class CameraInfoDecoder(Decoder):
 
     def decode(self, msg): 
         # print dir(msg), self.channel
-        # 'D', 'K', 'P', 'R', 'binning_x', 'binning_y', 
-        # 'distortion_model', 'header', 'height', 'roi',
-        # 'width'
+        """        
+        D, K, P, R, binning_x, binning_y, distortion_model, 
+        header, height, roi, width
+        """        
         return CameraIntrinsic(K=np.float64(msg.K).reshape(3,3), 
                                D=np.float64(msg.D).ravel(), 
                                shape=[msg.height, msg.width])

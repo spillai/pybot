@@ -38,6 +38,33 @@ class Decoder(object):
         self.idx += 1
         return self.idx % self.every_k_frames == 0 
 
+class LogDecoder(object): 
+    """
+    Defines a set of decoders to use against the log (either on-line/off-line)
+    """
+    def __init__(self, decoder=None):
+        if isinstance(decoder, list): 
+            self.decoder_ = { dec.channel: dec for dec in decoder } 
+        else: 
+            self.decoder_ = { decoder.channel: decoder }
+
+    def decode_msg(self, channel, data, t): 
+        try: 
+            dec = self.decoder_[channel]
+            if dec.should_decode():
+                return True, (t, channel, dec.decode(data))
+        except KeyError: 
+            pass
+        except Exception as e:
+            print('{} :: decode_msg :: {}'.format(self.__class__.__name__, e))
+            import traceback
+            traceback.print_exc()
+                    
+        return False, (None, None, None)
+
+    @property
+    def decoder(self): 
+        return self.decoder_
 
 class LogFile(object): 
     """
@@ -162,25 +189,28 @@ class LogFile(object):
             yield c_ch, c_data, c_t
 
 
-class LogReader(object): 
+class LogReader(LogDecoder): 
     def __init__(self, filename, decoder=None, start_idx=0, every_k_frames=1, 
                  max_length=None, index=False, verbose=False):
+        LogDecoder.__init__(self, decoder=decoder)
+
         filename = os.path.expanduser(filename)
-        if filename is None or not os.path.exists(filename):
+        # if 'udpm://' in filename or len(filename) == 0: 
+        #     print('{} :: LIVE mode'.format(self.__class__.__name__))
+            
+        # else: 
+
+        if not os.path.exists(filename):
             raise RuntimeError('Invalid Filename: %s' % filename)
+        print('{} :: OFFLINE mode'.format(self.__class__.__name__))
 
         # Store attributes
         self.filename_ = filename
-        if isinstance(decoder, list): 
-            self.decoder_ = { dec.channel: dec for dec in decoder } 
-        else: 
-            self.decoder_ = { decoder.channel: decoder }
         self.every_k_frames_ = every_k_frames
         self.idx_ = 0
         self.start_idx_ = start_idx
         self.max_length_ = max_length
-        self.verbose_ = verbose
-        
+
         # Load the log
         self._init_log()
 
@@ -190,23 +220,8 @@ class LogReader(object):
         else: 
             self.index = None
 
-    def decode_msg(self, channel, data, t): 
-        try: 
-            dec = self.decoder_[channel]
-            if dec.should_decode():
-                return True, (t, channel, dec.decode(data))
-        except KeyError: 
-            pass
-        except Exception as e:
-            print('{} :: decode_msg :: {}'.format(self.__class__.__name__, e))
-            import traceback
-            traceback.print_exc()
-                    
-        return False, (None, None, None)
+        self.verbose_ = verbose
 
-    @property
-    def decoder(self): 
-        return self.decoder_
 
     @property
     def filename(self): 
@@ -304,6 +319,9 @@ class LogController(object):
         print('\t{:} :: Subscribing to {:} with callback {:}'
               .format(self.__class__.__name__, channel, func_name))
         self.controller_cb_[channel] = callback
+
+    def _run_offline(self): 
+        pass
 
     def run(self):
         if not len(self.controller_cb_): 

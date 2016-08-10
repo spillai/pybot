@@ -162,7 +162,6 @@ class KinectDecoder(Decoder):
 class LCMLogReader(LogReader): 
     def __init__(self, *args, **kwargs): 
         super(LCMLogReader, self).__init__(*args, **kwargs)
-        self._lc = lcm.LCM()
 
     def load_log(self, filename): 
         return lcm.EventLog(self.filename, 'r')
@@ -185,7 +184,7 @@ class LCMLogReader(LogReader):
         self.log.c_eventlog.seek_to_timestamp(t)
         while True: 
             ev = self.log.next()
-            res, msg = self.decode_msgs(ev.channel, ev.data, ev.timestamp)
+            res, msg = self.decode_msg(ev.channel, ev.data, ev.timestamp)
             if res: return msg
 
             # if ev.channel == self.decoder.channel: 
