@@ -17,6 +17,13 @@ def skew(v, return_dv=False):
   """ 
   Returns the skew-symmetric matrix of a vector
   Ref: https://github.com/dreamdragon/Solve3Plus1/blob/master/skew3.m
+
+  Also known as the cross-product matrix [v]_x such that 
+  the cross product of (v x w) is equivalent to the 
+  matrix multiplication of the cross product matrix of 
+  v ([v]_x) and w
+
+  In other words: v x w = [v]_x * w
   """
   sk = np.float32([[0, -v[2], v[1]],
                    [v[2], 0, -v[0]],
@@ -99,26 +106,10 @@ class RigidTransform(object):
         self.tvec = np.array(tvec)
 
     def __repr__(self):
-        return 'rpy: %s tvec: %s' % \
-            (np.array_str(self.quat.to_roll_pitch_yaw(), precision=2, suppress_small=True), 
+        return 'rpy (rxyz): %s tvec: %s' % \
+            (np.array_str(self.quat.to_roll_pitch_yaw(axes='rxyz'), precision=2, suppress_small=True), 
              np.array_str(self.tvec, precision=2, suppress_small=True))
         # return 'quat: %s, tvec: %s' % (self.quat, self.tvec)
-
-    def inverse(self):
-        """ Returns a new RigidTransform that corresponds to the inverse of this one """
-        qinv = self.quat.inverse()
-        return RigidTransform(qinv, qinv.rotate(- self.tvec))
-
-    def to_matrix(self):
-        """ Returns a 4x4 homogenous matrix of the form [R t; 0 1] """
-        result = self.quat.to_matrix()
-        result[:3, 3] = self.tvec
-        return result
-
-    def to_Rt(self):
-        """ Returns rotation R, and translational vector t """
-        T = self.to_matrix()
-        return T[:3,:3].copy(), T[:3,3].copy()
 
     def __mul__(self, other):
         """ 
@@ -138,6 +129,13 @@ class RigidTransform(object):
     def __rmul__(self, other): 
         raise NotImplementedError('Right multiply not implemented yet!')                    
 
+    # Basic operations
+
+    def inverse(self):
+        """ Returns a new RigidTransform that corresponds to the inverse of this one """
+        qinv = self.quat.inverse()
+        return RigidTransform(qinv, qinv.rotate(- self.tvec))
+
     def oplus(self, other): 
         if isinstance(other, RigidTransform): 
             t = self.quat.rotate(other.tvec) + self.tvec
@@ -148,70 +146,13 @@ class RigidTransform(object):
         else: 
             raise TypeError("Type inconsistent", type(other), other.__class__)
 
-    def to_roll_pitch_yaw_x_y_z(self, axes='rxyz'):
-        r, p, y = self.quat.to_roll_pitch_yaw(axes=axes)
-        return np.array((r, p, y, self.tvec[0], self.tvec[1], self.tvec[2]))
-
     def rotate_vec(self, v): 
-        if v.ndim == 2 and v.shape[0] > 1: 
+        if v.ndim == 2: 
             return np.vstack(map(lambda v_: self.quat.rotate(v_), v))
         else: 
             assert(v.ndim == 1 or (v.ndim == 2 and v.shape[0] == 1))
             return self.quat.rotate(v)
 
-    @classmethod
-    def from_roll_pitch_yaw_x_y_z(cls, r, p, yaw, x, y, z, axes='rxyz'):
-        q = Quaternion.from_roll_pitch_yaw(r, p, yaw, axes=axes)
-        return cls(q, (x, y, z))
-
-    @classmethod
-    def from_Rt(cls, R, t):
-        T = np.eye(4)
-        T[:3,:3] = R.copy();
-        return cls(Quaternion.from_matrix(T), t)
-
-    @classmethod
-    def from_matrix(cls, T):
-        return cls(Quaternion.from_matrix(T), T[:3,3])
-
-    @classmethod
-    def from_triad(cls, pos, v1, v2):
-        # print v1, v2, type(v1)
-        return RigidTransform.from_matrix(tf_compose(tf_construct(v1, v2), pos))
-
-    @classmethod
-    def from_angle_axis(cls, angle, axis, tvec): 
-        return cls(Quaternion.from_angle_axis(angle, axis), tvec)
-
-    def wxyz(self):
-        return self.quat.to_wxyz()
-
-    def xyzw(self):
-        return self.quat.to_xyzw()
-
-    @property
-    def R(self): 
-        return self.quat.R
-
-    @property
-    def t(self): 
-        return self.tvec
-
-    @property
-    def rotation(self): 
-        return self.quat
-
-    @property
-    def translation(self):
-        return self.tvec
-
-    @classmethod
-    def identity(cls):
-        return cls()
-
-    @property
-    def matrix(self): 
-        return self.to_matrix()
 
     def interpolate(self, other, w): 
         """
@@ -237,6 +178,88 @@ class RigidTransform(object):
     #     oinv = other.inverse()
     #     return oinv.oplus(self)
 
+
+    # (To) Conversions
+
+    def to_matrix(self):
+        """ Returns a 4x4 homogenous matrix of the form [R t; 0 1] """
+        result = self.quat.to_matrix()
+        result[:3, 3] = self.tvec
+        return result
+
+    def to_Rt(self):
+        """ Returns rotation R, and translational vector t """
+        T = self.to_matrix()
+        return T[:3,:3].copy(), T[:3,3].copy()
+
+    def to_roll_pitch_yaw_x_y_z(self, axes='rxyz'):
+        r, p, y = self.quat.to_roll_pitch_yaw(axes=axes)
+        return np.array((r, p, y, self.tvec[0], self.tvec[1], self.tvec[2]))
+
+
+    # (From) Conversions
+
+    @classmethod
+    def from_roll_pitch_yaw_x_y_z(cls, r, p, yaw, x, y, z, axes='rxyz'):
+        q = Quaternion.from_roll_pitch_yaw(r, p, yaw, axes=axes)
+        return cls(q, (x, y, z))
+
+    @classmethod
+    def from_Rt(cls, R, t):
+        T = np.eye(4)
+        T[:3,:3] = R.copy();
+        return cls(Quaternion.from_matrix(T), t)
+
+    @classmethod
+    def from_matrix(cls, T):
+        return cls(Quaternion.from_matrix(T), T[:3,3])
+
+    @classmethod
+    def from_triad(cls, pos, v1, v2):
+        # print v1, v2, type(v1)
+        return RigidTransform.from_matrix(tf_compose(tf_construct(v1, v2), pos))
+
+    @classmethod
+    def from_angle_axis(cls, angle, axis, tvec): 
+        return cls(Quaternion.from_angle_axis(angle, axis), tvec)
+
+    # Properties
+    @property
+    def wxyz(self):
+        return self.quat.wxyz
+
+    @property
+    def xyzw(self):
+        return self.quat.xyzw
+
+    @property
+    def R(self): 
+        return self.quat.R
+
+    @property
+    def t(self): 
+        return self.tvec
+
+    @property
+    def orientation(self): 
+        return self.quat
+
+    @property
+    def rotation(self): 
+        return self.quat
+
+    @property
+    def translation(self):
+        return self.tvec
+
+    @classmethod
+    def identity(cls):
+        return cls()
+
+    @property
+    def matrix(self): 
+        return self.to_matrix()
+
 ###############################################################################
 class DualQuaternion(object):
     """
@@ -253,40 +276,6 @@ class DualQuaternion(object):
         return 'real: %s dual: %s' % \
             (np.array_str(self.real, precision=2, suppress_small=True), 
              np.array_str(self.dual, precision=2, suppress_small=True))
-
-    def normalize(self): 
-        """ Check validity of unit-quaternion norm """
-        self.real.normalize()
-        self.dual.noramlize()
-
-    def dot(self, other): 
-        return self.real.dot(other.real)
-
-    def inverse(self):
-        """ Returns a new RigidTransform that corresponds to the inverse of this one """
-        qinv = self.dual.inverse()
-        return DualQuaternion.from_dq(qinv.q, qinv.rotate(- self.tvec))
-
-    def to_matrix(self):
-        """ Returns a 4x4 homogenous matrix of the form [R t; 0 1] """
-        result = self.rotation.to_matrix()
-        result[:3, 3] = self.translation
-        return result
-
-    def to_Rt(self):
-        """ Returns rotation R, and translational vector t """
-        T = self.to_matrix()
-        return T[:3,:3].copy(), T[:3,3].copy()
-
-    def conjugate(self): 
-        return DualQuaternion.from_dq(self.real.conjugate(), self.dual.conjugate())
-
-    def rotation(self): 
-        return self.real
-
-    def translation(self): 
-        t = self.dual.q * self.real.conjugate()
-        return np.array([t.x, t.y, t.z]) * 2.0
 
     def __add__(self, other): 
         return DualQuaternion.from_dq(self.real + other.real, self.dual + other.dual)
@@ -314,26 +303,44 @@ class DualQuaternion(object):
     def __rmul__(self, other): 
         raise NotImplementedError('Right multiply not implemented yet!')                    
 
-    # def oplus(self, other): 
-    #     if isinstance(other, RigidTransform): 
-    #         t = self.quat.rotate(other.tvec) + self.tvec
-    #         r = self.quat * other.quat
-    #         return RigidTransform(r, t)
-    #     elif isinstance(other, list): 
-    #         return map(lambda o: self.oplus(o), other)
-    #     else: 
-    #         raise TypeError("Type inconsistent", type(other), other.__class__)
+    # Basic operations
 
-    # def to_roll_pitch_yaw_x_y_z(self, axes='rxyz'):
-    #     r, p, y = self.quat.to_roll_pitch_yaw(axes=axes)
-    #     return np.array((r, p, y, self.tvec[0], self.tvec[1], self.tvec[2]))
+    def normalize(self): 
+        """ Check validity of unit-quaternion norm """
+        self.real.normalize()
+        self.dual.noramlize()
 
-    # def rotate_vec(self, v): 
-    #     if v.ndim == 2 and v.shape[0] > 1: 
-    #         return np.vstack(map(lambda v_: self.quat.rotate(v_), v))
-    #     else: 
-    #         assert(v.ndim == 1 or (v.ndim == 2 and v.shape[0] == 1))
-    #         return self.quat.rotate(v)
+    def dot(self, other): 
+        return self.real.dot(other.real)
+
+    def inverse(self):
+        """ Returns a new RigidTransform that corresponds to the inverse of this one """
+        qinv = self.dual.inverse()
+        return DualQuaternion.from_dq(qinv.q, qinv.rotate(- self.tvec))
+
+    def conjugate(self): 
+        return DualQuaternion.from_dq(self.real.conjugate(), self.dual.conjugate())
+
+    # To conversions
+
+    def to_matrix(self):
+        """ Returns a 4x4 homogenous matrix of the form [R t; 0 1] """
+        result = self.rotation.to_matrix()
+        result[:3, 3] = self.translation
+        return result
+
+    def to_Rt(self):
+        """ Returns rotation R, and translational vector t """
+        T = self.to_matrix()
+        return T[:3,:3].copy(), T[:3,3].copy()
+
+    def to_wxyz(self):
+        return self.rotation.to_wxyz()
+
+    def to_xyzw(self):
+        return self.rotation.to_xyzw()
+
+    # From conversions
 
     @classmethod
     def from_dq(cls, r, d):
@@ -347,43 +354,33 @@ class DualQuaternion(object):
         a.dual = d
         return a
 
-    # @classmethod
-    # def from_roll_pitch_yaw_x_y_z(cls, r, p, yaw, x, y, z, axes='rxyz'):
-    #     q = Quaternion.from_roll_pitch_yaw(r, p, yaw, axes=axes)
-    #     return cls(q, (x, y, z))
+    @classmethod
+    def from_Rt(cls, R, t):
+        T = np.eye(4)
+        T[:3,:3] = R.copy();
+        T[:3,3] = t.copy()
+        return cls.from_matrix(T)
 
-    # @classmethod
-    # def from_Rt(cls, R, t):
-    #     T = np.eye(4)
-    #     T[:3,:3] = R.copy();
-    #     return cls(Quaternion.from_matrix(T), t)
+    @classmethod
+    def from_matrix(cls, T):
+        return cls(Quaternion.from_matrix(T), T[:3,3])
 
-    # @classmethod
-    # def from_matrix(cls, T):
-    #     return cls(Quaternion.from_matrix(T), T[:3,3])
+    # Properties
 
-    # @classmethod
-    # def from_triad(cls, pos, v1, v2):
-    #     # print v1, v2, type(v1)
-    #     return RigidTransform.from_matrix(tf_compose(tf_construct(v1, v2), pos))
+    @property
+    def rotation(self): 
+        return self.real
 
-    # @classmethod
-    # def from_angle_axis(cls, angle, axis, tvec): 
-    #     return cls(Quaternion.from_angle_axis(angle, axis), tvec)
-
-    def wxyz(self):
-        return self.rotation.to_wxyz()
-
-    def xyzw(self):
-        return self.rotation.to_xyzw()
-
-    # def translation(self):
-    #     return self.tvec
+    @property
+    def translation(self): 
+        t = self.dual.q * self.real.conjugate()
+        return np.array([t.x, t.y, t.z]) * 2.0
 
     @classmethod
     def identity(cls):
         return cls()
 
+    
 ###############################################################################
 class Sim3(RigidTransform): 
     def __init__(self, xyzw=[0.,0.,0.,1.], tvec=[0.,0.,0.], scale=1.0):    
@@ -413,8 +410,10 @@ class Pose(RigidTransform):
         return cls(pid, pose.quat, pose.tvec)
     
     def __repr__(self): 
-        return 'Pose ID: %i, rpy: %s tvec: %s' % \
-            (self.id, np.array_str(self.quat.to_roll_pitch_yaw(), precision=2), np.array_str(self.tvec, precision=2))
+        return 'Pose ID: %i, rpy (rxyz): %s tvec: %s' % \
+            (self.id, 
+             np.array_str(self.quat.to_roll_pitch_yaw(axes='rxyz'), precision=2), 
+             np.array_str(self.tvec, precision=2))
 
 if __name__ == "__main__":
 

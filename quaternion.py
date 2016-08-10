@@ -25,6 +25,23 @@ class Quaternion(object):
                 raise TypeError("Quaternion can not be initialized from {:}".format(type(q)))
         
         self.normalize()
+    
+    def __repr__ (self):
+        return '%s' % self.q
+
+    def __getitem__ (self, i):
+        return self.q[i]
+
+    # Basic operations
+
+    def __mul__(self, other):
+        """ Multiply quaternion with another """
+        if isinstance(other, float): 
+            return Quaternion(self.q * other)
+        elif isinstance(other, Quaternion): 
+            return Quaternion(tf.quaternion_multiply(self.q, other.q))
+        else: 
+            raise TypeError('Quaternion multiply error')
 
     def normalize(self): 
         """ Check validity of unit-quaternion norm """
@@ -38,56 +55,13 @@ class Quaternion(object):
     def dot(self, other): 
         return self.q.dot(other.q)
 
-    @classmethod
-    def identity(cls):
-        return cls()
+    def inverse(self):
+        """ Invert rotation assuming unit quaternion """
+        return Quaternion(tf.quaternion_conjugate(self.q))
 
-    @classmethod
-    def from_wxyz(cls, q): 
-        return cls(np.roll(q, shift=-1))
-
-    @classmethod
-    def from_xyzw(cls, q): 
-        return cls(q)
-
-    @property
-    def x(self): 
-        return self.q[0]
-
-    @property
-    def y(self): 
-        return self.q[1]
-
-    @property
-    def z(self): 
-        return self.q[2]
-
-    @property
-    def w(self): 
-        return self.q[3]
-
-    def to_wxyz(self): 
-        q = np.roll(self.q, shift=1)
-        return q
-
-    def to_xyzw(self): 
-        """ Return (x,y,z,w) representation """
-        return self.q
-    
-    def __mul__(self, other):
-        """ Multiply quaternion with another """
-        if isinstance(other, float): 
-            return Quaternion(self.q * other)
-        elif isinstance(other, Quaternion): 
-            return tf.quaternion_multiply(self.q, other.q)
-        else: 
-            raise TypeError('Quaternion multiply error')
-
-    def __getitem__ (self, i):
-        return self.q[i]
-
-    def __repr__ (self):
-        return '%s' % self.q
+    def conjugate(self):
+        """ Quaternion conjugate """
+        return Quaternion(tf.quaternion_conjugate(self.q))
 
     def rotate(self, v):
         """ Rotate a vector with this quaternion in reverse """
@@ -120,69 +94,6 @@ class Quaternion(object):
         return np.array((b[0]*a[1] + b[1]*a[0] + b[2]*a[3] - b[3]*a[2],
                          b[0]*a[2] - b[1]*a[3] + b[2]*a[0] + b[3]*a[1],
                          b[0]*a[3] + b[1]*a[2] - b[2]*a[1] + b[3]*a[0]))
-
-    def inverse(self):
-        """ Invert rotation """
-        return Quaternion(tf.quaternion_inverse(self.q))
-
-    def conjugate(self):
-        """ Quaternion conjugate """
-        return Quaternion(tf.quaternion_conjugate(self.q))
-
-    @classmethod
-    def from_roll_pitch_yaw (cls, roll, pitch, yaw, axes='rxyz'):
-        """ Construct Quaternion from axis-angle representation """
-        return cls(tf.quaternion_from_euler(roll, pitch, yaw, axes=axes))
-
-    @classmethod
-    def from_rpy (cls, rpy, axes='rxyz'):
-        """ Construct Quaternion from Euler angle representation """
-        return cls.from_roll_pitch_yaw(rpy[0], rpy[1], rpy[2], axes=axes)
-
-    @classmethod
-    def from_angle_axis(cls, theta, axis):
-        """ Construct Quaternion from axis-angle representation """
-        x, y, z = axis
-        norm = math.sqrt(x*x + y*y + z*z)
-        if 0 == norm:
-            return cls([0, 0, 0, 1])
-        t = math.sin(theta/2) / norm;
-        return cls([x*t, y*t, z*t, math.cos(theta/2)])
-
-    def to_roll_pitch_yaw (self, axes='rxyz'):
-        """ Return Euler angle with XYZ convention """
-        return np.array(tf.euler_from_quaternion(self.q, axes=axes))
-
-    def to_angle_axis(self):
-        """ Return axis-angle representation """
-        q = np.roll(self.q, shift=1)
-        halftheta = math.acos(q[0])
-        if abs(halftheta) < 1e-12:
-            return 0, np.array((0, 0, 1))
-        else:
-            theta = halftheta * 2
-            axis = np.array(q[1:4]) / math.sin(halftheta)
-            return theta, axis
-
-    @classmethod
-    def from_matrix(cls, matrix):
-        """ From 4x4 transformation matrix """ 
-        return tf.quaternion_from_matrix(matrix)
-
-    def to_matrix(self):
-        """ Returns 4x4 transformation matrix """ 
-        return tf.quaternion_matrix(self.q)
-
-    @property
-    def R(self): 
-        """ Returns 3x3 transformation matrix """ 
-        return self.to_matrix()[:3,:3]
-
-    @property
-    def matrix(self): 
-        """ Returns 4x4 transformation matrix """ 
-        return self.to_matrix()
-
     def interpolate(self, other, this_weight):
         q0, q1 = np.roll(self.q, shift=1), np.roll(other.q, shift=1)
         u = 1 - this_weight
@@ -209,6 +120,111 @@ class Quaternion(object):
         else:
             result = result*a + q1*b
         return Quaternion(np.roll(result, shift=-1))
+
+    # To conversions
+
+    def to_wxyz(self): 
+        q = np.roll(self.q, shift=1)
+        return q
+
+    def to_xyzw(self): 
+        """ Return (x,y,z,w) representation """
+        return self.q
+
+    def to_roll_pitch_yaw(self, axes='rxyz'):
+        """ Return Euler angle with XYZ convention """
+        return np.array(tf.euler_from_quaternion(self.q, axes=axes))
+
+    def to_angle_axis(self):
+        """ Return axis-angle representation """
+        q = np.roll(self.q, shift=1)
+        halftheta = math.acos(q[0])
+        if abs(halftheta) < 1e-12:
+            return 0, np.array((0, 0, 1))
+        else:
+            theta = halftheta * 2
+            axis = np.array(q[1:4]) / math.sin(halftheta)
+            return theta, axis
+
+    def to_matrix(self):
+        """ Returns 4x4 transformation matrix """ 
+        return tf.quaternion_matrix(self.q)
+
+    # From conversions
+
+    @classmethod
+    def from_wxyz(cls, q): 
+        return cls(np.roll(q, shift=-1))
+
+    @classmethod
+    def from_xyzw(cls, q): 
+        return cls(q)
+
+    @classmethod
+    def from_matrix(cls, matrix):
+        """ From 4x4 transformation matrix """ 
+        return tf.quaternion_from_matrix(matrix)
+
+    @classmethod
+    def from_roll_pitch_yaw (cls, roll, pitch, yaw, axes='rxyz'):
+        """ Construct Quaternion from axis-angle representation """
+        return cls(tf.quaternion_from_euler(roll, pitch, yaw, axes=axes))
+
+    @classmethod
+    def from_rpy (cls, rpy, axes='rxyz'):
+        """ Construct Quaternion from Euler angle representation """
+        return cls.from_roll_pitch_yaw(rpy[0], rpy[1], rpy[2], axes=axes)
+
+    @classmethod
+    def from_angle_axis(cls, theta, axis):
+        """ Construct Quaternion from axis-angle representation """
+        x, y, z = axis
+        norm = math.sqrt(x*x + y*y + z*z)
+        if 0 == norm:
+            return cls([0, 0, 0, 1])
+        t = math.sin(theta/2) / norm;
+        return cls([x*t, y*t, z*t, math.cos(theta/2)])
+
+    # Properties
+
+    @classmethod
+    def identity(cls):
+        return cls()
+
+    @property
+    def matrix(self): 
+        """ Returns 4x4 transformation matrix """ 
+        return self.to_matrix()
+
+    @property
+    def R(self): 
+        """ Returns 3x3 transformation matrix """ 
+        return self.to_matrix()[:3,:3]
+
+    @property
+    def x(self): 
+        return self.q[0]
+
+    @property
+    def y(self): 
+        return self.q[1]
+
+    @property
+    def z(self): 
+        return self.q[2]
+
+    @property
+    def w(self): 
+        return self.q[3]
+
+    @property
+    def wxyz(self):
+        return self.to_wxyz()
+
+    @property
+    def xyzw(self):
+        return self.to_xyzw()
+
 
 
 ###############################################################################
