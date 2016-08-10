@@ -1,7 +1,6 @@
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
-*$py.class
 
 # C extensions
 *.so
@@ -44,6 +43,9 @@ nosetests.xml
 coverage.xml
 *,cover
 .hypothesis/
+.cache
+nosetests.xml
+coverage.xml
 
 # Translations
 *.mo
