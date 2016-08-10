@@ -145,7 +145,7 @@ class PoseSampler(Sampler):
         # print '------------'
         for p in reversed(self.q_): 
             newp = pinv * self.get_sample(p)
-            d, r = np.linalg.norm(newp.tvec), np.fabs(newp.to_roll_pitch_yaw_x_y_z()[:3])
+            d, r = np.linalg.norm(newp.tvec), np.fabs(newp.to_rpyxyz()[:3])
             if d < self.displacement_ and (r < self.theta_).all(): 
                 return False
 
@@ -153,7 +153,7 @@ class PoseSampler(Sampler):
 
     # def visualize(self, finish=False): 
     #     # # RPY
-    #     # rpyxyz = np.vstack(item.to_roll_pitch_yaw_x_y_z() for item in self.all_)
+    #     # rpyxyz = np.vstack(item.to_rpyxyz() for item in self.all_)
     #     # rot = rpyxyz[:,:3]
     #     # trans = rpyxyz[:,3:6]
 
@@ -244,7 +244,7 @@ class FrustumVolumeIntersectionPoseSampler(Sampler):
             # print p, self.volume_.get_volume()
 
             # newp = pinv * self.get_sample(p)
-            # d, r = np.linalg.norm(newp.tvec), np.fabs(newp.to_roll_pitch_yaw_x_y_z()[:3])
+            # d, r = np.linalg.norm(newp.tvec), np.fabs(newp.to_rpyxyz()[:3])
             # print r, d < self.displacement_, (r < self.theta_).all(), newp
             # if d < self.displacement_ and (r < self.theta_).all(): 
             #     return False

@@ -45,7 +45,7 @@ def plot_poses(poses, pose_type='absolute'):
     # font = { 'family': 'normal', 'weight': 'normal', 'size': 12 }
     # mpl.rc('font', **font)
 
-    rpyxyz = np.vstack([pose.to_roll_pitch_yaw_x_y_z() for pose in poses])
+    rpyxyz = np.vstack([pose.to_rpyxyz() for pose in poses])
     ax = f.add_subplot(2, 1, 1)
 
     if pose_type == 'absolute': 

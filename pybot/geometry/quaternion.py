@@ -131,7 +131,7 @@ class Quaternion(object):
         """ Return (x,y,z,w) representation """
         return self.q
 
-    def to_roll_pitch_yaw(self, axes='rxyz'):
+    def to_rpy(self, axes='rxyz'):
         """ Return Euler angle with XYZ convention """
         return np.array(tf.euler_from_quaternion(self.q, axes=axes))
 
@@ -166,14 +166,9 @@ class Quaternion(object):
         return tf.quaternion_from_matrix(matrix)
 
     @classmethod
-    def from_roll_pitch_yaw (cls, roll, pitch, yaw, axes='rxyz'):
+    def from_rpy (cls, roll, pitch, yaw, axes='rxyz'):
         """ Construct Quaternion from axis-angle representation """
         return cls(tf.quaternion_from_euler(roll, pitch, yaw, axes=axes))
-
-    @classmethod
-    def from_rpy (cls, rpy, axes='rxyz'):
-        """ Construct Quaternion from Euler angle representation """
-        return cls.from_roll_pitch_yaw(rpy[0], rpy[1], rpy[2], axes=axes)
 
     @classmethod
     def from_angle_axis(cls, theta, axis):
@@ -226,11 +221,16 @@ class Quaternion(object):
         return self.to_xyzw()
 
 
+    @property
+    def rpy(self):
+        return self.to_rpy()
+
+
 
 ###############################################################################
 if __name__ == "__main__":
     import random
-    q = Quaternion.from_roll_pitch_yaw (0, 0, 2 * math.pi / 16)
+    q = Quaternion.from_rpy (0, 0, 2 * math.pi / 16)
     v = [ 1, 0, 0 ]
     print 'init: ', v
     for i in range (16):
@@ -242,14 +242,14 @@ if __name__ == "__main__":
 
         # print v
 
-    q2 = Quaternion.from_roll_pitch_yaw(0, 0, 0)
-    rpy_start = np.array(q.to_roll_pitch_yaw())
-    rpy_goal = np.array(q2.to_roll_pitch_yaw())
-    print "interpolate from ", q2.to_roll_pitch_yaw(), " to ", q.to_roll_pitch_yaw()
+    q2 = Quaternion.from_rpy(0, 0, 0)
+    rpy_start = np.array(q.to_rpy())
+    rpy_goal = np.array(q2.to_rpy())
+    print "interpolate from ", q2.to_rpy(), " to ", q.to_rpy()
     for i in range(101):
         alpha = i / 100.
         qinterp = q2.interpolate(q, alpha)
-        rpy_interp = np.array(qinterp.to_roll_pitch_yaw())
+        rpy_interp = np.array(qinterp.to_rpy())
         rpy_expected = (rpy_goal * alpha + rpy_start * (1 - alpha))
         err = rpy_expected - rpy_interp
         for k in [ 0, 1, 2 ]:

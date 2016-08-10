@@ -122,7 +122,7 @@ class FreeSpaceDetection:
             raise RuntimeError('Height Map/Octmap is not setup: consider running setup_velodyne()')
 
         # Velodyne pose
-        pose_bv = RigidTransform.from_roll_pitch_yaw_x_y_z(0, 0, 0, -0.27, 0, 1.73)
+        pose_bv = RigidTransform.from_rpyxyz(0, 0, 0, -0.27, 0, 1.73)
 
         for vel_pc in self.dataset.iter_velodyne_frames(): 
             X = vel_pc[:,:3]
@@ -269,7 +269,7 @@ class FreeSpaceDetection:
         sigmoid = lambda x, mu, s: 1.0/(1.0 + np.exp(-(x - mu)/s))
 
         # Cam-pose 
-        cam_bc = RigidTransform.from_roll_pitch_yaw_x_y_z(0, 1.57, -1.57, 0, 0, 1.65)
+        cam_bc = RigidTransform.from_rpyxyz(0, 1.57, -1.57, 0, 0, 1.65)
 
         for left_im, right_im in self.dataset.iter_stereo_frames(): 
 
@@ -278,8 +278,8 @@ class FreeSpaceDetection:
             st = time.time()
             T = self.vo.process(left_im, right_im)
             pose_odom  = RigidTransform.from_homogenous_matrix(T)
-            _, _pitch, _, _x, _y, _z = pose_odom.to_roll_pitch_yaw_x_y_z()
-            pose_odom_ = RigidTransform.from_roll_pitch_yaw_x_y_z(0,_pitch,0,_x,_y,_z)
+            _, _pitch, _, _x, _y, _z = pose_odom.to_rpyxyz()
+            pose_odom_ = RigidTransform.from_rpyxyz(0,_pitch,0,_x,_y,_z)
             print 'Time taken to compute stereo VO pose', time.time() - st
             self.poses.append(pose_odom)
             

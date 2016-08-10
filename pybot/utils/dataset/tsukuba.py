@@ -20,13 +20,13 @@ def tsukuba_load_poses(fn):
 
     """ 
     P = np.loadtxt(os.path.expanduser(fn), dtype=np.float64, delimiter=',')
-    return [ RigidTransform.from_roll_pitch_yaw_x_y_z(np.pi, 0, 0, 0, 0, 0) * \
-             RigidTransform.from_roll_pitch_yaw_x_y_z(
+    return [ RigidTransform.from_rpyxyz(np.pi, 0, 0, 0, 0, 0) * \
+             RigidTransform.from_rpyxyz(
                  np.deg2rad(p[3]),np.deg2rad(p[4]),np.deg2rad(p[5]),
                  p[0]*.01,p[1]*.01,p[2]*.01, axes='sxyz') * \
-             RigidTransform.from_roll_pitch_yaw_x_y_z(np.pi, 0, 0, 0, 0, 0) for p in P ]
+             RigidTransform.from_rpyxyz(np.pi, 0, 0, 0, 0, 0) for p in P ]
     
-    # return [ RigidTransform.from_roll_pitch_yaw_x_y_z(
+    # return [ RigidTransform.from_rpyxyz(
     #     np.deg2rad(p[3]),-np.deg2rad(p[4]),-np.deg2rad(p[5]),
     #     p[0]*.01,-p[1]*.01,-p[2]*.01, axes='sxyz') for p in P ]
 

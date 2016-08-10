@@ -83,8 +83,8 @@ class VOMixin(object):
             return
 
         # # Project to 2d
-        # _, t, _, x, _, z  = p_ct.to_roll_pitch_yaw_x_y_z()
-        # pose_ct = RigidTransform.from_roll_pitch_yaw_x_y_z(0, t, 0, x, 0, z)
+        # _, t, _, x, _, z  = p_ct.to_rpyxyz()
+        # pose_ct = RigidTransform.from_rpyxyz(0, t, 0, x, 0, z)
 
         pose_id = self.poses_[-1].id + 1 if len(self.poses_) else 0
         pose_ct  = Pose.from_rigid_transform(pose_id, p_ct) 

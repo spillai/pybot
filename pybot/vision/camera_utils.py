@@ -613,7 +613,7 @@ class StereoCamera(Camera):
         rcamera = Camera.from_intrinsics_extrinsics(
             lcamera.intrinsics, 
             CameraExtrinsic.from_rigid_transform(
-                lcamera.oplus(RigidTransform.from_roll_pitch_yaw_x_y_z(0,0,0,baseline,0,0))
+                lcamera.oplus(RigidTransform.from_rpyxyz(0,0,0,baseline,0,0))
             )
         )
         return cls(lcamera, rcamera, baseline=baseline)
@@ -691,7 +691,7 @@ class StereoCamera(Camera):
         """
         super(StereoCamera, self).set_pose(left_pose)
         self.right.set_pose(
-            self.left.oplus(RigidTransform.from_roll_pitch_yaw_x_y_z(0,0,0,self.baseline,0,0))
+            self.left.oplus(RigidTransform.from_rpyxyz(0,0,0,self.baseline,0,0))
         )
         
     @classmethod

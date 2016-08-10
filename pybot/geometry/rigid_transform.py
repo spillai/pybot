@@ -107,7 +107,7 @@ class RigidTransform(object):
 
     def __repr__(self):
         return 'rpy (rxyz): %s tvec: %s' % \
-            (np.array_str(self.quat.to_roll_pitch_yaw(axes='rxyz'), precision=2, suppress_small=True), 
+            (np.array_str(self.quat.to_rpy(axes='rxyz'), precision=2, suppress_small=True), 
              np.array_str(self.tvec, precision=2, suppress_small=True))
         # return 'quat: %s, tvec: %s' % (self.quat, self.tvec)
 
@@ -192,16 +192,16 @@ class RigidTransform(object):
         T = self.to_matrix()
         return T[:3,:3].copy(), T[:3,3].copy()
 
-    def to_roll_pitch_yaw_x_y_z(self, axes='rxyz'):
-        r, p, y = self.quat.to_roll_pitch_yaw(axes=axes)
+    def to_rpyxyz(self, axes='rxyz'):
+        r, p, y = self.quat.to_rpy(axes=axes)
         return np.array((r, p, y, self.tvec[0], self.tvec[1], self.tvec[2]))
 
 
     # (From) Conversions
 
     @classmethod
-    def from_roll_pitch_yaw_x_y_z(cls, r, p, yaw, x, y, z, axes='rxyz'):
-        q = Quaternion.from_roll_pitch_yaw(r, p, yaw, axes=axes)
+    def from_rpyxyz(cls, roll, pitch, yaw, x, y, z, axes='rxyz'):
+        q = Quaternion.from_rpy(roll, pitch, yaw, axes=axes)
         return cls(q, (x, y, z))
 
     @classmethod
@@ -412,7 +412,7 @@ class Pose(RigidTransform):
     def __repr__(self): 
         return 'Pose ID: %i, rpy (rxyz): %s tvec: %s' % \
             (self.id, 
-             np.array_str(self.quat.to_roll_pitch_yaw(axes='rxyz'), precision=2), 
+             np.array_str(self.quat.to_rpy(axes='rxyz'), precision=2), 
              np.array_str(self.tvec, precision=2))
 
 if __name__ == "__main__":
@@ -434,7 +434,7 @@ if __name__ == "__main__":
     print m.to_matrix()
     print "--------------------------"
 
-    q2 = Quaternion.from_roll_pitch_yaw(np.pi / 4, 0, 0)
+    q2 = Quaternion.from_rpy(np.pi / 4, 0, 0)
     t2 = [ 0, 0, 0 ]
     m2 = RigidTransform(q2, t2)
     print "m2"

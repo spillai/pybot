@@ -86,7 +86,7 @@ def TangoOdomDecoder(channel, every_k_frames=1, noise=[0,0]):
     #       .format(p_ID, p_IC, p_DC, p_DF))
 
     # SS->CAM
-    p_S_CAM = RigidTransform.from_roll_pitch_yaw_x_y_z(
+    p_S_CAM = RigidTransform.from_rpyxyz(
         -np.pi/2, 0, 0, 0, 0, 0, axes='sxyz')
     p_CAM_S = p_S_CAM.inverse()
 
@@ -104,7 +104,7 @@ def TangoOdomDecoder(channel, every_k_frames=1, noise=[0,0]):
               if noise[0] > 0 else np.zeros(3)
         rpy = np.random.normal(0, noise[1], size=3) \
               if noise[1] > 0 else np.zeros(3)
-        return RigidTransform.from_roll_pitch_yaw_x_y_z(
+        return RigidTransform.from_rpyxyz(
             rpy[0], rpy[1], rpy[2], xyz[0], xyz[1], xyz[2])
 
     # Noise injection

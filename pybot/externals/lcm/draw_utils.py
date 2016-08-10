@@ -29,9 +29,9 @@ class VisualizationMsgsPub:
         self._sensor_pose = dict()
 
         self.lc = lcm.LCM()
-        camera_pose = RigidTransform.from_roll_pitch_yaw_x_y_z(-np.pi/2, 0, -np.pi/2, 
+        camera_pose = RigidTransform.from_rpyxyz(-np.pi/2, 0, -np.pi/2, 
                                                                0, 0, 2, axes='sxyz')
-        xz_pose = RigidTransform.from_roll_pitch_yaw_x_y_z(np.pi/2, 0, 0, 0, 0, 0, axes='sxyz')
+        xz_pose = RigidTransform.from_rpyxyz(np.pi/2, 0, 0, 0, 0, 0, axes='sxyz')
 
         self.reset_visualization()
         self.publish_sensor_frame('camera', pose=camera_pose)
@@ -74,7 +74,7 @@ class VisualizationMsgsPub:
         
         # Send sensor pose
         pose_msg = vs.obj_t()
-        roll, pitch, yaw, x, y, z = pose.to_roll_pitch_yaw_x_y_z(axes='sxyz')
+        roll, pitch, yaw, x, y, z = pose.to_rpyxyz(axes='sxyz')
         pose_msg.id = 0
         pose_msg.x, pose_msg.y, pose_msg.z, \
             pose_msg.roll, pose_msg.pitch, pose_msg.yaw  = x, y, z, roll, pitch, yaw
@@ -275,7 +275,7 @@ def publish_pose_list(pub_channel, poses, texts=[], covars=[], frame_id='camera'
 
         # Pose compounding
         p = frame_pose.oplus(pose) 
-        roll, pitch, yaw, x, y, z = p.to_roll_pitch_yaw_x_y_z(axes='sxyz')
+        roll, pitch, yaw, x, y, z = p.to_rpyxyz(axes='sxyz')
 
         # Optionally get the id of the pose, 
         # for plotting clouds with corresponding pose
@@ -392,7 +392,7 @@ def draw_laser_frustum(pose, zmin=0.0, zmax=10, fov=np.deg2rad(60)):
 
     N = 30
     curve = np.vstack([(
-        RigidTransform.from_roll_pitch_yaw_x_y_z(0, 0, rad, 0, 0, 0) * np.array([[zmax, 0, 0]])) 
+        RigidTransform.from_rpyxyz(0, 0, rad, 0, 0, 0) * np.array([[zmax, 0, 0]])) 
              for rad in np.linspace(-fov/2, fov/2, N)])
     
     curve_w = pose * curve
