@@ -1,0 +1,94 @@
+import time
+from collections import OrderedDict
+from functools import wraps
+
+def print_green(prt): print("\033[92m {}\033[00m" .format(prt))
+
+global g_timers
+g_timers = OrderedDict()
+
+def named_timer(name): 
+    global g_timers
+    header = '\n' if len(g_timers) == 0 else ''
+    if name not in g_timers: 
+        g_timers[name] = SimpleTimer(name, header=header)
+    try: 
+        return g_timers[name] 
+    except KeyError, e: 
+        raise RuntimeError('Failed to retrieve timer {:}'.format(e))
+
+def timeitmethod(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        try: 
+            name = ''.join([args[0].__class__.__name__, '::', func.__name__])
+        except: 
+            raise RuntimeError('timeitmethod requires first argument to be self')
+        named_timer(name).start()
+        r = func(*args, **kwargs)
+        named_timer(name).stop()
+        return r
+    return wrapper
+
+
+def timeit(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        named_timer(name).start()
+        r = func(*args, **kwargs)
+        named_timer(name).stop()
+        return r
+    return wrapper
+
+class SimpleTimer: 
+    def __init__(self, name='', hz=1.0, header=''): 
+        self.name_ = name
+        self.hz_ = hz
+        self.header_ = header
+
+        self.counter_ = 0
+        self.last_ = time.time()
+        self.period_ = 0
+        
+        self.last_print_ = time.time()        
+        self.last_fps_ = 0
+
+    def poll(self): 
+        self.counter_ += 1
+        now = time.time()
+        dt = (now - self.last_)
+
+        if (now-self.last_print_) > 1.0 / self.hz_: 
+            T = dt / self.counter_
+            fps = self.hz_ / T
+            print_green('%s\t[%5.1f ms, %3.1f Hz ]\t%s' % (self.header_, T * 1e3, fps, self.name_, ))
+            self.last_ = now
+            self.last_print_ = now
+            self.counter_ = 0
+
+    def poll_piecemeal(self): 
+        self.counter_ += 1
+        now = time.time()
+        dt = (now - self.last_)
+        self.period_ += dt
+
+        if (now-self.last_print_) > 1.0 / self.hz_:
+            T = self.period_ / self.counter_
+            fps = self.hz_ / T
+            print_green('%s\t[%5.1f ms, %3.1f Hz ]\t%s' % (self.header_, T * 1e3, fps, self.name_, ))
+            self.last_ = now
+            self.last_print_ = now
+            self.last_fps_ = fps
+            self.counter_ = 0
+            self.period_ = 0
+            
+    def start(self): 
+        self.last_ = time.time()
+
+    def stop(self): 
+        self.poll_piecemeal()
+
+    @property
+    def fps(self): 
+        return self.last_fps_
+        
