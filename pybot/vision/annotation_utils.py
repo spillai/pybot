@@ -2,8 +2,8 @@ import cv2
 import numpy as np
 import shapely.geometry as sg
 
-from bot_vision.imshow_utils import imshow_cv
-from bot_vision.color_utils import color_from_string, get_color_by_label
+from pybot.vision.imshow_utils import imshow_cv
+from pybot.vision.color_utils import color_from_string, get_color_by_label
 
 def reduce_funcs(*funcs): 
     from functools import wraps

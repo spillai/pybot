@@ -20,11 +20,11 @@ from sensor_msgs.msg import Image
 from cv_bridge import CvBridge, CvBridgeError
 from tf2_msgs.msg import TFMessage
 
-from bot_externals.log_utils import Decoder, LogReader, LogController, LogDB
-from bot_vision.image_utils import im_resize
-from bot_vision.imshow_utils import imshow_cv
-from bot_geometry.rigid_transform import RigidTransform
-from bot_vision.camera_utils import CameraIntrinsic
+from pybot.externals.log_utils import Decoder, LogReader, LogController, LogDB
+from pybot.vision.image_utils import im_resize
+from pybot.vision.imshow_utils import imshow_cv
+from pybot.geometry.rigid_transform import RigidTransform
+from pybot.vision.camera_utils import CameraIntrinsic
 
 class GazeboDecoder(Decoder): 
     """
@@ -240,7 +240,7 @@ class ROSBagReader(LogReader):
             
     #     print('Finished publishing gazebo states {:}'.format(len(self.gt_poses)))
         
-    #     # import bot_externals.draw_utils as draw_utils
+    #     # import pybot.externals.draw_utils as draw_utils
     #     # draw_utils.publish_pose_list('robot_poses', 
     #     #                              self.gt_poses[::10], frame_id='origin', reset=True)
 

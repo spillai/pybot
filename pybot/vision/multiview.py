@@ -5,8 +5,8 @@ from .imshow_utils import imshow_cv
 from .camera_utils import Camera, CameraIntrinsic, CameraExtrinsic, plot_epipolar_line
 from .image_utils import to_gray, to_color, im_resize
 
-from bot_vision.draw_utils import draw_features
-from bot_vision.feature_detection import FeatureDetector
+from pybot.vision.draw_utils import draw_features
+from pybot.vision.feature_detection import FeatureDetector
 
 class Frame(object): 
     def __init__(self, im, camera): 

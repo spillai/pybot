@@ -10,10 +10,10 @@ import lcm
 import zlib
 from itertools import islice
 
-from bot_vision.camera_utils import construct_K, DepthCamera
-from bot_vision.image_utils import im_resize
+from pybot.vision.camera_utils import construct_K, DepthCamera
+from pybot.vision.image_utils import im_resize
 
-from bot_externals.log_utils import Decoder, LogReader, LogController
+from pybot.externals.log_utils import Decoder, LogReader, LogController
 
 import bot_core.image_t as image_t
 import bot_core.pose_t as pose_t

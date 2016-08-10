@@ -1,5 +1,5 @@
-from bot_vision.imshow_utils import imshow_cv, trackbar_create, trackbar_value
-from bot_vision.image_utils import im_resize, to_gray
+from pybot.vision.imshow_utils import imshow_cv, trackbar_create, trackbar_value
+from pybot.vision.image_utils import im_resize, to_gray
 
 from pybot_vision import FastStereo as _FastStereo
 from pybot_vision import scaled_color_disp

@@ -3,8 +3,8 @@ import networkx as nx
 
 from collections import deque, defaultdict, Counter
 from itertools import izip
-from bot_utils.misc import print_red, print_green
-from bot_utils.db_utils import AttrDict
+from pybot.utils.misc import print_red, print_green
+from pybot.utils.db_utils import AttrDict
 
 from pygtsam import extractPose2, extractPose3, extractKeys
 from pygtsam import symbol as _symbol

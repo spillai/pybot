@@ -16,8 +16,8 @@ import cv2
 import time
 import numpy as np
 
-from bot_vision.image_utils import to_color, im_resize, im_mosaic, im_pad
-from bot_vision.imshow_utils import imshow_cv
+from pybot.vision.image_utils import to_color, im_resize, im_mosaic, im_pad
+from pybot.vision.imshow_utils import imshow_cv
 
 def ChessboardFinder(name, devices): 
     if name == 'webcam': 

@@ -57,7 +57,7 @@ if __name__ == "__main__":
 
     import argparse
     import os.path
-    from bot_utils.db_utils import AttrDict
+    from pybot.utils.db_utils import AttrDict
 
     # Parse directory
     parser = argparse.ArgumentParser(

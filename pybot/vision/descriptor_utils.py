@@ -1,6 +1,6 @@
 import cv2
 import numpy as np
-from bot_utils.db_utils import AttrDict
+from pybot.utils.db_utils import AttrDict
 
 class FeatureDetector(object): 
     """

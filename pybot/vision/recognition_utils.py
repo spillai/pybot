@@ -13,10 +13,10 @@ import datetime
 import pandas as pd
 
 import matplotlib.pyplot as plt
-from bot_vision.image_utils import im_resize, gaussian_blur, median_blur, box_blur
-from bot_utils.io_utils import memory_usage_psutil, format_time
-from bot_utils.db_utils import AttrDict, IterDB
-from bot_utils.itertools_recipes import chunks
+from pybot.vision.image_utils import im_resize, gaussian_blur, median_blur, box_blur
+from pybot.utils.io_utils import memory_usage_psutil, format_time
+from pybot.utils.db_utils import AttrDict, IterDB
+from pybot.utils.itertools_recipes import chunks
 
 # =====================================================================
 # Generic utility functions for object detection
@@ -333,7 +333,7 @@ def im_describe(*args, **kwargs):
 # General-purpose object recognition interfaces, and functions
 # ---------------------------------------------------------------------
 
-from bot_vision.geom_utils import brute_force_match, intersection_over_union
+from pybot.vision.geom_utils import brute_force_match, intersection_over_union
 
 import sklearn.metrics as metrics
 from sklearn.svm import LinearSVC, SVC
@@ -538,8 +538,8 @@ class NegativeMiningGenerator(object):
 # [Deprecated] General-purpose object recognition interfaces, and functions
 # ---------------------------------------------------------------------
 
-from bot_vision.feature_detection import get_dense_detector, get_detector
-from bot_vision.bow_utils import BoWVectorizer, bow_codebook, bow_project, flair_project
+from pybot.vision.feature_detection import get_dense_detector, get_detector
+from pybot.vision.bow_utils import BoWVectorizer, bow_codebook, bow_project, flair_project
 
 import sklearn.metrics as metrics
 from sklearn.preprocessing import normalize

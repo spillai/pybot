@@ -8,9 +8,9 @@ import numpy as np
 
 import cv2
 
-from bot_utils.io_utils import VideoCapture
-from bot_vision.image_utils import to_gray
-from bot_vision.imshow_utils import imshow_cv
+from pybot.utils.io_utils import VideoCapture
+from pybot.vision.image_utils import to_gray
+from pybot.vision.imshow_utils import imshow_cv
 
 # 
 

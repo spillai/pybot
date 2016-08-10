@@ -1,14 +1,14 @@
 import time
 import numpy as np
 
-from bot_vision.image_utils import to_color, to_gray
-from bot_vision.imshow_utils import imshow_cv
+from pybot.vision.image_utils import to_color, to_gray
+from pybot.vision.imshow_utils import imshow_cv
 
-from bot_utils.misc import Accumulator, SkippedCounter, CounterWithPeriodicCallback
-from bot_vision.mapping.pose_utils import PoseAccumulator
-from bot_geometry.rigid_transform import RigidTransform, Pose, Quaternion
+from pybot.utils.misc import Accumulator, SkippedCounter, CounterWithPeriodicCallback
+from pybot.vision.mapping.pose_utils import PoseAccumulator
+from pybot.geometry.rigid_transform import RigidTransform, Pose, Quaternion
 
-import bot_externals.draw_utils as draw_utils
+import pybot.externals.draw_utils as draw_utils
 
 from .gtsam import BaseSLAM as GTSAM_BaseSLAM
 from .gtsam import VisualSLAM as GTSAM_VisualSLAM

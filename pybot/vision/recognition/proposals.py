@@ -2,17 +2,17 @@
 import cv2
 import numpy as np
 
-from bot_utils.plot_utils import colormap
-from bot_vision.image_utils import im_resize
-from bot_vision.draw_utils import draw_bboxes
-# from bot_utils.timer import timeitmethod
+from pybot.utils.plot_utils import colormap
+from pybot.vision.image_utils import im_resize
+from pybot.vision.draw_utils import draw_bboxes
+# from pybot.utils.timer import timeitmethod
 
 import os.path
 import warnings
 with warnings.catch_warnings():
     warnings.simplefilter("ignore")
     import gop
-    from bot_vision.recognition.gop_util import setupLearned as gop_setuplearned
+    from pybot.vision.recognition.gop_util import setupLearned as gop_setuplearned
 
 class ObjectProposal(object): 
     """

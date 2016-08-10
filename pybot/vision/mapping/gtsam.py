@@ -24,9 +24,9 @@ from pygtsam import ISAM2, NonlinearOptimizer, \
 np.set_printoptions(precision=2, suppress=True)
 
 # REMOVE
-from bot_utils.timer import SimpleTimer, timeitmethod
-from bot_utils.db_utils import AttrDict
-from bot_utils.misc import print_red, print_yellow, print_green
+from pybot.utils.timer import SimpleTimer, timeitmethod
+from pybot.utils.db_utils import AttrDict
+from pybot.utils.misc import print_red, print_yellow, print_green
 
 def symbol(ch, i): 
     return _symbol(ord(ch), i)

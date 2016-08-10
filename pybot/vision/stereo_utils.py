@@ -3,14 +3,14 @@ import numpy as np
 from collections import deque
 from scipy.interpolate import LinearNDInterpolator
 
-from bot_utils.timer import timeitmethod
-from bot_utils.db_utils import AttrDict
+from pybot.utils.timer import timeitmethod
+from pybot.utils.db_utils import AttrDict
 
-from bot_vision.camera_utils import StereoCamera
-from bot_vision.image_utils import im_resize, gaussian_blur, to_color, to_gray, valid_pixels
-from bot_vision.imshow_utils import imshow_cv, trackbar_create, trackbar_value
-from bot_vision.color_utils import colormap
-from bot_vision.calib.calibrate_stereo import StereoCalibration, get_stereo_calibration_params
+from pybot.vision.camera_utils import StereoCamera
+from pybot.vision.image_utils import im_resize, gaussian_blur, to_color, to_gray, valid_pixels
+from pybot.vision.imshow_utils import imshow_cv, trackbar_create, trackbar_value
+from pybot.vision.color_utils import colormap
+from pybot.vision.calib.calibrate_stereo import StereoCalibration, get_stereo_calibration_params
         
 from pybot_vision import scaled_color_disp
 from pybot_externals import StereoELAS
@@ -337,7 +337,7 @@ def setup_ps3eye(scale=1.0):
     # return calib_params
 
 def stereo_dataset(filename, channel='CAMERA', start_idx=0, every_k_frames=1, max_length=None, scale=1, split='vertical'): 
-    from bot_externals.lcm.log_utils import LCMLogReader, ImageDecoder, StereoImageDecoder
+    from pybot.externals.lcm.log_utils import LCMLogReader, ImageDecoder, StereoImageDecoder
     dataset = LCMLogReader(filename=filename, start_idx=start_idx, 
                            max_length=max_length, every_k_frames=every_k_frames, 
                            index=False, 

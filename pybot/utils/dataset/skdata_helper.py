@@ -1,6 +1,6 @@
 import numpy as np
 from itertools import izip
-from bot_utils.db_utils import AttrDict
+from pybot.utils.db_utils import AttrDict
 
 class skdataHelper(object): 
     """

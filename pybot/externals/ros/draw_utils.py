@@ -16,9 +16,9 @@ import sensor_msgs.msg as sensor_msg
 from copy import deepcopy
 
 # Utility imports
-from bot_externals.draw_helpers import reshape_arr, get_color_arr, \
+from pybot.externals.draw_helpers import reshape_arr, get_color_arr, \
     height_map, color_by_height_axis, copy_pointcloud_data
-from bot_geometry.rigid_transform import RigidTransform
+from pybot.geometry.rigid_transform import RigidTransform
 from .pointclouds import xyz_array_to_pointcloud2, xyzrgb_array_to_pointcloud2
 
 global viz_pub_
@@ -31,7 +31,7 @@ def init():
     try: 
         # Initialize node
         import rospy
-        rospy.init_node('bot_vision_draw_utils_node', anonymous=True, disable_signals=True)
+        rospy.init_node('pybot_vision_draw_utils_node', anonymous=True, disable_signals=True)
 
         global viz_pub_
         viz_pub_ = VisualizationMsgsPub()

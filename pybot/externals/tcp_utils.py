@@ -3,7 +3,7 @@ import socket
 import time
 import cv2
 import numpy as np
-from bot_externals.print_utils import print_green
+from pybot.externals.print_utils import print_green
 
 def recvall(conn, count):
     buf = b''

@@ -32,9 +32,9 @@ from keras.callbacks import ModelCheckpoint, RemoteMonitor, TensorBoard, Progbar
 # from keras.utils.visualize_util import plot
 # from keras.optimizers import SGD
 
-from bot_utils.itertools_recipes import chunks
-from bot_vision.image_utils import flip_rb
-from bot_vision.color_utils import get_random_colors, colormap
+from pybot.utils.itertools_recipes import chunks
+from pybot.vision.image_utils import flip_rb
+from pybot.vision.color_utils import get_random_colors, colormap
 
 class UnPooling2D(Layer):
     """A 2D Repeat layer"""

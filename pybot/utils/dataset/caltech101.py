@@ -1,7 +1,7 @@
 import os
 import numpy as np
 
-from bot_utils.dataset_readers import read_dir, natural_sort
+from pybot.utils.dataset_readers import read_dir, natural_sort
 
 class Caltech101DatasetReader(object): 
     """

@@ -77,8 +77,8 @@ if __name__ == "__main__":
     import numpy as np
     from sklearn.pipeline import Pipeline, FeatureUnion
 
-    import bot_vision.image_utils as image_utils
-    import bot_vision.stereo_utils as stereo_utils
+    import pybot.vision.image_utils as image_utils
+    import pybot.vision.stereo_utils as stereo_utils
     
     fn = '/home/spillai/data/dataset/sequences/01/image_0/000000.png'
     print 'im_read_filter: Reading image '

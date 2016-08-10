@@ -1,7 +1,7 @@
 import cv2
 import numpy as np
 from itertools import chain, izip
-from bot_vision.image_utils import to_gray
+from pybot.vision.image_utils import to_gray
 
 def explore_match(win, img1, img2, kp_pairs, status = None, H = None):
     h1, w1 = img1.shape[:2]

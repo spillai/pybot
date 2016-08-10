@@ -18,15 +18,15 @@ import numpy as np
 from abc import ABCMeta, abstractmethod
 from collections import OrderedDict
 
-from bot_geometry.rigid_transform import Pose, RigidTransform, Sim3
-from bot_utils.db_utils import AttrDict
-from bot_utils.misc import CounterWithPeriodicCallback
-from bot_vision.imshow_utils import imshow_cv
-from bot_vision.image_utils import to_color, im_mosaic_list
-from bot_vision.draw_utils import draw_features
-from bot_vision.camera_utils import Camera, CameraIntrinsic, CameraExtrinsic
+from pybot.geometry.rigid_transform import Pose, RigidTransform, Sim3
+from pybot.utils.db_utils import AttrDict
+from pybot.utils.misc import CounterWithPeriodicCallback
+from pybot.vision.imshow_utils import imshow_cv
+from pybot.vision.image_utils import to_color, im_mosaic_list
+from pybot.vision.draw_utils import draw_features
+from pybot.vision.camera_utils import Camera, CameraIntrinsic, CameraExtrinsic
 
-import bot_externals.draw_utils as draw_utils
+import pybot.externals.draw_utils as draw_utils
 from pybot_vision import scaled_color_disp
 
 class Keyframe(object): 

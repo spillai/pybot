@@ -54,7 +54,7 @@ def copy_pointcloud_data(_arr, _carr, flip_rb=False):
 
 class Frustum(object): 
     """
-    Also see bot_vision.camera_utils.Frustum (need to fix redundancy)
+    Also see pybot.vision.camera_utils.Frustum (need to fix redundancy)
     """
 
     def __init__(self, pose, zmin=0.0, zmax=0.1, fov=np.deg2rad(60)): 

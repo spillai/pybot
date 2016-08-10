@@ -17,15 +17,15 @@ import numpy as np
 from collections import namedtuple, deque
 from itertools import izip
 
-from bot_utils.db_utils import AttrDict
-from bot_utils.data_containers import Feature3DData
+from pybot.utils.db_utils import AttrDict
+from pybot.utils.data_containers import Feature3DData
 
 from .base_klt import BaseKLT
-from bot_vision.imshow_utils import imshow_cv
-from bot_vision.image_utils import to_color, to_gray, gaussian_blur, im_mosaic
-from bot_utils.plot_utils import colormap
-from bot_vision.color_utils import color_from_string, get_color_by_label
-import bot_externals.draw_utils as draw_utils
+from pybot.vision.imshow_utils import imshow_cv
+from pybot.vision.image_utils import to_color, to_gray, gaussian_blur, im_mosaic
+from pybot.utils.plot_utils import colormap
+from pybot.vision.color_utils import color_from_string, get_color_by_label
+import pybot.externals.draw_utils as draw_utils
 
 import logging
 logging.basicConfig(format='%(name)s :: %(message)s',level=logging.INFO)

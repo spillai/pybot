@@ -13,7 +13,7 @@ from webcams import StereoPair
 
 import cv2
 import numpy as np
-from bot_vision.imshow_utils import imshow_cv
+from pybot.vision.imshow_utils import imshow_cv
 from pybot_externals import StereoELAS
 
 class CalibratedPair(StereoPair):

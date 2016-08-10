@@ -1,9 +1,9 @@
 import cv2
 import numpy as np
 
-from bot_utils.timer import timeitmethod
+from pybot.utils.timer import timeitmethod
 from .image_utils import to_gray
-from bot_vision.draw_utils import draw_ellipses, draw_hulls
+from pybot.vision.draw_utils import draw_ellipses, draw_hulls
 
 def fill_hulls(im, hulls): 
     for hull in hulls: 

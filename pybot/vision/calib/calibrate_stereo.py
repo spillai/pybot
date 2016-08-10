@@ -20,10 +20,10 @@ import cv2
 import numpy as np
 from itertools import izip
 
-from bot_utils.itertools_recipes import grouper
-from bot_utils.misc import progressbar
-from bot_vision.image_utils import to_color, im_resize, im_mosaic, im_pad
-from bot_vision.imshow_utils import imshow_cv
+from pybot.utils.itertools_recipes import grouper
+from pybot.utils.misc import progressbar
+from pybot.vision.image_utils import to_color, im_resize, im_mosaic, im_pad
+from pybot.vision.imshow_utils import imshow_cv
 
 class ChessboardNotFoundError(Exception):
     """No chessboard could be found in searched image."""

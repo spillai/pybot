@@ -1,6 +1,6 @@
 import cv2
 import numpy as np
-from bot_vision.image_utils import to_gray, to_color
+from pybot.vision.image_utils import to_gray, to_color
 
 def dense_optical_flow(im1, im2, pyr_scale=0.5, levels=3, winsize=5, 
                        iterations=3, poly_n=5, poly_sigma=1.2, fb_threshold=-1, 
@@ -182,8 +182,8 @@ def test_flow(img1, img2):
 #     def process_sparse(self): 
 
 #         if not hasattr(self, 'klt_'): 
-#             from bot_vision.trackers.base_klt import BaseKLT, OpenCVKLT
-#             from bot_vision.trackers.tracker_utils import OpticalFlowTracker
+#             from pybot.vision.trackers.base_klt import BaseKLT, OpenCVKLT
+#             from pybot.vision.trackers.tracker_utils import OpticalFlowTracker
 #             self.klt_ = OpenCVKLT()
 
 #             # Triangulated points

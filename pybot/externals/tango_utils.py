@@ -12,12 +12,12 @@ from itertools import izip
 from collections import deque, namedtuple, OrderedDict
 from abc import ABCMeta, abstractmethod
 
-from bot_externals.log_utils import Decoder, LogFile, LogReader, LogController, LogDB
-from bot_vision.image_utils import im_resize
-from bot_geometry.rigid_transform import RigidTransform
-from bot_vision.camera_utils import CameraIntrinsic
-from bot_utils.dataset.sun3d_utils import SUN3DAnnotationDB
-from bot_vision.mapping.pose_utils import PoseSampler
+from pybot.externals.log_utils import Decoder, LogFile, LogReader, LogController, LogDB
+from pybot.vision.image_utils import im_resize
+from pybot.geometry.rigid_transform import RigidTransform
+from pybot.vision.camera_utils import CameraIntrinsic
+from pybot.utils.dataset.sun3d_utils import SUN3DAnnotationDB
+from pybot.vision.mapping.pose_utils import PoseSampler
 
 # Decode odometry
 def odom_decode(data): 

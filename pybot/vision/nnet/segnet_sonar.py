@@ -24,9 +24,9 @@ from keras.utils import np_utils
 from keras.regularizers import ActivityRegularizer
 from keras.callbacks import ModelCheckpoint, RemoteMonitor, TensorBoard, ProgbarLogger
 
-from bot_utils.itertools_recipes import chunks
-# from bot_vision.image_utils import flip_rb
-# from bot_vision.color_utils import get_random_colors, colormap
+from pybot.utils.itertools_recipes import chunks
+# from pybot.vision.image_utils import flip_rb
+# from pybot.vision.color_utils import get_random_colors, colormap
 
 nchannels = 1
 

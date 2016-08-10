@@ -1,6 +1,6 @@
 import numpy as np
 
-from bot_utils.itertools_recipes import chunks
+from pybot.utils.itertools_recipes import chunks
 from sklearn.externals.joblib import Parallel, delayed
 
 def parallel_for(iterable, func, batch_size, *func_args, **func_kwargs): 

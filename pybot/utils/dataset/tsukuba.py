@@ -3,12 +3,12 @@ import cv2
 import numpy as np
 from itertools import izip, repeat
 
-from bot_vision.image_utils import im_resize
-from bot_vision.camera_utils import StereoCamera
-from bot_geometry.rigid_transform import Quaternion, RigidTransform
-from bot_utils.dataset_readers import FileReader, DatasetReader, ImageDatasetReader, StereoDatasetReader
-from bot_utils.db_utils import AttrDict
-import bot_externals.lcm.draw_utils as draw_utils
+from pybot.vision.image_utils import im_resize
+from pybot.vision.camera_utils import StereoCamera
+from pybot.geometry.rigid_transform import Quaternion, RigidTransform
+from pybot.utils.dataset_readers import FileReader, DatasetReader, ImageDatasetReader, StereoDatasetReader
+from pybot.utils.db_utils import AttrDict
+import pybot.externals.lcm.draw_utils as draw_utils
 
 def tsukuba_load_poses(fn): 
     """ 
@@ -110,8 +110,8 @@ def tsukuba_stereo_dataset(directory='~/HD1/data/NewTsukubaStereoDataset/', scal
     return TsukubaStereo2012Reader(directory=directory, scale=scale, grayscale=grayscale, start_idx=start_idx)
 
 if __name__ == "__main__": 
-    from bot_vision.imshow_utils import imshow_cv
-    from bot_vision.image_utils import to_gray
+    from pybot.vision.imshow_utils import imshow_cv
+    from pybot.vision.image_utils import to_gray
 
     dataset = tsukuba_stereo_dataset()
     for f in dataset.iterframes():

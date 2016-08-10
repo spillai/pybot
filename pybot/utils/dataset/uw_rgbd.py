@@ -14,17 +14,17 @@ from collections import defaultdict
 
 from scipy.io import loadmat
 
-from bot_utils.misc import progressbar
-from bot_utils.db_utils import AttrDict
-from bot_utils.dataset_readers import read_dir, read_files, natural_sort, \
+from pybot.utils.misc import progressbar
+from pybot.utils.db_utils import AttrDict
+from pybot.utils.dataset_readers import read_dir, read_files, natural_sort, \
     DatasetReader, ImageDatasetReader
-from bot_vision.draw_utils import annotate_bbox
-from bot_vision.camera_utils import kinect_v1_params, \
+from pybot.vision.draw_utils import annotate_bbox
+from pybot.vision.camera_utils import kinect_v1_params, \
     Camera, CameraIntrinsic, CameraExtrinsic, \
     check_visibility, get_object_bbox
 
-from bot_geometry.rigid_transform import Quaternion, RigidTransform
-from bot_externals.plyfile import PlyData
+from pybot.geometry.rigid_transform import Quaternion, RigidTransform
+from pybot.externals.plyfile import PlyData
 
 # __categories__ = ['flashlight', 'cap', 'cereal_box', 'coffee_mug', 'soda_can']
 
@@ -514,7 +514,7 @@ class UWRGBDSceneDataset(UWRGBDDataset):
                                  '''Check dataset and choose v1 scene dataset''' % version)
 
         def visualize_ground_truth(self): 
-            import bot_externals.draw_utils as draw_utils
+            import pybot.externals.draw_utils as draw_utils
 
             # Publish ground truth poses, and aligned point clouds
             draw_utils.publish_pose_list('ground_truth_poses', self.poses)
@@ -729,8 +729,8 @@ class UWRGBDSceneDataset(UWRGBDDataset):
 
 
 def test_uw_rgbd_object(): 
-    from bot_vision.image_utils import to_color
-    from bot_vision.imshow_utils import imshow_cv
+    from pybot.vision.image_utils import to_color
+    from pybot.vision.imshow_utils import imshow_cv
 
     object_directory = '~/data/rgbd_datasets/udub/rgbd-object-crop/rgbd-dataset'
     rgbd_data_uw = UWRGBDObjectDataset(directory=object_directory)
@@ -744,8 +744,8 @@ def test_uw_rgbd_object():
         imshow_cv('depth', (f.depth / 16).astype(np.uint8), text='Depth')
 
 def test_uw_rgbd_scene(version='v1'): 
-    from bot_vision.image_utils import to_color
-    from bot_vision.imshow_utils import imshow_cv
+    from pybot.vision.image_utils import to_color
+    from pybot.vision.imshow_utils import imshow_cv
 
     v1_directory = '/media/spillai/MRG-HD1/data/rgbd-scenes-v1/'
     v2_directory = '/media/spillai/MRG-HD1/data/rgbd-scenes-v2/rgbd-scenes-v2/'

@@ -2,11 +2,11 @@ import os
 import numpy as np
 from itertools import izip
 
-from bot_utils.io_utils import path_exists
-from bot_geometry.rigid_transform import Quaternion, RigidTransform
-from bot_utils.dataset_readers import natural_sort, \
+from pybot.utils.io_utils import path_exists
+from pybot.geometry.rigid_transform import Quaternion, RigidTransform
+from pybot.utils.dataset_readers import natural_sort, \
     read_dir, DatasetReader, ImageDatasetReader, StereoDatasetReader, VelodyneDatasetReader
-from bot_utils.db_utils import AttrDict
+from pybot.utils.db_utils import AttrDict
 
 def load_poses(fn): 
     """ Retrieve poses """ 
@@ -87,8 +87,8 @@ if __name__ == "__main__":
     # poses = load_poses('/home/spillai/data/stereo-poses/livingroom1_poses_0_interpolated.txt')
     # save_poses('test.txt', poses)
 
-    from bot_vision.imshow_utils import imshow_cv
-    from bot_vision.image_utils import to_gray
+    from pybot.vision.imshow_utils import imshow_cv
+    from pybot.vision.image_utils import to_gray
 
     dataset = StereoPOVDatasetReader(directory='~/data/stereo-poses/livingroom20_data')
     for f in dataset.iterframes():

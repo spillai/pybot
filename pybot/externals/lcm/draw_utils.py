@@ -3,7 +3,7 @@
 # Author: Sudeep Pillai <spillai@csail.mit.edu>
 # License: MIT
 # Dependencies: LCM, OpenCV, vs (Visualization renderer)
-# botcore (libbot), and bot_geometry (pybot_geometry)
+# botcore (libbot), and pybot.geometry (pybot_geometry)
 
 import time
 from itertools import izip
@@ -16,9 +16,9 @@ import lcm
 import vs
 from bot_core import image_t, pose_t
 
-from bot_externals.draw_helpers import reshape_arr, get_color_arr, height_map, \
+from pybot.externals.draw_helpers import reshape_arr, get_color_arr, height_map, \
     color_by_height_axis, copy_pointcloud_data, Frustum
-from bot_geometry.rigid_transform import RigidTransform
+from pybot.geometry.rigid_transform import RigidTransform
 
 class VisualizationMsgsPub: 
     """

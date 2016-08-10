@@ -19,7 +19,7 @@ ext_modules = [
 cmdclass.update({'build_ext': build_ext})
 
 setup(
-    name='bot_vision',
+    name='vision',
     cmdclass=cmdclass,
     ext_modules=ext_modules,
     include_dirs=[np.get_include()]

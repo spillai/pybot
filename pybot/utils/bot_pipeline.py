@@ -61,10 +61,10 @@ class BotPipeline(object):
         for step in self.steps_: 
             step.finalize()
 
-from bot_utils.test_utils import test_dataset
-from bot_vision.imshow_utils import imshow_cv
+from pybot.utils.test_utils import test_dataset
+from pybot.vision.imshow_utils import imshow_cv
 from pybot_externals import StereoELAS
-from bot_vision.color_utils import colormap
+from pybot.vision.color_utils import colormap
 
 class BotSource(object): 
     def __init__(self): 
@@ -80,8 +80,8 @@ class BotSource(object):
         return self.source_.iteritems(*args, **kwargs)
 
 
-from bot_utils.io_utils import VideoCapture
-from bot_externals.lcm.log_utils import KinectLCMLogReader, KinectDecoder
+from pybot.utils.io_utils import VideoCapture
+from pybot.externals.lcm.log_utils import KinectLCMLogReader, KinectDecoder
                         
 class MonoSource(BotSource): 
     """
@@ -123,7 +123,7 @@ class StereoSource(BotSource):
         
         if source_type == 'firewire': 
             from pybot_vision import DC1394Device
-            from bot_utils.db_utils import AttrDict
+            from pybot.utils.db_utils import AttrDict
 
             dataset = DC1394Device()
             dataset.init()

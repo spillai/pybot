@@ -11,7 +11,7 @@ import os
 import numpy as np
 
 from cStringIO import StringIO
-from bot_vision.image_utils import im_resize
+from pybot.vision.image_utils import im_resize
 
 def format_time(t):
     if t > 60:

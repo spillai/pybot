@@ -1,6 +1,6 @@
 #!/usr/bin/env python
-from bot_vision.image_utils import to_color, to_gray
-from bot_utils.dataset.kitti import KITTIDatasetReader, KITTIStereoGroundTruthDatasetReader
+from pybot.vision.image_utils import to_color, to_gray
+from pybot.utils.dataset.kitti import KITTIDatasetReader, KITTIStereoGroundTruthDatasetReader
 
 # def eval_kitti_dataset(color=False, **kwargs): 
 #     # if color: 
@@ -46,7 +46,7 @@ def test_video(color=True, stereo=False, **kwargs):
             yield l,r
 
 if __name__ == "__main__": 
-    from bot_vision.imshow_utils import imshow_cv
+    from pybot.vision.imshow_utils import imshow_cv
 
     # Test dataset
     dataset = test_dataset()

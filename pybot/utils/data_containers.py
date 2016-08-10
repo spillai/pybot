@@ -1,6 +1,6 @@
 import cv2, os, logging
 import numpy as np
-import bot_externals.draw_utils as draw_utils
+import pybot.externals.draw_utils as draw_utils
 
 # Class to encapsulate all relevant data ===============================
 # Build data (idx id, idx utime -> idx feature) 

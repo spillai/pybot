@@ -4,8 +4,8 @@ import numpy as np
 from itertools import izip
 from collections import defaultdict
 from datetime import datetime
-from bot_utils.io_utils import find_files
-from bot_utils.db_utils import load_json_dict, save_json_dict
+from pybot.utils.io_utils import find_files
+from pybot.utils.db_utils import load_json_dict, save_json_dict
 
 def frame_to_json(bboxes, targets): 
     """

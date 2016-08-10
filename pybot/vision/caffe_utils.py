@@ -2,7 +2,7 @@ from fast_rcnn.config import cfg
 import os
 import warnings
 
-from bot_vision.recognition_utils import BOWClassifier
+from pybot.vision.recognition_utils import BOWClassifier
  
 def extract_hypercolums(net, im, layers): 
     hypercolumns = []

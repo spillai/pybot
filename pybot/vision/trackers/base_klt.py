@@ -22,18 +22,18 @@ import numpy as np
 
 from itertools import izip
 from collections import namedtuple, deque
-from bot_utils.db_utils import AttrDict
+from pybot.utils.db_utils import AttrDict
 
-from bot_utils.plot_utils import colormap
-from bot_vision.imshow_utils import imshow_cv
-from bot_vision.image_utils import to_color, to_gray, gaussian_blur
-from bot_vision.draw_utils import draw_features, draw_lines
+from pybot.utils.plot_utils import colormap
+from pybot.vision.imshow_utils import imshow_cv
+from pybot.vision.image_utils import to_color, to_gray, gaussian_blur
+from pybot.vision.draw_utils import draw_features, draw_lines
 
-from bot_utils.timer import timeitmethod
-from bot_vision.trackers import FeatureDetector, OpticalFlowTracker, LKTracker
-from bot_vision.trackers import finite_and_within_bounds, to_pts, \
+from pybot.utils.timer import timeitmethod
+from pybot.vision.trackers import FeatureDetector, OpticalFlowTracker, LKTracker
+from pybot.vision.trackers import finite_and_within_bounds, to_pts, \
     TrackManager, FeatureDetector, OpticalFlowTracker, LKTracker
-# from bot_vision.geom_utils import brute_force_match, intersection_over_union
+# from pybot.vision.geom_utils import brute_force_match, intersection_over_union
 
 class BaseKLT(object): 
     """

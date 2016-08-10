@@ -3,8 +3,8 @@ from collections import deque, namedtuple
 from abc import ABCMeta, abstractmethod
 
 from itertools import imap
-from bot_utils.misc import print_green, print_red
-from bot_utils.misc import Counter, Accumulator, CounterWithPeriodicCallback 
+from pybot.utils.misc import print_green, print_red
+from pybot.utils.misc import Counter, Accumulator, CounterWithPeriodicCallback 
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
@@ -205,8 +205,8 @@ class FrustumVolumeIntersectionPoseSampler(Sampler):
         self.depth_ = depth
         self.fov_ = fov
         
-        from bot_geometry.rigid_transform import RigidTransform
-        from bot_vision.camera_utils import Frustum
+        from pybot.geometry.rigid_transform import RigidTransform
+        from pybot.vision.camera_utils import Frustum
         from bot_graphics.volumes import SweepingFrustum
 
         self.volume_ = SweepingFrustum()

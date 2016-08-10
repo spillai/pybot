@@ -227,7 +227,7 @@ class BotDBTable(object):
 if __name__ == "__main__": 
     import time
     import numpy as np    
-    from bot_utils.itertools_recipes import chunks
+    from pybot.utils.itertools_recipes import chunks
 
 
     db = BotDB(filename='test.db', flag='w')

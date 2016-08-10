@@ -14,16 +14,16 @@ from collections import defaultdict
 
 import h5py
 
-from bot_utils.db_utils import AttrDict
-from bot_utils.dataset_readers import read_dir, read_files, natural_sort, \
+from pybot.utils.db_utils import AttrDict
+from pybot.utils.dataset_readers import read_dir, read_files, natural_sort, \
     DatasetReader, ImageDatasetReader
-from bot_vision.draw_utils import annotate_bbox
-from bot_vision.camera_utils import kinect_v1_params, \
+from pybot.vision.draw_utils import annotate_bbox
+from pybot.vision.camera_utils import kinect_v1_params, \
     Camera, CameraIntrinsic, CameraExtrinsic, \
     check_visibility, get_object_bbox
 
-from bot_geometry.rigid_transform import Quaternion, RigidTransform
-from bot_externals.plyfile import PlyData
+from pybot.geometry.rigid_transform import Quaternion, RigidTransform
+from pybot.externals.plyfile import PlyData
 
 # =====================================================================
 # Generic NYU-RGBD Dataset class
@@ -98,8 +98,8 @@ class NYURGBDDataset(object):
     #         yield self._process_items(index, rgb_im, depth_im, bbox, pose)
 
 def test_nyu_rgbd(version='v2'): 
-    from bot_vision.image_utils import to_color
-    from bot_vision.imshow_utils import imshow_cv
+    from pybot.vision.image_utils import to_color
+    from pybot.vision.imshow_utils import imshow_cv
 
     v2_directory = '/media/spillai/MRG-HD1/data/nyu_rgbd/'
     v2_gt = os.path.join(v2_directory, 'nyu_depth_v2_labeled.mat')

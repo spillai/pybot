@@ -3,17 +3,17 @@ import numpy as np
 
 # import scipy.ndimage.filters as spfilters 
 
-import bot_vision.color_utils as color_utils 
-from bot_vision.imshow_utils import imshow_cv, imshow_plt, bar_plt
+import pybot.vision.color_utils as color_utils 
+from pybot.vision.imshow_utils import imshow_cv, imshow_plt, bar_plt
 
-# from bot_vision.stereo_utils import StereoBM
+# from pybot.vision.stereo_utils import StereoBM
 # from pybot_externals import CostVolumeStereo, StereoBMCustom
 
 import pyximport; pyximport.install()
 pyximport.install(setup_args={"include_dirs":np.get_include()},
                   reload_support=True)
 
-from bot_externals.adcensus_stereo import init, ad_vol, sgm, \
+from pybot.externals.adcensus_stereo import init, ad_vol, sgm, \
     depth_discontinuity_adjustment, subpixel_enhancement
 
 class StereoVoxels: 
@@ -219,7 +219,7 @@ class StereoVoxels:
 
 if __name__ == "__main__": 
     import os
-    from bot_utils.kitti_helpers import kitti_stereo_calib_params
+    from pybot.utils.kitti_helpers import kitti_stereo_calib_params
 
     left = cv2.imread(
         os.path.expanduser('~/data/dataset/sequences/08/image_0/000000.png'), 0)
