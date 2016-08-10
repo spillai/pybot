@@ -13,7 +13,7 @@ from itertools import islice
 from bot_vision.camera_utils import construct_K, DepthCamera
 from bot_vision.image_utils import im_resize
 
-from bot_externals.log_utils import take, Decoder, LogReader
+from bot_externals.log_utils import Decoder, LogReader, LogController
 
 import bot_core.image_t as image_t
 import bot_core.pose_t as pose_t
@@ -162,7 +162,6 @@ class KinectDecoder(Decoder):
 class LCMLogReader(LogReader): 
     def __init__(self, *args, **kwargs): 
         super(LCMLogReader, self).__init__(*args, **kwargs)
-        self._lc = lcm.LCM()
 
     def load_log(self, filename): 
         return lcm.EventLog(self.filename, 'r')
@@ -185,7 +184,7 @@ class LCMLogReader(LogReader):
         self.log.c_eventlog.seek_to_timestamp(t)
         while True: 
             ev = self.log.next()
-            res, msg = self.decode_msgs(ev.channel, ev.data, ev.timestamp)
+            res, msg = self.decode_msg(ev.channel, ev.data, ev.timestamp)
             if res: return msg
 
             # if ev.channel == self.decoder.channel: 
@@ -198,22 +197,6 @@ class LCMLogReader(LogReader):
     def get_frame_with_index(self, idx): 
         assert(idx >= 0 and idx < len(self.index))
         return self.get_frame_with_timestamp(self.index[idx])
-
-    def decode_msg(self, channel, data, t): 
-        try: 
-            # Check if log index has reached desired start index, 
-            # and only then check if decode necessary  
-            dec = self.decoder[channel]
-            if dec.should_decode():
-                # self.idx += 1
-                return True, (t, channel, dec.decode(data))
-        except Exception as e:
-            pass
-            # raise RuntimeError("""Failed to decode data from"""
-            #                    """channel: {:}, mis-specified decoder"""
-            #                    """? errmsg: {:}""".format(channel, e))
-        
-        return False, (None, None)
 
     def iteritems(self, reverse=False): 
         # Indexed iteration
@@ -231,7 +214,6 @@ class LCMLogReader(LogReader):
         else: 
             if reverse: 
                 raise RuntimeError('Cannot provide items in reverse when file is not indexed')
-
             
             # iterator = take(self.log, max_length=self.max_length)
             max_length = 1e12 if self.max_length is None else self.max_length
@@ -252,11 +234,18 @@ class LCMLogReader(LogReader):
                 #     if idx % self.every_k_frames == 0: 
                 #         yield self.decoder.decode(ev.data)
 
-    def iter_frames(self):
+    def iterframes(self):
         return self.iteritems()
 
     def get_first_frame(self): 
         return self.get_frame_with_index(0)
+
+class LCMLogController(LogController): 
+    def __init__(self, dataset): 
+        """
+        See LogController
+        """
+        LogController.__init__(self, dataset)
 
 def KinectLCMLogReader(filename=None, every_k_frames=1, **kwargs): 
     return LCMLogReader(filename=filename, every_k_frames=every_k_frames, decoder=KinectDecoder(**kwargs))        

@@ -5,9 +5,9 @@
 
 import sys
 import numpy as np
-import cv2, os.path, lcm, zlib
+import cv2
+import time
 
-import roslib
 import tf
 
 import rosbag
@@ -20,7 +20,7 @@ from sensor_msgs.msg import Image
 from cv_bridge import CvBridge, CvBridgeError
 from tf2_msgs.msg import TFMessage
 
-from bot_externals.log_utils import Decoder, LogReader
+from bot_externals.log_utils import Decoder, LogReader, LogController, LogDB
 from bot_vision.image_utils import im_resize
 from bot_vision.imshow_utils import imshow_cv
 from bot_geometry.rigid_transform import RigidTransform
@@ -32,16 +32,16 @@ class GazeboDecoder(Decoder):
     """
     def __init__(self, every_k_frames=1): 
         Decoder.__init__(self, channel='/gazebo/model_states', every_k_frames=every_k_frames)
-        self.index = None
+        self.__gazebo_index = None
 
     def decode(self, msg): 
-        if self.index is None: 
+        if self.__gazebo_index is None: 
             for j, name in enumerate(msg.name): 
                 if name == 'mobile_base': 
-                    self.index = j
+                    self.__gazebo_index = j
                     break
 
-        pose = msg.pose[self.index]
+        pose = msg.pose[self.__gazebo_index]
         tvec, ori = pose.position, pose.orientation
         return RigidTransform(xyzw=[ori.x,ori.y,ori.z,ori.w], tvec=[tvec.x,tvec.y,tvec.z])
 
@@ -53,8 +53,13 @@ class CameraInfoDecoder(Decoder):
         Decoder.__init__(self, channel=channel)
 
     def decode(self, msg): 
-        print dir(msg), self.channel
-        return CameraIntrinsic(K=np.float64(msg.K).reshape(3,3), D=np.float64(msg.D).ravel(), 
+        # print dir(msg), self.channel
+        """        
+        D, K, P, R, binning_x, binning_y, distortion_model, 
+        header, height, roi, width
+        """        
+        return CameraIntrinsic(K=np.float64(msg.K).reshape(3,3), 
+                               D=np.float64(msg.D).ravel(), 
                                shape=[msg.height, msg.width])
         
 class ImageDecoder(Decoder): 
@@ -71,7 +76,8 @@ class ImageDecoder(Decoder):
 
     def decode(self, msg): 
         if self.compressed: 
-            im = cv2.imdecode(np.fromstring(msg.data, np.uint8), cv2.CV_LOAD_IMAGE_COLOR)
+            im = cv2.imdecode(np.fromstring(msg.data, np.uint8), 
+                              cv2.CV_LOAD_IMAGE_COLOR)
         else: 
             try: 
                 im = self.bridge.imgmsg_to_cv2(msg, self.encoding)
@@ -147,7 +153,7 @@ class LaserScanDecoder(Decoder):
             if (self.__cos_sin_map.shape[1] != N or
                self.__angle_min != msg.angle_min or
                 self.__angle_max != msg.angle_max):
-                print("No precomputed map given. Computing one.")
+                print("{} :: No precomputed map given. Computing one.".format(self.__class__.__name__))
 
                 self.__angle_min = msg.angle_min
                 self.__angle_max = msg.angle_max
@@ -199,6 +205,10 @@ class ROSBagReader(LogReader):
 
         # TF relations
         self.relations_map = {}
+        print self.log
+
+        # for channel, ch_info in info.topics.iteritems(): 
+        #     print channel, ch_info.message_count
         
         # # Gazebo states (if available)
         # self._publish_gazebo_states()
@@ -234,9 +244,16 @@ class ROSBagReader(LogReader):
     #     # draw_utils.publish_pose_list('robot_poses', 
     #     #                              self.gt_poses[::10], frame_id='origin', reset=True)
 
+    def length(self, topic): 
+        info = self.log.get_type_and_topic_info()
+        return info.topics[topic].message_count
 
     def load_log(self, filename): 
-        return rosbag.Bag(filename, 'r', chunk_threshold=100 * 1024 * 1024)
+        st = time.time()
+        print('{} :: Loading ROSBag {} ...'.format(self.__class__.__name__, filename))
+        bag = rosbag.Bag(filename, 'r', chunk_threshold=100 * 1024 * 1024)
+        print('{} :: Done loading {} in {:5.2f} seconds'.format(self.__class__.__name__, filename, time.time() - st))
+        return bag
 
     def tf(self, from_tf, to_tf): 
         try: 
@@ -260,7 +277,7 @@ class ROSBagReader(LogReader):
         tf_dec = TfDecoderAndPublisher(channel='/tf')
 
         # Establish tf relations
-        print('Establishing tfs from ROSBag')
+        print('{} :: Establishing tfs from ROSBag'.format(self.__class__.__name__))
         for self.idx, (channel, msg, t) in enumerate(self.log.read_messages(topics='/tf')): 
             tf_dec.decode(msg)
 
@@ -285,9 +302,12 @@ class ROSBagReader(LogReader):
 
         except: 
             raise RuntimeError('Error concerning tf lookup')
-        print('Established {:} relations\n'.format(len(tfs)))
+        print('{} Established {:} relations\n'.format(self.__class__.__name__, len(tfs)))
         
         return tfs 
+
+    def calib(self, channel=''):
+        return self.retrieve_camera_calibration(channel)
 
     def retrieve_tf_relations(self, relations): 
         """
@@ -302,7 +322,7 @@ class ROSBagReader(LogReader):
         #     raise RuntimeError('Provided relations map is not a dict')
 
         # Check tf relations map
-        print('Checking tf relations in ROSBag')
+        print('{} :: Checking tf relations in ROSBag'.format(self.__class__.__name__))
         checked = set()
         relations_lut = dict((k,v) for (k,v) in relations)
 
@@ -321,105 +341,195 @@ class ROSBagReader(LogReader):
                 # Finish up
             if len(checked) == len(relations_lut):
                 break
-        print('Checked {:} relations\n'.format(len(checked)))
+        print('{} :: Checked {:} relations\n'.format(self.__class__.__name__, len(checked)))
         return  
 
     def retrieve_camera_calibration(self, topic):
         # Retrieve camera calibration
         dec = CameraInfoDecoder(channel=topic)
 
-        print('Retrieve camera calibration')
+        print('{} :: Retrieve camera calibration for {}'.format(self.__class__.__name__, topic))
         for self.idx, (channel, msg, t) in enumerate(self.log.read_messages(topics=topic)): 
             return dec.decode(msg) 
                     
     def _index(self): 
         raise NotImplementedError()
 
-    def iteritems(self, reverse=False): 
+    def itercursors(self, topics=[], reverse=False):
         if self.index is not None: 
             raise NotImplementedError('Cannot provide items indexed')
-            # if reverse: 
-            #     for t in self.index[::-1]: 
-            #         if self.start_idx != 0: 
-            #             raise RuntimeWarning('No support for start_idx != 0')
-            #         frame = self.get_frame_with_timestamp(t)
-            #         yield frame
-            # else: 
-            #     for t in self.index: 
-            #         frame = self.get_frame_with_timestamp(t)
-            #         yield frame
-        else: 
-            if reverse: 
-                raise RuntimeError('Cannot provide items in reverse when file is not indexed')
+        
+        if reverse: 
+            raise NotImplementedError('Cannot provide items in reverse when file is not indexed')
 
-            # Decode only messages that are supposed to be decoded 
-            # print self._log.get_message_count(topic_filters=self.decoder_keys())
-            st, end = self.log.get_start_time(), self.log.get_end_time()
-            start_t = Time(st + (end-st) * self.start_idx / 100.0)
-            
-            print('Reading ROSBag from {:3.2f}% onwards'.format(self.start_idx))
-            for self.idx, (channel, msg, t) in enumerate(
-                    self.log.read_messages(
-                        topics=self.decoder.keys(), start_time=start_t
-                    )
-            ):
+        # Decode only messages that are supposed to be decoded 
+        # print self._log.get_message_count(topic_filters=self.decoder_keys())
+        st, end = self.log.get_start_time(), self.log.get_end_time()
+        start_t = Time(st + (end-st) * self.start_idx / 100.0)
 
-                if self.verbose: 
-                    print('Channel: {:}, t: {:}'.format(channel, t))
-                res, msg = self.decode_msg(channel, msg, t)
+        print('{} :: Reading ROSBag from {:3.2f}% onwards'.format(self.__class__.__name__, self.start_idx))
+        for self.idx, (channel, msg, t) in \
+            enumerate(self.log.read_messages(
+                topics=self.decoder.keys() if not len(topics) else topics, 
+                start_time=start_t)):
+            yield (t, channel, msg)
+
+    def iteritems(self, topics=[], reverse=False): 
+        for (t, channel, msg) in self.itercursors(topics=topics, reverse=reverse): 
+            try: 
+                res, (t, ch, data) = self.decode_msg(channel, msg, t)
                 if res: 
-                    yield msg
-                
-    def decode_msg(self, channel, data, t): 
-        try: 
-            # Check if log index has reached desired start index, 
-            # and only then check if decode necessary  
-            dec = self.decoder[channel]
-            if dec.should_decode():
-                return True, (t, channel, dec.decode(data))
-        except: 
-            import traceback
-            traceback.print_exc()
-                    
-        return False, (None, None)
+                    yield (t, ch, data)
+            except Exception, e: 
+                print('ROSBagReader.iteritems() :: {:}'.format(e))
 
-    def iter_frames(self):
+    def iterframes(self):
         return self.iteritems()
 
-class ROSBagController(object): 
+    @property
+    def db(self): 
+        return BagDB(self)
+
+class ROSBagController(LogController): 
     def __init__(self, dataset): 
         """
-        Setup channel => callbacks so that they are automatically called 
-        with appropriate decoded data and timestamp
+        See LogController
         """
-        self.dataset_ = dataset
-        self.ctrl_cb_ = {}
-        self.ctrl_idx_ = 0
+        LogController.__init__(self, dataset)
 
-    def subscribe(self, channel, callback): 
-        self.ctrl_cb_[channel] = callback
-
-    def run(self):
-        if not len(self.ctrl_cb_): 
-            raise RuntimeError('No callbacks registered yet, subscribe to channels first!')
-
-        for self.ctrl_idx_, (t, ch, data) in enumerate(self.dataset_.iter_frames()): 
-            if ch in self.ctrl_cb_: 
-                self.ctrl_cb_[ch](t, data)
-
-    @property
-    def index(self): 
-        return self.ctrl_idx_
-
-    @property
-    def filename(self): 
-        return self.dataset_.filename
-
-    @property
-    def controller(self): 
+class BagDB(LogDB): 
+    def __init__(self, dataset): 
         """
-        Should return the dataset (for offline bag-based callbacks), and 
-        should return the rosnode (for online/live callbacks)
         """
-        return self.dataset_
+        LogDB.__init__(self, dataset)
+
+    # @property
+    # def poses(self): 
+    #     return [v.pose for k,v in self.frame_index_.iteritems()]
+        
+    # def _index(self, pose_channel='/odom', rgb_channel='/camera/rgb/image_raw'): 
+    #     """
+    #     Constructs a look up table for the following variables: 
+        
+    #         self.frame_index_:  rgb/img.png -> TangoFrame
+    #         self.frame_idx2name_: idx -> rgb/img.png
+    #         self.frame_name2idx_: idx -> rgb/img.png
+
+    #     where TangoFrame (index_in_the_dataset, timestamp, )
+    #     """
+
+    #     # 1. Iterate through both poses and images, and construct frames
+    #     # with look up table for filename str -> (timestamp, pose, annotation) 
+    #     poses = []
+    #     # pose_decode = lambda msg_item: \
+    #     #               self.dataset.decoder[pose_channel].decode(msg_item)
+
+    #     # Note: Control flow for idx is critical since start_idx could
+    #     # potentially change the offset and destroy the pose_index
+    #     for idx, (t, ch, data) in enumerate(self.dataset.iteritems()): 
+    #         pose = None
+    #         if ch == pose_channel: 
+    #             try: 
+    #                 pose = data
+    #             except: 
+    #                 pose = None
+    #         poses.append(pose)
+
+    #     # Find valid and missing poses
+    #     # pose_inds: log_index -> closest_valid_index
+    #     valid_arr = np.array(
+    #         map(lambda item: item is not None, poses), dtype=np.bool)
+    #     pose_inds = BagDB._nn_pose_fill(valid_arr)
+
+    #     # Create indexed frames for lookup        
+    #     # self.frame_index_:  rgb/img.png -> TangoFrame
+    #     # self.frame_idx2name_: idx -> rgb/img.png
+    #     # self.frame_name2idx_: rgb/img.png -> idx
+    #     img_decode = lambda msg_item: \
+    #                 self.dataset.decoder[TangoFile.RGB_CHANNEL].decode(msg_item)
+    #     self.frame_index_ = OrderedDict([
+    #         (img_msg, TangoFrame(idx, t, img_msg, poses[pose_inds[idx]], 
+    #                              self.dataset.annotationdb[img_msg], img_decode))
+    #         for idx, (t, ch, img_msg) in enumerate(self.dataset.itercursors()) \
+    #         if ch == TangoFile.RGB_CHANNEL
+    #     ])
+    #     self.frame_idx2name_ = OrderedDict([
+    #         (idx, k) for idx, k in enumerate(self.frame_index_.keys())
+    #     ])
+    #     self.frame_name2idx_ = OrderedDict([
+    #         (k, idx) for idx, k in enumerate(self.frame_index_.keys())
+    #     ])
+
+    # def iterframes(self): 
+    #     """
+    #     Ground truth reader interface for Images [with time, pose,
+    #     annotation] : lookup corresponding annotation, and filled in
+    #     poses from nearest available timestamp
+    #     """
+    #     # self._check_ground_truth_availability()
+
+    #     # Iterate through both poses and images, and construct frames
+    #     # with look up table for filename str -> (timestamp, pose, annotation) 
+    #     for img_msg, frame in self.frame_index_.iteritems(): 
+    #         yield (frame.timestamp, img_msg, frame)
+
+    # def iterframes_indices(self, inds): 
+    #     for ind in inds: 
+    #         img_msg = self.frame_idx2name_[ind]
+    #         frame = self.frame_index_[img_msg]
+    #         yield (frame.timestamp, img_msg, frame)
+
+    # def iterframes_range(self, ind_range): 
+    #     assert(isinstance(ind_range, tuple) and len(ind_range) == 2)
+    #     st, end = ind_range
+    #     inds = np.arange(0 if st < 0 else st, 
+    #                      len(self.frame_index_) if end < 0 else end+1)
+    #     return self.iterframes_indices(inds)
+
+    # @property
+    # def annotated_inds(self): 
+    #     return self.dataset.annotationdb.annotated_inds
+
+    # @property
+    # def object_annotations(self): 
+    #     return self.dataset.annotationdb.object_annotations
+
+    # @property
+    # def objects(self): 
+    #     return self.dataset.annotationdb.objects
+
+    # def iter_object_annotations(self, target_name=''): 
+    #     frame_keys, polygon_inds = self.dataset.annotationdb.find_object_annotations(target_name)
+    #     for idx, (fkey,pind) in enumerate(izip(frame_keys, polygon_inds)): 
+    #         try: 
+    #             f = self[fkey]
+    #         except KeyError, e: 
+    #             print(e)
+    #             continue
+    #         assert(f.is_annotated)
+    #         yield f, pind
+        
+    # # def list_annotations(self, target_name=None): 
+    # #     " List of lists"
+    # #     inds = self.annotated_inds
+    # #     return [ filter(lambda frame: 
+    # #                     target_name is None or name is in target_name, 
+    # #                     self.dataset.annotationdb.iterframes(inds))
+
+    # def print_index_info(self): 
+    #     # Retrieve ground truth information
+    #     gt_str = '{} frames annotated ({} total annotations)'\
+    #         .format(self.dataset.annotationdb.num_frame_annotations, 
+    #                 self.dataset.annotationdb.num_annotations) \
+    #         if self.dataset.ground_truth_available else 'Not Available'
+
+    #     # Pretty print IndexDB description 
+    #     print('\nTango IndexDB \n========\n'
+    #           '\tFrames: {:}\n'
+    #           '\tGround Truth: {:}\n'
+    #           .format(len(self.frame_index_), gt_str)) 
+
+    # @property
+    # def index(self): 
+    #     return self.frame_index_
 

@@ -53,29 +53,46 @@ def copy_pointcloud_data(_arr, _carr, flip_rb=False):
 
 
 class Frustum(object): 
+    """
+    Also see bot_vision.camera_utils.Frustum (need to fix redundancy)
+    """
+
     def __init__(self, pose, zmin=0.0, zmax=0.1, fov=np.deg2rad(60)): 
-    
-        self.p0 = np.array([0,0,0])
-        self.near, self.far = np.array([0,0,zmin]), np.array([0,0,zmax])
-        self.near_off, self.far_off = np.tan(fov / 2) * zmin, np.tan(fov / 2) * zmax
-        self.zmin = zmin
-        self.zmax = zmax
-        self.fov = fov
+        # FoV derived from fx,fy,cx,cy=500,500,320,240
+        # fovx, fovy = 65.23848614  51.28201165
+        rx, ry = 0.638, 0.478
 
         self.pose = pose
-        self.p0 = pose.tvec
+        arr = [np.array([-rx, -ry, 1.]) * zmin,
+               np.array([-rx,  ry, 1.]) * zmin,
+               np.array([ rx,  ry, 1.]) * zmin,
+               np.array([ rx, -ry, 1.]) * zmin,
 
-    def get_vertices(self): 
-        arr = [self.near + np.array([-1, -1, 0]) * self.near_off, 
-               self.near + np.array([1, -1, 0]) * self.near_off, 
-               self.near + np.array([1, 1, 0]) * self.near_off, 
-               self.near + np.array([-1, 1, 0]) * self.near_off, 
+               np.array([-rx, -ry, 1.]) * zmax,
+               np.array([-rx,  ry, 1.]) * zmax,
+               np.array([ rx,  ry, 1.]) * zmax,
+               np.array([ rx, -ry, 1.]) * zmax]
+
+        # vertices: nul, nll, nlr, nur, ful, fll, flr, fur
+        self.vertices_ = self.pose * np.vstack(arr)
+
+        # self.near, self.far = np.array([0,0,zmin]), np.array([0,0,zmax])
+        # self.near_off, self.far_off = np.tan(fov / 2) * zmin, np.tan(fov / 2) * zmax
+
+        # arr = [self.near + np.array([-1, -1, 0]) * self.near_off, 
+        #        self.near + np.array([1, -1, 0]) * self.near_off, 
+        #        self.near + np.array([1, 1, 0]) * self.near_off, 
+        #        self.near + np.array([-1, 1, 0]) * self.near_off, 
                
-               self.far + np.array([-1, -1, 0]) * self.far_off, 
-               self.far + np.array([1, -1, 0]) * self.far_off, 
-               self.far + np.array([1, 1, 0]) * self.far_off, 
-               self.far + np.array([-1, 1, 0]) * self.far_off]
+        #        self.far + np.array([-1, -1, 0]) * self.far_off, 
+        #        self.far + np.array([1, -1, 0]) * self.far_off, 
+        #        self.far + np.array([1, 1, 0]) * self.far_off, 
+        #        self.far + np.array([-1, 1, 0]) * self.far_off]
         
-        nll, nlr, nur, nul, fll, flr, fur, ful = self.pose * np.vstack(arr)
-        return nll, nlr, nur, nul, fll, flr, fur, ful
+        # nll, nlr, nur, nul, fll, flr, fur, ful = self.pose * np.vstack(arr)
+        # return nll, nlr, nur, nul, fll, flr, fur, ful
+    
+    @property
+    def vertices(self): 
+        return self.vertices_
 
