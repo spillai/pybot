@@ -335,7 +335,8 @@ class LogController(object):
         # Run
         print('{:}: run::Reading log {:}'
               .format(self.__class__.__name__, self.filename))
-        for self.controller_idx_, (t, ch, data) in enumerate(self.dataset_.iterframes()): 
+        # for self.controller_idx_, (t, ch, data) in enumerate(self.dataset_.iterframes()): 
+        for self.controller_idx_, (t, ch, data) in enumerate(self.dataset_.iteritems()): 
             if ch in self.controller_cb_: 
                 self.controller_cb_[ch](t, data)
 
