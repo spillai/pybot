@@ -1,7 +1,7 @@
 """
 Basic utilities for dataset reader 
 """
-# Copyright (c) 2015 Sudeep Pillai <spillai@csail.mit.edu>
+
 # Author: Sudeep Pillai <spillai@csail.mit.edu>
 # License: MIT
 

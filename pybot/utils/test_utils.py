@@ -1,4 +1,6 @@
-#!/usr/bin/env python
+# Author: Sudeep Pillai <spillai@csail.mit.edu>
+# License: MIT
+
 from ..vision.image_utils import to_color, to_gray
 from .dataset.kitti import KITTIDatasetReader, KITTIStereoGroundTruthDatasetReader
 

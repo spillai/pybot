@@ -1,3 +1,6 @@
+# Author: Sudeep Pillai <spillai@csail.mit.edu>
+# License: MIT
+
 import tables as tb
 import numpy as np
 import pickle

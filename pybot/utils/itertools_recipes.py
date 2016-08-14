@@ -1,3 +1,6 @@
+# Author: Sudeep Pillai <spillai@csail.mit.edu>
+# License: MIT
+
 from itertools import *
 
 def take(iterable, n):

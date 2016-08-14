@@ -1,3 +1,5 @@
+# Author: Sudeep Pillai <spillai@csail.mit.edu>
+# License: MIT
 
 def print_red(print_t): print("\033[91m {}\033[00m" .format(prt))
 def print_green(prt): print("\033[92m {}\033[00m" .format(prt))

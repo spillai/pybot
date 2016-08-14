@@ -1,3 +1,6 @@
+# Author: Sudeep Pillai <spillai@csail.mit.edu>
+# License: MIT
+
 import numpy as np
 from itertools import izip
 from ..db_utils import AttrDict

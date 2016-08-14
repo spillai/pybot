@@ -1,3 +1,6 @@
+# Author: Sudeep Pillai <spillai@csail.mit.edu>
+# License: MIT
+
 import time
 from collections import OrderedDict
 from functools import wraps

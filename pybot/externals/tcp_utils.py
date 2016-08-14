@@ -1,4 +1,6 @@
-#!/usr/bin/python
+# Author: Sudeep Pillai <spillai@csail.mit.edu>
+# License: MIT
+
 import socket
 import time
 import cv2

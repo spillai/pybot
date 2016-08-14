@@ -1,3 +1,6 @@
+# Author: Sudeep Pillai <spillai@csail.mit.edu>
+# License: MIT
+
 # Helper functions for plotting
 import numpy as np
 import matplotlib.pyplot as plt

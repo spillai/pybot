@@ -1,4 +1,5 @@
-#!/usr/bin/env python
+# Author: Sudeep Pillai <spillai@csail.mit.edu>
+# License: MIT
 
 import numpy as np
 import matplotlib as mpl

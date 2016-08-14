@@ -17,6 +17,9 @@ for track initialization and back-tracking for match verification
 between frames.
 '''
 
+# Author: Sudeep Pillai <spillai@csail.mit.edu>
+# License: MIT
+
 import cv2
 import numpy as np
 
