@@ -1,4 +1,3 @@
-from fast_rcnn.config import cfg
 import os
 import warnings
 
