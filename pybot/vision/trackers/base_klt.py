@@ -242,8 +242,6 @@ class OpenCVKLT(BaseKLT):
         # This is different from self.tm_.ids, self.tm_.pts
         return self.latest_ids, self.latest_pts
 
-from scipy.spatial import cKDTree
-
 class MeshKLT(OpenCVKLT): 
     """
     KLT Tracker as implemented in OpenCV 2.4.9
