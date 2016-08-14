@@ -18,16 +18,16 @@ import numpy as np
 from abc import ABCMeta, abstractmethod
 from collections import OrderedDict
 
-from pybot.geometry.rigid_transform import Pose, RigidTransform, Sim3
-from pybot.utils.db_utils import AttrDict
-from pybot.utils.misc import CounterWithPeriodicCallback
-from pybot.vision.imshow_utils import imshow_cv
-from pybot.vision.image_utils import to_color, im_mosaic_list
-from pybot.vision.draw_utils import draw_features
-from pybot.vision.camera_utils import Camera, CameraIntrinsic, CameraExtrinsic
-
-import pybot.externals.draw_utils as draw_utils
-from pybot_vision import scaled_color_disp
+from ..geometry.rigid_transform import Pose, RigidTransform, Sim3
+from ..utils.db_utils import AttrDict
+from ..utils.misc import CounterWithPeriodicCallback
+from ..vision.color_utils import colormap
+from ..vision.imshow_utils import imshow_cv
+from ..vision.image_utils import to_color, im_mosaic_list
+from ..vision.draw_utils import draw_features
+from ..vision.camera_utils import Camera, \
+    CameraIntrinsic, CameraExtrinsic
+from ..externals.lcm import draw_utils
 
 class Keyframe(object): 
     """
@@ -135,7 +135,7 @@ class Keyframe(object):
 
         pts, depths = cam.project(self.points_, check_bounds=True, return_depth=True)
 
-        colors = np.int64(scaled_color_disp(depths.astype(np.float32), 32).reshape(-1,3))        
+        colors = np.int64(colormap(depths.astype(np.float32) / 32.0).reshape(-1,3))        
         return draw_features(vis, pts, colors=colors, size=6)
 
 class Mapper(object): 

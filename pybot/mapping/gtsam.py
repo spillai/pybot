@@ -4,6 +4,10 @@ import networkx as nx
 from collections import deque, defaultdict, Counter
 from itertools import izip
 
+from ..utils.timer import SimpleTimer, timeitmethod
+from ..utils.db_utils import AttrDict
+from ..utils.misc import print_red, print_yellow, print_green
+
 from pygtsam import Symbol, extractPose2, extractPose3, extractPoint3, extractKeys
 from pygtsam import symbol as _symbol
 from pygtsam import Point2, Rot2, Pose2, \
@@ -22,11 +26,6 @@ from pygtsam import ISAM2, NonlinearOptimizer, \
     NonlinearFactorGraph, LevenbergMarquardtOptimizer, DoglegOptimizer
 
 np.set_printoptions(precision=2, suppress=True)
-
-# REMOVE
-from pybot.utils.timer import SimpleTimer, timeitmethod
-from pybot.utils.db_utils import AttrDict
-from pybot.utils.misc import print_red, print_yellow, print_green
 
 def symbol(ch, i): 
     return _symbol(ord(ch), i)

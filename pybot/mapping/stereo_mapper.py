@@ -10,7 +10,7 @@ Map the environment using stereo data
 """
 
 # Author: Sudeep Pillai <spillai@csail.mit.edu>
-# License: TODO
+# License: MIT
 
 import numpy as np
 import cv2, os, time
@@ -18,20 +18,20 @@ import argparse
 from itertools import izip
 from collections import OrderedDict, deque
 
-from pybot.geometry.rigid_transform import Pose, Quaternion, \
+from ..geometry.rigid_transform import Pose, Quaternion, \
     RigidTransform, Sim3, normalize_vec
 
-from pybot.utils.io_utils import read_config
-from pybot.utils.db_utils import AttrDict
+from ..utils.io_utils import read_config
+from ..utils.db_utils import AttrDict
 
-from pybot.vision.camera_utils import StereoCamera
-from pybot.vision.image_utils import to_color, to_gray, flip_rb, im_resize
-from pybot.vision.stereo_utils import StereoSGBM, StereoBM, CalibratedFastStereo, setup_zed_dataset
-from pybot.vision.color_utils import get_color_by_label
-from pybot.vision.image_utils import to_color, to_gray, median_blur
-from pybot.vision.imshow_utils import imshow_cv
+from ..vision.camera_utils import StereoCamera
+from ..vision.image_utils import to_color, to_gray, flip_rb, im_resize
+from ..vision.stereo_utils import StereoSGBM, StereoBM, CalibratedFastStereo, setup_zed_dataset
+from ..vision.color_utils import get_color_by_label
+from ..vision.image_utils import to_color, to_gray, median_blur
+from ..vision.imshow_utils import imshow_cv
 
-import pybot.externals.draw_utils as draw_utils
+from ..externals.lcm import draw_utils
 
 from pybot_vision import scaled_color_disp 
 from pybot_vision import CrossRatioStereo, FastStereo

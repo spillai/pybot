@@ -1,14 +1,16 @@
 import time
 import numpy as np
+from scipy.spatial.distance import mahalanobis
 
-from pybot.vision.image_utils import to_color, to_gray
-from pybot.vision.imshow_utils import imshow_cv
+from ..vision.image_utils import to_color, to_gray
+from ..vision.imshow_utils import imshow_cv
 
-from pybot.utils.misc import Accumulator, SkippedCounter, CounterWithPeriodicCallback
-from pybot.vision.mapping.pose_utils import PoseAccumulator
-from pybot.geometry.rigid_transform import RigidTransform, Pose, Quaternion
+from ..utils.pose_utils import PoseAccumulator
+from ..utils.misc import Accumulator, SkippedCounter, CounterWithPeriodicCallback
 
-import pybot.externals.draw_utils as draw_utils
+from ..geometry.rigid_transform import RigidTransform, Pose, Quaternion
+
+from ..externals.lcm import draw_utils
 
 from .gtsam import BaseSLAM as GTSAM_BaseSLAM
 from .gtsam import VisualSLAM as GTSAM_VisualSLAM
@@ -16,24 +18,6 @@ from .gtsam import VisualSLAM as GTSAM_VisualSLAM
 from pybot_gtsam import GTSAMTags
 from pybot_slam import ISAMTags, draw_tags
 from pybot_apriltags import AprilTag, AprilTagsWrapper
-
-
-# Mahalanobis distance
-# Normalized mahalanobis distance
-# fbn_remus/apps/ranger_nav/Point3DLM.h
-# LinAlg::Matrix<3,1,double> X = m_X-pLM.m_X;
-# 	LinAlg::Matrix<3,3,double> P = (m_P+pLM.m_P).inverse();
-# 	LinAlg::Matrix<1,1,double> d = (X.transpose()*P)*X;
-
-	# LinAlg::Matrix<3,1,double> rX;
-	# rX(1,1) = pA.GetX()-pB.GetX();
-	# rX(2,1) = pA.GetY()-pB.GetY();
-	# rX(3,1) = pA.GetZ()-pB.GetZ();
-	# LinAlg::Matrix<3,3,double> iP =(pA.GetCov()+pB.GetCov()).inverse();
-	# LinAlg::Matrix<3,1,double> iPrX = iP*rX;
-	# double d = rX(1,1)*iPrx(1,1)+rX(2,1)*iPrX(2,1)+rX(3,1)*iPrX(3,1);
-
-from scipy.spatial.distance import mahalanobis
 
 def mahalanobis_distance(u, v, VI): 
     return mahalanobis(u, v, VI)

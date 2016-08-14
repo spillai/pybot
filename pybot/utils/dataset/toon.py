@@ -2,11 +2,12 @@ import os
 import numpy as np
 from itertools import izip
 
-from ...geometry.rigid_transform import Quaternion, RigidTransform
 from ..io_utils import path_exists
 from ..dataset_readers import natural_sort, \
-    read_dir, DatasetReader, ImageDatasetReader, StereoDatasetReader, VelodyneDatasetReader
+    read_dir, DatasetReader, ImageDatasetReader, StereoDatasetReader
 from ..db_utils import AttrDict
+
+from ...geometry.rigid_transform import Quaternion, RigidTransform
 
 def load_poses(fn): 
     """ Retrieve poses """ 
@@ -67,21 +68,9 @@ class StereoPOVDatasetReader(object):
     def iter_stereo_frames(self, *args, **kwargs): 
         return self.stereo.iteritems(*args, **kwargs)
 
-    # def iter_velodyne_frames(self, *args, **kwargs):         
-    #     return self.velodyne.iteritems(*args, **kwargs)
-
-    # def iter_stereo_velodyne_frames(self, *args, **kwargs):         
-    #     return izip(self.left.iteritems(*args, **kwargs), 
-    #                 self.right.iteritems(*args, **kwargs), 
-    #                 self.velodyne.iteritems(*args, **kwargs))
-
     @property
     def stereo_frames(self): 
         return self.iter_stereo_frames()
-
-    @property
-    def velodyne_frames(self): 
-        return self.iter_velodyne_frames()
 
 if __name__ == "__main__": 
     # poses = load_poses('/home/spillai/data/stereo-poses/livingroom1_poses_0_interpolated.txt')

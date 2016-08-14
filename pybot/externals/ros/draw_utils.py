@@ -16,10 +16,10 @@ import sensor_msgs.msg as sensor_msg
 from copy import deepcopy
 
 # Utility imports
-from pybot.externals.draw_helpers import reshape_arr, get_color_arr, \
-    height_map, color_by_height_axis, copy_pointcloud_data
-from pybot.geometry.rigid_transform import RigidTransform
 from .pointclouds import xyz_array_to_pointcloud2, xyzrgb_array_to_pointcloud2
+from ..externals.draw_helpers import reshape_arr, get_color_arr, \
+    height_map, color_by_height_axis, copy_pointcloud_data
+from ...geometry.rigid_transform import RigidTransform
 
 global viz_pub_
 viz_pub_ = None

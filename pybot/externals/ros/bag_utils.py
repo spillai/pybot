@@ -20,11 +20,12 @@ from sensor_msgs.msg import Image
 from cv_bridge import CvBridge, CvBridgeError
 from tf2_msgs.msg import TFMessage
 
-from pybot.externals.log_utils import Decoder, LogReader, LogController, LogDB
-from pybot.vision.image_utils import im_resize
-from pybot.vision.imshow_utils import imshow_cv
-from pybot.geometry.rigid_transform import RigidTransform
-from pybot.vision.camera_utils import CameraIntrinsic
+from .log_utils import Decoder, LogReader, LogController, LogDB
+from ..vision.image_utils import im_resize
+from ..vision.imshow_utils import imshow_cv
+from ..vision.camera_utils import CameraIntrinsic
+from ..geometry.rigid_transform import RigidTransform
+
 
 class GazeboDecoder(Decoder): 
     """
