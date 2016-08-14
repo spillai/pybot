@@ -12,9 +12,9 @@ import re
 
 from itertools import izip, imap, chain, islice
 from collections import defaultdict, namedtuple, OrderedDict
-from pybot.utils.async_utils import async_prefetch
+# from .async_utils import async_prefetch
 
-from pybot.vision.image_utils import im_resize
+from ..vision.image_utils import im_resize
 
 def valid_path(path): 
     vpath = os.path.expanduser(path)

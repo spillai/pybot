@@ -2,8 +2,8 @@ import cv2
 import numpy as np
 
 from itertools import imap
-from pybot.utils.plot_utils import colormap
-from pybot.vision.image_utils import to_color
+from ..utils.plot_utils import colormap
+from .image_utils import to_color
 
 def draw_features(im, pts, colors=None, size=2): 
     out = to_color(im)

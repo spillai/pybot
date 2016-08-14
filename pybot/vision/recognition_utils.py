@@ -4,19 +4,21 @@ Object Recognition utilities
 # Author: Sudeep Pillai <spillai@csail.mit.edu>
 # License: MIT
 
-import numpy as np
-import cv2, os, time, random
-from itertools import izip, chain
-
+import os
+import cv2
+import time
 import pprint
 import datetime
 import pandas as pd
 
+import numpy as np
+from itertools import izip, chain
+
 import matplotlib.pyplot as plt
-from pybot.vision.image_utils import im_resize, gaussian_blur, median_blur, box_blur
-from pybot.utils.io_utils import memory_usage_psutil, format_time
-from pybot.utils.db_utils import AttrDict, IterDB
-from pybot.utils.itertools_recipes import chunks
+from .image_utils import im_resize, gaussian_blur, median_blur, box_blur
+from ..utils.io_utils import memory_usage_psutil, format_time
+from ..utils.db_utils import AttrDict, IterDB
+from ..utils.itertools_recipes import chunks
 
 # =====================================================================
 # Generic utility functions for object detection
@@ -333,7 +335,7 @@ def im_describe(*args, **kwargs):
 # General-purpose object recognition interfaces, and functions
 # ---------------------------------------------------------------------
 
-from pybot.vision.geom_utils import brute_force_match, intersection_over_union
+from .geom_utils import brute_force_match, intersection_over_union
 
 import sklearn.metrics as metrics
 from sklearn.svm import LinearSVC, SVC
@@ -538,8 +540,8 @@ class NegativeMiningGenerator(object):
 # [Deprecated] General-purpose object recognition interfaces, and functions
 # ---------------------------------------------------------------------
 
-from pybot.vision.feature_detection import get_dense_detector, get_detector
-from pybot.vision.bow_utils import BoWVectorizer, bow_codebook, bow_project, flair_project
+from .feature_detection import get_dense_detector, get_detector
+from .bow_utils import BoWVectorizer, bow_codebook, bow_project, flair_project
 
 import sklearn.metrics as metrics
 from sklearn.preprocessing import normalize

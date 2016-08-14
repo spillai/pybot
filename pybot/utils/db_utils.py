@@ -6,9 +6,9 @@ from collections import defaultdict
 from itertools import izip
 
 import os.path
-from pybot.utils.misc import progressbar
-from pybot.utils.io_utils import create_path_if_not_exists
-from pybot.utils.itertools_recipes import grouper
+from .misc import progressbar
+from .io_utils import create_path_if_not_exists
+from .itertools_recipes import grouper
 
 # =============================================================================
 # Pytables helpers

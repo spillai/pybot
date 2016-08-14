@@ -3,8 +3,8 @@ from collections import deque, namedtuple
 from abc import ABCMeta, abstractmethod
 
 from itertools import imap
-from pybot.utils.misc import print_green, print_red
-from pybot.utils.misc import Counter, Accumulator, CounterWithPeriodicCallback 
+from .misc import print_green, print_red
+from .misc import Counter, Accumulator, CounterWithPeriodicCallback 
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
@@ -194,62 +194,62 @@ class PoseSampler(Sampler):
     #     plt.show(block=finish)
 
 
-class FrustumVolumeIntersectionPoseSampler(Sampler): 
-    def __init__(self, iou=0.5, depth=20, fov=np.deg2rad(60), lookup_history=10, 
-                 get_sample=lambda item: item, 
-                 on_sampled_cb=lambda index, item: None, verbose=False): 
-        Sampler.__init__(self, lookup_history=lookup_history, 
-                         get_sample=get_sample, 
-                         on_sampled_cb=on_sampled_cb, verbose=verbose)
-        self.iou_ = iou
-        self.depth_ = depth
-        self.fov_ = fov
+# class FrustumVolumeIntersectionPoseSampler(Sampler): 
+#     def __init__(self, iou=0.5, depth=20, fov=np.deg2rad(60), lookup_history=10, 
+#                  get_sample=lambda item: item, 
+#                  on_sampled_cb=lambda index, item: None, verbose=False): 
+#         Sampler.__init__(self, lookup_history=lookup_history, 
+#                          get_sample=get_sample, 
+#                          on_sampled_cb=on_sampled_cb, verbose=verbose)
+#         self.iou_ = iou
+#         self.depth_ = depth
+#         self.fov_ = fov
         
-        from pybot.geometry.rigid_transform import RigidTransform
-        from pybot.vision.camera_utils import Frustum
-        from bot_graphics.volumes import SweepingFrustum
+#         from pybot.geometry.rigid_transform import RigidTransform
+#         from pybot.vision.camera_utils import Frustum
+#         from bot_graphics.volumes import SweepingFrustum
 
-        self.volume_ = SweepingFrustum()
-        self.get_frustum = lambda pose: Frustum(pose, zmin=0.05, zmax=self.depth_, fov=self.fov_)
+#         self.volume_ = SweepingFrustum()
+#         self.get_frustum = lambda pose: Frustum(pose, zmin=0.05, zmax=self.depth_, fov=self.fov_)
 
-        # Get canonical volume
-        fverts = self.get_frustum(RigidTransform.identity()).get_vertices()
+#         # Get canonical volume
+#         fverts = self.get_frustum(RigidTransform.identity()).get_vertices()
 
-        print 'Adding basic shape'
-        self.volume_.add_vertices(fverts)
-        self.fvol_ = self.volume_.get_volume()
-        self.volume_.clear()
+#         print 'Adding basic shape'
+#         self.volume_.add_vertices(fverts)
+#         self.fvol_ = self.volume_.get_volume()
+#         self.volume_.clear()
 
-    def check_sample(self, item):
-        if self.force_check(): 
-            return True
+#     def check_sample(self, item):
+#         if self.force_check(): 
+#             return True
         
-        pose = self.get_sample(item)
-        # pinv = pose.inverse()
+#         pose = self.get_sample(item)
+#         # pinv = pose.inverse()
 
-        fverts = self.get_frustum(pose).get_vertices()
+#         fverts = self.get_frustum(pose).get_vertices()
         
-        # Check starting from new to old items
-        # print '------------'
-        for p in reversed(self.q_): 
-            verts = self.get_frustum(self.get_sample(p)).get_vertices()
+#         # Check starting from new to old items
+#         # print '------------'
+#         for p in reversed(self.q_): 
+#             verts = self.get_frustum(self.get_sample(p)).get_vertices()
 
-            self.volume_.clear()
-            self.volume_.add_vertices(fverts)
-            self.volume_.add_vertices(verts)
-            assert(self.volume_.volume_.getNumComponents() > 0)
-            intersection = self.volume_.get_volume()
-            union = self.fvol_ * 2 - intersection
-            print intersection, self.fvol_ * 2, self.fvol_
-            # print p, self.volume_.get_volume()
+#             self.volume_.clear()
+#             self.volume_.add_vertices(fverts)
+#             self.volume_.add_vertices(verts)
+#             assert(self.volume_.volume_.getNumComponents() > 0)
+#             intersection = self.volume_.get_volume()
+#             union = self.fvol_ * 2 - intersection
+#             print intersection, self.fvol_ * 2, self.fvol_
+#             # print p, self.volume_.get_volume()
 
-            # newp = pinv * self.get_sample(p)
-            # d, r = np.linalg.norm(newp.tvec), np.fabs(newp.to_rpyxyz()[:3])
-            # print r, d < self.displacement_, (r < self.theta_).all(), newp
-            # if d < self.displacement_ and (r < self.theta_).all(): 
-            #     return False
+#             # newp = pinv * self.get_sample(p)
+#             # d, r = np.linalg.norm(newp.tvec), np.fabs(newp.to_rpyxyz()[:3])
+#             # print r, d < self.displacement_, (r < self.theta_).all(), newp
+#             # if d < self.displacement_ and (r < self.theta_).all(): 
+#             #     return False
 
-        return True
+#         return True
 
 
 Keyframe = namedtuple('Keyframe', ['img', 'pose', 'index'], verbose=False)
@@ -263,14 +263,14 @@ class KeyframeSampler(PoseSampler):
                              get_sample=get_sample, 
                              on_sampled_cb=on_sampled_cb, verbose=verbose)
 
-class KeyframeVolumeSampler(FrustumVolumeIntersectionPoseSampler): 
-    def __init__(self, iou=0.5, depth=20, fov=np.deg2rad(60), lookup_history=10, 
-                 get_sample=lambda item: item.pose,  
-                 on_sampled_cb=lambda index, item: None, verbose=False): 
-        FrustumVolumeIntersectionPoseSampler.__init__(self, iou=iou, depth=depth, fov=fov, 
-                                                      lookup_history=lookup_history, 
-                                                      get_sample=get_sample, 
-                                                      on_sampled_cb=on_sampled_cb, verbose=verbose)
+# class KeyframeVolumeSampler(FrustumVolumeIntersectionPoseSampler): 
+#     def __init__(self, iou=0.5, depth=20, fov=np.deg2rad(60), lookup_history=10, 
+#                  get_sample=lambda item: item.pose,  
+#                  on_sampled_cb=lambda index, item: None, verbose=False): 
+#         FrustumVolumeIntersectionPoseSampler.__init__(self, iou=iou, depth=depth, fov=fov, 
+#                                                       lookup_history=lookup_history, 
+#                                                       get_sample=get_sample, 
+#                                                       on_sampled_cb=on_sampled_cb, verbose=verbose)
 
 
 class PoseAccumulator(Accumulator): 

@@ -1,12 +1,11 @@
 import numpy as np
-import cv2, time, os.path, logging
 from copy import deepcopy
-
 from collections import defaultdict, deque
-from pybot.utils.db_utils import AttrDict
-from pybot.utils.timer import timeitmethod
 
-from pybot.vision.feature_detection import to_kpt, to_kpts, to_pts, \
+from ...utils.db_utils import AttrDict
+from ...utils.timer import timeitmethod
+
+from ..feature_detection import to_kpt, to_kpts, to_pts, \
     finite_and_within_bounds
 
 class IndexedDeque(object): 

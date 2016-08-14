@@ -11,20 +11,19 @@ import cv2
 
 from itertools import izip
 from collections import defaultdict
-
 from scipy.io import loadmat
 
-from pybot.utils.misc import progressbar
-from pybot.utils.db_utils import AttrDict
-from pybot.utils.dataset_readers import read_dir, read_files, natural_sort, \
+from ..misc import progressbar
+from ..db_utils import AttrDict
+from ..dataset_readers import read_dir, read_files, natural_sort, \
     DatasetReader, ImageDatasetReader
-from pybot.vision.draw_utils import annotate_bbox
-from pybot.vision.camera_utils import kinect_v1_params, \
+from ...vision.draw_utils import annotate_bbox
+from ...vision.camera_utils import kinect_v1_params, \
     Camera, CameraIntrinsic, CameraExtrinsic, \
     check_visibility, get_object_bbox
 
-from pybot.geometry.rigid_transform import Quaternion, RigidTransform
-from pybot.externals.plyfile import PlyData
+from ...geometry.rigid_transform import Quaternion, RigidTransform
+from ...externals.plyfile import PlyData
 
 # __categories__ = ['flashlight', 'cap', 'cereal_box', 'coffee_mug', 'soda_can']
 
@@ -514,7 +513,7 @@ class UWRGBDSceneDataset(UWRGBDDataset):
                                  '''Check dataset and choose v1 scene dataset''' % version)
 
         def visualize_ground_truth(self): 
-            import pybot.externals.draw_utils as draw_utils
+            import pybot.externals.lcm.draw_utils as draw_utils
 
             # Publish ground truth poses, and aligned point clouds
             draw_utils.publish_pose_list('ground_truth_poses', self.poses)
