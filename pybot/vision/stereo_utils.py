@@ -1,4 +1,8 @@
-import cv2, time
+# Author: Sudeep Pillai <spillai@csail.mit.edu>
+# License: MIT
+
+import time
+import cv2
 import numpy as np
 from collections import deque
 from scipy.interpolate import LinearNDInterpolator
@@ -11,15 +15,6 @@ from pybot.vision.image_utils import im_resize, gaussian_blur, to_color, to_gray
 from pybot.vision.imshow_utils import imshow_cv, trackbar_create, trackbar_value
 from pybot.vision.color_utils import colormap
 from pybot.vision.calib.calibrate_stereo import StereoCalibration, get_stereo_calibration_params
-        
-from pybot_vision import scaled_color_disp
-from pybot_externals import StereoELAS
-
-# from pybot_externals import fast_cost_volume_filtering, ordered_row_disparity
-
-# from pybot_vision import VoxelStereoBM as _VoxelStereoBM
-# from pybot_vision import EdgeStereoBM as _EdgeStereoBM
-# from pybot_vision import EdgeStereo as _EdgeStereo
 
 def colorize_stereo_disparity(disp, im=None, max_disparity=256): 
     # Display colored disparity
@@ -102,120 +97,6 @@ class StereoBM:
         return self.bm.compute(left, right).astype(np.float32) / 16.0
 
 
-# class VoxelStereoBM: 
-#     def __init__(self, discretize=1, do_sgm=True): 
-#         self.discretize = discretize
-#         if discretize > 1: 
-#             # Initilize stereo block matching
-#             self.stereo = _VoxelStereoBM(discretize=discretize, 
-#                                          do_sgm=do_sgm,
-#                                          preset=cv2.STEREO_BM_BASIC_PRESET, 
-#                                          ndisparities=64, SAD_window_size=5)
-
-#             # self.stereo = StereoBM() # **self.params)
-#             # self.stereo.process = lambda l,r: self.stereo.compute(l,r)
-#         else: 
-#             raise RuntimeError("Discretization less than 1 not supported!")
-
-#     def compute(self, left, right): 
-#         # Compute stereo disparity
-#         disp = (self.stereo.process(left, right)).astype(np.float32) / 16
-#         disp = cv2.medianBlur(disp, 3)
-
-#         # Re-scale disparity image
-#         disp_out = cv2.resize(disp.astype(np.float32), (left.shape[1],left.shape[0]), 
-#                               fx=self.discretize, 
-#                               fy=self.discretize, 
-#                               interpolation=cv2.INTER_NEAREST)
-
-#         return disp_out
-
-
-# class EdgeStereoBM: 
-#     def __init__(self): 
-#         # Initilize stereo block matching
-#         self.stereo = _EdgeStereoBM(preset=cv2.STEREO_BM_BASIC_PRESET, 
-#                                     ndisparities=64, SAD_window_size=5)
-
-#     def compute(self, left, right): 
-#         return self.stereo.process(left, right).astype(np.float32) / 16.0
-
-
-# class EdgeStereo: 
-#     def __init__(self): 
-#         # Initilize stereo block matching
-#         self.stereo = _EdgeStereo()
-
-#     def compute(self, left, right): 
-#         return self.stereo.process(left, right).astype(np.float32) / 16.0
-
-
-# ================================
-# Ordered stereo disparity matching
-class OrderedStereoBM(object): 
-    # sad_window_size = 9
-    # params_ = dict( preset=cv2.STEREO_BM_BASIC_PRESET, 
-    #                 ndisparities=64, 
-    #                 SADWindowSize=sad_window_size )
-
-    def __init__(self): 
-        # # Init ELAS, and queue of disparities
-        # self.stereo = StereoELAS()
-        # self.prior_disps = deque(maxlen=5)        
-        self.stereo = OrderedCostVolumeStereo()
-
-    # def compute_with_prior(self, left_im, right_im): 
-    #     # ELAS for prior disparity
-    #     elas_disp = self.stereo.process(left_im, right_im)
-
-    #     # Set maximum number of prior disparities
-    #     if len(self.prior_disps) < 5: 
-    #         self.prior_disps.append(np.copy(elas_disp))
-    #     imshow_cv('prior_disps', reduce(lambda x, v: np.vstack([x,v]), self.prior_disps) * 1.0 / 255)
-
-    #     # Compute median disp across past frames
-    #     all_disps = reduce(lambda x, v: np.dstack([x,v]), self.prior_disps)
-    #     prior_median_disp = np.median(all_disps, axis=2) if all_disps.ndim > 2 else np.copy(all_disps)
-
-    #     # Filtered median disparity
-    #     prior_median_disp[prior_median_disp < 5] = 0
-    #     imshow_cv('median_disps', prior_median_disp * 1.0 / 128)
-
-    #     # Ordered median disparity
-    #     prior_median_disp = ordered_row_disparity(prior_median_disp)
-    #     imshow_cv('ordered_median_disps', prior_median_disp * 1.0 / 128)
-
-    #     # # Compute variance on past disparities
-    #     # prior_var_disp = np.std(all_disps, axis=2) if all_disps.ndim > 2 else all_disps
-    #     # imshow_cv('var_disps', prior_var_disp * 5.0 / 128)
-    #     # print 'Minmax: ', np.min(prior_median_disp), np.max(prior_median_disp)
-
-    #     # Fast cost volume filtering
-    #     return self.compute(left_im, right_im, prior_median_disp)
-
-    def compute(self, left, right): 
-
-        # Fast cost volume filtering
-        st = time.time()
-        disp = self.stereo.process(left, right)
-        assert(disp.dtype == np.float32)
-        print 'Time taken to sgbm_test', time.time() - st
-
-        # # Display 
-        # imshow_cv('disparity', disp.astype(np.float32) / 128)
-
-        # # Difference b/w median elas disp and current disparity
-        # if prior_median_disp.shape == disp.shape: 
-        #     imshow_cv('diff_disp', (np.abs(disp - prior_median_disp) > 2).astype(np.uint8) * 255)
-
-        # # Compute median blur on disparity
-        # dispm = cv2.medianBlur(disp, 5)
-        # # imshow_cv('disp bil', dispm / 128)        
-
-        return disp
-
-# class StereoReconstruction(object): 
-#     raise RuntimeError('Deprecated, see camera_utils.StereoCamera')
 
 class CalibratedStereo(object): 
     def __init__(self, left, right):

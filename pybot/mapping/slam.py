@@ -1,3 +1,6 @@
+# Author: Sudeep Pillai <spillai@csail.mit.edu>
+# License: MIT
+
 import time
 import numpy as np
 from scipy.spatial.distance import mahalanobis
