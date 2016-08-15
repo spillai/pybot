@@ -352,6 +352,8 @@ class ROSBagReader(LogReader):
         print('{} :: Retrieve camera calibration for {}'.format(self.__class__.__name__, topic))
         for self.idx, (channel, msg, t) in enumerate(self.log.read_messages(topics=topic)): 
             return dec.decode(msg) 
+
+        raise RuntimeError('Failed to retrieve camera calibration {}'.format(topic))
                     
     def _index(self): 
         raise NotImplementedError()
