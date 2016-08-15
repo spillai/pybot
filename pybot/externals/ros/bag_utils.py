@@ -18,6 +18,7 @@ from message_filters import ApproximateTimeSynchronizer
 from genpy.rostime import Time
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge, CvBridgeError
+from cv_bridge.boost.cv_bridge_boost import cvtColor2
 from tf2_msgs.msg import TFMessage
 
 from pybot.externals.log_utils import Decoder, LogReader, LogController, LogDB
@@ -63,6 +64,43 @@ class CameraInfoDecoder(Decoder):
                                D=np.float64(msg.D).ravel(), 
                                shape=[msg.height, msg.width])
         
+
+def compressed_imgmsg_to_cv2(cmprs_img_msg, desired_encoding = "passthrough"):
+    """
+    Convert a sensor_msgs::CompressedImage message to an OpenCV :cpp:type:`cv::Mat`.
+
+    :param cmprs_img_msg:   A :cpp:type:`sensor_msgs::CompressedImage` message
+    :param desired_encoding:  The encoding of the image data, one of the following strings:
+
+       * ``"passthrough"``
+       * one of the standard strings in sensor_msgs/image_encodings.h
+
+    :rtype: :cpp:type:`cv::Mat`
+    :raises CvBridgeError: when conversion is not possible.
+
+    If desired_encoding is ``"passthrough"``, then the returned image has the same format as img_msg.
+    Otherwise desired_encoding must be one of the standard image encodings
+
+    This function returns an OpenCV :cpp:type:`cv::Mat` message on success, or raises :exc:`cv_bridge.CvBridgeError` on failure.
+
+    If the image only has one channel, the shape has size 2 (width and height)
+    """
+    str_msg = cmprs_img_msg.data
+    buf = np.ndarray(shape=(1, len(str_msg)),
+                      dtype=np.uint8, buffer=cmprs_img_msg.data)
+    im = cv2.imdecode(buf, cv2.IMREAD_ANYCOLOR)
+
+    if desired_encoding == "passthrough":
+        return im
+
+    try:
+        res = cvtColor2(im, "bgr8", desired_encoding)
+    except RuntimeError as e:
+        raise CvBridgeError(e)
+
+    return res
+
+
 class ImageDecoder(Decoder): 
     """
     Encoding types supported: 
@@ -76,9 +114,12 @@ class ImageDecoder(Decoder):
         self.compressed = compressed
 
     def decode(self, msg): 
-        if self.compressed: 
-            im = cv2.imdecode(np.fromstring(msg.data, np.uint8), 
-                              cv2.CV_LOAD_IMAGE_COLOR)
+        print msg.format
+        if 'compressed' in msg.format: 
+            try: 
+                im = compressed_imgmsg_to_cv2(msg, self.encoding)
+            except CvBridgeError as e:
+                print e
         else: 
             try: 
                 im = self.bridge.imgmsg_to_cv2(msg, self.encoding)
@@ -347,9 +388,7 @@ class ROSBagReader(LogReader):
 
     def retrieve_camera_calibration(self, topic):
         try: 
-            info = self.log.get_type_and_topic_info()
-            length = info[topic]
-            if not length: 
+            if not self.length(topic): 
                 raise ValueError('Camera calibration unavailable {}'.format(topic))
         except: 
             raise RuntimeError('Failed to retrieve camera calibration {}, \ntopics are {}\n'.format(topic, ', '.join(info.topics)))
