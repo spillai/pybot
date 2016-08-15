@@ -2,18 +2,18 @@ import time
 import numpy as np
 from scipy.spatial.distance import mahalanobis
 
-from ..vision.image_utils import to_color, to_gray
-from ..vision.imshow_utils import imshow_cv
+from pybot.vision.image_utils import to_color, to_gray
+from pybot.vision.imshow_utils import imshow_cv
 
-from ..utils.pose_utils import PoseAccumulator
-from ..utils.misc import Accumulator, SkippedCounter, CounterWithPeriodicCallback
+from pybot.utils.pose_utils import PoseAccumulator
+from pybot.utils.misc import Accumulator, SkippedCounter, CounterWithPeriodicCallback
 
-from ..geometry.rigid_transform import RigidTransform, Pose, Quaternion
+from pybot.geometry.rigid_transform import RigidTransform, Pose, Quaternion
 
-from ..externals.lcm import draw_utils
+from pybot.externals.lcm import draw_utils
 
-from .gtsam import BaseSLAM as GTSAM_BaseSLAM
-from .gtsam import VisualSLAM as GTSAM_VisualSLAM
+from pybot.mapping.gtsam import BaseSLAM as GTSAM_BaseSLAM
+from pybot.mapping.gtsam import VisualSLAM as GTSAM_VisualSLAM
 
 from pybot_gtsam import GTSAMTags
 from pybot_slam import ISAMTags, draw_tags

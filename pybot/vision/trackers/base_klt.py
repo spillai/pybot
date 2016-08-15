@@ -26,17 +26,17 @@ import numpy as np
 from itertools import izip
 from collections import namedtuple, deque
 
-from ...utils.db_utils import AttrDict
-from ...utils.timer import timeitmethod
-from ...utils.plot_utils import colormap
+from pybot.utils.db_utils import AttrDict
+from pybot.utils.timer import timeitmethod
+from pybot.utils.plot_utils import colormap
 
-from ..imshow_utils import imshow_cv
-from ..image_utils import to_color, to_gray, gaussian_blur
-from ..draw_utils import draw_features, draw_lines
+from pybot.vision.imshow_utils import imshow_cv
+from pybot.vision.image_utils import to_color, to_gray, gaussian_blur
+from pybot.vision.draw_utils import draw_features, draw_lines
 
 
-from ..trackers import FeatureDetector, OpticalFlowTracker, LKTracker
-from ..trackers import finite_and_within_bounds, to_pts, \
+from pybot.vision.trackers import FeatureDetector, OpticalFlowTracker, LKTracker
+from pybot.vision.trackers import finite_and_within_bounds, to_pts, \
     TrackManager, FeatureDetector, OpticalFlowTracker, LKTracker
 
 class BaseKLT(object): 

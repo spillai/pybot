@@ -6,7 +6,7 @@ General-purpose class for rigid-body transformations.
 
 import numpy as np
 import transformations as tf
-from .quaternion import Quaternion
+from pybot.geometry.quaternion import Quaternion
 
 ###############################################################################
 def normalize_vec(v): 

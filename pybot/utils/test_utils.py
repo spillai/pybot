@@ -1,8 +1,8 @@
 # Author: Sudeep Pillai <spillai@csail.mit.edu>
 # License: MIT
 
-from ..vision.image_utils import to_color, to_gray
-from .dataset.kitti import KITTIDatasetReader, KITTIStereoGroundTruthDatasetReader
+from pybot.vision.image_utils import to_color, to_gray
+from pybot.utils.dataset.kitti import KITTIDatasetReader, KITTIStereoGroundTruthDatasetReader
 
 # def eval_kitti_dataset(color=False, **kwargs): 
 #     # if color: 

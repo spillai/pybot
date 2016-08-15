@@ -4,9 +4,9 @@ import networkx as nx
 from collections import deque, defaultdict, Counter
 from itertools import izip
 
-from ..utils.timer import SimpleTimer, timeitmethod
-from ..utils.db_utils import AttrDict
-from ..utils.misc import print_red, print_yellow, print_green
+from pybot.utils.timer import SimpleTimer, timeitmethod
+from pybot.utils.db_utils import AttrDict
+from pybot.utils.misc import print_red, print_yellow, print_green
 
 from pygtsam import Symbol, extractPose2, extractPose3, extractPoint3, extractKeys
 from pygtsam import symbol as _symbol

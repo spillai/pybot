@@ -15,10 +15,10 @@ import numpy as np
 from itertools import izip, chain
 
 import matplotlib.pyplot as plt
-from .image_utils import im_resize, gaussian_blur, median_blur, box_blur
-from ..utils.io_utils import memory_usage_psutil, format_time
-from ..utils.db_utils import AttrDict, IterDB
-from ..utils.itertools_recipes import chunks
+from pybot.vision.image_utils import im_resize, gaussian_blur, median_blur, box_blur
+from pybot.utils.io_utils import memory_usage_psutil, format_time
+from pybot.utils.db_utils import AttrDict, IterDB
+from pybot.utils.itertools_recipes import chunks
 
 # =====================================================================
 # Generic utility functions for object detection

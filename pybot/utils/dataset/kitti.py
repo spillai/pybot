@@ -6,13 +6,13 @@ import numpy as np
 import cv2
 from itertools import izip, repeat
 
-from ..db_utils import AttrDict
-from ..dataset_readers import natural_sort, \
+from pybot.utils.db_utils import AttrDict
+from pybot.utils.dataset_readers import natural_sort, \
     FileReader, DatasetReader, ImageDatasetReader, \
     StereoDatasetReader, VelodyneDatasetReader
 
-from ...geometry.rigid_transform import RigidTransform
-from ...vision.camera_utils import StereoCamera
+from pybot.geometry.rigid_transform import RigidTransform
+from pybot.vision.camera_utils import StereoCamera
 
 def kitti_stereo_calib(sequence, scale=1.0): 
     seq = int(sequence)

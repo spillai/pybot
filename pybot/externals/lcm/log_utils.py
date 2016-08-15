@@ -14,10 +14,10 @@ import bot_core.image_t as image_t
 import bot_core.pose_t as pose_t
 import bot_param.update_t as update_t
 
-from ...vision.camera_utils import construct_K, DepthCamera
-from ...vision.image_utils import im_resize
+from pybot.vision.camera_utils import construct_K, DepthCamera
+from pybot.vision.image_utils import im_resize
 
-from ..log_utils import Decoder, LogReader, LogController
+from pybot.externals.log_utils import Decoder, LogReader, LogController
 
 class BotParamDecoder(Decoder): 
     def __init__(self, channel='PARAM_UPDATE', every_k_frames=1): 

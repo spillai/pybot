@@ -11,8 +11,8 @@ from scipy.spatial import cKDTree
 from sklearn.cluster import KMeans, MiniBatchKMeans
 from sklearn.mixture import GMM
 
-from .color_utils import get_random_colors
-from ..utils.db_utils import AttrDict
+from pybot.vision.color_utils import get_random_colors
+from pybot.utils.db_utils import AttrDict
 
 from pybot_vision import flair_code
 

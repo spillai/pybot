@@ -6,8 +6,8 @@ from collections import deque, namedtuple
 from abc import ABCMeta, abstractmethod
 
 from itertools import imap
-from .misc import print_green, print_red
-from .misc import Counter, Accumulator, CounterWithPeriodicCallback 
+from pybot.utils.misc import print_green, print_red
+from pybot.utils.misc import Counter, Accumulator, CounterWithPeriodicCallback 
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt

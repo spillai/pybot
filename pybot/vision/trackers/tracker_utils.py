@@ -5,10 +5,10 @@ import numpy as np
 from copy import deepcopy
 from collections import defaultdict, deque
 
-from ...utils.db_utils import AttrDict
-from ...utils.timer import timeitmethod
+from pybot.utils.db_utils import AttrDict
+from pybot.utils.timer import timeitmethod
 
-from ..feature_detection import to_kpt, to_kpts, to_pts, \
+from pybot.vision.feature_detection import to_kpt, to_kpts, to_pts, \
     finite_and_within_bounds
 
 class IndexedDeque(object): 

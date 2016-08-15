@@ -3,7 +3,7 @@
 
 import cv2
 import numpy as np
-from ..utils.db_utils import AttrDict
+from pybot.utils.db_utils import AttrDict
 
 def finite_and_within_bounds(xys, shape): 
     H, W = shape[:2]

@@ -14,16 +14,16 @@ from collections import defaultdict
 
 import h5py
 
-from ..db_utils import AttrDict
-from ..dataset_readers import read_dir, read_files, natural_sort, \
+from pybot.utils.db_utils import AttrDict
+from pybot.utils.dataset_readers import read_dir, read_files, natural_sort, \
     DatasetReader, ImageDatasetReader
-from ...vision.draw_utils import annotate_bbox
-from ...vision.camera_utils import kinect_v1_params, \
+from pybot.vision.draw_utils import annotate_bbox
+from pybot.vision.camera_utils import kinect_v1_params, \
     Camera, CameraIntrinsic, CameraExtrinsic, \
     check_visibility, get_object_bbox
 
-from ...geometry.rigid_transform import Quaternion, RigidTransform
-from ...externals.plyfile import PlyData
+from pybot.geometry.rigid_transform import Quaternion, RigidTransform
+from pybot.externals.plyfile import PlyData
 
 # =====================================================================
 # Generic NYU-RGBD Dataset class

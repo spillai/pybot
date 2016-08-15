@@ -5,12 +5,12 @@ import os
 import numpy as np
 from itertools import izip
 
-from ..io_utils import path_exists
-from ..dataset_readers import natural_sort, \
+from pybot.utils.io_utils import path_exists
+from pybot.utils.dataset_readers import natural_sort, \
     read_dir, DatasetReader, ImageDatasetReader, StereoDatasetReader
-from ..db_utils import AttrDict
+from pybot.utils.db_utils import AttrDict
 
-from ...geometry.rigid_transform import Quaternion, RigidTransform
+from pybot.geometry.rigid_transform import Quaternion, RigidTransform
 
 def load_poses(fn): 
     """ Retrieve poses """ 

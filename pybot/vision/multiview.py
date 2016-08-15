@@ -4,12 +4,12 @@
 import numpy as np
 from collections import deque
 
-from .imshow_utils import imshow_cv
-from .camera_utils import Camera, CameraIntrinsic, CameraExtrinsic, plot_epipolar_line
-from .image_utils import to_gray, to_color, im_resize
+from pybot.vision.imshow_utils import imshow_cv
+from pybot.vision.camera_utils import Camera, CameraIntrinsic, CameraExtrinsic, plot_epipolar_line
+from pybot.vision.image_utils import to_gray, to_color, im_resize
 
-from .draw_utils import draw_features
-from .feature_detection import FeatureDetector
+from pybot.vision.draw_utils import draw_features
+from pybot.vision.feature_detection import FeatureDetector
 
 class Frame(object): 
     def __init__(self, im, camera): 

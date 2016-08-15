@@ -6,9 +6,9 @@ import numpy as np
 import cv2
 
 from itertools import izip
-from ...geometry.rigid_transform import RigidTransform
-from ..db_utils import AttrDict
-from ..dataset_readers import natural_sort, \
+from pybot.geometry.rigid_transform import RigidTransform
+from pybot.utils.db_utils import AttrDict
+from pybot.utils.dataset_readers import natural_sort, \
     read_dir, DatasetReader, ImageDatasetReader, StereoDatasetReader, VelodyneDatasetReader
 
 class VaFRICDatasetReader(object): 

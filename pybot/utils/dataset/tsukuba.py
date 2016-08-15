@@ -6,13 +6,13 @@ import cv2
 import numpy as np
 from itertools import izip, repeat
 
-from ..dataset_readers import FileReader, DatasetReader, ImageDatasetReader, StereoDatasetReader
-from ..db_utils import AttrDict
+from pybot.utils.dataset_readers import FileReader, DatasetReader, ImageDatasetReader, StereoDatasetReader
+from pybot.utils.db_utils import AttrDict
 
-from ...vision.image_utils import im_resize
-from ...vision.camera_utils import StereoCamera
-from ...geometry.rigid_transform import Quaternion, RigidTransform
-from ...externals.lcm import draw_utils
+from pybot.vision.image_utils import im_resize
+from pybot.vision.camera_utils import StereoCamera
+from pybot.geometry.rigid_transform import Quaternion, RigidTransform
+from pybot.externals.lcm import draw_utils
 
 def tsukuba_load_poses(fn): 
     """ 

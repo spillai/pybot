@@ -16,9 +16,9 @@ import lcm
 import vs
 from bot_core import image_t, pose_t
 
-from ..draw_helpers import reshape_arr, get_color_arr, height_map, \
+from pybot.externals.draw_helpers import reshape_arr, get_color_arr, height_map, \
     color_by_height_axis, copy_pointcloud_data, Frustum
-from ...geometry.rigid_transform import RigidTransform
+from pybot.geometry.rigid_transform import RigidTransform
 
 class VisualizationMsgsPub: 
     """

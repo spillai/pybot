@@ -18,20 +18,20 @@ import argparse
 from itertools import izip
 from collections import OrderedDict, deque
 
-from ..geometry.rigid_transform import Pose, Quaternion, \
+from pybot.geometry.rigid_transform import Pose, Quaternion, \
     RigidTransform, Sim3, normalize_vec
 
-from ..utils.io_utils import read_config
-from ..utils.db_utils import AttrDict
+from pybot.utils.io_utils import read_config
+from pybot.utils.db_utils import AttrDict
 
-from ..vision.camera_utils import StereoCamera
-from ..vision.image_utils import to_color, to_gray, flip_rb, im_resize
-from ..vision.stereo_utils import StereoSGBM, StereoBM, CalibratedFastStereo, setup_zed_dataset
-from ..vision.color_utils import get_color_by_label
-from ..vision.image_utils import to_color, to_gray, median_blur
-from ..vision.imshow_utils import imshow_cv
+from pybot.vision.camera_utils import StereoCamera
+from pybot.vision.image_utils import to_color, to_gray, flip_rb, im_resize
+from pybot.vision.stereo_utils import StereoSGBM, StereoBM, CalibratedFastStereo, setup_zed_dataset
+from pybot.vision.color_utils import get_color_by_label
+from pybot.vision.image_utils import to_color, to_gray, median_blur
+from pybot.vision.imshow_utils import imshow_cv
 
-from ..externals.lcm import draw_utils
+from pybot.externals.lcm import draw_utils
 
 from pybot_vision import scaled_color_disp 
 from pybot_vision import CrossRatioStereo, FastStereo

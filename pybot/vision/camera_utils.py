@@ -8,10 +8,10 @@ from numpy.linalg import det, norm
 import numpy.matlib as npm
 from scipy import linalg
 
-from .color_utils import get_color_by_label
-from .image_utils import to_color
-from ..utils.db_utils import AttrDict
-from ..geometry.rigid_transform import Quaternion, RigidTransform
+from pybot.vision.color_utils import get_color_by_label
+from pybot.vision.image_utils import to_color
+from pybot.utils.db_utils import AttrDict
+from pybot.geometry.rigid_transform import Quaternion, RigidTransform
 
 kinect_v1_params = AttrDict(
     K_depth = np.array([[576.09757860, 0, 319.5],

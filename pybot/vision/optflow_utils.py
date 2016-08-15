@@ -3,7 +3,7 @@
 
 import cv2
 import numpy as np
-from .image_utils import to_gray, to_color
+from pybot.vision.image_utils import to_gray, to_color
 
 def dense_optical_flow(im1, im2, pyr_scale=0.5, levels=3, winsize=5, 
                        iterations=3, poly_n=5, poly_sigma=1.2, fb_threshold=-1, 
