@@ -114,8 +114,7 @@ class ImageDecoder(Decoder):
         self.compressed = compressed
 
     def decode(self, msg): 
-        print msg.format
-        if 'compressed' in msg.format: 
+        if self.compressed: 
             try: 
                 im = compressed_imgmsg_to_cv2(msg, self.encoding)
             except CvBridgeError as e:
