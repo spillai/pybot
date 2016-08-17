@@ -323,12 +323,24 @@ class ROSBagReader(LogReader):
             tf_dec.decode(msg)
 
             for (from_tf, to_tf) in relations:  
+
+                # If the relations have been added already, skip
+                if (from_tf, to_tf) in self.relations_map_: 
+                    continue
+                    
+                # Check if the frames exist yet
+                if not tf_listener.frameExists(from_tf) or not tf_listener.frameExists(to_tf): 
+                    continue
+
+                # Retrieve the transform with common time
                 try:
-                    (trans,rot) = tf_listener.lookupTransform(from_tf, to_tf, t)
+                    tcommon = tf_listener.getLatestCommonTime(from_tf, to_tf)
+                    (trans,rot) = tf_listener.lookupTransform(from_tf, to_tf, tcommon)
                     self.relations_map_[(from_tf,to_tf)] = RigidTransform(tvec=trans, xyzw=rot)
-                    # print('\tSuccessfully received transform: {:} => {:} {:}'
-                    #       .format(from_tf, to_tf, self.relations_map_[(from_tf,to_tf)]))
-                except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
+                    print('\tSuccessfully received transform: {:} => {:} {:}'
+                          .format(from_tf, to_tf, self.relations_map_[(from_tf,to_tf)]))
+                except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException) as e:
+                    # print e
                     pass
 
             # Finish up once we've established all the requested tfs
