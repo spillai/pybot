@@ -246,7 +246,7 @@ class ROSBagReader(LogReader):
 
         # TF relations
         self.relations_map = {}
-        print self.log
+        print('-' * 120 + '\n{:}\n'.format(self.log) + '-' * 120)
 
         # for channel, ch_info in info.topics.iteritems(): 
         #     print channel, ch_info.message_count
