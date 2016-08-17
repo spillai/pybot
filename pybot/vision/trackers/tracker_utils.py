@@ -1,6 +1,6 @@
 # Author: Sudeep Pillai <spillai@csail.mit.edu>
 # License: MIT
-
+import cv2
 import numpy as np
 from copy import deepcopy
 from collections import defaultdict, deque
