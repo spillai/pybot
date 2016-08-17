@@ -156,11 +156,11 @@ class CameraIntrinsic(object):
         self.shape = np.int32(shape) if shape is not None else None
         
     def __repr__(self): 
-        return 'CameraIntrinsic =======>\n K:\n{:}\n D: {:}\n fx: {:}, fy: {:}, '\
-            'cx: {:}, cy: {:}, shape: {:}'.format(
+        return '=' * 80 + '\nCameraIntrinsic: fx: {:3.2f}, fy: {:3.2f}, '\
+            'cx: {:3.2f}, cy: {:3.2f}, shape: {:}\n K:\n{:}\n D: {:}\n'.format(
+                self.fx, self.fy, self.cx, self.cy, self.shape, 
                 np.array_str(np.array(self.K), precision=2, suppress_small=True), 
-                np.array_str(self.D, precision=2),
-                self.fx, self.fy, self.cx, self.cy, self.shape) 
+                np.array_str(self.D, precision=2)) + '=' * 80
 
     @classmethod
     def simulate(cls): 
