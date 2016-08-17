@@ -73,6 +73,11 @@ class Counter(object):
     def __init__(self): 
         self.idx_ = 0
 
+    def __repr__(self): 
+        return '{}: index: {}, length: {}'.format(
+            self.__class__.__name__, self.index, self.length
+        )
+
     def count(self): 
         self.idx_ += 1
 
