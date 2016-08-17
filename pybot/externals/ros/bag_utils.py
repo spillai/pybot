@@ -245,7 +245,7 @@ class ROSBagReader(LogReader):
             raise ValueError('start_idx in ROSBagReader expects a percentage [0,100], provided {:}'.format(self.start_idx))
 
         # TF relations
-        self.relations_map = {}
+        self.relations_map_ = {}
         print('-' * 120 + '\n{:}\n'.format(self.log) + '-' * 120)
 
         # for channel, ch_info in info.topics.iteritems(): 
@@ -298,7 +298,7 @@ class ROSBagReader(LogReader):
 
     def tf(self, from_tf, to_tf): 
         try: 
-            return self.relations_map[(from_tf, to_tf)]
+            return self.relations_map_[(from_tf, to_tf)]
         except: 
             raise KeyError('Relations map does not contain {:}=>{:} tranformation'.format(from_tf, to_tf))
 
@@ -325,21 +325,21 @@ class ROSBagReader(LogReader):
             for (from_tf, to_tf) in relations:  
                 try:
                     (trans,rot) = tf_listener.lookupTransform(from_tf, to_tf, t)
-                    self.relations_map[(from_tf,to_tf)] = RigidTransform(tvec=trans, xyzw=rot)
+                    self.relations_map_[(from_tf,to_tf)] = RigidTransform(tvec=trans, xyzw=rot)
                     # print('\tSuccessfully received transform: {:} => {:} {:}'
-                    #       .format(from_tf, to_tf, self.relations_map[(from_tf,to_tf)]))
+                    #       .format(from_tf, to_tf, self.relations_map_[(from_tf,to_tf)]))
                 except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
                     pass
 
             # Finish up once we've established all the requested tfs
-            if len(self.relations_map) == len(relations): 
+            if len(self.relations_map_) == len(relations): 
                 break
 
         try: 
-            tfs = [self.relations_map[(from_tf,to_tf)] for (from_tf, to_tf) in relations] 
+            tfs = [self.relations_map_[(from_tf,to_tf)] for (from_tf, to_tf) in relations] 
             for (from_tf, to_tf) in relations: 
                 print('\tSuccessfully received transform: {:} => {:} {:}'
-                      .format(from_tf, to_tf, self.relations_map[(from_tf,to_tf)]))
+                      .format(from_tf, to_tf, self.relations_map_[(from_tf,to_tf)]))
 
         except: 
             raise RuntimeError('Error concerning tf lookup')
