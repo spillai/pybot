@@ -95,6 +95,11 @@ class Accumulator(Counter):
         Counter.__init__(self)
         self.items_ = deque(maxlen=maxlen)
 
+    def __repr__(self): 
+        return '{}: index: {}, items: {}, length: {}'.format(
+            self.__class__.__name__, self.index, len(self.items_), self.length
+        )
+
     def accumulate(self, item): 
         self.items_.append(item)
         self.count()
