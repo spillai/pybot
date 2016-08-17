@@ -156,10 +156,10 @@ class CameraIntrinsic(object):
         self.shape = np.int32(shape) if shape is not None else None
         
     def __repr__(self): 
-        return '-' * 80 + '\nCameraIntrinsic:\n\t fx: {:3.2f}, fy: {:3.2f}, '\
+        return '\n' + '-' * 80 + '\nCameraIntrinsic:\n\t fx: {:3.2f}, fy: {:3.2f}, '\
             'cx: {:3.2f}, cy: {:3.2f}, \n\t shape: {:}, skew: {},\n\t D: {:}\n'.format(
                 self.fx, self.fy, self.cx, self.cy, self.shape, self.skew, 
-                np.array_str(self.D, precision=2, suppress_small=True)) + '-' * 80
+                np.array_str(self.D, precision=2, suppress_small=True)) + '-' * 80 + '\n'
 
     @classmethod
     def simulate(cls): 
@@ -375,7 +375,7 @@ class CameraExtrinsic(RigidTransform):
         return cls(R=np.float64(db.R), t=np.float64(db.t))
         
 class Camera(CameraIntrinsic, CameraExtrinsic): 
-    def __init__(self, K, R, t, D=np.zeros(4, dtype=np.float64), shape=None): 
+    def __init__(self, K, R, t, D=np.zeros(5, dtype=np.float64), shape=None): 
         CameraIntrinsic.__init__(self, K, D, shape=shape)
         CameraExtrinsic.__init__(self, R, t)
 
@@ -711,7 +711,7 @@ def KinectCamera(R=npm.eye(3), t=npm.zeros(3)):
     return Camera(kinect_v1_params.K_depth, R, t)
 
 class DepthCamera(CameraIntrinsic): 
-    def __init__(self, K, shape=(480,640), skip=1, D=np.zeros(4, dtype=np.float64)):
+    def __init__(self, K, shape=(480,640), skip=1, D=np.zeros(5, dtype=np.float64)):
         CameraIntrinsic.__init__(self, K, D)
 
         # Retain image shape
