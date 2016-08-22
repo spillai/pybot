@@ -35,7 +35,7 @@ class RobotSLAMMixin(object):
                 (isinstance(self, GTSAM_VisualSLAM) and landmark_type == 'point')): 
             raise ValueError('Wrong expected landmark type for {}, provided {}'
                              .format(type(self), landmark_type))
-            
+
         self.__poses = Accumulator(maxlen=2)
         self.landmark_type_ = landmark_type
         self.update_on_odom_ = update_on_odom
@@ -47,6 +47,7 @@ class RobotSLAMMixin(object):
 
         self.landmark_text_lut_ = {}
         self.smart_ = smart
+        self.slam_mixin_timing_st_ = time.time()
 
     @property
     def is_smart(self): 
@@ -101,7 +102,7 @@ class RobotSLAMMixin(object):
         self.add_odom_incremental(p.matrix)
 
         # 3. Visualize
-        self.vis_optimized()
+        # self.vis_optimized()
 
         return self.latest
 
@@ -121,7 +122,7 @@ class RobotSLAMMixin(object):
                 pts3 = RigidTransform.from_matrix(self.pose(self.latest)).inverse() * pts3
             draw_utils.publish_cloud('gtsam-pc', [pts3], c='b', frame_id='gtsam-pose', element_id=[t], reset=False)
 
-        self.vis_optimized()
+        # self.vis_optimized()
 
         return self.latest
 
@@ -136,16 +137,16 @@ class RobotSLAMMixin(object):
             if self.smart_: 
                 ids, pts3 = self.smart_update()
 
-            # Publish pose
-            draw_utils.publish_pose_list('gtsam-pose', [Pose.from_rigid_transform(t, self.__poses.latest)], 
-                                         frame_id='camera', reset=False)
+            # # Publish pose
+            # draw_utils.publish_pose_list('gtsam-pose', [Pose.from_rigid_transform(t, self.__poses.latest)], 
+            #                              frame_id='camera', reset=False)
 
             # # Publish cloud in latest pose reference frame
             # if len(pts3): 
             #     pts3 = RigidTransform.from_matrix(self.pose(self.latest)).inverse() * pts3
             # draw_utils.publish_cloud('gtsam-pc', [pts3], c='b', frame_id='gtsam-pose', element_id=[t], reset=False)
 
-        self.vis_optimized()
+        # self.vis_optimized()
 
         return self.latest
 
@@ -157,6 +158,7 @@ class RobotSLAMMixin(object):
         if self.smart_: 
             ids, pts3 = self.smart_update()
         self.vis_optimized()
+        print('{} :: Finished/Solved in {:4.2f} s'.format(self.__class__.__name__, time.time() - self.slam_mixin_timing_st_))
 
     #################
     # Visualization #
@@ -233,8 +235,9 @@ class RobotSLAMMixin(object):
             updated_targets = {pid : Pose.from_rigid_transform(pid, RigidTransform.from_matrix(p)) 
                                for (pid, p) in self.target_poses.iteritems()}
             if len(updated_targets): 
+                texts = [self.landmark_text_lut_.get(k, str(k)) for k in updated_targets.keys()]
                 draw_utils.publish_pose_list('optimized_node_landmark', updated_targets.values(), 
-                                             texts=map(str, updated_targets.keys()), reset=True)
+                                             texts=texts, reset=True)
 
                 # edges = np.vstack([draw_utils.draw_tag_edges(p) for p in updated_targets.itervalues()])
                 # draw_utils.publish_line_segments('optimized_node_landmark', edges[:,:3], edges[:,3:6], c='r', 
