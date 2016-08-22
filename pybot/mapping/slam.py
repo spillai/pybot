@@ -82,7 +82,7 @@ class RobotSLAMMixin(object):
         self.add_odom_incremental(p_odom.matrix)
 
         # 3. Visualize
-        # self.vis_measurements()        
+        self.vis_measurements()        
 
         return self.latest
 
@@ -99,7 +99,7 @@ class RobotSLAMMixin(object):
         self.add_odom_incremental(p.matrix)
 
         # 3. Visualize
-        # self.vis_measurements()
+        self.vis_measurements()
 
         return self.latest
 
@@ -148,7 +148,8 @@ class RobotSLAMMixin(object):
 
 
     def finish(self): 
-        self.update()
+        for j in range(10): 
+            self.update()
         self.update_marginals()
         if self.smart_: 
             ids, pts3 = self.smart_update()
@@ -167,16 +168,13 @@ class RobotSLAMMixin(object):
         # draw_utils.publish_pose_list('CAMERA_POSES', [Pose.from_rigid_transform(poses.index, poses.latest)], 
         #                              frame_id=frame_id, reset=False)
 
-        # # Draw odometry link
-        # if poses.length >= 2:
-
-        #     p_odom = (poses.items[-2].inverse()).oplus(poses.items[-1])
-
-        #     factor_st = (poses.items[-2].tvec).reshape(-1,3)
-        #     factor_end = (poses.items[-1].tvec).reshape(-1,3)
-        #     draw_utils.publish_line_segments('measured_factor_odom', factor_st, factor_end, c='r', 
-        #                                      frame_id=frame_id, reset=False)
-
+        # Draw odometry link
+        if poses.length >= 2:
+            p_odom = (poses.items[-2].inverse()).oplus(poses.items[-1])
+            factor_st = (poses.items[-2].tvec).reshape(-1,3)
+            factor_end = (poses.items[-1].tvec).reshape(-1,3)
+            draw_utils.publish_line_segments('measured_factor_odom', factor_st, factor_end, c='r', 
+                                             frame_id=frame_id, reset=False)
 
     def vis_optimized(self, frame_id='camera'): 
         """
@@ -232,9 +230,15 @@ class RobotSLAMMixin(object):
             updated_targets = {pid : Pose.from_rigid_transform(pid, RigidTransform.from_matrix(p)) 
                                for (pid, p) in self.target_poses.iteritems()}
             if len(updated_targets): 
-                edges = np.vstack([draw_utils.draw_tag_edges(p) for p in updated_targets.itervalues()])
-                draw_utils.publish_line_segments('optimized_node_landmark', edges[:,:3], edges[:,3:6], c='r', 
-                                                 frame_id=frame_id, reset=True)
+                draw_utils.publish_pose_list('optimized_node_landmark', updated_targets.values(), 
+                                             texts=map(str, updated_targets.keys()), reset=True)
+
+                # edges = np.vstack([draw_utils.draw_tag_edges(p) for p in updated_targets.itervalues()])
+                # draw_utils.publish_line_segments('optimized_node_landmark', edges[:,:3], edges[:,3:6], c='r', 
+                #                                  frame_id=frame_id, reset=True)
+                # draw_utils.publish_tags('optimized_node_landmark', updated_targets.values(), 
+                #                         texts=map(str, updated_targets.keys()), draw_nodes=True, draw_edges=True, 
+                #                         frame_id=frame_id, reset=True)
 
             # Draw edges (between landmarks and poses)
             if self.visualize_factors_: 
@@ -312,13 +316,13 @@ class RobotSLAMMixin(object):
         factor_ct_end = np.vstack([p.tvec for p in p_landmarks])
         factor_ct_st = np.zeros_like(factor_ct_end)
 
-        # draw_utils.publish_line_segments('measured_factor_{:}'.format(landmark_name), factor_st, factor_end, c='b', 
-        #                                  frame_id=frame_id, reset=self.reset_required())
-        # edges = np.vstack([draw_utils.draw_tag_edges(p) for p in p_Wt])
-        # draw_utils.publish_line_segments('measured_node_{:}'.format(landmark_name), edges[:,:3], edges[:,3:6], c='b', 
-        #                                  frame_id=frame_id, reset=self.reset_required())
+        draw_utils.publish_line_segments('measured_factor_{:}'.format(landmark_name), factor_st, factor_end, c='b', 
+                                         frame_id=frame_id, reset=self.reset_required())
+        edges = np.vstack([draw_utils.draw_tag_edges(p) for p in p_Wt])
+        draw_utils.publish_line_segments('measured_node_{:}'.format(landmark_name), edges[:,:3], edges[:,3:6], c='b', 
+                                         frame_id=frame_id, reset=self.reset_required())
 
-        # Optionally plot as Tags
+        # # Optionally plot as Tags
         # draw_utils.publish_pose_list('RAW_tags', p_Wt, texts=[], object_type='TAG', 
         #                              frame_id=frame_id, reset=self.reset_required())
 
@@ -340,7 +344,8 @@ class RobotSLAM(RobotSLAMMixin, GTSAM_BaseSLAM):
         GTSAM_BaseSLAM.__init__(self, 
                                 odom_noise=GTSAM_BaseSLAM.odom_noise, 
                                 prior_noise=GTSAM_BaseSLAM.prior_noise, verbose=verbose)
-        RobotSLAMMixin.__init__(self, landmark_type='pose', update_on_odom=update_on_odom, 
+        RobotSLAMMixin.__init__(self, smart=False, landmark_type='pose', 
+                                update_on_odom=update_on_odom, 
                                 visualize_nodes=visualize_nodes, 
                                 visualize_factors=visualize_factors, 
                                 visualize_marginals=visualize_marginals)
@@ -358,7 +363,7 @@ class RobotVisualSLAM(RobotSLAMMixin, GTSAM_VisualSLAM):
                                   px_error_threshold=px_error_threshold, 
                                   odom_noise=odom_noise, prior_noise=prior_noise, 
                                   px_noise=px_noise, verbose=verbose)
-        RobotSLAMMixin.__init__(self, landmark_type='point', 
+        RobotSLAMMixin.__init__(self, smart=True, landmark_type='point', 
                                 update_on_odom=update_on_odom, 
                                 visualize_nodes=visualize_nodes, 
                                 visualize_factors=visualize_factors, 

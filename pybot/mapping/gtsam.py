@@ -235,8 +235,8 @@ class BaseSLAM(object):
             self.graph_.add(BetweenFactorPose3(x_id, l_id, pdelta, 
                                                self.measurement_noise_))
 
-        # # Add to landmark measurements
-        # self.xls_.extend([(xid, lid) for lid in lids])
+        # Add to landmark measurements
+        self.xls_.extend([(xid, lid) for lid in lids])
 
         # # Add landmark edge to graphviz
         # self.gviz_.add_edge(x_id, l_id)
