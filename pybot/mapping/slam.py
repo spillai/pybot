@@ -82,7 +82,9 @@ class RobotSLAMMixin(object):
         self.add_odom_incremental(p_odom.matrix)
 
         # 3. Visualize
-        self.vis_measurements()        
+        draw_utils.publish_pose_list('measured_factor_odom', 
+                                     [Pose.from_rigid_transform(t, self.__poses.latest)], 
+                                     frame_id='camera', reset=False)
 
         return self.latest
 
@@ -99,7 +101,7 @@ class RobotSLAMMixin(object):
         self.add_odom_incremental(p.matrix)
 
         # 3. Visualize
-        self.vis_measurements()
+        self.vis_optimized()
 
         return self.latest
 
@@ -134,9 +136,10 @@ class RobotSLAMMixin(object):
             if self.smart_: 
                 ids, pts3 = self.smart_update()
 
-            # # Publish pose
-            # draw_utils.publish_pose_list('gtsam-pose', [Pose.from_rigid_transform(t, self.__poses.latest)], 
-            #                              frame_id='camera', reset=False)
+            # Publish pose
+            draw_utils.publish_pose_list('gtsam-pose', [Pose.from_rigid_transform(t, self.__poses.latest)], 
+                                         frame_id='camera', reset=False)
+
             # # Publish cloud in latest pose reference frame
             # if len(pts3): 
             #     pts3 = RigidTransform.from_matrix(self.pose(self.latest)).inverse() * pts3
@@ -379,165 +382,6 @@ class RobotVisualSLAM(RobotSLAMMixin, GTSAM_VisualSLAM):
 
     # def on_landmark(self, p): 
     #     pass
-
-
-# class BaseSLAM(GTSAM_BaseSLAM):
-#     """
-#     Basic SLAM interface
-    
-#        All measurements are to be provided in the 
-#        same reference frame 
-    
-#     """
-#     def __init__(self, ref_frames={}, absolute_measurements=True, visualize=True): 
-
-#         # Initialize SLAM (GTSAM / ISAM)
-#         # self.slam_ = GTSAMTags() # FIX: TODO
-#         # self.slam_ = BaseSLAM()
-#         self.slam_ = SLAM3D()
-
-#         # self.slam_cb_ = CounterWithPeriodicCallback(
-#         #     every_k=10, 
-#         #     process_cb=lambda:  self.slam_.save_graph("slam_fg.dot")
-#         # )
-#         # self.slam_cb_.register_callback(self.slam_, 'on_odom')
-
-#         # Poses (request for relative measurements if the odometry is absolute)
-#         self.pose_id_ = -1
-#         self.poses_ = Accumulator(maxlen=10)
-
-#         # self.reset_required = lambda: self.poses_.length == 0
-#         # print 'reset: ', self.reset_required()
-
-#         # Updated ids
-#         self.updated_ids_ = set()
-
-#         # Visualization: Reference names
-#         self.vis_name_ = 'slam_vis'
-#         self.ref_frames_ = {}
-        
-#         # Visualization: Publish reference frames
-#         for k, v in ref_frames.iteritems(): 
-#             draw_utils.publish_sensor_frame(k, v)
-
-#     @property
-#     def pose_id(self): 
-#         return self.slam_.latest
-        
-#     def update(self, iterations=1): 
-#         # Finalize updates
-#         for j in range(iterations): 
-#             self.slam_.update()
-#         self.updated_ids_ = vis_slam_updates(self.slam_)
-#         self.slam_.save_graph("slam_fg.dot")
-
-#     def on_tags(self, t, tags):
-#         """
-#         Add tags to factor graph 
-#         TODO: currently GTSAM is only adding Pose3-Pose3 costraint. 
-#         Need to incorporate Pose3-Point2 constraint from tag corners
-#         """
-#         ids = [tag.id for tag in tags]
-#         poses = [tag.getPose() for tag in tags]
-#         self.pose_id_ = self.slam_.on_pose_ids(t, ids, poses)
-#         print ids, poses
-
-#         # Visualize SLAM updates
-#         self.updated_ids_ = vis_slam_updates(self.slam_)
-
-#         # Visualize tags/landmarks
-#         p_landmarks = [ Pose.from_rigid_transform(tag.id, RigidTransform.from_matrix(tag.getPose())) 
-#                         for tag in tags ]
-#         self.vis_landmarks(self.pose_id_, self.poses_.latest, p_landmarks)
-        
-#         return self.pose_id_
-
-#     def on_landmarks(self, t, poses_w_ids): 
-#         """
-#         Add pose landmarks to factor graph 
-#         Pose3-Pose3 costraint. 
-
-#         poses: Pose (with ID)
-#         """
-#         if not self.poses_.length: 
-#             import warnings 
-#             warnings.warn('Failed to add landmark since pose has not been initialized')
-#             return
-
-#         ids = [p.id for p in poses_w_ids]
-#         poses = [p.matrix for p in poses_w_ids]
-#         print ids, poses, self.poses_.latest, self.pose_id_
-
-#         self.pose_id_ = self.slam_.on_pose_ids(t, ids, poses)
-
-#         # Visualize SLAM updates
-#         self.updated_ids_ = vis_slam_updates(self.slam_)
-
-#         # Visualize tags/landmarks
-#         self.vis_landmarks(self.pose_id_, self.poses_.latest, poses_w_ids)
-        
-#         return self.pose_id_
-
-
-#     def vis_odom(self, poses, frame_id='camera'): 
-
-#         # Set ids for accumulated poses
-#         # draw_utils.publish_pose_t('POSE', poses.latest, frame_id=frame_id)
-#         draw_utils.publish_pose_t('CAMERA_POSE', poses.latest, frame_id=frame_id)
-#         draw_utils.publish_pose_list('CAMERA_LATEST', [poses.latest], texts=[],
-#                                      frame_id=frame_id) # TODO: reset?
-#         # draw_utils.publish_pose_list('CAMERA_POSES', [Pose.from_rigid_transform(poses.index, poses.latest)], 
-#         #                              frame_id=frame_id, reset=(poses.length <= 1))
-
-#         if poses.length < 2: 
-#             return
-
-#         p_odom = (poses.items[-2].inverse()).oplus(poses.items[-1])
-
-#         factor_st = (poses.items[-2].tvec).reshape(-1,3)
-#         factor_end = (poses.items[-1].tvec).reshape(-1,3)
-
-#         draw_utils.publish_line_segments('measured_factor_odom', factor_st, factor_end, c='r', 
-#                                          frame_id=frame_id, reset=False)
-        
-    
-#     def vis_landmarks(self, pose_id, p_latest, p_landmarks, frame_id='camera', landmark_name='tag'): 
-#         """
-#         Visualize tags with respect to latest camera frame
-#         """
-#         if not len(p_landmarks): 
-#             return
-
-#         # Accumulate tag detections into global reference frame
-#         p_Wc = p_latest
-#         p_Wt = [Pose.from_rigid_transform(pose_id * 20 + p.id, p_Wc.oplus(p)) for p in p_landmarks]
-
-#         # Plot RAW tag factors
-#         factor_st = np.tile(p_latest.tvec, [len(p_Wt),1])
-#         factor_end = np.vstack(map(lambda p: p.tvec, p_Wt))
-
-#         factor_ct_end = np.vstack([p.tvec for p in p_landmarks])
-#         factor_ct_st = np.zeros_like(factor_ct_end)
-
-#         # draw_utils.publish_line_segments('measured_factor_{:}'.format(landmark_name), factor_st, factor_end, c='b', 
-#         #                                  frame_id=frame_id, reset=self.reset_required())
-#         # edges = np.vstack([draw_utils.draw_tag_edges(p) for p in p_Wt])
-#         # draw_utils.publish_line_segments('measured_node_{:}'.format(landmark_name), edges[:,:3], edges[:,3:6], c='b', 
-#         #                                  frame_id=frame_id, reset=self.reset_required())
-
-#         # Optionally plot as Tags
-#         # draw_utils.publish_pose_list('RAW_tags', p_Wt, texts=[], object_type='TAG', 
-#         #                              frame_id=frame_id, reset=self.reset_required())
-
-        
-#         # # Plot OPTIMIZED tag factors
-#         # if pose_id in self.updated_ids_: 
-#         #     draw_utils.publish_line_segments('OPT_factors_{:}'.format(landmark_name), factor_ct_st, factor_ct_end, c='r', 
-#         #                                  frame_id='optimized_poses', element_id=pose_id, reset=self.reset_required())
-
-#         #     edges = np.vstack([draw_utils.draw_tag_edges(p) for p in p_landmarks])
-#         #     draw_utils.publish_line_segments('optimized_{:}'.format(landmark_name), edges[:,:3], edges[:,3:6], c='r', 
-#         #                                      frame_id='optimized_poses', element_id=pose_id, reset=self.reset_required())
 
 
 class TagDetector(object): 
