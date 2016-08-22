@@ -77,7 +77,8 @@ class BaseSLAM(object):
     """
     odom_noise = np.ones(6) * 0.01
     prior_noise = np.ones(6) * 0.001
-    def __init__(self, odom_noise=np.ones(6) * 0.01, prior_noise=np.ones(6) * 0.001, verbose=False):
+    def __init__(self, odom_noise=np.ones(6) * 0.01, prior_noise=np.ones(6) * 0.001, 
+                 verbose=False, export_graph=False):
  
         # ISAM2 interface
         self.slam_ = ISAM2()
@@ -105,9 +106,11 @@ class BaseSLAM(object):
 
         # Timestamped look up for landmarks, and poses
         self.timer_ls_ = defaultdict(list)
+        self.export_graph_ = export_graph
 
-        # # Graph visualization
-        # self.gviz_ = nx.Graph()
+        # Graph visualization
+        if self.export_graph_: 
+            self.gviz_ = nx.Graph()
 
     @property
     def poses(self): 
@@ -174,17 +177,18 @@ class BaseSLAM(object):
         self.xs_[index] = pose0
         self.idx_ = index
 
-        # # Add node to graphviz
-        # self.gviz_.add_node(x_id) # , label='x0')
-        # self.gviz_.node[x_id]['label'] = 'X %i' % index
+        # Add node to graphviz
+        if self.export_graph_: 
+            self.gviz_.add_node(x_id) # , label='x0')
+            self.gviz_.node[x_id]['label'] = 'X %i' % index
 
-        # Add prior factor to graphviz
-        # p_id = symbol('p', index)
-        # self.gviz_.add_edge(p_id, symbol('x', index))
-        # self.gviz_.node[p_id]['label'] = 'P %i' % index
-        # self.gviz_.node[p_id]['color'] = 'blue'
-        # self.gviz_.node[p_id]['style'] = 'filled'
-        # self.gviz_.node[p_id]['shape'] = 'box'
+            Add prior factor to graphviz
+            p_id = symbol('p', index)
+            self.gviz_.add_edge(p_id, symbol('x', index))
+            self.gviz_.node[p_id]['label'] = 'P %i' % index
+            self.gviz_.node[p_id]['color'] = 'blue'
+            self.gviz_.node[p_id]['style'] = 'filled'
+            self.gviz_.node[p_id]['shape'] = 'box'
 
     def add_odom_incremental(self, delta): 
         """
@@ -216,9 +220,10 @@ class BaseSLAM(object):
         # Add to edges
         self.xxs_.append((xid1, xid2))
 
-        # # Add edge to graphviz
-        # self.gviz_.add_edge(x_id1, x_id2)
-        # self.gviz_.node[x_id2]['label'] = 'X ' + str(xid2)
+        # Add edge to graphviz
+        if self.export_graph_: 
+            self.gviz_.add_edge(x_id1, x_id2)
+            self.gviz_.node[x_id2]['label'] = 'X ' + str(xid2)
 
     def add_pose_landmarks(self, xid, lids, deltas): 
         if self.verbose_: 
@@ -238,9 +243,10 @@ class BaseSLAM(object):
         # Add to landmark measurements
         self.xls_.extend([(xid, lid) for lid in lids])
 
-        # # Add landmark edge to graphviz
-        # self.gviz_.add_edge(x_id, l_id)
-
+        # Add landmark edge to graphviz
+        if self.export_graph_: 
+            self.gviz_.add_edge(x_id, l_id)
+        
         # Initialize new landmark pose node from the latest robot
         # pose. This should be done just once
         for (l_id, lid, delta) in izip(l_ids, lids, deltas): 
@@ -254,10 +260,11 @@ class BaseSLAM(object):
                     raise KeyError('Pose {:} not available'
                                    .format(xid))
 
-                # # Label landmark node
-                # self.gviz_.node[l_id]['label'] = 'L ' + str(lid)            
-                # self.gviz_.node[l_id]['color'] = 'red'
-                # self.gviz_.node[l_id]['style'] = 'filled'
+                # Label landmark node
+                if self.export_graph_: 
+                    self.gviz_.node[l_id]['label'] = 'L ' + str(lid)            
+                    self.gviz_.node[l_id]['color'] = 'red'
+                    self.gviz_.node[l_id]['style'] = 'filled'
             
         return 
 
@@ -288,9 +295,10 @@ class BaseSLAM(object):
         # # Add to landmark measurements
         # self.xls_.extend([(xid, lid) for lid in lids])
 
-        # # Add landmark edge to graphviz
-        # for l_id in l_ids: 
-        #     self.gviz_.add_edge(x_id, l_id)
+        # Add landmark edge to graphviz
+        if self.export_graph_: 
+            for l_id in l_ids: 
+                self.gviz_.add_edge(x_id, l_id)
         
         # Initialize new landmark pose node from the latest robot
         # pose. This should be done just once
@@ -305,10 +313,11 @@ class BaseSLAM(object):
                     raise RuntimeError('Initialization failed ({:}). xid:{:}, lid:{:}, l_id: {:}'
                                        .format(e, xid, lid, l_id))
 
-                # # Label landmark node
-                # self.gviz_.node[l_id]['label'] = 'L ' + str(lid)            
-                # self.gviz_.node[l_id]['color'] = 'red'
-                # self.gviz_.node[l_id]['style'] = 'filled'
+                # Label landmark node
+                if self.export_graph_: 
+                    self.gviz_.node[l_id]['label'] = 'L ' + str(lid)            
+                    self.gviz_.node[l_id]['color'] = 'red'
+                    self.gviz_.node[l_id]['style'] = 'filled'
         
         return 
 
