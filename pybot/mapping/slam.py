@@ -3,6 +3,7 @@
 
 import time
 import numpy as np
+from itertools import izip
 from scipy.spatial.distance import mahalanobis
 
 from pybot.vision.image_utils import to_color, to_gray
@@ -26,7 +27,7 @@ def mahalanobis_distance(u, v, VI):
     return mahalanobis(u, v, VI)
 
 class RobotSLAMMixin(object): 
-    def __init__(self, landmark_type='point', update_on_odom=False, 
+    def __init__(self, landmark_type='point', smart=False, update_on_odom=False, 
                  visualize_factors=False, visualize_nodes=False, visualize_marginals=False): 
         if not isinstance(self, (GTSAM_BaseSLAM, GTSAM_VisualSLAM)): 
             raise RuntimeError('Cannot mixin without mixing with one of the SLAM classes')
@@ -45,6 +46,11 @@ class RobotSLAMMixin(object):
         self.visualize_marginals_ = visualize_marginals
 
         self.landmark_text_lut_ = {}
+        self.smart_ = smart
+
+    @property
+    def is_smart(self): 
+        return self.smart_
 
     def set_landmark_texts(self, landmark_lut): 
         " {landmark id -> landmark str, ... }"
@@ -98,6 +104,7 @@ class RobotSLAMMixin(object):
         return self.latest
 
     def on_point_landmarks_smart(self, t, ids, pts, keep_tracked=True): 
+        assert(self.smart_)
         self.add_point_landmarks_incremental_smart(ids, pts, keep_tracked=keep_tracked)
         if self.__poses.length >= 2: 
             self.update()
@@ -116,11 +123,35 @@ class RobotSLAMMixin(object):
 
         return self.latest
 
+    def on_pose_landmarks(self, t, ids, poses): 
+        deltas = [p.matrix for p in poses]
+        self.add_pose_landmarks_incremental(ids, deltas)
+
+        if self.__poses.length >= 2 and self.__poses.length % 10 == 0: 
+            self.update()
+            self.update_marginals()
+            
+            if self.smart_: 
+                ids, pts3 = self.smart_update()
+
+            # # Publish pose
+            # draw_utils.publish_pose_list('gtsam-pose', [Pose.from_rigid_transform(t, self.__poses.latest)], 
+            #                              frame_id='camera', reset=False)
+            # # Publish cloud in latest pose reference frame
+            # if len(pts3): 
+            #     pts3 = RigidTransform.from_matrix(self.pose(self.latest)).inverse() * pts3
+            # draw_utils.publish_cloud('gtsam-pc', [pts3], c='b', frame_id='gtsam-pose', element_id=[t], reset=False)
+
+        self.vis_optimized()
+
+        return self.latest
+
+
     def finish(self): 
         self.update()
-        # self.update_marginals()
-        ids, pts3 = self.smart_update()
-
+        self.update_marginals()
+        if self.smart_: 
+            ids, pts3 = self.smart_update()
         self.vis_optimized()
 
     #################
@@ -180,7 +211,7 @@ class RobotSLAMMixin(object):
 
         # Draw cameras (with poses and marginals)
         draw_utils.publish_cameras('optimized_node_poses', updated_poses.values(), 
-                                   covars=covars, frame_id=frame_id, reset=True)
+                                   covars=covars, frame_id=frame_id, draw_edges=False, reset=True)
 
         # Draw odometry edges (between robot poses)
         if self.visualize_factors_: 
@@ -198,7 +229,7 @@ class RobotSLAMMixin(object):
 
         if self.landmark_type_ == 'pose': 
             # Draw targets (constantly updated, so draw with reset)
-            updated_targets = {pid : Pose.from_rigid_transform(pid, RigidTransform.from_homogenous_matrix(p)) 
+            updated_targets = {pid : Pose.from_rigid_transform(pid, RigidTransform.from_matrix(p)) 
                                for (pid, p) in self.target_poses.iteritems()}
             if len(updated_targets): 
                 edges = np.vstack([draw_utils.draw_tag_edges(p) for p in updated_targets.itervalues()])
@@ -304,6 +335,7 @@ class RobotSLAMMixin(object):
 # Right to left inheritance
 class RobotSLAM(RobotSLAMMixin, GTSAM_BaseSLAM): 
     def __init__(self, update_on_odom=False, verbose=False, 
+                 odom_noise=GTSAM_VisualSLAM.odom_noise, prior_noise=GTSAM_VisualSLAM.prior_noise, 
                  visualize_nodes=False, visualize_factors=False, visualize_marginals=False): 
         GTSAM_BaseSLAM.__init__(self, 
                                 odom_noise=GTSAM_BaseSLAM.odom_noise, 
@@ -409,7 +441,7 @@ class RobotVisualSLAM(RobotSLAMMixin, GTSAM_VisualSLAM):
 #         self.updated_ids_ = vis_slam_updates(self.slam_)
 
 #         # Visualize tags/landmarks
-#         p_landmarks = [ Pose.from_rigid_transform(tag.id, RigidTransform.from_homogenous_matrix(tag.getPose())) 
+#         p_landmarks = [ Pose.from_rigid_transform(tag.id, RigidTransform.from_matrix(tag.getPose())) 
 #                         for tag in tags ]
 #         self.vis_landmarks(self.pose_id_, self.poses_.latest, p_landmarks)
         

@@ -222,7 +222,7 @@ class BaseSLAM(object):
 
     def add_pose_landmarks(self, xid, lids, deltas): 
         if self.verbose_: 
-            print_red('\t\t{:}::add_landmark {:}->{:}'.format(self.__class__.__name__, xid, len(lids)))
+            print_red('\t\t{:}::add_landmark x{:} -> lcount: {:}'.format(self.__class__.__name__, xid, len(lids)))
 
         # Add Pose-Pose landmark factor
         x_id = symbol('x', xid)
