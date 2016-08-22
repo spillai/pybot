@@ -426,6 +426,19 @@ def draw_tags_edges(poses, size=0.1):
     return np.vstack([draw_tag_edges(p) for p in poses])
 
 # Publish Objects ===============================================================
+def publish_tags(pub_channel, poses, c='g', texts=[], covars=[], frame_id='camera', 
+                 draw_edges=True, draw_nodes=False, element_id=0, size=1, reset=True):
+ 
+
+    # Publish pose, and corresponding texts
+    if draw_nodes: 
+        publish_pose_list(pub_channel, poses, texts=texts, frame_id=frame_id, reset=reset)
+
+    # Green tag edges
+    tag_edges = np.vstack([draw_tag_edges(p) for p in poses])
+    publish_line_segments(pub_channel + '-edges', tag_edges[:,:3], tag_edges[:,3:6], c=c, 
+                          frame_id=frame_id, element_id=element_id, reset=reset)
+
 def publish_cameras(pub_channel, poses, c='y', texts=[], covars=[], frame_id='camera', 
                     draw_faces=False, draw_edges=True, draw_nodes=False, size=1, zmin=0.01, zmax=0.5, reset=True):
     cam_feats = [draw_camera(pose, zmin=zmin * size, zmax=zmax * size) for pose in poses]
