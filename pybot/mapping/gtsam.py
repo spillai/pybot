@@ -1,3 +1,5 @@
+"""SLAM interface with GTSAM"""
+
 # Author: Sudeep Pillai <spillai@csail.mit.edu>
 # License: MIT
 
@@ -168,7 +170,7 @@ class BaseSLAM(object):
             self.gviz_.add_node(x_id) # , label='x0')
             self.gviz_.node[x_id]['label'] = 'X %i' % index
 
-            Add prior factor to graphviz
+            # Add prior factor to graphviz
             p_id = symbol('p', index)
             self.gviz_.add_edge(p_id, symbol('x', index))
             self.gviz_.node[p_id]['label'] = 'P %i' % index
@@ -196,7 +198,7 @@ class BaseSLAM(object):
         pdelta = Pose3(delta)
         x_id1, x_id2 = symbol('x', xid1), symbol('x', xid2)
         self.graph_.add(BetweenFactorPose3(x_id1, x_id2, 
-                                               pdelta, self.odo_noise_))
+                                           pdelta, self.odo_noise_))
         
         # Predict pose and add as initial estimate
         pred_pose = self.xs_[xid1].compose(pdelta)
@@ -213,7 +215,8 @@ class BaseSLAM(object):
 
     def add_pose_landmarks(self, xid, lids, deltas): 
         if self.verbose_: 
-            print_red('\t\t{:}::add_landmark x{:} -> lcount: {:}'.format(self.__class__.__name__, xid, len(lids)))
+            print_red('\t\t{:}::add_landmark x{:} -> lcount: {:}'
+                      .format(self.__class__.__name__, xid, len(lids)))
 
         # Add Pose-Pose landmark factor
         x_id = symbol('x', xid)
