@@ -78,6 +78,9 @@ class Counter(object):
             self.__class__.__name__, self.index, self.length
         )
 
+    def poll(self): 
+        self.count()
+
     def count(self): 
         self.idx_ += 1
 
