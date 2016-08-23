@@ -42,20 +42,6 @@ def matrix(m):
 def vec(*args):
     return vector(list(args)) 
 
-def plot2DTrajectory(values, linespec, marginals=[]): 
-    pass
-
-    # poses = extractPose2(values)
-    # X = poses[:,1]
-    # Y = poses[:,2]
-    # theta = poses[:,3]
-
-    # # if len(marginals): 
-    # #     C = np.cos(theta)
-    # #     S = np.sin(theta)
-
-    # print values, marginals
-
 class BaseSLAM(object): 
     """
     Basic SLAM interface with GTSAM::ISAM2
@@ -731,6 +717,10 @@ class VisualSLAM(BaseSLAM):
 # #         camera = SimpleCamera(self.prev_pose_)
 # #         pass
 
+
+# Helper functions for tests
+# ======================================================================
+
 def createPoints(): 
     # Create the set of ground-truth landmarks
     points = [Point3(10.0,10.0,10.0), 
@@ -757,6 +747,24 @@ def createPoses():
         poses.append(camera.pose())
 
     return poses
+
+def plot2DTrajectory(values, linespec, marginals=[]): 
+    pass
+
+    # poses = extractPose2(values)
+    # X = poses[:,1]
+    # Y = poses[:,2]
+    # theta = poses[:,3]
+
+    # # if len(marginals): 
+    # #     C = np.cos(theta)
+    # #     S = np.sin(theta)
+
+    # print values, marginals
+
+
+# Tests
+# ======================================================================
 
 def test_odometryExample(): 
     print("test_odmetryExample\n")
@@ -1049,8 +1057,12 @@ def test_SFMExample_SmartFactor():
     # landmark_result.printf("Landmark results:\n")
             
 if __name__ == "__main__": 
-    # test_odometryExample()
-    # test_PlanarSLAMExample()
-    # test_StereoVOExample()
+    test_odometryExample()
+    print('OK')
+    test_PlanarSLAMExample()
+    print('OK')
+    test_StereoVOExample()
+    print('OK')
     test_SFMExample_SmartFactor()
+    print('OK')
     

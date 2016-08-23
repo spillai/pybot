@@ -409,10 +409,3 @@ class TagDetector(object):
         
         return tags
 
-# Test /home/spillai/perceptual-learning/software/python/apps/tango/tango_annotations_app.py
-
-# import subprocess
-# print ("1. Running tango slam")
-# app = subprocess.Popen( [os.path.join("/home/spillai/perceptual-learning/software/python/apps/tango/tango_annotations_app.py")] )
-# app.wait()
-
