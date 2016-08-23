@@ -137,38 +137,83 @@ class ApproximateTimeSynchronizerBag(ApproximateTimeSynchronizer):
 
     def __init__(self, topics, queue_size, slop): 
         ApproximateTimeSynchronizer.__init__(self, [], queue_size, slop)
-        self.queues = [{} for f in topics]
-        self.topic_queue = {topic: self.queues[ind] for ind, topic in enumerate(topics)}
+        self.queues_ = [{} for f in topics]
+        self.topic_queue_ = {topic: self.queues_[ind] for ind, topic in enumerate(topics)}
 
     def add_topic(self, topic, msg):
-        self.add(msg, self.topic_queue[topic])
+        self.add(msg, self.topic_queue_[topic])
 
-class StereoSynchronizer(object): 
+class SensorSynchronizer(object): 
+    def __init__(self, channels, cb_names, decoders, on_synced_cb, slop_seconds=0.1, queue_length=10): 
+        self.channels_ = channels
+        self.cb_name_ = cb_names
+        self.decoders_ = decoders
+        self.slop_seconds_ = slop
+        self.queue_length_ = queue_length
+
+        self.synch_ = ApproximateTimeSynchronizerBag(self.channels_, queue_length, slop_seconds)
+        self.synch_.registerCallback(self.on_sync)
+        self.on_synced_cb = on_synced_cb
+
+        for (channel, cb_name) in zip(self.channels_, self.cb_names_): 
+            setattr(self, cb_name, lambda t, msg: self.synch_.add_topic(channel, msg))
+            print('{} :: Registering {} with callback'.format(self.__class__.__name__, cb_name))
+
+    def on_sync(self, *args): 
+        items = [dec.decoder(msg) for msg, dec in izip(*args, self.decoders_)]
+        return self.on_synced_cb(*items)
+
+def StereoSynchronizer(left_channel, right_channel, left_cb_name, right_cb_name, on_stereo_cb, 
+                       every_k_frames=1, scale=1., encoding='bgr8', compressed=False): 
     """
     Time-synchronized stereo image decoder
     """
-    def __init__(self, left_channel, right_channel, on_stereo_cb, 
+    channels = [left_channel, right_channel]
+    cb_names = [left_cb_name, right_cb_name]
+    decoders = [ImageDecoder(channel=channel, every_k_frames=every_k_frames, 
+                             scale=scale, encoding=encoding, compressed=compressed)
+                for channel in channels]
+    return SensorSynchronizer(channels, cb_names, decoders, on_stereo_cb)
+
+def RGBDSynchronizer(left_channel, right_channel, on_stereo_cb, 
                  every_k_frames=1, scale=1., encoding='bgr8', compressed=False): 
+    """
+    Time-synchronized RGB-D decoder
+    """
+    channels = [rgb_channel, depth_channel]
+    cb_names = [rgb_cb_name, depth_cb_name]
+    decoders = [ImageDecoder(channel=channel, every_k_frames=every_k_frames, 
+                             scale=scale, encoding=encoding, compressed=compressed)
+                for channel in channels]
+    return SensorSynchronizer(channels, decoders, on_stereo_cb)
 
-        self.left_channel = left_channel
-        self.right_channel = right_channel
+                              
+# class StereoSynchronizer(object): 
+#     """
+#     Time-synchronized stereo image decoder
+#     """
+#     def __init__(self, left_channel, right_channel, on_stereo_cb, 
+#                  every_k_frames=1, scale=1., encoding='bgr8', compressed=False): 
 
-        self.decoder = ImageDecoder(every_k_frames=every_k_frames, 
-                                    scale=scale, encoding=encoding, compressed=compressed)
+#         self.left_channel = left_channel
+#         self.right_channel = right_channel
 
-        slop_seconds = 0.02
-        queue_len = 10 
-        self.synch = ApproximateTimeSynchronizerBag([left_channel, right_channel], queue_len, slop_seconds)
-        self.synch.registerCallback(self.on_stereo_sync)
-        self.on_stereo_cb = on_stereo_cb
+#         self.decoder = ImageDecoder(every_k_frames=every_k_frames, 
+#                                     scale=scale, encoding=encoding, compressed=compressed)
 
-        self.on_left = lambda t, msg: self.synch.add_topic(left_channel, msg)
-        self.on_right = lambda t, msg: self.synch.add_topic(right_channel, msg)
+#         slop_seconds = 0.02
+#         queue_len = 10 
+#         self.synch = ApproximateTimeSynchronizerBag([left_channel, right_channel], queue_len, slop_seconds)
+#         self.synch.registerCallback(self.on_stereo_sync)
+#         self.on_stereo_cb = on_stereo_cb
+
+#         self.on_left = lambda t, msg: self.synch.add_topic(left_channel, msg)
+#         self.on_right = lambda t, msg: self.synch.add_topic(right_channel, msg)
         
-    def on_stereo_sync(self, lmsg, rmsg): 
-        limg = self.decoder.decode(lmsg)
-        rimg = self.decoder.decode(rmsg)
-        return self.on_stereo_cb(limg, rimg)
+#     def on_stereo_sync(self, lmsg, rmsg): 
+#         limg = self.decoder.decode(lmsg)
+#         rimg = self.decoder.decode(rmsg)
+#         return self.on_stereo_cb(limg, rimg)
         
 class LaserScanDecoder(Decoder): 
     """
