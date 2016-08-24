@@ -215,22 +215,25 @@ class LaserScanDecoder(Decoder):
     Mostly stripped from 
     https://github.com/ros-perception/laser_geometry/blob/indigo-devel/src/laser_geometry/laser_geometry.py
     """
-    def __init__(self, channel='/scan', every_k_frames=1):
+    def __init__(self, channel='/scan', every_k_frames=1, range_min=0.0, range_max=np.inf):
         Decoder.__init__(self, channel=channel, every_k_frames=every_k_frames)
 
         self.angle_min_ = 0.0
         self.angle_max_ = 0.0
+        self.range_min_ = range_min
+        self.range_max_ = range_max
         self.cos_sin_map_ = np.array([[]])
-                
+        
     def decode(self, msg): 
         try:
-
             N = len(msg.ranges)
 
             zeros = np.zeros(shape=(N,1))
             ranges = np.array(msg.ranges)
+            ranges[ranges < self.range_min_] = np.inf
+            ranges[ranges > self.range_max_] = np.inf
             ranges = np.array([ranges, ranges])
-
+            
             if (self.cos_sin_map_.shape[1] != N or
                self.angle_min_ != msg.angle_min or
                 self.angle_max_ != msg.angle_max):
@@ -365,7 +368,6 @@ class ROSBagReader(LogReader):
         print('{} :: Establishing tfs from ROSBag'.format(self.__class__.__name__))
         for self.idx, (channel, msg, t) in enumerate(self.log.read_messages(topics='/tf')): 
             tf_dec.decode(msg)
-
             for (from_tf, to_tf) in relations:  
 
                 # If the relations have been added already, skip

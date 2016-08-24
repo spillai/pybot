@@ -320,8 +320,8 @@ class LogController(object):
         """
         Pre-processing for inherited controllers
         """
-        print('{:}: init::Initializing controller {:}'.format(self.__class__.__name__, self.filename))
-        print('{:}: Subscriptions:')
+        print('{:} :: Initializing controller {:}'.format(self.__class__.__name__, self.filename))
+        print('{:} :: Subscriptions:'.format(self.__class__.__name__))
         for k,v in self.controller_cb_.iteritems(): 
             func_name = getattr(v, 'im_func', v).func_name
             print('\t{} -> {}'.format(k,func_name))
