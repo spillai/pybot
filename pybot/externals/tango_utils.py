@@ -196,7 +196,7 @@ class TangoLogReader(LogReader):
     """
 
     def __init__(self, directory, scale=1., start_idx=0, every_k_frames=1, 
-                 noise=[0,0], with_ground_truth=False, meta_file='tango_data.txt'): 
+                 noise=[0,0], meta_file='tango_data.txt'): 
 
         # Set directory and filename for time synchronized log reads 
         self.directory_ = os.path.expanduser(directory)
@@ -320,9 +320,9 @@ class TangoLogReader(LogReader):
 
             yield (data.img, bboxes, np.int32(map(lambda key: target_hash[key], target_names)))
 
-    @property
-    def db(self): 
-        return TangoDB(self)
+    # @property
+    # def db(self): 
+    #     return TangoDB(self)
 
 
 # Define tango frame for known decoders
@@ -389,9 +389,14 @@ class TangoDB(LogDB):
         """
         # Load logdb with ground truth metadata
         # Read annotations from index.json {fn -> annotations}
-        meta_directory = os.path.expanduser(dataset.directory)
-        meta = SUN3DAnnotationDB.load(meta_directory, shape=dataset.shape) \
-               if with_ground_truth else None
+        try: 
+            H, W = dataset.shape
+            meta_directory = os.path.expanduser(dataset.directory)
+            meta = SUN3DAnnotationDB.load(meta_directory, shape=(W,H))
+        except Exception, e:
+            print e
+            meta = None
+
         LogDB.__init__(self, dataset, meta=meta)
 
     @property
@@ -443,7 +448,7 @@ class TangoDB(LogDB):
                     self.dataset.decoder[rgb_channel].decode(msg_item)
         self.frame_index_ = OrderedDict([
             (img_msg, TangoFrame(idx, t, img_msg, poses[pose_inds[idx]], 
-                                 self.dataset.annotationdb[img_msg], img_decode))
+                                 self.annotationdb[img_msg], img_decode))
             for idx, (t, ch, img_msg) in enumerate(self.dataset.itercursors()) \
             if ch == rgb_channel and pose_inds[idx] >= 0
         ])
@@ -482,18 +487,18 @@ class TangoDB(LogDB):
 
     @property
     def annotated_inds(self): 
-        return self.dataset.annotationdb.annotated_inds
+        return self.annotationdb.annotated_inds
 
     @property
     def object_annotations(self): 
-        return self.dataset.annotationdb.object_annotations
+        return self.annotationdb.object_annotations
 
     @property
     def objects(self): 
-        return self.dataset.annotationdb.objects
+        return self.annotationdb.objects
 
     def iter_object_annotations(self, target_name=''): 
-        frame_keys, polygon_inds = self.dataset.annotationdb.find_object_annotations(target_name)
+        frame_keys, polygon_inds = self.annotationdb.find_object_annotations(target_name)
         for idx, (fkey,pind) in enumerate(izip(frame_keys, polygon_inds)): 
             try: 
                 f = self[fkey]
@@ -513,9 +518,9 @@ class TangoDB(LogDB):
     def print_index_info(self): 
         # Retrieve ground truth information
         gt_str = '{} frames annotated ({} total annotations)'\
-            .format(self.dataset.annotationdb.num_frame_annotations, 
-                    self.dataset.annotationdb.num_annotations) \
-            if self.dataset.ground_truth_available else 'Not Available'
+            .format(self.annotationdb.num_frame_annotations, 
+                    self.annotationdb.num_annotations) \
+            if self.ground_truth_available else 'Not Available'
 
         # Pretty print IndexDB description 
         print('\nTango IndexDB \n========\n'

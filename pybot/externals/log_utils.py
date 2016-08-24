@@ -83,23 +83,23 @@ class LogFile(object):
         self.topics_ = list(set(topics))
         self.topic_lengths_ = dict(c.items())
         self.length_ = sum(self.topic_lengths_.values())
+        print(self)
 
+    def __repr__(self): 
         # Get distance traveled (accumulate relative motion)
         distance = self._get_distance_travelled()
-        
         messages_str = ', '.join(['{:} ({:})'.format(k,v) 
-                                  for k,v in c.iteritems()])
-        print('\n{} \n========\n'
-              '\tFile: {:}\n'
-              '\tTopics: {:}\n'
-              '\tMessages: {:}\n'
-              '\tDistance Travelled: {:.2f} m\n'
-              '\tDuration: {:} s\n'.format(
-                  self.__class__.__name__, 
-                  self.filename_, 
-                  self.topics_, messages_str, 
-                  distance, np.max(ts)-np.min(ts)))
-        
+                                  for k,v in self.topic_lengths_.iteritems()])
+        return '\n{} \n========\n' \
+        '\tFile: {:}\n' \
+        '\tTopics: {:}\n' \
+        '\tMessages: {:}\n' \
+        '\tDistance Travelled: {:.2f} m\n'.format(
+            self.__class__.__name__, 
+            self.filename_, 
+            self.topics_, messages_str, 
+            distance)
+              
     def _get_distance_travelled(self): 
         " Retrieve distance traveled through relative motion "
 
@@ -373,7 +373,7 @@ class LogDB(object):
     def __init__(self, dataset, meta=None): 
         self.dataset_ = dataset
         self.meta_ = meta
-        print('{} :: Metadata: \n{}\n'.format(self.__class__.__name__, meta))
+        print('{}'.format(meta))
 
         self.frame_index_ = None
         self.frame_name2idx_, self.frame_idx2name_ = None, None

@@ -502,14 +502,16 @@ class ROSBagController(LogController):
         LogController.__init__(self, dataset)
 
 class BagDB(LogDB): 
-    def __init__(self, dataset, with_ground_truth=False): 
+    def __init__(self, dataset): 
         """
         """
         # Load logdb with ground truth metadata
         # Read annotations from index.json {fn -> annotations}
-        meta_directory = os.path.expanduser(dataset.filename).replace('.bag','')
-        meta = SUN3DAnnotationDB.load(meta_directory, shape=None) \
-               if with_ground_truth else None
+        try: 
+            meta_directory = os.path.expanduser(dataset.filename).replace('.bag','')
+            meta = SUN3DAnnotationDB.load(meta_directory, shape=None)
+        except: 
+            meta = None
         LogDB.__init__(self, dataset, meta=meta)
 
     # @property

@@ -129,13 +129,11 @@ class SUN3DAnnotationDB(object):
         self.initialize(data=data)
 
     def __repr__(self): 
-        print('=' * 80 + 
-              '\n{}\n========\n'
-              '\tAnnotations: {}\n'
-              '\tObjects: {}'.format(self.__class__.__name__, 
-                                     self.num_annotations, 
-                                     self.num_objects) + 
-              '=' * 80)
+       return '{}\n========\n' \
+       '\tAnnotations: {}\n' \
+       '\tObjects: {}\n'.format(self.__class__.__name__, 
+                              self.num_annotations, 
+                              self.num_objects) 
         
     @property
     def initialized(self): 
