@@ -289,21 +289,6 @@ class ROSBagReader(LogReader):
         self.relations_map_ = {}
         print('-' * 120 + '\n{:}\n'.format(self.log) + '-' * 120)
         
-        # Initialize TangoLogReader with appropriate decoders
-        # H, W = self.shape_
-
-        # Load ground truth filename
-        # Read annotations from index.json {fn -> annotations}
-        directory = os.path.expanduser(filename).replace('.bag','')
-        if True: # with_ground_truth: 
-            self.meta_ = SUN3DAnnotationDB.load(directory, shape=None) # (W,H))
-            print('\nGround Truth\n========\n'
-                  '\tAnnotations: {}\n'
-                  '\tObjects: {}'.format(self.meta_.num_annotations, 
-                                         self.meta_.num_objects))
-        else: 
-            self.meta_ = None
-        
         # # Gazebo states (if available)
         # self._publish_gazebo_states()
 
@@ -517,10 +502,15 @@ class ROSBagController(LogController):
         LogController.__init__(self, dataset)
 
 class BagDB(LogDB): 
-    def __init__(self, dataset): 
+    def __init__(self, dataset, with_ground_truth=False): 
         """
         """
-        LogDB.__init__(self, dataset)
+        # Load logdb with ground truth metadata
+        # Read annotations from index.json {fn -> annotations}
+        meta_directory = os.path.expanduser(dataset.filename).replace('.bag','')
+        meta = SUN3DAnnotationDB.load(meta_directory, shape=None) \
+               if with_ground_truth else None
+        LogDB.__init__(self, dataset, meta=meta)
 
     # @property
     # def poses(self): 

@@ -19,6 +19,7 @@ from pybot.geometry.rigid_transform import RigidTransform
 from pybot.utils.dataset.sun3d_utils import SUN3DAnnotationDB
 from pybot.utils.pose_utils import PoseSampler
 
+
 # Decode odometry
 def odom_decode(data): 
     """ 
@@ -202,28 +203,15 @@ class TangoLogReader(LogReader):
         # Set directory and filename for time synchronized log reads 
         self.directory_ = os.path.expanduser(directory)
         self.filename_ = os.path.join(self.directory_, meta_file)
-            
+
+        self.start_idx_ = start_idx
         self.scale_ = scale
         self.calib_ = TangoLogReader.cam.scaled(self.scale_)
         self.shape_ = self.calib_.shape
-
         assert(self.shape_[0] % 2 == 0 and self.shape_[1] % 2 == 0)
-        self.start_idx_ = start_idx
-
-        # Initialize TangoLogReader with appropriate decoders
         H, W = self.shape_
 
-        # Load ground truth filename
-        # Read annotations from index.json {fn -> annotations}
-        if with_ground_truth: 
-            self.meta_ = SUN3DAnnotationDB.load(self.directory_, shape=(W,H))
-            print('\nGround Truth\n========\n'
-                  '\tAnnotations: {}\n'
-                  '\tObjects: {}'.format(self.meta_.num_annotations, 
-                                         self.meta_.num_objects))
-        else: 
-            self.meta_ = None
-
+        # Initialize TangoLogReader with appropriate decoders
         # Setup log (calls load_log, and initializes decoders)
         # Initialize as a log reader with an associated filename
         # (calls load_log on filename) and appropriate decoders
@@ -243,18 +231,9 @@ class TangoLogReader(LogReader):
             raise ValueError('start_idx in TangoReader expects an integer,'
                              'provided {:}'.format(self.start_idx_))
 
-
     @property
-    def annotationdb(self): 
-        return self.meta_
-
-    @property
-    def ground_truth_available(self): 
-        return self.meta_ is not None
-
-    def _check_ground_truth_availability(self):
-        if not self.ground_truth_available: 
-            raise RuntimeError('Ground truth dataset not loaded')
+    def shape(self): 
+        return self.shape_
 
     @property
     def directory(self): 
@@ -290,35 +269,6 @@ class TangoLogReader(LogReader):
             except Exception, e: 
                 print('TangLog.iteritems() :: {:}'.format(e))
 
-    # def iterframes(self, reverse=False): 
-    #     """
-    #     Ground truth reader interface for 
-    #     Images [with time, pose, annotation]  
-    #     : lookup corresponding annotation, and 
-    #     fill in poses from previous timestamp
-    #     """
-    #     # self._check_ground_truth_availability()
-
-    #     # Iterate through both poses and images, and construct frames
-    #     # with look up table for filename str -> (timestamp, pose, annotation) 
-    #     for (t, channel, msg) in self.itercursors(topics=TangoFile.RGB_CHANNEL, 
-    #                                               reverse=reverse): 
-    #         try: 
-    #             res, (t, ch, data) = self.decode_msg(channel, msg, t)
-
-    #             # Annotations
-    #             # Available entries: polygon, bbox, class_label, class_id, instance_id
-    #             if res: 
-    #                 if self.ground_truth_available: 
-    #                     assert(msg in self.meta_)
-    #                     yield (t, ch, AnnotatedImage(img=data, annotation=self.meta_[msg]))
-    #                 else: 
-    #                     yield (t, ch, AnnotatedImage(img=data, annotation=None))
-
-    #         except Exception, e: 
-    #             print('TangLog.iteritems() :: {:}'.format(e))
-
-
     def iterframes(self, reverse=False): 
         """
         Ground truth reader interface for 
@@ -331,7 +281,6 @@ class TangoLogReader(LogReader):
         # with look up table for filename str -> (timestamp, pose, annotation) 
         for (t, channel, frame) in self.db.iterframes(): 
             yield (t, channel, frame)
-
 
     def keyframedb(self, theta=np.deg2rad(20), displacement=0.25, lookup_history=10): 
         sampler = PoseSampler(theta=theta, displacement=displacement, lookup_history=lookup_history, 
@@ -377,12 +326,6 @@ class TangoLogReader(LogReader):
     def db(self): 
         return TangoDB(self)
 
-    @property
-    def annotated_indices(self): 
-        assert(self.ground_truth_available)
-        assert(self.start_idx_ == 0)
-        inds, = np.where(self.meta_.annotation_sizes)
-        return inds
 
 # Define tango frame for known decoders
 class TangoFrame(object): 
@@ -446,7 +389,12 @@ class TangoDB(LogDB):
     def __init__(self, dataset): 
         """
         """
-        LogDB.__init__(self, dataset)
+        # Load logdb with ground truth metadata
+        # Read annotations from index.json {fn -> annotations}
+        meta_directory = os.path.expanduser(dataset.directory)
+        meta = SUN3DAnnotationDB.load(meta_directory, shape=dataset.shape) \
+               if with_ground_truth else None
+        LogDB.__init__(self, dataset, meta=meta)
 
     @property
     def poses(self): 
@@ -607,18 +555,18 @@ Frame = namedtuple('Frame', ['img', 'pose', 't_pose', 't_img'])
 AnnotatedFrame = namedtuple('AnnotatedFrame', ['img', 'pose', 't_pose', 't_img', 'bboxes'])
 
 class TangoLogController(LogController): 
-    def __init__(self, dataset): 
+    def __init__(self, dataset, with_ground_truth=False): 
         super(TangoLogController, self).__init__(dataset)
 
-        print('\nSubscriptions\n==============')
-        if not self.controller.ground_truth_available: 
-            self.subscribe(TangoFile.RGB_CHANNEL, self.on_rgb)
-        else: 
-            print('\tGround Truth available, subscribe to LogController.on_rgb_gt')
-            self.subscribe(TangoFile.RGB_CHANNEL, self.on_rgb_gt)
+        # print('\nSubscriptions\n==============')
+        # if not self.controller.ground_truth_available: 
+        #     self.subscribe(TangoFile.RGB_CHANNEL, self.on_rgb)
+        # else: 
+        #     print('\tGround Truth available, subscribe to LogController.on_rgb_gt')
+        #     self.subscribe(TangoFile.RGB_CHANNEL, self.on_rgb_gt)
 
-        self.subscribe(TangoFile.VIO_CHANNEL, self.on_pose)
-        print('')
+        # self.subscribe(TangoFile.VIO_CHANNEL, self.on_pose)
+        # print('')
 
         # Keep a queue of finite lenght to ensure 
         # time-sync with RGB and IMU

@@ -24,12 +24,11 @@ class Decoder(object):
         try: 
             return self.decode_cb(data)
         except Exception, e:
-            print e
-            raise RuntimeError('Error decoding channel: {} with {}\n'
-                               'Data: {}\n '
-                               'Can decode: {}'\
-                               .format(self.channel, self.decode_cb.func_code, data, 
-                                       self.can_decode(self.channel)))
+            raise RuntimeError('\nError decoding channel: {} with {}\n'
+                               'Data: {}, Can decode: {}\n'
+                               'Error: {}\n'\
+                               .format(self.channel, self.decode_cb.func_name, data, 
+                                       self.can_decode(self.channel), e))
 
     def can_decode(self, channel): 
         return self.channel == channel
@@ -342,7 +341,12 @@ class LogController(object):
         Pre-processing for inherited controllers
         """
         print('{:}: init::Initializing controller {:}'.format(self.__class__.__name__, self.filename))
-       
+        print('{:}: Subscriptions:')
+        for k,v in self.controller_cb_.iteritems(): 
+            func_name = getattr(v, 'im_func', v).func_name
+            print('\t{} -> {}'.format(k,func_name))
+        print('-' * 80)
+
     def finish(self): 
         """
         Post-processing for inherited controllers
@@ -366,8 +370,11 @@ class LogController(object):
         return self.dataset_
 
 class LogDB(object): 
-    def __init__(self, dataset): 
+    def __init__(self, dataset, meta=None): 
         self.dataset_ = dataset
+        self.meta_ = meta
+        print('{} :: Metadata: \n{}\n'.format(self.__class__.__name__, meta))
+
         self.frame_index_ = None
         self.frame_name2idx_, self.frame_idx2name_ = None, None
         self._index()
@@ -443,3 +450,26 @@ class LogDB(object):
     @property
     def dataset(self): 
         return self.dataset_
+
+    @property
+    def meta(self): 
+        return self.meta_
+
+    @property
+    def annotationdb(self): 
+        return self.meta_
+
+    @property
+    def ground_truth_available(self): 
+        return self.meta_ is not None
+
+    def _check_ground_truth_availability(self):
+        if not self.ground_truth_available: 
+            raise RuntimeError('Ground truth dataset not loaded')
+
+    @property
+    def annotated_indices(self): 
+        assert(self.ground_truth_available)
+        assert(self.start_idx_ == 0)
+        inds, = np.where(self.annotationdb.annotation_sizes)
+        return inds
