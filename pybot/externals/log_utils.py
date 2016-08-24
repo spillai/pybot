@@ -525,7 +525,7 @@ class LogDB(object):
                 target_names = [target_names[ind] for ind in inds]
                 bboxes = bboxes[inds]
 
-            yield (data.img, bboxes, np.int32(map(lambda key: target_hash[key], target_names)))
+            yield (data.img, bboxes, np.int32(map(lambda key: target_hash.get(key, -1), target_names)))
 
     def iter_object_annotations(self, target_name=''): 
         frame_keys, polygon_inds = self.annotationdb.find_object_annotations(target_name)
