@@ -385,7 +385,7 @@ class LogDB(object):
         print('\nTango IndexDB \n========\n'
               '\tFrames: {:}\n'
               '\tGround Truth: {:}\n'
-              .format(len(self.frame_index_), gt_str)) 
+              .format(self.annotationdb.num_frames, gt_str))
 
     def iterframes(self, reverse=False): 
         raise NotImplementedError()
@@ -486,3 +486,54 @@ class LogDB(object):
         assert(self.start_idx_ == 0)
         inds, = np.where(self.annotationdb.annotation_sizes)
         return inds
+
+    def keyframedb(self, theta=np.deg2rad(20), displacement=0.25, lookup_history=10): 
+        sampler = PoseSampler(theta=theta, displacement=displacement, lookup_history=lookup_history, 
+                              get_sample=lambda (t, channel, frame): frame.pose, verbose=True)
+        self.iterframes = lambda: sampler.iteritems(self.iterframes())
+        return self
+
+    def roidb(self, target_hash, targets=[], every_k_frames=1, verbose=True, skip_empty=True): 
+        """
+        Returns (img, bbox, targets [unique text])
+        """
+
+        self.check_ground_truth_availability()
+
+        if every_k_frames > 1 and skip_empty: 
+            raise RuntimeError('roidb not meant for skipping frames,'
+                               'and skipping empty simultaneously ')
+
+        # Iterate through all images
+        for idx, (t,ch,data) in enumerate(self.iterframes()): 
+
+            # Skip every k frames, if requested
+            if idx % every_k_frames != 0: 
+                continue
+
+            # Annotations may be empty, if 
+            # unlabeled, however we can request
+            # to yield if its empty or not
+            bboxes = data.annotation.bboxes
+            if not len(bboxes) and skip_empty: 
+                continue
+            target_names = data.annotation.pretty_names
+
+            if len(targets): 
+                inds, = np.where([np.any([t in name for t in targets]) for name in target_names])
+
+                target_names = [target_names[ind] for ind in inds]
+                bboxes = bboxes[inds]
+
+            yield (data.img, bboxes, np.int32(map(lambda key: target_hash[key], target_names)))
+
+    def iter_object_annotations(self, target_name=''): 
+        frame_keys, polygon_inds = self.annotationdb.find_object_annotations(target_name)
+        for idx, (fkey,pind) in enumerate(izip(frame_keys, polygon_inds)): 
+            try: 
+                f = self[fkey]
+            except KeyError, e: 
+                print(e)
+                continue
+            assert(f.is_annotated)
+            yield f, pind

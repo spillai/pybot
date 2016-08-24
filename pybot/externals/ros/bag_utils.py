@@ -20,6 +20,7 @@ from cv_bridge import CvBridge, CvBridgeError
 from cv_bridge.boost.cv_bridge_boost import cvtColor2
 from tf2_msgs.msg import TFMessage
 
+from pybot.utils.misc import Accumulator
 from pybot.externals.log_utils import Decoder, LogReader, LogController, LogDB
 from pybot.vision.image_utils import im_resize
 from pybot.vision.imshow_utils import imshow_cv
@@ -502,6 +503,50 @@ class ROSBagController(LogController):
         """
         LogController.__init__(self, dataset)
 
+class BagFrame(object): 
+    """
+    BagFrame to allow for indexed look up with minimal 
+    memory overhead; images are only decoded and held in 
+    memory only at request, and not when indexed
+
+    BagFrame: 
+       .img [np.arr (in-memory only on request)]
+       .pose [RigidTransform]
+       .annotation [SUN3DAnntotaionFrame]
+
+    """
+
+    def __init__(self, index, t, img, pose, annotation): 
+        self.index_ = index
+        self.t_ = t
+        self.pose_ = pose
+        self.annotation_ = annotation
+        self.img_ = img
+
+    @property
+    def timestamp(self): 
+        return self.t_
+
+    @property
+    def pose(self): 
+        return self.pose_
+
+    @property
+    def is_annotated(self): 
+        return self.annotation_.is_annotated
+
+    @property
+    def annotation(self): 
+        return self.annotation_
+
+    @property
+    def img(self): 
+        return self.img_
+
+    def __repr__(self): 
+        return 'BagFrame::img={}'.format(self.img.shape)
+
+
 class BagDB(LogDB): 
     def __init__(self, dataset): 
         """
@@ -511,9 +556,44 @@ class BagDB(LogDB):
         try: 
             meta_directory = os.path.expanduser(dataset.filename).replace('.bag','')
             meta = SUN3DAnnotationDB.load(meta_directory, shape=None)
-        except: 
+        except Exception, e: 
+            raise RuntimeError('Failed to open {}, Error: {}'.format(meta_directory, e))
             meta = None
         LogDB.__init__(self, dataset, meta=meta)
+
+    def _index(self): 
+        pass
+
+    def iterframes(self): 
+        """
+        Ground truth reader interface for Images [with time, pose,
+        annotation] : lookup corresponding annotation, and filled in
+        poses from nearest available timestamp
+        """
+        self.check_ground_truth_availability()
+
+        for rgb_idx, (t, ch, data) in enumerate(self.dataset.iteritems(topics=['/camera/rgb/image_raw/compressed_triggered'])):
+            frame = BagFrame(rgb_idx, t, data, None, self.annotationdb['rgb/{:08d}.jpg'.format(rgb_idx)]) 
+            yield (frame.timestamp, rgb_idx, frame)
+                   
+
+        # Iterate through both poses and images, and construct frames
+        # with look up table for filename str -> (timestamp, pose, annotation) 
+
+        # SensorSynchronizer(channels=[rgb_channel, depth_channel, odom_channel], 
+        #                    cb_names=)
+
+        # odom_data = Accumulator(maxlen=1)
+        # rgb_data = Accumulator(maxlen=1)
+        # for (t,ch,data) in self.iteritems(): 
+        #     if ch == odom_channel: 
+        #         odom_data.accumulate(data)
+        #     elif ch == rgb_channel: 
+        #         rgb_data.accumulate(data)
+        #     elif ch == depth_channel: 
+        #         depth_data.accumulate(data)
+        #     if odom_data.length > 0 and rgb_data.length > 0 and depth_data.length > 0: 
+        #         yield
 
     # @property
     # def poses(self): 
@@ -529,29 +609,44 @@ class BagDB(LogDB):
 
     #     where TangoFrame (index_in_the_dataset, timestamp, )
     #     """
+        
+    #     # Create lut for all topics and corresponding connection index
+    #     bag = self.dataset.log
+    #     lut = {conn.topic : idx for idx, conn in bag._connections.iteritems()}
 
-    #     # 1. Iterate through both poses and images, and construct frames
-    #     # with look up table for filename str -> (timestamp, pose, annotation) 
-    #     poses = []
-    #     # pose_decode = lambda msg_item: \
-    #     #               self.dataset.decoder[pose_channel].decode(msg_item)
+    #     # Establish index entries for each of the decoder channels
+    #     connection_indexes =  {dec.channel: bag._connection_indexes[lut[dec.channel]]
+    #                            for dec in self.dataset.decoder.itervalues()}
 
-    #     # Note: Control flow for idx is critical since start_idx could
-    #     # potentially change the offset and destroy the pose_index
-    #     for idx, (t, ch, data) in enumerate(self.dataset.iteritems()): 
-    #         pose = None
-    #         if ch == pose_channel: 
-    #             try: 
-    #                 pose = data
-    #             except: 
-    #                 pose = None
-    #         poses.append(pose)
+    #     for k,v in connection_indexes.iteritems(): 
+    #         print k, len(v)
 
-    #     # Find valid and missing poses
-    #     # pose_inds: log_index -> closest_valid_index
-    #     valid_arr = np.array(
-    #         map(lambda item: item is not None, poses), dtype=np.bool)
-    #     pose_inds = BagDB._nn_pose_fill(valid_arr)
+    #     for idx, rgb_item in enumerate(connection_indexes[rgb_channel]): 
+    #         frame_index_[idx] = rgb_item.time
+            
+
+        # # 1. Iterate through both poses and images, and construct frames
+        # # with look up table for filename str -> (timestamp, pose, annotation) 
+        # poses = []
+        # # pose_decode = lambda msg_item: \
+        # #               self.dataset.decoder[pose_channel].decode(msg_item)
+
+        # # Note: Control flow for idx is critical since start_idx could
+        # # potentially change the offset and destroy the pose_index
+        # for idx, (t, ch, data) in enumerate(self.dataset.iteritems()): 
+        #     pose = None
+        #     if ch == pose_channel: 
+        #         try: 
+        #             pose = data
+        #         except: 
+        #             pose = None
+        #     poses.append(pose)
+
+        # # Find valid and missing poses
+        # # pose_inds: log_index -> closest_valid_index
+        # valid_arr = np.array(
+        #     map(lambda item: item is not None, poses), dtype=np.bool)
+        # pose_inds = BagDB._nn_pose_fill(valid_arr)
 
     #     # Create indexed frames for lookup        
     #     # self.frame_index_:  rgb/img.png -> TangoFrame

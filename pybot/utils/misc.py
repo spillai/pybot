@@ -69,6 +69,10 @@ class OneHotLabeler(dict):
     def __repr__(self):
         return 'OneHotLabeler(%s)' % (dict.__repr__(self))
 
+    @property
+    def target_unhash(self): 
+        return {v:k for k,v in self.iteritems()}
+
 class Counter(object): 
     def __init__(self): 
         self.idx_ = 0
