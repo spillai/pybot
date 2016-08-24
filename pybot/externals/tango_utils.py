@@ -458,7 +458,18 @@ class TangoDB(LogDB):
         inds = np.arange(0 if st < 0 else st, 
                          len(self.frame_index_) if end < 0 else end+1)
         return self.iterframes_indices(inds)
-        
+
+    def iter_object_annotations(self, target_name=''): 
+        frame_keys, polygon_inds = self.annotationdb.find_object_annotations(target_name)
+        for idx, (fkey,pind) in enumerate(izip(frame_keys, polygon_inds)): 
+            try: 
+                f = self[fkey]
+            except KeyError, e: 
+                print(e)
+                continue
+            assert(f.is_annotated)
+            yield f, pind
+
     # def list_annotations(self, target_name=None): 
     #     " List of lists"
     #     inds = self.annotated_inds

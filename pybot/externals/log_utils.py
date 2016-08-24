@@ -5,7 +5,7 @@
 
 import os.path
 import numpy as np
-from itertools import islice
+from itertools import islice, izip
 from abc import ABCMeta, abstractmethod
 from collections import Counter
 from heapq import heappush, heappop
@@ -526,14 +526,3 @@ class LogDB(object):
                 bboxes = bboxes[inds]
 
             yield (data.img, bboxes, np.int32(map(lambda key: target_hash.get(key, -1), target_names)))
-
-    def iter_object_annotations(self, target_name=''): 
-        frame_keys, polygon_inds = self.annotationdb.find_object_annotations(target_name)
-        for idx, (fkey,pind) in enumerate(izip(frame_keys, polygon_inds)): 
-            try: 
-                f = self[fkey]
-            except KeyError, e: 
-                print(e)
-                continue
-            assert(f.is_annotated)
-            yield f, pind
