@@ -94,6 +94,7 @@ class SUN3DAnnotationFrame(object):
 
     @property
     def object_ids(self): 
+        # print [ann['object_id'] for ann in self.annotations_]
         return np.int64([ann['object_id'] for ann in self.annotations_])
 
     # def to_json(): 
@@ -101,7 +102,6 @@ class SUN3DAnnotationFrame(object):
     #     Write annotation to json
     #     """
     #     pass
-
 
 class SUN3DAnnotationDB(object):
     """
@@ -113,6 +113,8 @@ class SUN3DAnnotationDB(object):
           'conflictList': [null,null, ...],
           'fileList': ['rgb/2394624513.png', ...],
           'img_height': 360, 'img_width': 640}
+
+    shape: (W, H)
     """
 
     def __init__(self, filename, basename, shape=None, data=None):
@@ -155,6 +157,7 @@ class SUN3DAnnotationDB(object):
                 'img_width': self.shape_[0]
             }
         else: 
+            self.shape_ = (data['img_width'], data['img_height'])
             self.data_ = data
 
         # Determine scale (if not already set)
@@ -290,9 +293,6 @@ class SUN3DAnnotationDB(object):
                    if item is not None else 'null', 
                    self.data_['objects'])
 
-        # return map(lambda item: str(item['name']), 
-        #            filter_none(self.data_['objects']))
-
     @property
     def num_objects(self): 
         return len(self.objects)
@@ -306,7 +306,7 @@ class SUN3DAnnotationDB(object):
         return len(self.data_['fileList'])
 
     def _get_prettynames(self, frame): 
-        return [self.object_unhash_[oid] for oid in frame.object_ids]
+        return [self.object_unhash_.get(oid, 'undefined') for oid in frame.object_ids]
 
     def _get_targets(self, frame): 
         return np.int64([self.target_hash_[self.object_unhash_[oid]] for oid in frame.object_ids])
