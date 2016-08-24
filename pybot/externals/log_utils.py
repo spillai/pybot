@@ -86,36 +86,15 @@ class LogFile(object):
         print(self)
 
     def __repr__(self): 
-        # Get distance traveled (accumulate relative motion)
-        distance = self._get_distance_travelled()
         messages_str = ', '.join(['{:} ({:})'.format(k,v) 
                                   for k,v in self.topic_lengths_.iteritems()])
         return '\n{} \n========\n' \
         '\tFile: {:}\n' \
         '\tTopics: {:}\n' \
-        '\tMessages: {:}\n' \
-        '\tDistance Travelled: {:.2f} m\n'.format(
+        '\tMessages: {:}\n'.format(
             self.__class__.__name__, 
             self.filename_, 
-            self.topics_, messages_str, 
-            distance)
-              
-    def _get_distance_travelled(self): 
-        " Retrieve distance traveled through relative motion "
-
-        prev_pose, tvec = None, 0
-        for (_,pose_str,_) in self.read_messages(topics=LogFile.VIO_CHANNEL): 
-            try: 
-                pose = odom_decode(pose_str)
-            except: 
-                continue
-
-            if prev_pose is not None: 
-                tvec += np.linalg.norm(prev_pose.tvec-pose.tvec)
-
-            prev_pose = pose
-
-        return tvec
+            self.topics_, messages_str)
 
     def _get_stats(self): 
         # Get stats
@@ -139,10 +118,10 @@ class LogFile(object):
     def length(self): 
         return self.length_
 
-    @property
-    def fd(self): 
-        """ Open the tango meta data file as a file descriptor """
-        return open(self.filename, 'r')
+    # @property
+    # def fd(self): 
+    #     """ Open the tango meta data file as a file descriptor """
+    #     return open(self.filename, 'r')
         
     def read_messages(self, topics=[], start_time=0): 
         """
@@ -161,31 +140,32 @@ class LogFile(object):
         # Push messages onto the heap and pop such that 
         # the order of timestamps is ensured to be increasing.
         p_t = 0
-        for l in self.fd: 
-            try: 
-                t, ch, data = l.replace('\n', '').split('\t')
-            except: 
-                continue
+        with open(self.filename, 'r') as f: 
+            for l in f: 
+                try: 
+                    t, ch, data = l.replace('\n', '').split('\t')
+                except: 
+                    continue
 
-            if len(topics_set) and ch not in topics_set: 
-                continue
+                if len(topics_set) and ch not in topics_set: 
+                    continue
 
-            if len(heap) == N: 
+                if len(heap) == N: 
+                    c_t, c_ch, c_data = heappop(heap)
+                    # Check monotononic measurements
+                    assert(c_t >= p_t)
+                    p_t = c_t
+                    yield c_ch, c_data, c_t
+
+                heappush(heap, (int(t), ch, data))
+
+            # Pop the rest of the heap
+            for j in range(len(heap)): 
                 c_t, c_ch, c_data = heappop(heap)
                 # Check monotononic measurements
                 assert(c_t >= p_t)
                 p_t = c_t
                 yield c_ch, c_data, c_t
-            
-            heappush(heap, (int(t), ch, data))
-
-        # Pop the rest of the heap
-        for j in range(len(heap)): 
-            c_t, c_ch, c_data = heappop(heap)
-            # Check monotononic measurements
-            assert(c_t >= p_t)
-            p_t = c_t
-            yield c_ch, c_data, c_t
 
 
 class LogReader(LogDecoder): 

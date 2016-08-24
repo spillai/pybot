@@ -164,6 +164,38 @@ class TangoFile(LogFile):
     def __init__(self, filename): 
         LogFile.__init__(self, filename)
 
+    def __repr__(self): 
+        # Get distance traveled (accumulate relative motion)
+        distance = self._get_distance_travelled()
+        messages_str = ', '.join(['{:} ({:})'.format(k,v) 
+                                  for k,v in self.topic_lengths_.iteritems()])
+        return '\n{} \n========\n' \
+        '\tFile: {:}\n' \
+        '\tTopics: {:}\n' \
+        '\tMessages: {:}\n' \
+        '\tDistance Travelled: {:.2f} m\n'.format(
+            self.__class__.__name__, 
+            self.filename_, 
+            self.topics_, messages_str, 
+            distance)
+              
+    def _get_distance_travelled(self): 
+        " Retrieve distance traveled through relative motion "
+
+        prev_pose, tvec = None, 0
+        for (_,pose_str,_) in self.read_messages(topics=LogFile.VIO_CHANNEL): 
+            try: 
+                pose = odom_decode(pose_str)
+            except: 
+                continue
+
+            if prev_pose is not None: 
+                tvec += np.linalg.norm(prev_pose.tvec-pose.tvec)
+
+            prev_pose = pose
+
+        return tvec
+
 class TangoLogReader(LogReader): 
     
     cam = CameraIntrinsic(
