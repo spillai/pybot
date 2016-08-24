@@ -56,8 +56,8 @@ class SUN3DAnnotationFrame(object):
             object_id = poly['object']
             self.add(poly['object'], xy)
 
-    # def __repr__(self): 
-    #     return self.annotations_
+    def __repr__(self): 
+        return self.annotations_
             
     def add(self, object_id, xy, bbox=None): 
         if bbox is None: 
@@ -127,7 +127,15 @@ class SUN3DAnnotationDB(object):
         self.basename_ = basename.replace('/','')
         self.shape_ = shape
         self.initialize(data=data)
-        
+
+    def __repr__(self): 
+        print('=' * 80 + 
+              '\n{}\n========\n'
+              '\tAnnotations: {}\n'
+              '\tObjects: {}'.format(self.__class__.__name__, 
+                                     self.num_annotations, 
+                                     self.num_objects) + 
+              '=' * 80)
         
     @property
     def initialized(self): 
