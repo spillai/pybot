@@ -19,6 +19,8 @@ from pybot.geometry.rigid_transform import RigidTransform
 from pybot.utils.dataset.sun3d_utils import SUN3DAnnotationDB
 from pybot.utils.pose_utils import PoseSampler
 
+TANGO_RGB_CHANNEL = 'RGB'
+TANGO_VIO_CHANNEL = 'RGB_VIO'
 
 # Decode odometry
 def odom_decode(data): 
@@ -159,10 +161,6 @@ class TangoImageDecoder(Decoder):
 AnnotatedImage = namedtuple('AnnotatedImage', ['img', 'annotation'])
 
 class TangoFile(LogFile): 
-
-    RGB_CHANNEL = 'RGB'
-    VIO_CHANNEL = 'RGB_VIO'
-
     def __init__(self, filename): 
         LogFile.__init__(self, filename)
 
@@ -218,11 +216,11 @@ class TangoLogReader(LogReader):
         super(TangoLogReader, self).__init__(
             self.filename_, 
             decoder=[
-                TangoOdomDecoder(channel=TangoFile.VIO_CHANNEL, 
+                TangoOdomDecoder(channel=TANGO_VIO_CHANNEL, 
                                  every_k_frames=every_k_frames, 
                                  noise=noise), 
                 TangoImageDecoder(
-                    self.directory_, channel=TangoFile.RGB_CHANNEL, color=True, 
+                    self.directory_, channel=TANGO_RGB_CHANNEL, color=True, 
                     shape=(W,H), every_k_frames=every_k_frames)]
         )
 
@@ -400,7 +398,7 @@ class TangoDB(LogDB):
     def poses(self): 
         return [v.pose for k,v in self.frame_index_.iteritems()]
         
-    def _index(self, pose_channel=TangoFile.VIO_CHANNEL, rgb_channel=TangoFile.RGB_CHANNEL): 
+    def _index(self, pose_channel=TANGO_VIO_CHANNEL, rgb_channel=TANGO_RGB_CHANNEL): 
         """
         Constructs a look up table for the following variables: 
         
@@ -539,14 +537,14 @@ class TangoDB(LogDB):
     #     self.nodes_ = []
 
     #     for (t,ch,data) in self.dataset_.itercursors(topics=[]): 
-    #         if ch == TangoFile.VIO_CHANNEL: 
+    #         if ch == TANGO_VIO_CHANNEL: 
     #             self.__pose_q.append(data)
     #             continue
             
     #         if not len(self.__pose_q): 
     #             continue
 
-    #         assert(ch == TangoFile.RGB_CHANNEL)
+    #         assert(ch == TANGO_RGB_CHANNEL)
     #         self.nodes_.append(dict(img=data, pose=self.__pose_q[-1]))
             
 
@@ -560,12 +558,12 @@ class TangoLogController(LogController):
 
         # print('\nSubscriptions\n==============')
         # if not self.controller.ground_truth_available: 
-        #     self.subscribe(TangoFile.RGB_CHANNEL, self.on_rgb)
+        #     self.subscribe(TANGO_RGB_CHANNEL, self.on_rgb)
         # else: 
         #     print('\tGround Truth available, subscribe to LogController.on_rgb_gt')
-        #     self.subscribe(TangoFile.RGB_CHANNEL, self.on_rgb_gt)
+        #     self.subscribe(TANGO_RGB_CHANNEL, self.on_rgb_gt)
 
-        # self.subscribe(TangoFile.VIO_CHANNEL, self.on_pose)
+        # self.subscribe(TANGO_VIO_CHANNEL, self.on_pose)
         # print('')
 
         # Keep a queue of finite lenght to ensure 
