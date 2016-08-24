@@ -577,7 +577,7 @@ class BagDB(LogDB):
     #     annotation] : lookup corresponding annotation, and filled in
     #     poses from nearest available timestamp
     #     """
-    #     # self._check_ground_truth_availability()
+    #     # self.check_ground_truth_availability()
 
     #     # Iterate through both poses and images, and construct frames
     #     # with look up table for filename str -> (timestamp, pose, annotation) 
@@ -632,7 +632,7 @@ class BagDB(LogDB):
     #     gt_str = '{} frames annotated ({} total annotations)'\
     #         .format(self.dataset.annotationdb.num_frame_annotations, 
     #                 self.dataset.annotationdb.num_annotations) \
-    #         if self.dataset.ground_truth_available else 'Not Available'
+    #         if self.dataset.is_ground_truth_available else 'Not Available'
 
     #     # Pretty print IndexDB description 
     #     print('\nTango IndexDB \n========\n'

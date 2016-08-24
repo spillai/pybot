@@ -460,11 +460,11 @@ class LogDB(object):
         return self.meta_
 
     @property
-    def ground_truth_available(self): 
+    def is_ground_truth_available(self): 
         return self.meta_ is not None
 
-    def _check_ground_truth_availability(self):
-        if not self.ground_truth_available: 
+    def check_ground_truth_availability(self):
+        if not self.is_ground_truth_available: 
             raise RuntimeError('Ground truth dataset not loaded')
 
     @property

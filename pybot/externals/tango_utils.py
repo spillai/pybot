@@ -267,59 +267,6 @@ class TangoLogReader(LogReader):
             except Exception, e: 
                 print('TangLog.iteritems() :: {:}'.format(e))
 
-    def iterframes(self, reverse=False): 
-        """
-        Ground truth reader interface for 
-        Images [with time, pose, annotation]  
-        : lookup corresponding annotation, and 
-        fill in poses from previous timestamp
-        """
-        
-        # Iterate through both poses and images, and construct frames
-        # with look up table for filename str -> (timestamp, pose, annotation) 
-        for (t, channel, frame) in self.db.iterframes(): 
-            yield (t, channel, frame)
-
-    def keyframedb(self, theta=np.deg2rad(20), displacement=0.25, lookup_history=10): 
-        sampler = PoseSampler(theta=theta, displacement=displacement, lookup_history=lookup_history, 
-                              get_sample=lambda (t, channel, frame): frame.pose, verbose=True)
-        self.iterframes = lambda: sampler.iteritems(self.db.iterframes())
-        return self
-
-    def roidb(self, target_hash, targets=[], every_k_frames=1, verbose=True, skip_empty=True): 
-        """
-        Returns (img, bbox, targets [unique text])
-        """
-
-        self._check_ground_truth_availability()
-
-        if every_k_frames > 1 and skip_empty: 
-            raise RuntimeError('roidb not meant for skipping frames,'
-                               'and skipping empty simultaneously ')
-
-        # Iterate through all images
-        for idx, (t,ch,data) in enumerate(self.iterframes()): 
-
-            # Skip every k frames, if requested
-            if idx % every_k_frames != 0: 
-                continue
-
-            # Annotations may be empty, if 
-            # unlabeled, however we can request
-            # to yield if its empty or not
-            bboxes = data.annotation.bboxes
-            if not len(bboxes) and skip_empty: 
-                continue
-            target_names = data.annotation.pretty_names
-
-            if len(targets): 
-                inds, = np.where([np.any([t in name for t in targets]) for name in target_names])
-
-                target_names = [target_names[ind] for ind in inds]
-                bboxes = bboxes[inds]
-
-            yield (data.img, bboxes, np.int32(map(lambda key: target_hash[key], target_names)))
-
     # @property
     # def db(self): 
     #     return TangoDB(self)
@@ -461,11 +408,11 @@ class TangoDB(LogDB):
 
     def iterframes(self): 
         """
-        Ground truth reader interface for Images [with time, pose,
-        annotation] : lookup corresponding annotation, and filled in
-        poses from nearest available timestamp
+        Ground truth reader interface for Images 
+        [time, pose, annotation] : lookup corresponding annotation, 
+        and filled in poses from nearest available timestamp
         """
-        # self._check_ground_truth_availability()
+        # self.check_ground_truth_availability()
 
         # Iterate through both poses and images, and construct frames
         # with look up table for filename str -> (timestamp, pose, annotation) 
@@ -484,6 +431,47 @@ class TangoDB(LogDB):
         inds = np.arange(0 if st < 0 else st, 
                          len(self.frame_index_) if end < 0 else end+1)
         return self.iterframes_indices(inds)
+
+    def keyframedb(self, theta=np.deg2rad(20), displacement=0.25, lookup_history=10): 
+        sampler = PoseSampler(theta=theta, displacement=displacement, lookup_history=lookup_history, 
+                              get_sample=lambda (t, channel, frame): frame.pose, verbose=True)
+        self.iterframes = lambda: sampler.iteritems(self.iterframes())
+        return self
+
+    def roidb(self, target_hash, targets=[], every_k_frames=1, verbose=True, skip_empty=True): 
+        """
+        Returns (img, bbox, targets [unique text])
+        """
+
+        self.check_ground_truth_availability()
+
+        if every_k_frames > 1 and skip_empty: 
+            raise RuntimeError('roidb not meant for skipping frames,'
+                               'and skipping empty simultaneously ')
+
+        # Iterate through all images
+        for idx, (t,ch,data) in enumerate(self.iterframes()): 
+
+            # Skip every k frames, if requested
+            if idx % every_k_frames != 0: 
+                continue
+
+            # Annotations may be empty, if 
+            # unlabeled, however we can request
+            # to yield if its empty or not
+            bboxes = data.annotation.bboxes
+            if not len(bboxes) and skip_empty: 
+                continue
+            target_names = data.annotation.pretty_names
+
+            if len(targets): 
+                inds, = np.where([np.any([t in name for t in targets]) for name in target_names])
+
+                target_names = [target_names[ind] for ind in inds]
+                bboxes = bboxes[inds]
+
+            yield (data.img, bboxes, np.int32(map(lambda key: target_hash[key], target_names)))
+
 
     @property
     def annotated_inds(self): 
@@ -520,7 +508,7 @@ class TangoDB(LogDB):
         gt_str = '{} frames annotated ({} total annotations)'\
             .format(self.annotationdb.num_frame_annotations, 
                     self.annotationdb.num_annotations) \
-            if self.ground_truth_available else 'Not Available'
+            if self.is_ground_truth_available else 'Not Available'
 
         # Pretty print IndexDB description 
         print('\nTango IndexDB \n========\n'
@@ -558,11 +546,11 @@ Frame = namedtuple('Frame', ['img', 'pose', 't_pose', 't_img'])
 AnnotatedFrame = namedtuple('AnnotatedFrame', ['img', 'pose', 't_pose', 't_img', 'bboxes'])
 
 class TangoLogController(LogController): 
-    def __init__(self, dataset, with_ground_truth=False): 
+    def __init__(self, dataset): 
         super(TangoLogController, self).__init__(dataset)
 
         # print('\nSubscriptions\n==============')
-        # if not self.controller.ground_truth_available: 
+        # if not self.controller.is_ground_truth_available: 
         #     self.subscribe(TANGO_RGB_CHANNEL, self.on_rgb)
         # else: 
         #     print('\tGround Truth available, subscribe to LogController.on_rgb_gt')
