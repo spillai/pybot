@@ -368,7 +368,17 @@ class LogDB(object):
         raise NotImplementedError()
 
     def print_index_info(self): 
-        pass
+        # Retrieve ground truth information
+        gt_str = '{} frames annotated ({} total annotations)'\
+            .format(self.annotationdb.num_frame_annotations, 
+                    self.annotationdb.num_annotations) \
+            if self.is_ground_truth_available else 'Not Available'
+
+        # Pretty print IndexDB description 
+        print('\nTango IndexDB \n========\n'
+              '\tFrames: {:}\n'
+              '\tGround Truth: {:}\n'
+              .format(len(self.frame_index_), gt_str)) 
 
     def iterframes(self, reverse=False): 
         raise NotImplementedError()
@@ -438,6 +448,22 @@ class LogDB(object):
     @property
     def annotationdb(self): 
         return self.meta_
+
+    @property
+    def annotated_inds(self): 
+        return self.annotationdb.annotated_inds
+
+    @property
+    def object_annotations(self): 
+        return self.annotationdb.object_annotations
+
+    @property
+    def objects(self): 
+        return self.annotationdb.objects
+
+    @property
+    def poses(self): 
+        return [v.pose for k,v in self.frame_index_.iteritems()]
 
     @property
     def is_ground_truth_available(self): 

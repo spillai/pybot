@@ -377,10 +377,6 @@ class TangoDB(LogDB):
             meta = None
 
         LogDB.__init__(self, dataset, meta=meta)
-
-    @property
-    def poses(self): 
-        return [v.pose for k,v in self.frame_index_.iteritems()]
         
     def _index(self, pose_channel=TANGO_VIO_CHANNEL, rgb_channel=TANGO_RGB_CHANNEL): 
         """
@@ -504,19 +500,6 @@ class TangoDB(LogDB):
 
             yield (data.img, bboxes, np.int32(map(lambda key: target_hash[key], target_names)))
 
-
-    @property
-    def annotated_inds(self): 
-        return self.annotationdb.annotated_inds
-
-    @property
-    def object_annotations(self): 
-        return self.annotationdb.object_annotations
-
-    @property
-    def objects(self): 
-        return self.annotationdb.objects
-
     def iter_object_annotations(self, target_name=''): 
         frame_keys, polygon_inds = self.annotationdb.find_object_annotations(target_name)
         for idx, (fkey,pind) in enumerate(izip(frame_keys, polygon_inds)): 
@@ -534,24 +517,7 @@ class TangoDB(LogDB):
     #     return [ filter(lambda frame: 
     #                     target_name is None or name is in target_name, 
     #                     self.dataset.annotationdb.iterframes(inds))
-
-    def print_index_info(self): 
-        # Retrieve ground truth information
-        gt_str = '{} frames annotated ({} total annotations)'\
-            .format(self.annotationdb.num_frame_annotations, 
-                    self.annotationdb.num_annotations) \
-            if self.is_ground_truth_available else 'Not Available'
-
-        # Pretty print IndexDB description 
-        print('\nTango IndexDB \n========\n'
-              '\tFrames: {:}\n'
-              '\tGround Truth: {:}\n'
-              .format(len(self.frame_index_), gt_str)) 
                       
-
-    @property
-    def index(self): 
-        return self.frame_index_
 
 
     # def _build_graph(self): 

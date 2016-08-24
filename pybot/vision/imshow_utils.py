@@ -64,6 +64,7 @@ def print_status(vis, text=None):
         cv2.rectangle(vis, (0, vis.shape[0]-18), (len(text) * 8, vis.shape[0]), (50, 50, 50), -1)
         cv2.putText(vis, '%s' % text, (2, vis.shape[0] - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.4, 
                     (240, 240, 240), thickness = 1)
+    return vis
 
 def imshow_cv(label, im, block=False, text=None, wait=2): 
     vis = im.copy()
