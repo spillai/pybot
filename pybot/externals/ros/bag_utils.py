@@ -27,7 +27,6 @@ from pybot.vision.imshow_utils import imshow_cv
 from pybot.vision.camera_utils import CameraIntrinsic
 from pybot.geometry.rigid_transform import RigidTransform
 
-
 class GazeboDecoder(Decoder): 
     """
     Model state decoder for gazebo
@@ -143,49 +142,49 @@ class ApproximateTimeSynchronizerBag(ApproximateTimeSynchronizer):
     def add_topic(self, topic, msg):
         self.add(msg, self.topic_queue_[topic])
 
-class SensorSynchronizer(object): 
-    def __init__(self, channels, cb_names, decoders, on_synced_cb, slop_seconds=0.1, queue_length=10): 
-        self.channels_ = channels
-        self.cb_name_ = cb_names
-        self.decoders_ = decoders
-        self.slop_seconds_ = slop
-        self.queue_length_ = queue_length
+# class SensorSynchronizer(object): 
+#     def __init__(self, channels, cb_names, decoders, on_synced_cb, slop_seconds=0.1, queue_length=10): 
+#         self.channels_ = channels
+#         self.cb_name_ = cb_names
+#         self.decoders_ = decoders
+#         self.slop_seconds_ = slop
+#         self.queue_length_ = queue_length
 
-        self.synch_ = ApproximateTimeSynchronizerBag(self.channels_, queue_length, slop_seconds)
-        self.synch_.registerCallback(self.on_sync)
-        self.on_synced_cb = on_synced_cb
+#         self.synch_ = ApproximateTimeSynchronizerBag(self.channels_, queue_length, slop_seconds)
+#         self.synch_.registerCallback(self.on_sync)
+#         self.on_synced_cb = on_synced_cb
 
-        for (channel, cb_name) in zip(self.channels_, self.cb_names_): 
-            setattr(self, cb_name, lambda t, msg: self.synch_.add_topic(channel, msg))
-            print('{} :: Registering {} with callback'.format(self.__class__.__name__, cb_name))
+#         for (channel, cb_name) in zip(self.channels_, self.cb_names_): 
+#             setattr(self, cb_name, lambda t, msg: self.synch_.add_topic(channel, msg))
+#             print('{} :: Registering {} with callback'.format(self.__class__.__name__, cb_name))
 
-    def on_sync(self, *args): 
-        items = [dec.decoder(msg) for msg, dec in izip(*args, self.decoders_)]
-        return self.on_synced_cb(*items)
+#     def on_sync(self, *args): 
+#         items = [dec.decoder(msg) for msg, dec in izip(*args, self.decoders_)]
+#         return self.on_synced_cb(*items)
 
-def StereoSynchronizer(left_channel, right_channel, left_cb_name, right_cb_name, on_stereo_cb, 
-                       every_k_frames=1, scale=1., encoding='bgr8', compressed=False): 
-    """
-    Time-synchronized stereo image decoder
-    """
-    channels = [left_channel, right_channel]
-    cb_names = [left_cb_name, right_cb_name]
-    decoders = [ImageDecoder(channel=channel, every_k_frames=every_k_frames, 
-                             scale=scale, encoding=encoding, compressed=compressed)
-                for channel in channels]
-    return SensorSynchronizer(channels, cb_names, decoders, on_stereo_cb)
+# def StereoSynchronizer(left_channel, right_channel, left_cb_name, right_cb_name, on_stereo_cb, 
+#                        every_k_frames=1, scale=1., encoding='bgr8', compressed=False): 
+#     """
+#     Time-synchronized stereo image decoder
+#     """
+#     channels = [left_channel, right_channel]
+#     cb_names = [left_cb_name, right_cb_name]
+#     decoders = [ImageDecoder(channel=channel, every_k_frames=every_k_frames, 
+#                              scale=scale, encoding=encoding, compressed=compressed)
+#                 for channel in channels]
+#     return SensorSynchronizer(channels, cb_names, decoders, on_stereo_cb)
 
-def RGBDSynchronizer(left_channel, right_channel, on_stereo_cb, 
-                 every_k_frames=1, scale=1., encoding='bgr8', compressed=False): 
-    """
-    Time-synchronized RGB-D decoder
-    """
-    channels = [rgb_channel, depth_channel]
-    cb_names = [rgb_cb_name, depth_cb_name]
-    decoders = [ImageDecoder(channel=channel, every_k_frames=every_k_frames, 
-                             scale=scale, encoding=encoding, compressed=compressed)
-                for channel in channels]
-    return SensorSynchronizer(channels, decoders, on_stereo_cb)
+# def RGBDSynchronizer(left_channel, right_channel, on_stereo_cb, 
+#                  every_k_frames=1, scale=1., encoding='bgr8', compressed=False): 
+#     """
+#     Time-synchronized RGB-D decoder
+#     """
+#     channels = [rgb_channel, depth_channel]
+#     cb_names = [rgb_cb_name, depth_cb_name]
+#     decoders = [ImageDecoder(channel=channel, every_k_frames=every_k_frames, 
+#                              scale=scale, encoding=encoding, compressed=compressed)
+#                 for channel in channels]
+#     return SensorSynchronizer(channels, decoders, on_stereo_cb)
 
                               
 # class StereoSynchronizer(object): 
@@ -299,6 +298,13 @@ class ROSBagReader(LogReader):
         # # Gazebo states (if available)
         # self._publish_gazebo_states()
 
+    def close(self): 
+        print('{} :: Closing log file {}'.format(self.__class__.__name__, self.filename))
+        self.log.close()
+
+    def __del__(self): 
+        self.log.close()
+
     # def _publish_gazebo_states(self): 
     #     """
     #     Perform a one-time publish of all the gazebo states
@@ -337,7 +343,7 @@ class ROSBagReader(LogReader):
     def load_log(self, filename): 
         st = time.time()
         print('{} :: Loading ROSBag {} ...'.format(self.__class__.__name__, filename))
-        bag = rosbag.Bag(filename, 'r', chunk_threshold=100 * 1024 * 1024)
+        bag = rosbag.Bag(filename, 'r', chunk_threshold=10 * 1024 * 1024)
         print('{} :: Done loading {} in {:5.2f} seconds'.format(self.__class__.__name__, filename, time.time() - st))
         return bag
 

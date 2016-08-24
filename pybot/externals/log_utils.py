@@ -195,11 +195,6 @@ class LogReader(LogDecoder):
         LogDecoder.__init__(self, decoder=decoder)
 
         filename = os.path.expanduser(filename)
-        # if 'udpm://' in filename or len(filename) == 0: 
-        #     print('{} :: LIVE mode'.format(self.__class__.__name__))
-            
-        # else: 
-
         if not os.path.exists(filename):
             raise RuntimeError('Invalid Filename: %s' % filename)
         print('{} :: OFFLINE mode'.format(self.__class__.__name__))
@@ -221,7 +216,6 @@ class LogReader(LogDecoder):
             self.index = None
 
         self.verbose_ = verbose
-
 
     @property
     def filename(self): 
