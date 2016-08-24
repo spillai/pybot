@@ -7,12 +7,11 @@ import sys
 import numpy as np
 import cv2
 import time
+import os.path
 
 import tf
-
 import rosbag
 import rospy
-
 from message_filters import ApproximateTimeSynchronizer
 
 from genpy.rostime import Time
@@ -26,6 +25,7 @@ from pybot.vision.image_utils import im_resize
 from pybot.vision.imshow_utils import imshow_cv
 from pybot.vision.camera_utils import CameraIntrinsic
 from pybot.geometry.rigid_transform import RigidTransform
+from pybot.utils.dataset.sun3d_utils import SUN3DAnnotationDB
 
 class GazeboDecoder(Decoder): 
     """
@@ -113,17 +113,14 @@ class ImageDecoder(Decoder):
         self.compressed = compressed
 
     def decode(self, msg): 
-        if self.compressed: 
-            try: 
+        try: 
+            if self.compressed: 
                 im = compressed_imgmsg_to_cv2(msg, self.encoding)
-            except CvBridgeError as e:
-                print e
-        else: 
-            try: 
+            else: 
                 im = self.bridge.imgmsg_to_cv2(msg, self.encoding)
-                # print("%.6f" % msg.header.stamp.to_sec())
-            except CvBridgeError as e:
-                print e
+        except CvBridgeError as e:
+            print e
+            try: 
 
         return im_resize(im, scale=self.scale)
 
@@ -222,9 +219,9 @@ class LaserScanDecoder(Decoder):
     def __init__(self, channel='/scan', every_k_frames=1):
         Decoder.__init__(self, channel=channel, every_k_frames=every_k_frames)
 
-        self.__angle_min = 0.0
-        self.__angle_max = 0.0
-        self.__cos_sin_map = np.array([[]])
+        self.angle_min_ = 0.0
+        self.angle_max_ = 0.0
+        self.cos_sin_map_ = np.array([[]])
                 
     def decode(self, msg): 
         try:
@@ -235,22 +232,22 @@ class LaserScanDecoder(Decoder):
             ranges = np.array(msg.ranges)
             ranges = np.array([ranges, ranges])
 
-            if (self.__cos_sin_map.shape[1] != N or
-               self.__angle_min != msg.angle_min or
-                self.__angle_max != msg.angle_max):
+            if (self.cos_sin_map_.shape[1] != N or
+               self.angle_min_ != msg.angle_min or
+                self.angle_max_ != msg.angle_max):
                 print("{} :: No precomputed map given. Computing one.".format(self.__class__.__name__))
 
-                self.__angle_min = msg.angle_min
-                self.__angle_max = msg.angle_max
+                self.angle_min_ = msg.angle_min
+                self.angle_max_ = msg.angle_max
 
                 cos_map = [np.cos(msg.angle_min + i * msg.angle_increment)
                        for i in range(N)]
                 sin_map = [np.sin(msg.angle_min + i * msg.angle_increment)
                         for i in range(N)]
 
-                self.__cos_sin_map = np.array([cos_map, sin_map])
+                self.cos_sin_map_ = np.array([cos_map, sin_map])
 
-            return np.hstack([(ranges * self.__cos_sin_map).T, zeros])
+            return np.hstack([(ranges * self.cos_sin_map_).T, zeros])
         except Exception as e:
             print e
 
@@ -291,9 +288,21 @@ class ROSBagReader(LogReader):
         # TF relations
         self.relations_map_ = {}
         print('-' * 120 + '\n{:}\n'.format(self.log) + '-' * 120)
+        
+        # Initialize TangoLogReader with appropriate decoders
+        # H, W = self.shape_
 
-        # for channel, ch_info in info.topics.iteritems(): 
-        #     print channel, ch_info.message_count
+        # Load ground truth filename
+        # Read annotations from index.json {fn -> annotations}
+        directory = os.path.expanduser(filename).replace('.bag','')
+        if True: # with_ground_truth: 
+            self.meta_ = SUN3DAnnotationDB.load(directory, shape=None) # (W,H))
+            print('\nGround Truth\n========\n'
+                  '\tAnnotations: {}\n'
+                  '\tObjects: {}'.format(self.meta_.num_annotations, 
+                                         self.meta_.num_objects))
+        else: 
+            self.meta_ = None
         
         # # Gazebo states (if available)
         # self._publish_gazebo_states()

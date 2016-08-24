@@ -384,16 +384,6 @@ class TangoLogReader(LogReader):
         inds, = np.where(self.meta_.annotation_sizes)
         return inds
 
-def iter_tango_logs(directory, logs, topics=[]):
-    for log in logs: 
-        directory = os.path.expanduser(os.path.join(args.directory, log))
-        print('Accessing Tango directory {:}'.format(directory))
-        dataset = TangoLogReader(directory=directory, scale=im_scale) 
-        for item in dataset.iterframes(topics=topics): 
-            bboxes = item.bboxes
-            targets = item.coords
-
-
 # Define tango frame for known decoders
 class TangoFrame(object): 
     """
@@ -632,27 +622,26 @@ class TangoLogController(LogController):
 
         # Keep a queue of finite lenght to ensure 
         # time-sync with RGB and IMU
-        self.__pose_q = deque(maxlen=10)
+        self.q_pose_ = deque(maxlen=10)
 
     def on_rgb_gt(self, t_img, ann_img): 
-        if not len(self.__pose_q):
+        if not len(self.q_pose_):
             return
-        t_pose, pose = self.__pose_q[-1]
+        t_pose, pose = self.q_pose_[-1]
         self.on_frame(AnnotatedFrame(img=ann_img.img, pose=pose, 
                                      t_pose=t_pose, t_img=t_img, 
                                      bboxes=ann_img.annotation.bboxes))
         
     def on_rgb(self, t_img, img): 
-        if not len(self.__pose_q):
+        if not len(self.q_pose_):
             return
-        t_pose, pose = self.__pose_q[-1]
+        t_pose, pose = self.q_pose_[-1]
         self.on_frame(AnnotatedFrame(img=img, pose=pose, 
                                      t_pose=t_pose, t_img=t_img, 
                                      bboxes=[]))
 
     def on_pose(self, t, pose): 
-        # self.__item_q.append((1, t, pose))
-        self.__pose_q.append((t,pose))
+        self.q_pose_.append((t,pose))
 
         # # If RGB_VIO, RGB, RGB_VIO in stream, then interpolate pose
         # # b/w the 1st and 3rd timestamps to match RGB timestamps
@@ -677,3 +666,13 @@ class TangoLogController(LogController):
     # @abstractmethod
     # def on_pose(self, t, pose): 
     #     raise NotImplementedError()
+
+
+def iter_tango_logs(directory, logs, topics=[]):
+    for log in logs: 
+        directory = os.path.expanduser(os.path.join(args.directory, log))
+        print('Accessing Tango directory {:}'.format(directory))
+        dataset = TangoLogReader(directory=directory, scale=im_scale) 
+        for item in dataset.iterframes(topics=topics): 
+            bboxes = item.bboxes
+            targets = item.coords
