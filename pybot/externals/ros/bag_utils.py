@@ -119,8 +119,7 @@ class ImageDecoder(Decoder):
             else: 
                 im = self.bridge.imgmsg_to_cv2(msg, self.encoding)
         except CvBridgeError as e:
-            print e
-            try: 
+            raise Exception('ImageDecoder.decode :: {}'.format(e))
 
         return im_resize(im, scale=self.scale)
 
