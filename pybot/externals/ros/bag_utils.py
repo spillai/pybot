@@ -237,7 +237,7 @@ class LaserScanDecoder(Decoder):
             if (self.cos_sin_map_.shape[1] != N or
                self.angle_min_ != msg.angle_min or
                 self.angle_max_ != msg.angle_max):
-                print("{} :: No precomputed map given. Computing one.".format(self.__class__.__name__))
+                # print("{} :: No precomputed map given. Computing one.".format(self.__class__.__name__))
 
                 self.angle_min_ = msg.angle_min
                 self.angle_max_ = msg.angle_max

@@ -15,27 +15,34 @@ def take(iterable, max_length=None):
 
 class Decoder(object): 
     def __init__(self, channel='', every_k_frames=1, decode_cb=lambda data: data): 
-        self.channel = channel
-        self.every_k_frames = every_k_frames
-        self.decode_cb = decode_cb
-        self.idx = 0
+        self.channel_ = channel
+        self.every_k_frames_ = every_k_frames
+        self.decode_cb_ = decode_cb
+        self.idx_ = 0
 
     def decode(self, data): 
         try: 
-            return self.decode_cb(data)
+            return self.decode_cb_(data)
         except Exception, e:
             raise RuntimeError('\nError decoding channel: {} with {}\n'
                                'Data: {}, Can decode: {}\n'
                                'Error: {}\n'\
-                               .format(self.channel, self.decode_cb.func_name, data, 
-                                       self.can_decode(self.channel), e))
+                               .format(self.channel_, self.decode_cb_.func_name, data, 
+                                       self.can_decode(self.channel_), e))
 
     def can_decode(self, channel): 
-        return self.channel == channel
+        return self.channel_ == channel
 
     def should_decode(self): 
-        self.idx += 1
-        return self.idx % self.every_k_frames == 0 
+        if self.every_k_frames_ == 1: 
+            return True
+        ret = self.idx_ % self.every_k_frames_ == 0
+        self.idx_ += 1
+        return ret
+
+    @property
+    def channel(self): 
+        return self.channel_
 
 class LogDecoder(object): 
     """
