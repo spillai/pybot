@@ -40,11 +40,11 @@ class ObjectProposal(object):
         return draw_bboxes(vis, bboxes, ellipse=ellipse, colored=colored)
     
     @classmethod
-    def create(cls, method='GOP', scale=1, num_proposals=1000, params=None): 
+    def create(cls, method='GOP', data_dir='', scale=1, num_proposals=1000, params=None): 
         if method == 'GOP': 
             params = dict(detector='sobel', num_proposals=num_proposals) \
                      if params is None else params
-            return cls(GOPObjectProposal(**params), scale=scale)
+            return cls(GOPObjectProposal(data_dir, **params), scale=scale)
         else: 
             raise RuntimeError('Unknown proposals method: %s' % method)
 
@@ -53,8 +53,7 @@ class ObjectProposal(object):
 
 
 class GOPObjectProposal(object): 
-    def __init__(self, detector='sobel', num_proposals=300): 
-        gop_data_dir = """/home/spillai/perceptual-learning/software/externals/recognition-pod/proposals/gop/data/"""
+    def __init__(self, gop_data_dir, detector='sobel', num_proposals=300): 
         self.prop_ = gop.proposals.Proposal( gop_setuplearned( 140, 4, 0.8, gop_data_dir=gop_data_dir ) )
 
         if detector == 'sf': 
@@ -70,7 +69,6 @@ class GOPObjectProposal(object):
     def process(self, im): 
         # To get the 0th proposal segment: b[0, s.s]
         # segmented = np.zeros(shape=s.s.shape[:2], dtype=np.uint8)
-
         im_ = gop.imgproc.npread(np.copy(im))
         s = gop.segmentation.geodesicKMeans( im_, self.segmenter_, self.num_proposals_ )
         b = self.prop_.propose( s )
