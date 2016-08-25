@@ -82,7 +82,7 @@ def config_and_args_parser(conf_path, section, description=''):
     # Parse directory
     parser = argparse.ArgumentParser(
         description=description)
-    parser.add_argument('-c', '--conf_file', required=False, 
+    parser.add_argument('-c', '--config-file', required=False, 
                         default=conf_path, help='Specify config file', metavar='FILE')
     args, remaining_argv = parser.parse_known_args()
 
@@ -90,10 +90,11 @@ def config_and_args_parser(conf_path, section, description=''):
     try: 
         import ConfigParser
         config = ConfigParser.SafeConfigParser()
-        config.read([args.conf_file])
+        config.read([args.config_file])
         defaults = dict(config.items(section))
+        print('Loading config file: {}'.format(args.config_file))
     except Exception as e: 
-        raise RuntimeError('Failed reading %s: %s' % (args.conf_file, e))
+        raise RuntimeError('Failed reading %s: %s' % (args.config_file, e))
 
     parser.set_defaults(**defaults)
     # parser.add_argument("--option1", help="some option")

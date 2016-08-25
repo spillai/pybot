@@ -8,6 +8,7 @@ import numpy as np
 import os.path
 import json
 
+from functools import partial 
 from itertools import izip
 from collections import deque, namedtuple, OrderedDict
 from abc import ABCMeta, abstractmethod
@@ -469,6 +470,12 @@ class TangoDB(LogDB):
                 continue
             assert(f.is_annotated)
             yield f, pind
+
+    def keyframedb(self, theta=np.deg2rad(20), displacement=0.25, lookup_history=10): 
+        sampler = PoseSampler(theta=theta, displacement=displacement, lookup_history=lookup_history, 
+                              get_sample=lambda (t, channel, frame): frame.pose, verbose=True)
+        self.iterframes = partial(sampler.iteritems, self.iterframes())
+        return self
 
     # def list_annotations(self, target_name=None): 
     #     " List of lists"

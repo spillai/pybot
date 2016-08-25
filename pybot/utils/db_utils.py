@@ -83,7 +83,7 @@ def load_pytable(fn):
         data = read_pytable(h5f, group=h5f.root)
         h5f.close()
     except Exception as e: 
-        raise RuntimeError('%s' % e)
+        raise RuntimeError('{}'.format(e))
         data = AttrDict()
     return data
 

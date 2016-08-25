@@ -157,7 +157,7 @@ class SUN3DAnnotationDB(object):
                 'img_width': self.shape_[0]
             }
         else: 
-            self.shape_ = (data['img_width'], data['img_height'])
+            # self.shape_ = (data['img_width'], data['img_height'])
             self.data_ = data
 
         # Determine scale (if not already set)

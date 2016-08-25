@@ -487,11 +487,8 @@ class LogDB(object):
         inds, = np.where(self.annotationdb.annotation_sizes)
         return inds
 
-    def keyframedb(self, theta=np.deg2rad(20), displacement=0.25, lookup_history=10): 
-        sampler = PoseSampler(theta=theta, displacement=displacement, lookup_history=lookup_history, 
-                              get_sample=lambda (t, channel, frame): frame.pose, verbose=True)
-        self.iterframes = lambda: sampler.iteritems(self.iterframes())
-        return self
+    def keyframedb(self, *args, **kwargs): 
+        raise NotImplementedError()
 
     def roidb(self, target_hash, targets=[], every_k_frames=1, verbose=True, skip_empty=True): 
         """
