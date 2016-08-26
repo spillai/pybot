@@ -61,7 +61,7 @@ def read_pytable(h5f, group=None):
     if group is None: group = h5f.root
 
     data = AttrDict()
-    for child in h5f.listNodes(group): 
+    for child in h5f.list_nodes(group): 
         item = None
         try: 
             if isinstance(child, tb.group.Group): 
@@ -79,7 +79,7 @@ def read_pytable(h5f, group=None):
 
 def load_pytable(fn): 
     try: 
-        h5f = tb.openFile(os.path.expanduser(fn), mode='r', title='Title: %s' % fn)
+        h5f = tb.open_file(os.path.expanduser(fn), mode='r', title='Title: %s' % fn)
         data = read_pytable(h5f, group=h5f.root)
         h5f.close()
     except Exception as e: 
@@ -114,7 +114,7 @@ def flush_pytable(h5f, data=None, group=None, table=None, force=True):
         # Clean up before writing 
         if force: 
             try:
-                h5f.removeNode(get_node(group._gp,k), recursive=True) 
+                h5f.remove_node(get_node(group._gp,k), recursive=True) 
             except tb.NoSuchNodeError:
                 pass
 
@@ -124,22 +124,22 @@ def flush_pytable(h5f, data=None, group=None, table=None, force=True):
             # assert(k not in table);
             table[k] = AttrDict()
             group[k] = AttrDict();
-            group[k]._gp = h5f.createGroup(group._gp, k)
+            group[k]._gp = h5f.create_group(group._gp, k)
             h5f.flush()
             # self.log.debug('Out Group: %s' % group[k])
             flush_pytable(h5f, data=v, group=group[k], table=table[k])
         elif isinstance(v, np.ndarray): 
             # self.log.debug('Attempting to save ndarray %s' % type(v))
-            table[k] = h5f.createArray(group._gp, k, v)
+            table[k] = h5f.create_array(group._gp, k, v)
             # self.log.debug('Out Table: %s' % table[k])
         else: 
             # print 'Attempting to save arbitrary type %s' % type(v), k, group._gp
             try: 
                 assert v is not None
-                table[k] = h5f.createCArray(group._gp, k, obj=v)
+                table[k] = h5f.create_carray(group._gp, k, obj=v)
             except (TypeError, ValueError, AssertionError): 
                 v = 'OBJ_' + cPickle.dumps(v, -1)
-                table[k] = h5f.createArray(group._gp, k, v)
+                table[k] = h5f.create_array(group._gp, k, v)
                 # print 'TypeError', v
             finally: 
                 h5f.flush()
@@ -147,7 +147,7 @@ def flush_pytable(h5f, data=None, group=None, table=None, force=True):
 
 def save_pytable(fn, d): 
     create_path_if_not_exists(fn)
-    h5f = tb.openFile(os.path.expanduser(fn), mode='w', title='%s' % fn)
+    h5f = tb.open_file(os.path.expanduser(fn), mode='w', title='%s' % fn)
 
     tables = AttrDict()
     groups = AttrDict()
@@ -427,7 +427,7 @@ class AttrDictDB(object):
         self.log.info('DictDB: Opening file %s' % output_filename)
 
         # Open the db, no append support just yet
-        self.h5f = tb.openFile(output_filename, mode=mode, title='%s' % filename)
+        self.h5f = tb.open_file(output_filename, mode=mode, title='%s' % filename)
 
         # Init the dict
         self.data = data
@@ -461,7 +461,7 @@ class AttrDictDB(object):
         if group is None:  group = self.h5f.root
 
         data = AttrDict()
-        for child in self.h5f.listNodes(group): 
+        for child in self.h5f.list_nodes(group): 
             item = None
             try: 
                 if isinstance(child, tb.group.Group): 
@@ -499,7 +499,7 @@ class AttrDictDB(object):
             # Clean up before writing 
             if force: 
                 try:
-                    self.h5f.removeNode(self.get_node(group._gp,k), recursive=True) 
+                    self.h5f.remove_node(self.get_node(group._gp,k), recursive=True) 
                 except tb.NoSuchNodeError:
                     pass
 
@@ -509,13 +509,13 @@ class AttrDictDB(object):
                 # assert(k not in table);
                 table[k] = AttrDict()
                 group[k] = AttrDict();
-                group[k]._gp = self.h5f.createGroup(group._gp, k)
+                group[k]._gp = self.h5f.create_group(group._gp, k)
                 self.h5f.flush()
                 self.log.debug('Out Group: %s' % group[k])
                 self.flush(data=v, group=group[k], table=table[k])
             elif isinstance(v, np.ndarray): 
                 self.log.debug('Attempting to save ndarray %s' % type(v))
-                table[k] = self.h5f.createArray(group._gp, k, v)
+                table[k] = self.h5f.create_array(group._gp, k, v)
                 self.log.debug('Out Table: %s' % table[k])
             # elif isinstance(v,io_utils.TableWriter):
             #     self.log.debug('Attempting to save with custom writer')
@@ -529,10 +529,10 @@ class AttrDictDB(object):
                 self.log.debug('Attempting to save arbitrary type %s' % type(v))
                 try: 
                     assert v is not None
-                    table[k] = self.h5f.createCArray(group._gp, k, obj=v)
+                    table[k] = self.h5f.create_carray(group._gp, k, obj=v)
                 except (TypeError, ValueError, AssertionError): 
                     v = 'OBJ_' + cPickle.dumps(v, -1)
-                    table[k] = self.h5f.createArray(group._gp, k, v)
+                    table[k] = self.h5f.create_array(group._gp, k, v)
                     # print 'TypeError', v
                 finally: 
                     self.h5f.flush()
