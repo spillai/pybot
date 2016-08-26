@@ -266,7 +266,7 @@ class TfDecoderAndPublisher(Decoder):
         if self.pub_ is None: 
             self.pub_ = rospy.Publisher('/tf', TFMessage, queue_size=10, latch=True)
         self.pub_.publish(msg)
-        return None
+        return None 
 
 def NavMsgDecoder(channel, every_k_frames=1): 
     def odom_decode(data): 
@@ -361,8 +361,6 @@ class ROSBagReader(LogReader):
         tf_listener = tf.TransformListener()
 
         # Create tf decoder
-        # st, end = self.log.get_start_time(), self.log.get_end_time()
-        # start_t = Time(st + (end-st) * self.start_idx / 100.0)
         tf_dec = TfDecoderAndPublisher(channel='/tf')
 
         # Establish tf relations
