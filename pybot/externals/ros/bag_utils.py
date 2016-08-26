@@ -476,7 +476,7 @@ class ROSBagReader(LogReader):
             enumerate(self.log.read_messages(
                 topics=self.decoder.keys() if not len(topics) else topics, 
                 start_time=start_t)):
-            yield (t, channel, msg)
+            yield (msg.header.stamp, channel, msg)
 
     def iteritems(self, topics=[], reverse=False): 
         for (t, channel, msg) in self.itercursors(topics=topics, reverse=reverse): 
