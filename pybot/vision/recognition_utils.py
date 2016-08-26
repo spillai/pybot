@@ -369,7 +369,7 @@ class HistogramClassifier(object):
     def fit(self, X, y, test_size=0.3):
         # Grid search cross-val (best C param)
         cv = ShuffleSplit(len(X), n_iter=1, test_size=0.3, random_state=self.seed_)
-        clf_cv = GridSearchCV(self.clf_base_, self.clf_hyparams_, cv=cv, n_jobs=4, verbose=4)
+        clf_cv = GridSearchCV(self.clf_base_, self.clf_hyparams_, cv=cv, n_jobs=-1, verbose=4)
 
         print('====> Training Classifier (with grid search hyperparam tuning) .. ')
         print('====> BATCH Training (in-memory): {:4.3f} MB'.format(X.nbytes / 1024.0 / 1024.0) )
