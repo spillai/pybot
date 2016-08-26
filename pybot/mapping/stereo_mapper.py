@@ -37,62 +37,6 @@ from pybot_vision import scaled_color_disp
 from pybot_vision import CrossRatioStereo, FastStereo
 from pybot_externals import StereoELAS, StereoVISO2, MonoVISO2, ORBSLAM2
 
-class VOMixin(object): 
-    def __init__(self, camera, alg='viso2'): 
-        """
-        Setup visual odometry using stereo data
-        """
-        if not isinstance(camera, StereoCamera): 
-            raise TypeError('Camera provided is not StereoCamera, but {:}'.format())
-
-        if alg == 'viso2':        
-            self.vo_ = StereoVISO2(f=camera.left.fx, 
-                                   cx=camera.left.cx, cy=camera.left.cy, 
-                                   baseline=camera.baseline, relative=False, project_2d=False) 
-            print 'Baseline: ', camera.baseline
-        # elif alg == 'orb-slam2':
-        #     path = '/home/spillai/perceptual-learning/software/python/apps/config/orb_slam/'
-
-        #     settings_fn = os.path.join(path,'Settings_zed.yaml')
-        #     vocab_fn = os.path.join(path, 'ORBvoc.txt')
-        #     self.vo_ = ORBSLAM2(settings=settings_fn, vocab=vocab_fn, mode=ORBSLAM2.STEREO)
-        #     self.vo_.process = lambda l,r: self.vo_.process_stereo(l,r)
-
-        #     # self.slam_ = ORBSLAM2(settings='Settings_zed.yaml')
-        #     # self.slam_.initialize_baseline(Tcw)
-        #     # self.slam_ = LSDMapper(self.calib_.K0)
-        else: 
-            raise RuntimeError('Unknown VO algorithm: %s. Use either viso2' % alg)
-
-    def process_vo(self, left_im, right_im):
-        """
-        Perform stereo VO
-        """
-
-        # Perform VO and update TF
-        try: 
-            # Stereo-VO
-            T_ct = self.vo_.process(to_gray(left_im), to_gray(right_im))
-
-            # # Monocular vSLAM
-            # T_ct = self.slam_.process(to_gray(left_im), right=to_gray(right_im))
-
-            p_ct = RigidTransform.from_matrix(T_ct)
-        except Exception as e:
-            print e
-            return
-
-        # # Project to 2d
-        # _, t, _, x, _, z  = p_ct.to_rpyxyz()
-        # pose_ct = RigidTransform.from_rpyxyz(0, t, 0, x, 0, z)
-
-        pose_id = self.poses_[-1].id + 1 if len(self.poses_) else 0
-        pose_ct  = Pose.from_rigid_transform(pose_id, p_ct) 
-        # pose_ct  = Pose.from_rigid_transform(pose_id, self.poses_[-1].oplus(p_ct)) \
-        #                                      if len(self.poses_) else Pose.from_rigid_transform(pose_id, p_ct)
-
-        return pose_ct
-
 class StereoMapper(VOMixin): 
     def __init__(self, camera, vo_alg='viso2', stereo_alg='elas', 
                  iterations=2, threshold=20, cost_threshold=0.15, draw_relative=False): 

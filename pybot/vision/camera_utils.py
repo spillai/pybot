@@ -750,7 +750,25 @@ class DepthCamera(CameraIntrinsic):
     @classmethod
     def load(cls, filename):
         raise NotImplementedError()
-        
+
+class RGBDCamera(object): 
+    def __init__(self, rgb, depth, baseline): 
+        self.rgb_ = rgb
+        self.depth_ = depth
+        self.baseline_ = baseline
+
+    @property
+    def rgb(self): 
+        return self.rgb_
+
+    @property
+    def depth(self): 
+        return self.depth_
+
+    @property
+    def baseline(self): 
+        return self.baseline_
+
 
 def KinectDepthCamera(K=kinect_v1_params.K_depth, shape=(480,640)): 
     return DepthCamera(K=K, shape=shape)
