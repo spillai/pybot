@@ -264,7 +264,7 @@ class IterDB(object):
                 l = 0
                 for chunk in self.meta_file_.chunks: l += chunk[key]
                 self.lengths_[key] = l
-            print 'IterDB::[LOADED] # keys: ', len(self.meta_file_)
+            print 'IterDB::[LOADED], keys: {}, metafiles: {}'.format(self.keys_, len(self.meta_file_))
         
             # For the time-being, dynamically disattach append, extend functionality
 
