@@ -246,6 +246,8 @@ class IterDB(object):
         self.setup(filename)
 
         if mode == 'w': 
+            print('{}::Writing with fields: {}, batch size: {}'.format(self.__class__.__name__, fields, batch_size))
+
             # Keep data_.keys(), and keys_ consistent
             self.data_ = AttrDict()
             self.keys_ = set()
@@ -264,10 +266,10 @@ class IterDB(object):
                 l = 0
                 for chunk in self.meta_file_.chunks: l += chunk[key]
                 self.lengths_[key] = l
-            print 'IterDB::[LOADED], keys: {}, metafiles: {}'.format(self.keys_, len(self.meta_file_))
+
+            print('{}::Loaded with fields: {}, metafiles: {}'.format(self.__class__.__name__, self.keys_, len(self.meta_file_)))
         
             # For the time-being, dynamically disattach append, extend functionality
-
             self.append, self.extend, self.add_fields = None, None, None
             self.flush, self.save = None, None
 
