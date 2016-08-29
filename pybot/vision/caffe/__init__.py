@@ -1,5 +1,7 @@
 # Author: Sudeep Pillai <spillai@csail.mit.edu>
 # License: MIT
+import os
+os.environ["GLOG_minloglevel"] ="3"
 
 def setup_rcnn(method, data_dir, net): 
     if method == 'fast_rcnn':
