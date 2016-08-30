@@ -24,7 +24,7 @@ def segnet_extract(net, input_image, layer='conv1_1_D'):
     # start = time.time()
     out = net.forward_all(data=input_image)
     # end = time.time()
-    print '%30s' % 'Executed SegNet in ', str((end - start)*1000), 'ms'
+    # print '%30s' % 'Executed SegNet in ', str((end - start)*1000), 'ms'
     response = np.squeeze(net.blobs[layer].data, axis=0)
     return response
 
