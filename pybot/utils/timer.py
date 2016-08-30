@@ -37,6 +37,10 @@ def timeitmethod(func):
 def timeit(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
+        try: 
+            name = ''.join([func.__name__])
+        except: 
+            raise RuntimeError('timeitmethod requires first argument to be self')
         named_timer(name).start()
         r = func(*args, **kwargs)
         named_timer(name).stop()
