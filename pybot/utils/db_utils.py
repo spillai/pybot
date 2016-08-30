@@ -330,7 +330,7 @@ class IterDB(object):
                     if inds[ii] == idx + i: 
                         yield item
                         ii += 1
-                        if ii >= len(inds): break
+                        if ii >= len(inds)-1: break
                 idx += len(data[key])
 
     def keys(self): 
