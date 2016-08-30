@@ -279,8 +279,8 @@ class IterDB(object):
     def setup(self, filename): 
         self.chunk_idx_ = 0
         self.folder_, self.filename_ = os.path.split(filename)
-        self.meta_filename_ = os.path.join(self.folder_, self.filename_, 'meta_%s' % self.filename_)
-        self.get_chunk_filename = lambda idx: os.path.join(self.folder_, self.filename_, 'chunks', 'chunk_%04i_%s' % (idx, self.filename_))
+        self.meta_filename_ = os.path.join(self.folder_, self.filename_, 'meta_data.h5')
+        self.get_chunk_filename = lambda idx: os.path.join(self.folder_, self.filename_, 'chunks', 'chunk_%04i.h5' % (idx))
 
     # def __del__(self): 
     #     if len(self.data_): 

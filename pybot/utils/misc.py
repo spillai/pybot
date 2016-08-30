@@ -37,7 +37,6 @@ def progressbar(it, prefix = "", size=100, verbose=True, width=100):
     Optional progress bar, if verbose == True
     """
     def _show(_i):
-        print size
         try: 
             x = int(_i * (width * 1.0 / size))
         except: 
