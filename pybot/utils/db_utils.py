@@ -325,13 +325,15 @@ class IterDB(object):
             if inds is None: 
                 for item in data[key]: 
                     yield item
+                    idx += 1
             else:
-                for i, item in enumerate(data[key]): 
-                    if inds[ii] == idx + i: 
+                for i, item in enumerate(data[key]):
+                    if ii >= len(inds): break
+                    if idx == inds[ii]: 
+                        # print i, ii, idx
                         yield item
                         ii += 1
-                        if ii >= len(inds)-1: break
-                idx += len(data[key])
+                    idx += 1
 
     def keys(self): 
         return self.keys_
