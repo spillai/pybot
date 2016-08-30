@@ -1,3 +1,4 @@
+import os
 import cv2
 import numpy as np
 
@@ -28,7 +29,7 @@ def segnet_extract(net, input_image, layer='conv1_1_D'):
     response = np.squeeze(net.blobs[layer].data, axis=0)
     return response
 
-class SegnetDescription(object): 
+class SegNetDescription(object): 
     def __init__(self, model_file, weights_file): 
         if not os.path.exists(model_file) or \
            not os.path.exists(weights_file): 
@@ -41,5 +42,5 @@ class SegnetDescription(object):
 
     @timeitmethod
     def describe(self, im, layer='conv1_1_D'):
-        convert_image(im, self.input_shape_)
+        input_image = convert_image(im, self.input_shape_)
         return segnet_extract(self.net_, input_image, layer=layer)

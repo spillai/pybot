@@ -21,6 +21,11 @@ def setup_rcnn(method, data_dir, net):
 
     return rcnn
 
+def setup_segnet(model_file, weights_file): 
+    print('=====> SegNet')
+    from pybot.vision.caffe.segnet_utils import SegNetDescription
+    return SegNetDescription(model_file, weights_file)
+
 class FastRCNNObjectDetector(object): 
     def __init__(self, proposer, rcnn, clf): 
         self.proposer_ = proposer
