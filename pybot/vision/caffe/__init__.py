@@ -20,3 +20,32 @@ def setup_rcnn(method, data_dir, net):
         raise ValueError('Unknown rcnn method {}'.format(method))
 
     return rcnn
+
+class FastRCNNObjectDetector(object): 
+    def __init__(self, proposer, rcnn, clf): 
+        self.proposer_ = proposer
+        self.rcnn_ = rcnn
+        self.clf_ = clf
+
+    def predict(self, im): 
+        # 1. Propose objects, 
+        # 2. Describe proposals
+        # 3. Classify proposals
+        bboxes = self.proposer_.process(im)
+        phi = self.rcnn_.describe(im, bboxes)
+        targets = self.clf_.predict(phi)
+        scores = self.clf_.decision_function(phi)
+        return bboxes, phi, scores, targets
+
+
+class FasterRCNNObjectDetector(object): 
+    def __init__(self, rcnn, clf): 
+        self.rcnn_ = rcnn
+        self.clf_ = clf
+
+    def predict(self, im): 
+        phi,bboxes = self.rcnn_.describe(im, boxes=None)
+        bboxes = self.bboxes_.astype(np.int64)
+        targets = self.clf_.predict(phi)
+        scores = self.clf_.decision_function(phi)
+        return bboxes, phi, scores, targets

@@ -360,8 +360,8 @@ class HistogramClassifier(object):
             self.clf_base_ = LinearSVC(random_state=self.seed_)
         elif classifier == 'sgd': 
             self.clf_hyparams_ = {'alpha':[0.0001, 0.001, 0.01, 0.1, 1.0, 10.0], 'class_weight':['auto']} # 'loss':['hinge'], 
-            self.clf_ = SGDClassifier(loss='log', penalty='l1', shuffle=False, random_state=self.seed_, 
-                                      warm_start=True, n_jobs=-1, n_iter=1, verbose=1)
+            self.clf_ = SGDClassifier(loss='log', penalty='l2', shuffle=False, random_state=self.seed_, 
+                                      warm_start=True, n_jobs=-1, n_iter=1, verbose=4)
         else: 
             raise Exception('Unknown classifier type %s. Choose from [sgd, svm, gradient-boosting, extra-trees]' 
                             % classifier)

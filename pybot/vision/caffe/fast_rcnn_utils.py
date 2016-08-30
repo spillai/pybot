@@ -22,6 +22,7 @@ caffe.set_mode_gpu()
 
 from fast_rcnn.test import _get_blobs, _bbox_pred, _clip_boxes, nms
 from fast_rcnn.config import cfg
+from pybot.utils.timer import timeitmethod
 
 def im_detect(net, im, boxes, layer='fc7'):
     """Detect object classes in an image given object proposals.
@@ -153,6 +154,7 @@ class FastRCNNDescription(caffe.Net):
         cfg.TEST.BBOX_REG = False
         caffe.Net.__init__(self, model_file, pretrained_file, caffe.TEST)        
 
+    @timeitmethod
     def describe(self, im, boxes, layer='fc7'):
         return im_detect(self, im, boxes, layer=layer)
 
