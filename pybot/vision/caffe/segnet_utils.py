@@ -22,12 +22,8 @@ def segnet_extract(net, input_image, layer='conv1_1_D'):
     """
     layer options: conv1_1_D, conv1_2_D
     """
-    # start = time.time()
     out = net.forward_all(data=input_image)
-    # end = time.time()
-    # print '%30s' % 'Executed SegNet in ', str((end - start)*1000), 'ms'
-    response = np.squeeze(net.blobs[layer].data, axis=0)
-    return response
+    return np.squeeze(net.blobs[layer].data, axis=0)
 
 class SegNetDescription(object): 
     def __init__(self, model_file, weights_file): 
@@ -43,4 +39,14 @@ class SegNetDescription(object):
     @timeitmethod
     def describe(self, im, layer='conv1_1_D'):
         input_image = convert_image(im, self.input_shape_)
-        return segnet_extract(self.net_, input_image, layer=layer)
+        self.forward(input_image)
+        return self.extract(response, layer=layer)
+
+    @timeitmethod
+    def forward(self, im): 
+        input_image = convert_image(im, self.input_shape_)
+        self.net_.forward_all(data=input_image)
+        return 
+
+    def extract(self, layer='conv1_1_D'): 
+        return np.squeeze(self.net_.blobs[layer].data, axis=0)
