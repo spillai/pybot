@@ -48,7 +48,7 @@ def timeit(func):
     return wrapper
 
 class SimpleTimer: 
-    def __init__(self, name='', hz=1.0, header=''): 
+    def __init__(self, name='', hz=0.5, header=''): 
         self.name_ = name
         self.hz_ = hz
         self.header_ = header
@@ -56,7 +56,8 @@ class SimpleTimer:
         self.counter_ = 0
         self.last_ = time.time()
         self.period_ = 0
-        
+        self.calls_ = 0
+
         self.last_print_ = time.time()        
         self.last_fps_ = 0
 
@@ -68,7 +69,9 @@ class SimpleTimer:
         if (now-self.last_print_) > 1.0 / self.hz_: 
             T = dt / self.counter_
             fps = self.hz_ / T
-            print_green('%s\t[%5.1f ms, %3.1f Hz ]\t%s' % (self.header_, T * 1e3, fps, self.name_, ))
+            self.calls_ += self.counter_
+            print_green('{:s}\t[{:5.1f} ms, {:5.1f} Hz, {:d} ]\t{:s}'
+                        .format(self.header_, T * 1e3, fps, int(self.calls_), self.name_))
             self.last_ = now
             self.last_print_ = now
             self.counter_ = 0
@@ -82,7 +85,9 @@ class SimpleTimer:
         if (now-self.last_print_) > 1.0 / self.hz_:
             T = self.period_ / self.counter_
             fps = self.hz_ / T
-            print_green('%s\t[%5.1f ms, %3.1f Hz ]\t%s' % (self.header_, T * 1e3, fps, self.name_, ))
+            self.calls_ += self.counter_
+            print_green('{:s}\t[{:5.1f} ms, {:5.1f} Hz, {:d} ]\t{:s}'
+                        .format(self.header_, T * 1e3, fps, int(self.calls_), self.name_))
             self.last_ = now
             self.last_print_ = now
             self.last_fps_ = fps
