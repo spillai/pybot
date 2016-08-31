@@ -225,11 +225,113 @@ class AttrDict(dict):
         create_path_if_not_exists(fn)
         return save_pytable(fn, self)
 
-class IterDBChunk(object): 
-    def __init__(self, filename, mode, fields=[]): 
-        pass
-
 class IterDB(object): 
+    def __init__(self, filename, mode, batch_size=5): 
+        """
+        An iterable database that should theoretically allow 
+        scalable reading/writing of datasets. 
+           batch_size: length of list
+
+        Notes: 
+           meta_file should contain all the related meta data 
+        including keys, their corresponding value lengths, 
+        overall file size etc
+        """
+        fn = os.path.expanduser(filename)
+        if mode == 'w' or mode == 'a': 
+            print('{}::{} with batch size: {}'.format(
+                'Writing' if mode == 'w' else 'Appending', 
+                self.__class__.__name__, batch_size))
+            self.h5f_ = tb.open_file(fn, mode=mode, title='%s' % fn)
+            self.data_ = {}
+        elif mode == 'r': 
+            self.h5f_ = tb.open_file(fn, mode=mode, title='%s' % fn)
+            print('{}::Loaded with fields: {}'.format(self.__class__.__name__, self.keys))
+        else: 
+            raise RuntimeError('Unknown mode %s' % mode)
+
+    @property
+    def keys(self): 
+        return [child._v_name for child in self.h5f_.list_nodes(self.h5f_.root)]
+
+    @property
+    def filename(self): 
+        return self.filename_
+
+    def append(self, key, item): 
+        if key not in self.data_: 
+            filters = tb.Filters(complevel=5, complib='blosc')
+            if isinstance(item, np.ndarray): 
+                atom = tb.Atom.from_type(item.dtype.name, item.shape[1:])
+            else:
+                atom = tb.VLStringAtom()
+            self.data_[key] = self.h5f_.create_vlarray(self.h5f_.root, key, 
+                                                       atom, filters=filters)
+            print('Creating VLArray, and appending to key {}'.format(key))
+            print self.data_[key]
+
+        self.data_[key].append(self.pack(item))
+
+    def pack(self, item): 
+        if isinstance(item, np.ndarray): 
+            return item
+        else: 
+            return 'OBJ_' + cPickle.dumps(item, -1)
+
+    def unpack(self, item): 
+        if isinstance(item, np.ndarray):
+            return item
+        elif isinstance(item, str) and item.startswith('OBJ_'): 
+            return cPickle.loads(item[4:])
+        else: 
+            raise ValueError('Unknown type written to pytables')
+            
+    def extend(self, key, items): 
+        for item in items: 
+            self.data_[key].append(item)
+
+    def get_child(self, key): 
+        return self.h5f_.root._f_get_child(key)
+
+    def length(self, key): 
+        return self.get_child(key).nrows
+
+    def itervalues_for_key(self, key, inds=None, verbose=False): 
+        if key not in self.keys: 
+            raise RuntimeError('Key %s not found in dataset. keys: %s' % (key, self.keys))
+        return imap(self.unpack, self.get_child(key).iterrows())
+            
+    def itervalues_for_keys(self, keys, inds=None, verbose=False): 
+        for key in keys: 
+            if key not in self.keys: 
+                raise RuntimeError('Key %s not found in dataset. keys: %s' % (key, self.keys))
+
+        items = (self.itervalues_for_key(key) for key in keys)
+        return izip(*items)
+
+    def iterchunks(self, key, batch_size=10, verbose=False): 
+        if key not in self.keys: 
+            raise RuntimeError('Key %s not found in dataset. keys: %s' % (key, self.keys))
+
+        chunks = grouper(self.itervalues_for_key(key), batch_size)
+        for chunk in progressbar(chunks, size=self.length(key) / batch_size, verbose=verbose): 
+            yield chunk
+ 
+    def iterchunks_keys(self, keys, batch_size=10, verbose=False): 
+        """
+        Iterate in chunks and izip specific keys
+        """
+        for key in keys: 
+            if key not in self.keys: 
+                raise RuntimeError('Key %s not found in dataset. keys: %s' % (key, self.keys))
+            
+        iterables = (self.iterchunks(key, batch_size=batch_size, verbose=verbose) for key in keys)
+        return izip(*iterables)
+
+    def close(self): 
+        self.h5f_.close()
+
+class IterDBDeprecated(object): 
     def __init__(self, filename, mode, fields=[], batch_size=5): 
         """
         An iterable database that should theoretically allow 
@@ -613,4 +715,50 @@ if __name__ == "__main__":
     print 'keys: ', rkeys
     rdb.close()
     print 'OK'
+
+    print('Testing IterDB')
+    from pybot.geometry import RigidTransform
+    p = RigidTransform.identity()
+    A = [np.random.rand(400,1000,3) for j in range(3)]
+
+    print('Writing to IterDB a,b,c')
+    db = IterDB(filename='iterdb_test.h5', mode='w', batch_size=10000)
+    for j in range(100): 
+        db.append('a', A[0])
+        db.append('b', A[1])
+        db.append('c', p)
+        print j
+    print('a: {}'.format(db.length('a')))
+    print('b: {}'.format(db.length('b')))
+    print('c: {}'.format(db.length('c')))
+    db.close()
+    print('OK')
+
+    print('Reading from IterDB a,c')
+    db = IterDB(filename='iterdb_test.h5', mode='r')
+    iter_a = db.itervalues_for_key('a')
+    for item in db.itervalues_for_key('c'): 
+        print item
+    print db.length('c')
+    db.close()
+    print('OK')
+
+    print('Appending to IterDB d,e,f')
+    db = IterDB(filename='iterdb_test.h5', mode='a')
+    for j in range(300): 
+        db.append('d', A[0])
+        db.append('e', A[1])
+        db.append('f', p)
+    print('d: {}'.format(db.length('d')))
+    print('e: {}'.format(db.length('e')))
+    print('f: {}'.format(db.length('f')))
+    db.close()
+    print('OK')
+
+    print('Reading c and f')
+    db = IterDB(filename='iterdb_test.h5', mode='r')
+    for (c,f) in db.itervalues_for_keys(['c','f']): 
+        print (c,f)
+    db.close()
+    print('OK')
 
