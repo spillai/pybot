@@ -6,7 +6,7 @@ import numpy as np
 import pickle
 import time, logging, cPickle, shelve
 from collections import defaultdict
-from itertools import izip
+from itertools import izip, imap
 
 import os.path
 from pybot.utils.misc import progressbar
@@ -290,16 +290,20 @@ class IterDB(object):
         for item in items: 
             self.data_[key].append(item)
 
-    def get_child(self, key): 
-        return self.h5f_.root._f_get_child(key)
+    def node_str(self, key): 
+        return ''.join(['/',key])
+
+    def get_node(self, key): 
+        # _f_get_child(key)
+        return self.h5f_.get_node(self.node_str(key))
 
     def length(self, key): 
-        return self.get_child(key).nrows
+        return self.get_node(key).nrows
 
     def itervalues_for_key(self, key, inds=None, verbose=False): 
         if key not in self.keys: 
             raise RuntimeError('Key %s not found in dataset. keys: %s' % (key, self.keys))
-        return imap(self.unpack, self.get_child(key).iterrows())
+        return imap(self.unpack, self.get_node(key).iterrows())
             
     def itervalues_for_keys(self, keys, inds=None, verbose=False): 
         for key in keys: 
@@ -653,86 +657,86 @@ class AttrDictDB(object):
         return 
 
 if __name__ == "__main__": 
-    print '\nTesting AttrDict()'
-    a = AttrDict()
-    a.a = 1
-    a.b = 'string'
-    a.c = np.arange(10)
-    a.d = np.arange(36).reshape((6,6))
-    a['test'] = 'test'
+    # print '\nTesting AttrDict()'
+    # a = AttrDict()
+    # a.a = 1
+    # a.b = 'string'
+    # a.c = np.arange(10)
+    # a.d = np.arange(36).reshape((6,6))
+    # a['test'] = 'test'
 
-    a.e = AttrDict()
-    a.e.a = 2
-    a.e.b= 'string2'
-    a.e.c= np.arange(10)
-    print a
+    # a.e = AttrDict()
+    # a.e.a = 2
+    # a.e.b= 'string2'
+    # a.e.c= np.arange(10)
+    # print a
 
-    print '\nTesting DictDB() write'
-    db = AttrDictDB(filename='test.h5', mode='w')
-    db.data.a = 1
-    db.data.b = 'string'
-    db.data.c = np.arange(10)
+    # print '\nTesting DictDB() write'
+    # db = AttrDictDB(filename='test.h5', mode='w')
+    # db.data.a = 1
+    # db.data.b = 'string'
+    # db.data.c = np.arange(10)
 
-    db.data.e = AttrDict()
-    db.data.e.a = 2
-    db.data.e.b = 'string2'
-    db.data.e.c = np.arange(10)
-    db.data.e.d = ('this','hat')
-    # db.data.e.f = io_utils.Feature3DWriter(data=[])
-    print 'Write DB: ', db.data
-    wkeys = db.data.keys()
-    db.flush()
-    db.close()
-    print 'OK'
+    # db.data.e = AttrDict()
+    # db.data.e.a = 2
+    # db.data.e.b = 'string2'
+    # db.data.e.c = np.arange(10)
+    # db.data.e.d = ('this','hat')
+    # # db.data.e.f = io_utils.Feature3DWriter(data=[])
+    # print 'Write DB: ', db.data
+    # wkeys = db.data.keys()
+    # db.flush()
+    # db.close()
+    # print 'OK'
 
-    print '\nTesting DictDB() read'
-    rdb = AttrDictDB(filename='test', mode='r')
-    print 'Read DB: ', rdb.data
-    rkeys = rdb.data.keys()
-    print 'Rkeys: ', rkeys
-    print 'Wkeys: ', wkeys
-    print 'Diff: ', set(rkeys).difference(set(wkeys))
-    rdb.close()
-    print 'OK'
-
-    print '\nTesting DictDB() read and then write'
-    rwdb = AttrDictDB(filename='test', mode='a')
-    print 'Read DB: ', rwdb.data
-    print 'Keys: ', rwdb.data.keys()
-    add = AttrDict()
-    add.desc = np.ones((64,2), dtype=np.float32)
-    add.desc2 = np.eye(4)
-    add.string = 'string'
-    add.tup = ('this', 'that')
-    rwdb.flush(data=add)
-    rwdb.close()
-
-
-    print '\nTesting DictDB() re-read'
-    rdb = AttrDictDB(filename='test', mode='r')
+    # print '\nTesting DictDB() read'
+    # rdb = AttrDictDB(filename='test', mode='r')
     # print 'Read DB: ', rdb.data
-    rkeys = rdb.data.keys()
-    print 'keys: ', rkeys
-    rdb.close()
-    print 'OK'
+    # rkeys = rdb.data.keys()
+    # print 'Rkeys: ', rkeys
+    # print 'Wkeys: ', wkeys
+    # print 'Diff: ', set(rkeys).difference(set(wkeys))
+    # rdb.close()
+    # print 'OK'
+
+    # print '\nTesting DictDB() read and then write'
+    # rwdb = AttrDictDB(filename='test', mode='a')
+    # print 'Read DB: ', rwdb.data
+    # print 'Keys: ', rwdb.data.keys()
+    # add = AttrDict()
+    # add.desc = np.ones((64,2), dtype=np.float32)
+    # add.desc2 = np.eye(4)
+    # add.string = 'string'
+    # add.tup = ('this', 'that')
+    # rwdb.flush(data=add)
+    # rwdb.close()
+
+
+    # print '\nTesting DictDB() re-read'
+    # rdb = AttrDictDB(filename='test', mode='r')
+    # # print 'Read DB: ', rdb.data
+    # rkeys = rdb.data.keys()
+    # print 'keys: ', rkeys
+    # rdb.close()
+    # print 'OK'
 
     print('Testing IterDB')
     from pybot.geometry import RigidTransform
     p = RigidTransform.identity()
     A = [np.random.rand(400,1000,3) for j in range(3)]
 
-    print('Writing to IterDB a,b,c')
-    db = IterDB(filename='iterdb_test.h5', mode='w', batch_size=10000)
-    for j in range(100): 
-        db.append('a', A[0])
-        db.append('b', A[1])
-        db.append('c', p)
-        print j
-    print('a: {}'.format(db.length('a')))
-    print('b: {}'.format(db.length('b')))
-    print('c: {}'.format(db.length('c')))
-    db.close()
-    print('OK')
+    # print('Writing to IterDB a,b,c')
+    # db = IterDB(filename='iterdb_test.h5', mode='w', batch_size=10000)
+    # for j in range(100): 
+    #     db.append('a', A[0])
+    #     db.append('b', A[1])
+    #     db.append('c', p)
+    #     print j
+    # print('a: {}'.format(db.length('a')))
+    # print('b: {}'.format(db.length('b')))
+    # print('c: {}'.format(db.length('c')))
+    # db.close()
+    # print('OK')
 
     print('Reading from IterDB a,c')
     db = IterDB(filename='iterdb_test.h5', mode='r')
@@ -743,22 +747,22 @@ if __name__ == "__main__":
     db.close()
     print('OK')
 
-    print('Appending to IterDB d,e,f')
-    db = IterDB(filename='iterdb_test.h5', mode='a')
-    for j in range(300): 
-        db.append('d', A[0])
-        db.append('e', A[1])
-        db.append('f', p)
-    print('d: {}'.format(db.length('d')))
-    print('e: {}'.format(db.length('e')))
-    print('f: {}'.format(db.length('f')))
-    db.close()
-    print('OK')
+    # print('Appending to IterDB d,e,f')
+    # db = IterDB(filename='iterdb_test.h5', mode='a')
+    # for j in range(300): 
+    #     db.append('d', A[0])
+    #     db.append('e', A[1])
+    #     db.append('f', p)
+    # print('d: {}'.format(db.length('d')))
+    # print('e: {}'.format(db.length('e')))
+    # print('f: {}'.format(db.length('f')))
+    # db.close()
+    # print('OK')
 
-    print('Reading c and f')
-    db = IterDB(filename='iterdb_test.h5', mode='r')
-    for (c,f) in db.itervalues_for_keys(['c','f']): 
-        print (c,f)
-    db.close()
-    print('OK')
+    # print('Reading c and f')
+    # db = IterDB(filename='iterdb_test.h5', mode='r')
+    # for (c,f) in db.itervalues_for_keys(['c','f']): 
+    #     print (c,f)
+    # db.close()
+    # print('OK')
 
