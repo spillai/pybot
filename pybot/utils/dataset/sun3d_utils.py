@@ -571,7 +571,7 @@ class SUNRGBDDataset(object):
         print('{} :: Loading {} image/depth/segmentation pairs'.format(self.__class__.__name__, len(self.rgb_files_)))
         
         self.rgb_ = imap(lambda fn: cv2.imread(fn, cv2.CV_LOAD_IMAGE_COLOR), self.rgb_files_)
-        self.depth_ = imap(lambda fn: cv2.imread(fn, cv2.CV_LOAD_IMAGE_COLOR), self.depth_files_)
+        self.depth_ = imap(lambda fn: cv2.imread(fn, -1), self.depth_files_)
         self.labels_ = imap(self._process_label, self.label_files_)
         self.target_hash_ = {item.encode('utf8'): idx+1 
                              for idx, item in enumerate(loadmat('data/sun3d/seg37list.mat', squeeze_me=True)['seg37list'])}
@@ -642,6 +642,7 @@ def test_sun_rgbd():
     from pybot.vision.image_utils import to_color
     from pybot.vision.imshow_utils import imshow_cv
     from pybot.utils.io_utils import write_video
+    from pybot.vision.color_utils import colormap
 
     directory = '/media/HD1/data/SUNRGBD/'
     dataset = SUNRGBDDataset(directory)
@@ -650,8 +651,9 @@ def test_sun_rgbd():
     for (rgb, depth, label) in dataset.segmentationdb(None): 
         cout = np.dstack([label, label, label])
         colored = cv2.LUT(cout, colors)
+        cdepth = colormap(depth / 64000.0)
         for j in range(5): 
-            write_video('xtion.avi', np.hstack([rgb, colored]))
+            write_video('xtion.avi', np.hstack([rgb, cdepth, colored]))
 
     # for f in dataset.iteritems(every_k_frames=5): 
     #     # vis = rgbd_data_uw.annotate(f)
