@@ -544,7 +544,7 @@ class SUNRGBDDataset(object):
     #            'clothes', 'ceiling', 'books', 'fridge', 'tv', 'paper', 'towel', 
     #            'shower curtain', 'box', 'whiteboard', 'person', 'nightstand', 
     #            'toilet', 'sink', 'lamp', 'bathtub', 'bag']
-    # target_hash = {name: idx for idx, name in enumerate(objects)}
+    # target_hash = OneHotLabeler({name: idx for idx, name in enumerate(objects)})
     # target_unhash = {idx: name for idx, name in enumerate(objects)}
 
     def __init__(self, directory):
@@ -573,7 +573,10 @@ class SUNRGBDDataset(object):
         self.rgb_ = imap(lambda fn: cv2.imread(fn, cv2.CV_LOAD_IMAGE_COLOR), self.rgb_files_)
         self.depth_ = imap(lambda fn: cv2.imread(fn, cv2.CV_LOAD_IMAGE_COLOR), self.depth_files_)
         self.labels_ = imap(self._process_label, self.label_files_)
-        self.objects_ = OneHotLabeler()
+        self.target_hash_ = {item.encode('utf8'): idx+1 
+                             for idx, item in enumerate(loadmat('data/sun3d/seg37list.mat', squeeze_me=True)['seg37list'])}
+        self.target_unhash_ = {v:k for k,v in self.target_hash_.iteritems()}
+        print('{} :: Targets ({}): {}'.format(self.__class__.__name__, len(self.target_hash_), self.target_hash_.keys()))
 
     @property
     def target_unhash(self): 
@@ -594,8 +597,12 @@ class SUNRGBDDataset(object):
 
         labels = np.zeros_like(_labels)
         for (idx, name) in enumerate(mat['names']): 
+            try: 
+                value = self.target_hash_[name]
+            except: 
+                value = 0
             mask = _labels == idx+1
-            labels[mask] = self.objects_.target_hash[name]            
+            labels[mask] = value
         return labels
 
     @timeitmethod
@@ -639,11 +646,11 @@ def test_sun_rgbd():
     directory = '/media/HD1/data/SUNRGBD/'
     dataset = SUNRGBDDataset(directory)
 
-    colors = cv2.imread('data/sun.png').astype(np.uint8)
+    colors = cv2.imread('data/sun3d/sun.png').astype(np.uint8)
     for (rgb, depth, label) in dataset.segmentationdb(None): 
         cout = np.dstack([label, label, label])
         colored = cv2.LUT(cout, colors)
-        for j in range(10): 
+        for j in range(5): 
             write_video('xtion.avi', np.hstack([rgb, colored]))
 
     # for f in dataset.iteritems(every_k_frames=5): 
