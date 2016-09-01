@@ -178,7 +178,7 @@ class VideoWriter:
             h, w = im.shape[:2]
             self.writer = cv2.VideoWriter(self.filename, cv2.cv.CV_FOURCC(*'mp42'), 
                                           30.0, (w, h), im.ndim == 3)
-            print 'Creating writer: %s (%i,%i)' % (self.filename, w, h)
+            print('{} :: creating {} ({},{})'.format(self.__class__.__name__, self.filename, w, h))
         self.writer.write(im)
 
     def close(self): 
