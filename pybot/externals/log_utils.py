@@ -492,7 +492,10 @@ class LogDB(object):
 
     def roidb(self, target_hash, targets=[], every_k_frames=1, verbose=True, skip_empty=True): 
         """
-        Returns (img, bbox, targets [unique text])
+        @param target_hash: target hash map (name -> unique id)
+        @param targets: return only provided target names 
+
+        Returns (img, bbox, targets [hashed with target_hash (int32)])
         """
 
         self.check_ground_truth_availability()
