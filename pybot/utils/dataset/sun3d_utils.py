@@ -538,14 +538,15 @@ class SUN3DObjectDB(object):
 # ---------------------------------------------------------------------
 
 class SUNRGBDDataset(object): 
-    # objects = ['wall', 'floor', 'cabinet', 'bed', 'chair', 'sofa', 'table', 'door', 
-    #            'window', 'bookshelf', 'picture', 'counter', 'blinds', 'desk', 
-    #            'shelves', 'curtain', 'dresser', 'pillow', 'mirror', 'floor mat', 
-    #            'clothes', 'ceiling', 'books', 'fridge', 'tv', 'paper', 'towel', 
-    #            'shower curtain', 'box', 'whiteboard', 'person', 'nightstand', 
-    #            'toilet', 'sink', 'lamp', 'bathtub', 'bag']
-    # target_hash = OneHotLabeler({name: idx for idx, name in enumerate(objects)})
-    # target_unhash = {idx: name for idx, name in enumerate(objects)}
+    objects = ['wall', 'floor', 'cabinet', 'bed', 'chair', 'sofa', 'table', 'door', 
+               'window', 'bookshelf', 'picture', 'counter', 'blinds', 'desk', 
+               'shelves', 'curtain', 'dresser', 'pillow', 'mirror', 'floor mat', 
+               'clothes', 'ceiling', 'books', 'fridge', 'tv', 'paper', 'towel', 
+               'shower curtain', 'box', 'whiteboard', 'person', 'nightstand', 
+               'toilet', 'sink', 'lamp', 'bathtub', 'bag']
+    target_hash = {name: idx+1 for idx, name in enumerate(objects)}
+    target_unhash = {idx+1: name for idx, name in enumerate(objects)}
+    shape = (480, 640)
 
     def __init__(self, directory):
         """
@@ -570,21 +571,25 @@ class SUNRGBDDataset(object):
             raise RuntimeError('{} :: Failed to load dataset'.format(self.__class__.__name__))
         print('{} :: Loading {} image/depth/segmentation pairs'.format(self.__class__.__name__, len(self.rgb_files_)))
         
-        self.rgb_ = imap(lambda fn: cv2.imread(fn, cv2.CV_LOAD_IMAGE_COLOR), self.rgb_files_)
-        self.depth_ = imap(lambda fn: cv2.imread(fn, -1), self.depth_files_)
+        self.rgb_ = imap(lambda fn: self._pad_image(cv2.imread(fn, cv2.CV_LOAD_IMAGE_COLOR)), self.rgb_files_)
+        self.depth_ = imap(lambda fn: self._pad_image(cv2.imread(fn, -1)), self.depth_files_)
         self.labels_ = imap(self._process_label, self.label_files_)
-        self.target_hash_ = {item.encode('utf8'): idx+1 
-                             for idx, item in enumerate(loadmat('data/sun3d/seg37list.mat', squeeze_me=True)['seg37list'])}
-        self.target_unhash_ = {v:k for k,v in self.target_hash_.iteritems()}
-        print('{} :: Targets ({}): {}'.format(self.__class__.__name__, len(self.target_hash_), self.target_hash_.keys()))
+        # self.target_hash_ = {item.encode('utf8'): idx+1 
+        #                      for idx, item in enumerate(loadmat('data/sun3d/seg37list.mat', squeeze_me=True)['seg37list'])}
+        # self.target_unhash_ = {v:k for k,v in self.target_hash_.iteritems()}
+        # self.target_hash_ = SUNRGBDDataset.target_hash
+        # self.target_unhash_ = SUNRGBDDataset.target_unhash
 
-    @property
-    def target_unhash(self): 
-        return self.objects_.target_unhash
+    # @property
+    # def target_unhash(self): 
+    #     return self.objects_.target_unhash
 
-    @property
-    def target_hash(self): 
-        return self.objects_.target_hash
+    # @property
+    # def target_hash(self): 
+    #     return self.objects_.target_hash
+
+    def _pad_image(self, im): 
+        return cv2.copyMakeBorder(im,19,20,24,25,cv2.BORDER_CONSTANT,value=[0,0,0] if im.ndim == 3 else 0)
 
     def _process_label(self, fn): 
         """
@@ -598,12 +603,12 @@ class SUNRGBDDataset(object):
         labels = np.zeros_like(_labels)
         for (idx, name) in enumerate(mat['names']): 
             try: 
-                value = self.target_hash_[name]
+                value = SUNRGBDDataset.target_hash[name]
             except: 
                 value = 0
             mask = _labels == idx+1
             labels[mask] = value
-        return labels
+        return self._pad_image(labels)
 
     @timeitmethod
     def segmentationdb(self, target_hash, targets=[], every_k_frames=1, verbose=True, skip_empty=True): 
@@ -613,6 +618,10 @@ class SUNRGBDDataset(object):
 
         Returns (img, lut, targets [unique text])
         """
+        print('{} :: Targets ({}): {}'.format(self.__class__.__name__, 
+                                              len(SUNRGBDDataset.target_hash), 
+                                              SUNRGBDDataset.target_hash.keys()))
+
         for rgb_im, depth_im, label in izip(islice(self.rgb_, 0, None, every_k_frames), 
                                             islice(self.depth_, 0, None, every_k_frames), 
                                             islice(self.labels_, 0, None, every_k_frames)
