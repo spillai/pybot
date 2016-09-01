@@ -3,11 +3,16 @@
 
 import os
 import numpy as np
+import fnmatch
+import cv2
 
-from itertools import izip
+from itertools import izip, imap, islice
 from collections import defaultdict
 from datetime import datetime
 
+from scipy.io import loadmat
+from pybot.utils.misc import OneHotLabeler
+from pybot.utils.timer import timeitmethod
 from pybot.utils.io_utils import find_files
 from pybot.utils.db_utils import load_json_dict, save_json_dict
 
@@ -508,21 +513,149 @@ class SUN3DObjectDB(object):
     def get_instance_name(self): 
         raise NotImplementedError()
 
+# if __name__ == "__main__": 
+#     import argparse
+#     parser = argparse.ArgumentParser(
+#         description='Load sun3d annotations')
+#     parser.add_argument(
+#         '-d', '--directory', type=str, required=True, 
+#         default=None, help='Annotated image directory')
+#     args = parser.parse_args()
+
+#     shape = (640,360)
+#     db = SUN3DAnnotationDB.load(args.directory, shape)
+#     frames = db.frames
+#     # print db.num_annotations, db.num_files, db.num_objects, db.name, db.objects
+#     # print frames, db.image_width, db.image_height
+#     files = db.files
+#     print db[files[2996]]
+
+#     # import ipdb; ipdb.set_trace()
+
+
+# =====================================================================
+# Generic SUN-RGBD Dataset class
+# ---------------------------------------------------------------------
+
+class SUNRGBDDataset(object): 
+    # objects = ['wall', 'floor', 'cabinet', 'bed', 'chair', 'sofa', 'table', 'door', 
+    #            'window', 'bookshelf', 'picture', 'counter', 'blinds', 'desk', 
+    #            'shelves', 'curtain', 'dresser', 'pillow', 'mirror', 'floor mat', 
+    #            'clothes', 'ceiling', 'books', 'fridge', 'tv', 'paper', 'towel', 
+    #            'shower curtain', 'box', 'whiteboard', 'person', 'nightstand', 
+    #            'toilet', 'sink', 'lamp', 'bathtub', 'bag']
+    # target_hash = {name: idx for idx, name in enumerate(objects)}
+    # target_unhash = {idx: name for idx, name in enumerate(objects)}
+
+    def __init__(self, directory):
+        """
+        SUN RGB-D Dataset reader
+        Note: First run find . | grep seg.mat > annotations.txt (in SUNRGBD folder)
+        @params directory: SUNRGBD directory listing with image/*.png, and seg.mat files
+        """
+
+        self.directory_ = os.path.expanduser(directory)
+        with open(os.path.join(self.directory_, 'image.txt')) as f: 
+            rgb_files = f.read().splitlines()
+        with open(os.path.join(self.directory_, 'depth.txt')) as f: 
+            depth_files = f.read().splitlines()
+        assert(len(rgb_files) == len(depth_files))
+
+        self.rgb_files_ = [os.path.join(self.directory_, fn) for fn in fnmatch.filter(rgb_files,'*xtion*')]
+        self.depth_files_ = [os.path.join(self.directory_, fn) for fn in fnmatch.filter(depth_files,'*xtion*')]
+        self.label_files_ = [ os.path.join(
+            os.path.split(
+                os.path.split(fn)[0])[0], 'seg.mat') for fn in self.rgb_files_ ]
+        if not len(self.rgb_files_): 
+            raise RuntimeError('{} :: Failed to load dataset'.format(self.__class__.__name__))
+        print('{} :: Loading {} image/depth/segmentation pairs'.format(self.__class__.__name__, len(self.rgb_files_)))
+        
+        self.rgb_ = imap(lambda fn: cv2.imread(fn, cv2.CV_LOAD_IMAGE_COLOR), self.rgb_files_)
+        self.depth_ = imap(lambda fn: cv2.imread(fn, cv2.CV_LOAD_IMAGE_COLOR), self.depth_files_)
+        self.labels_ = imap(self._process_label, self.label_files_)
+        self.objects_ = OneHotLabeler()
+
+    @property
+    def target_unhash(self): 
+        return self.objects_.target_unhash
+
+    @property
+    def target_hash(self): 
+        return self.objects_.target_hash
+
+    def _process_label(self, fn): 
+        """
+        TODO: Fix one-indexing to zero-index; 
+        retained one-index due to uint8 constraint
+        """
+        mat = loadmat(fn, squeeze_me=True)
+        _labels = mat['seglabel'].astype(np.uint8)
+        # _labels -= 1 # (move to zero-index)
+
+        labels = np.zeros_like(_labels)
+        for (idx, name) in enumerate(mat['names']): 
+            mask = _labels == idx+1
+            labels[mask] = self.objects_.target_hash[name]            
+        return labels
+
+    @timeitmethod
+    def segmentationdb(self, target_hash, targets=[], every_k_frames=1, verbose=True, skip_empty=True): 
+        """
+        @param target_hash: target hash map (name -> unique id)
+        @param targets: return only provided target names 
+
+        Returns (img, lut, targets [unique text])
+        """
+        for rgb_im, depth_im, label in izip(islice(self.rgb_, 0, None, every_k_frames), 
+                                            islice(self.depth_, 0, None, every_k_frames), 
+                                            islice(self.labels_, 0, None, every_k_frames)
+        ): 
+            yield (rgb_im, depth_im, label)
+        
+
+    # def iteritems(self, every_k_frames=1): 
+    #     index = 0 
+    #     for rgb_im, depth_im, instance, label in izip(islice(self._ims, 0, None, every_k_frames), 
+    #                                                   islice(self._depths, 0, None, every_k_frames), 
+    #                                                   islice(self._instances, 0, None, every_k_frames), 
+    #                                                   islice(self._labels, 0, None, every_k_frames)
+    #     ): 
+    #         index += every_k_frames
+    #         yield self._process_items(index, rgb_im, depth_im, instance, label, bbox, pose)
+
+    # def iterinds(self, inds): 
+    #     for index, rgb_im, depth_im, bbox, pose in izip(inds, 
+    #                                                     self.rgb.iterinds(inds), 
+    #                                                     self.depth.iterinds(inds), 
+    #                                                     [self.bboxes[ind] for ind in inds], 
+    #                                                     [self.poses[ind] for ind in inds]): 
+    #         yield self._process_items(index, rgb_im, depth_im, bbox, pose)
+
+def test_sun_rgbd(): 
+    from pybot.vision.image_utils import to_color
+    from pybot.vision.imshow_utils import imshow_cv
+    from pybot.utils.io_utils import write_video
+
+    directory = '/media/HD1/data/SUNRGBD/'
+    dataset = SUNRGBDDataset(directory)
+
+    colors = cv2.imread('data/sun.png').astype(np.uint8)
+    for (rgb, depth, label) in dataset.segmentationdb(None): 
+        cout = np.dstack([label, label, label])
+        colored = cv2.LUT(cout, colors)
+        for j in range(10): 
+            write_video('xtion.avi', np.hstack([rgb, colored]))
+
+    # for f in dataset.iteritems(every_k_frames=5): 
+    #     # vis = rgbd_data_uw.annotate(f)
+    #     imshow_cv('frame', f.img, text='Image')
+    #     imshow_cv('depth', (f.depth / 16).astype(np.uint8), text='Depth')
+    #     imshow_cv('instance', (f.instance).astype(np.uint8), text='Instance')
+    #     imshow_cv('label', (f.label).astype(np.uint8), text='Label')
+    #     cv2.waitKey(100)
+
+    return dataset
+
 if __name__ == "__main__": 
-    import argparse
-    parser = argparse.ArgumentParser(
-        description='Load sun3d annotations')
-    parser.add_argument(
-        '-d', '--directory', type=str, required=True, 
-        default=None, help='Annotated image directory')
-    args = parser.parse_args()
+    test_sun_rgbd()
 
-    shape = (640,360)
-    db = SUN3DAnnotationDB.load(args.directory, shape)
-    frames = db.frames
-    # print db.num_annotations, db.num_files, db.num_objects, db.name, db.objects
-    # print frames, db.image_width, db.image_height
-    files = db.files
-    print db[files[2996]]
-
-    # import ipdb; ipdb.set_trace()
