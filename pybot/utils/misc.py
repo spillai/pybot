@@ -54,6 +54,7 @@ def progressbar(it, prefix = "", size=100, verbose=True, width=100):
 class OneHotLabeler(dict):
     def __init__(self, *args, **kwargs):
         dict.__init__(self, *args, **kwargs)
+        self.unhash_ = dict()
 
     def __getitem__(self, key):
         try:
@@ -63,14 +64,19 @@ class OneHotLabeler(dict):
 
     def __missing__(self, key):
         self[key] = value = len(self)
+        self.unhash_[value] = key
         return value
 
     def __repr__(self):
         return 'OneHotLabeler(%s)' % (dict.__repr__(self))
 
     @property
+    def target_hash(self): 
+        return self
+
+    @property
     def target_unhash(self): 
-        return {v:k for k,v in self.iteritems()}
+        return self.unhash_
 
 class Counter(object): 
     def __init__(self): 
