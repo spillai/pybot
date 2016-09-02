@@ -548,7 +548,7 @@ class SUNRGBDDataset(object):
     target_unhash = {idx+1: name for idx, name in enumerate(objects)}
     shape = (480, 640)
 
-    def __init__(self, directory):
+    def __init__(self, directory, max_files=20000):
         """
         SUN RGB-D Dataset reader
         Note: First run find . | grep seg.mat > annotations.txt (in SUNRGBD folder)
@@ -562,8 +562,8 @@ class SUNRGBDDataset(object):
             depth_files = f.read().splitlines()
         assert(len(rgb_files) == len(depth_files))
 
-        self.rgb_files_ = [os.path.join(self.directory_, fn) for fn in fnmatch.filter(rgb_files,'*xtion*')]
-        self.depth_files_ = [os.path.join(self.directory_, fn) for fn in fnmatch.filter(depth_files,'*xtion*')]
+        self.rgb_files_ = [os.path.join(self.directory_, fn) for fn in fnmatch.filter(rgb_files,'*mit_*')][:max_files]
+        self.depth_files_ = [os.path.join(self.directory_, fn) for fn in fnmatch.filter(depth_files,'*mit_*')][:max_files]
         self.label_files_ = [ os.path.join(
             os.path.split(
                 os.path.split(fn)[0])[0], 'seg.mat') for fn in self.rgb_files_ ]
@@ -629,15 +629,11 @@ class SUNRGBDDataset(object):
             yield (rgb_im, depth_im, label)
         
 
-    # def iteritems(self, every_k_frames=1): 
-    #     index = 0 
-    #     for rgb_im, depth_im, instance, label in izip(islice(self._ims, 0, None, every_k_frames), 
-    #                                                   islice(self._depths, 0, None, every_k_frames), 
-    #                                                   islice(self._instances, 0, None, every_k_frames), 
-    #                                                   islice(self._labels, 0, None, every_k_frames)
-    #     ): 
-    #         index += every_k_frames
-    #         yield self._process_items(index, rgb_im, depth_im, instance, label, bbox, pose)
+    def iteritems(self, every_k_frames=1): 
+        for rgb_im, depth_im in izip(islice(self.rgb_, 0, None, every_k_frames), 
+                                     islice(self.depth_, 0, None, every_k_frames)
+        ): 
+            yield (rgb_im, depth_im)
 
     # def iterinds(self, inds): 
     #     for index, rgb_im, depth_im, bbox, pose in izip(inds, 
