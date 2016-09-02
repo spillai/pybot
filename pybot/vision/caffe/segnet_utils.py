@@ -4,6 +4,7 @@ import numpy as np
 
 import caffe
 caffe.set_mode_gpu()
+caffe.set_device(1)
 
 from pybot.utils.timer import timeit, timeitmethod
 
