@@ -237,7 +237,7 @@ class CameraIntrinsic(object):
                                                  p1=self.p1, p2=self.p2, 
                                                  shape=shape)
 
-    def ray(self, pts, undistort=True, rotate=False): 
+    def ray(self, pts, undistort=True, rotate=False, normalize=False): 
         """
         Returns the ray corresponding to the points. 
         Optionally undistort (defaults to true), and 
@@ -247,8 +247,13 @@ class CameraIntrinsic(object):
         ret = unproject_points(
             np.hstack([ (colvec(upts[:,0])-self.cx) / self.fx, (colvec(upts[:,1])-self.cy) / self.fy ])
         )
+
         if rotate: 
             ret = self.extrinsics.rotate_vec(ret)
+
+        if normalize: 
+            ret = ret / np.linalg.norm(ret, axis=1)[:, np.newaxis]
+
         return ret
 
     def reconstruct(self, xyZ, undistort=True): 

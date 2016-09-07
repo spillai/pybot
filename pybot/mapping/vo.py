@@ -10,6 +10,19 @@ from pybot.vision.camera_utils import Camera, StereoCamera, RGBDCamera, CameraEx
 from pybot.geometry.rigid_transform import Pose, RigidTransform
 from pybot_externals import StereoELAS, StereoVISO2, MonoVISO2, ORBSLAM2, FOVIS
 
+from pyopengv import relative_pose_ransac as _relative_pose_ransac
+
+def to4x4(m):
+    T = np.eye(4, dtype=m.dtype)
+    T[:3,:] = m
+    return T
+
+def relative_pose_ransac(bearing_vectors1, bearing_vectors2, 
+                         sac_model="NISTER", threshold=0.01, max_iterations=1000): 
+    T_ct = _relative_pose_ransac(
+        bearing_vectors1, bearing_vectors2, sac_model, threshold, max_iterations)
+    return RigidTransform.from_matrix(to4x4(T_ct))
+
 class VisualOdometry(object): 
     def __init__(self, camera, alg='viso2'): 
         """
