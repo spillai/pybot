@@ -68,7 +68,7 @@ class SimpleTimer:
 
         if (now-self.last_print_) > 1.0 / self.hz_: 
             T = dt / self.counter_
-            fps = self.hz_ / T
+            fps = 1.0 / T
             self.calls_ += self.counter_
             print_green('{:s}\t[{:5.1f} ms, {:5.1f} Hz, {:d} ]\t{:s}'
                         .format(self.header_, T * 1e3, fps, int(self.calls_), self.name_))
@@ -84,7 +84,7 @@ class SimpleTimer:
 
         if (now-self.last_print_) > 1.0 / self.hz_:
             T = self.period_ / self.counter_
-            fps = self.hz_ / T
+            fps = 1.0 / T
             self.calls_ += self.counter_
             print_green('{:s}\t[{:5.1f} ms, {:5.1f} Hz, {:d} ]\t{:s}'
                         .format(self.header_, T * 1e3, fps, int(self.calls_), self.name_))
