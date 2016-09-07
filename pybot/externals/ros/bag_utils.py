@@ -404,8 +404,9 @@ class ROSBagReader(LogReader):
         
         return tfs 
 
-    def calib(self, channel=''):
-        return self.retrieve_camera_calibration(channel)
+    def calib(self, channels):
+        assert(isinstance(channels, list))
+        return self.retrieve_camera_calibration(channels)
 
     def retrieve_tf_relations(self, relations): 
         """
@@ -442,19 +443,21 @@ class ROSBagReader(LogReader):
         print('{} :: Checked {:} relations\n'.format(self.__class__.__name__, len(checked)))
         return  
 
-    def retrieve_camera_calibration(self, topic):
-        try: 
-            if not self.length(topic): 
-                raise ValueError('Camera calibration unavailable {}'.format(topic))
-        except: 
-            raise RuntimeError('Failed to retrieve camera calibration {}, \ntopics are {}\n'.format(topic, ', '.join(info.topics)))
-            
-        # Retrieve camera calibration
-        dec = CameraInfoDecoder(channel=topic)
+    # @timeitonce('Retrieve camera calibration')
+    def retrieve_camera_calibration(self, topics):
 
-        print('{} :: Retrieve camera calibration for {}'.format(self.__class__.__name__, topic))
-        for self.idx, (channel, msg, t) in enumerate(self.log.read_messages(topics=topic)): 
-            return dec.decode(msg) 
+        # Retrieve camera calibration
+        dec = CameraInfoDecoder()
+        calib = [None for topic in topics]
+        idx_lut = {topic: idx for idx, topic in enumerate(topics)}
+        print('{} :: Retrieve camera calibration for {}'.format(self.__class__.__name__, topics))
+        for self.idx, (channel, msg, t) in enumerate(self.log.read_messages(topics=topics)): 
+            calib[idx_lut[channel]] = dec.decode(msg)
+            if all([c is not None for c in calib]): 
+                return calib
+
+        raise RuntimeError('Failed to retrieve camera calibration {},\n'
+                           'topics are {}\n'.format(topics, ', '.join(info.topics)))
                     
     def _index(self): 
         raise NotImplementedError()
@@ -476,6 +479,9 @@ class ROSBagReader(LogReader):
             enumerate(self.log.read_messages(
                 topics=self.decoder.keys() if not len(topics) else topics, 
                 start_time=start_t)):
+            # try: 
+            #     yield (msg.header.stamp, channel, msg)
+            # except: 
             yield (t, channel, msg)
 
     def iteritems(self, topics=[], reverse=False): 
