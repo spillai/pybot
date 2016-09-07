@@ -76,7 +76,7 @@ class BaseKLT(object):
     @classmethod
     def from_params(cls, detector_params=default_detector_params, 
                     tracker_params=default_tracker_params,
-                    min_track_length=3, max_track_length=4, min_tracks=1200, mask_size=9): 
+                    min_track_length=2, max_track_length=4, min_tracks=1200, mask_size=9): 
 
         # Setup detector and tracker
         detector = FeatureDetector(**detector_params)
@@ -220,7 +220,7 @@ class OpenCVKLT(BaseKLT):
 
         # Check if more features required
         self.add_features_ = self.add_features_ or ppts is None or (ppts is not None and len(ppts) < self.min_tracks_)
-        
+
         # Initialize or add more features
         if self.add_features_: 
             # Extract features
