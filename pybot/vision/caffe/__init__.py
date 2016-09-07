@@ -1,7 +1,33 @@
 # Author: Sudeep Pillai <spillai@csail.mit.edu>
 # License: MIT
 import os
+import numpy as np
+import cv2
 os.environ["GLOG_minloglevel"] ="3"
+
+# SegNet
+# =================================================================================
+
+def setup_segnet(model_file, weights_file): 
+    print('=====> SegNet')
+    from pybot.vision.caffe.segnet_utils import SegNetDescription
+    return SegNetDescription(model_file, weights_file)
+
+class SegNetFeatureExtraction(object): 
+    def __init__(self, segnet_model, segnet_weights): 
+        self.segnet_ = setup_segnet(segnet_model, segnet_weights)
+        
+    def process(self, im): 
+        self.segnet_.forward(im)
+        conv64 = self.segnet_.extract(layer='conv1_1_D')
+        labels = self.segnet_.extract(layer='argmax')
+        return labels.transpose(1,2,0).astype(np.uint8), conv64.transpose(1,2,0)
+
+    def resize(self, labels, im): 
+        return cv2.resize(labels, (im.shape[1],im.shape[0]), fx=0., fy=0., interpolation=cv2.INTER_AREA)
+    
+# RCNN
+# =================================================================================
 
 def setup_rcnn(method, data_dir, net): 
     if method == 'fast_rcnn':
@@ -20,11 +46,6 @@ def setup_rcnn(method, data_dir, net):
         raise ValueError('Unknown rcnn method {}'.format(method))
 
     return rcnn
-
-def setup_segnet(model_file, weights_file): 
-    print('=====> SegNet')
-    from pybot.vision.caffe.segnet_utils import SegNetDescription
-    return SegNetDescription(model_file, weights_file)
 
 class FastRCNNObjectDetector(object): 
     def __init__(self, proposer, rcnn, clf): 
@@ -54,3 +75,4 @@ class FasterRCNNObjectDetector(object):
         targets = self.clf_.predict(phi)
         scores = self.clf_.decision_function(phi)
         return bboxes, phi, scores, targets
+

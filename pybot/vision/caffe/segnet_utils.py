@@ -36,13 +36,7 @@ class SegNetDescription(object):
         # Init caffe with model
         self.net_ = caffe.Net(model_file, weights_file, caffe.TEST)
         self.input_shape_ = self.net_.blobs['data'].data.shape    
-
-    @timeitmethod
-    def describe(self, im, layer='conv1_1_D'):
-        input_image = convert_image(im, self.input_shape_)
-        self.forward(input_image)
-        return self.extract(response, layer=layer)
-
+        
     @timeitmethod
     def forward(self, im): 
         input_image = convert_image(im, self.input_shape_)
@@ -51,3 +45,8 @@ class SegNetDescription(object):
 
     def extract(self, layer='conv1_1_D'): 
         return np.squeeze(self.net_.blobs[layer].data, axis=0)
+        
+    @timeitmethod
+    def describe(self, im, layer='conv1_1_D'):
+        self.forward(im)
+        return self.extract(response, layer=layer)
