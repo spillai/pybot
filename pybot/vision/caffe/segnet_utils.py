@@ -1,3 +1,6 @@
+# Author: Sudeep Pillai <spillai@csail.mit.edu>
+# License: MIT
+
 import os
 import cv2
 import numpy as np
@@ -10,12 +13,9 @@ from pybot.utils.timer import timeit, timeitmethod
 
 @timeit
 def convert_image(im, input_shape): 
-    # start = time.time()
     frame = cv2.resize(im, (input_shape[3],input_shape[2]), fx=0., fy=0., interpolation=cv2.INTER_AREA)
     input_image = frame.transpose((2,0,1))
     input_image = np.asarray([input_image])
-    # end = time.time()
-    # print '%30s' % 'Resized image in ', str((end - start)*1000), 'ms'
     return input_image
 
 @timeit
