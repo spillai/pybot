@@ -49,4 +49,4 @@ class SegNet(object):
     @timeitmethod
     def describe(self, im, layer='conv1_1_D'):
         self.forward(im)
-        return self.extract(response, layer=layer)
+        return self.extract(layer=layer)

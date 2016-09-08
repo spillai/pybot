@@ -30,7 +30,7 @@ def convert_image(im, input_shape):
 class PoseNet(object): 
     def __init__(self, model_file, weights_file, mean_file): 
         if not os.path.exists(model_file) or \
-           not os.path.exists(weights_file) or \: 
+           not os.path.exists(weights_file) or \
            not os.path.exists(mean_file): 
             raise ValueError('Invalid model: {}, \nweights file: {}, \nmean file: {}'
                              .format(model_file, weights_file, mean_file))
@@ -53,7 +53,9 @@ class PoseNet(object):
         input_image = convert_image(im, self.input_shape_)
         if self.meanfile_image_ is None: 
             self.meanfile_image_ = convert_image(self.meanfile_, self.input_shape_)
-        self.net_.forward_all(data=input_image-self.meanfile_image_)
+
+        self.net_.blobs['data'].data[...] = input_image-self.meanfile_image_
+        self.net_.forward()
         return 
 
     def extract(self, layer): 
@@ -62,8 +64,8 @@ class PoseNet(object):
     @timeitmethod
     def predict(self, im, return_rigid_transform=True):
         self.forward(im)
-        predicted_q = self.extract(response, layer='cls3_fc_wpqr')
-        predicted_x = self.extract(response, layer='cls3_fc_xyz')
+        predicted_q = self.extract(layer='cls3_fc_wpqr')
+        predicted_x = self.extract(layer='cls3_fc_xyz')
         
         predicted_q_norm = predicted_q / np.linalg.norm(predicted_q)
         if return_rigid_transform: 

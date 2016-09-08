@@ -22,8 +22,8 @@ def setup_segnet(model_file, weights_file):
 
 def setup_posenet(model_file, weights_file, imagemean_file): 
     print('=====> Posenet')
-    from pybot.vision.caffe.posenet_utils import Posenet
-    return Posenet(model_file, weights_file, imagemean_file)
+    from pybot.vision.caffe.posenet_utils import PoseNet
+    return PoseNet(model_file, weights_file, imagemean_file)
 
 # RCNN
 # =================================================================================
