@@ -512,17 +512,9 @@ AnnotatedFrame = namedtuple('AnnotatedFrame', ['img', 'pose', 't_pose', 't_img',
 class TangoLogController(LogController): 
     def __init__(self, dataset): 
         super(TangoLogController, self).__init__(dataset)
-
-        # print('\nSubscriptions\n==============')
-        # if not self.controller.is_ground_truth_available: 
-        #     self.subscribe(TANGO_RGB_CHANNEL, self.on_rgb)
-        # else: 
-        #     print('\tGround Truth available, subscribe to LogController.on_rgb_gt')
-        #     self.subscribe(TANGO_RGB_CHANNEL, self.on_rgb_gt)
-
-        # self.subscribe(TANGO_VIO_CHANNEL, self.on_pose)
-        # print('')
-
+        self.subscribe(TANGO_RGB_CHANNEL, self.on_rgb)
+        self.subscribe(TANGO_VIO_CHANNEL, self.on_pose)
+        
         # Keep a queue of finite lenght to ensure 
         # time-sync with RGB and IMU
         self.q_pose_ = deque(maxlen=10)

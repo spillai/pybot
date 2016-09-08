@@ -24,11 +24,11 @@ class Decoder(object):
         try: 
             return self.decode_cb_(data)
         except Exception, e:
-            raise RuntimeError('\nError decoding channel: {} with {}\n'
-                               'Data: {}, Can decode: {}\n'
-                               'Error: {}\n'\
-                               .format(self.channel_, self.decode_cb_.func_name, data, 
-                                       self.can_decode(self.channel_), e))
+            raise ValueError('\nError decoding channel: {} with {}\n'
+                             'Data: {}, Can decode: {}\n'
+                             'Error: {}\n'\
+                             .format(self.channel_, self.decode_cb_.func_name, data, 
+                                     self.can_decode(self.channel_), e))
 
     def can_decode(self, channel): 
         return self.channel_ == channel
