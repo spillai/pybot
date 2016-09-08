@@ -9,6 +9,7 @@ import caffe
 caffe.set_mode_gpu()
 caffe.set_device(1)
 
+from pybot.geometry.rigid_transform import RigidTransform, Quaternion
 from pybot.utils.timer import timeit, timeitmethod
 
 @timeit
@@ -26,7 +27,7 @@ def convert_image(im, input_shape):
 #     out = net.forward_all(data=input_image-meanfile_image)
 #     return np.squeeze(net.blobs[layer].data, axis=0)
 
-class PoseNetDescription(object): 
+class PoseNet(object): 
     def __init__(self, model_file, weights_file, mean_file): 
         if not os.path.exists(model_file) or \
            not os.path.exists(weights_file) or \: 
@@ -55,10 +56,17 @@ class PoseNetDescription(object):
         self.net_.forward_all(data=input_image-self.meanfile_image_)
         return 
 
-    def extract(self, layer='conv1_1_D'): 
-        return np.squeeze(self.net_.blobs[layer].data, axis=0)
+    def extract(self, layer): 
+        return np.squeeze(self.net_.blobs[layer].data)
         
     @timeitmethod
-    def describe(self, im, layer='conv1_1_D'):
+    def predict(self, im, return_rigid_transform=True):
         self.forward(im)
-        return self.extract(response, layer=layer)
+        predicted_q = self.extract(response, layer='cls3_fc_wpqr')
+        predicted_x = self.extract(response, layer='cls3_fc_xyz')
+        
+        predicted_q_norm = predicted_q / np.linalg.norm(predicted_q)
+        if return_rigid_transform: 
+            return RigidTransform(Quaternion.from_wxyz(predicted_q_norm), tvec=predicted_x)
+        return (predicted_q_norm, predicted_x)
+        

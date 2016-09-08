@@ -26,7 +26,7 @@ def segnet_extract(net, input_image, layer='conv1_1_D'):
     out = net.forward_all(data=input_image)
     return np.squeeze(net.blobs[layer].data, axis=0)
 
-class SegNetDescription(object): 
+class SegNet(object): 
     def __init__(self, model_file, weights_file): 
         if not os.path.exists(model_file) or \
            not os.path.exists(weights_file): 
@@ -44,7 +44,7 @@ class SegNetDescription(object):
         return 
 
     def extract(self, layer='conv1_1_D'): 
-        return np.squeeze(self.net_.blobs[layer].data, axis=0)
+        return np.squeeze(self.net_.blobs[layer].data, axis=0).transpose(1,2,0)
         
     @timeitmethod
     def describe(self, im, layer='conv1_1_D'):

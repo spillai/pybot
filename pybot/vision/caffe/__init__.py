@@ -6,27 +6,25 @@ import numpy as np
 import cv2
 os.environ["GLOG_minloglevel"] ="3"
 
+def resize_to(labels, im): 
+    return cv2.resize(labels, (im.shape[1],im.shape[0]), fx=0., fy=0., interpolation=cv2.INTER_AREA)
+
 # SegNet
 # =================================================================================
 
 def setup_segnet(model_file, weights_file): 
     print('=====> SegNet')
-    from pybot.vision.caffe.segnet_utils import SegNetDescription
-    return SegNetDescription(model_file, weights_file)
+    from pybot.vision.caffe.segnet_utils import SegNet
+    return SegNet(model_file, weights_file)
 
-class SegNetFeatureExtraction(object): 
-    def __init__(self, segnet_model, segnet_weights): 
-        self.segnet_ = setup_segnet(segnet_model, segnet_weights)
-        
-    def process(self, im): 
-        self.segnet_.forward(im)
-        conv64 = self.segnet_.extract(layer='conv1_1_D')
-        labels = self.segnet_.extract(layer='argmax')
-        return labels.transpose(1,2,0).astype(np.uint8), conv64.transpose(1,2,0)
+# Posenet
+# =================================================================================
 
-    def resize(self, labels, im): 
-        return cv2.resize(labels, (im.shape[1],im.shape[0]), fx=0., fy=0., interpolation=cv2.INTER_AREA)
-    
+def setup_posenet(model_file, weights_file, imagemean_file): 
+    print('=====> Posenet')
+    from pybot.vision.caffe.posenet_utils import Posenet
+    return Posenet(model_file, weights_file, imagemean_file)
+
 # RCNN
 # =================================================================================
 
