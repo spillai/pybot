@@ -19,6 +19,8 @@ from pybot.vision.camera_utils import CameraIntrinsic
 from pybot.geometry.rigid_transform import RigidTransform
 from pybot.utils.dataset.sun3d_utils import SUN3DAnnotationDB
 from pybot.utils.pose_utils import PoseSampler
+from pybot.utils.misc import Accumulator
+
 
 TANGO_RGB_CHANNEL = 'RGB'
 TANGO_VIO_CHANNEL = 'RGB_VIO'
@@ -512,56 +514,46 @@ AnnotatedFrame = namedtuple('AnnotatedFrame', ['img', 'pose', 't_pose', 't_img',
 class TangoLogController(LogController): 
     def __init__(self, dataset): 
         super(TangoLogController, self).__init__(dataset)
-        self.subscribe(TANGO_RGB_CHANNEL, self.on_rgb)
+        self.subscribe(TANGO_RGB_CHANNEL, self.on_image)
         self.subscribe(TANGO_VIO_CHANNEL, self.on_pose)
         
-        # Keep a queue of finite lenght to ensure 
+        # Keep a queue of finite length to ensure 
         # time-sync with RGB and IMU
-        self.q_pose_ = deque(maxlen=10)
+        self.q_pose_ = Accumulator(maxlen=10)
+        self.q_im_ = Accumulator(maxlen=2)
 
-    def on_rgb_gt(self, t_img, ann_img): 
+        self.t_pose_ = Accumulator(maxlen=10)
+
+    def on_image_gt(self, t_img, ann_img): 
+        self.q_im_.append(ann_img.img.copy())
+
         if not len(self.q_pose_):
             return
-        t_pose, pose = self.q_pose_[-1]
+
+        t_pose = self.t_pose_.latest
+        pose = self.q_pose_.latest
         self.on_frame(AnnotatedFrame(img=ann_img.img, pose=pose, 
                                      t_pose=t_pose, t_img=t_img, 
                                      bboxes=ann_img.annotation.bboxes))
         
-    def on_rgb(self, t_img, img): 
+    def on_image(self, t_img, img): 
+        self.q_im_.append(img.copy())
+
         if not len(self.q_pose_):
             return
-        t_pose, pose = self.q_pose_[-1]
+
+        t_pose = self.t_pose_.latest
+        pose = self.q_pose_.latest
         self.on_frame(AnnotatedFrame(img=img, pose=pose, 
                                      t_pose=t_pose, t_img=t_img, 
                                      bboxes=[]))
 
     def on_pose(self, t, pose): 
-        self.q_pose_.append((t,pose))
+        self.t_pose_.append(t)
+        self.q_pose_.append(pose)
 
-        # # If RGB_VIO, RGB, RGB_VIO in stream, then interpolate pose
-        # # b/w the 1st and 3rd timestamps to match RGB timestamps
-        # if len(self.__item_q) >= 3 and \
-        #    self.__item_q[-1][0] == self.__item_q[-3][0] == 1 and \
-        #    self.__item_q[-2][0] == 0: 
-        #     t1,t2,t3 = self.__item_q[-3][1], self.__item_q[-2][1], self.__item_q[-1][1]
-        #     w2, w1 = np.float32([t2-t1, t3-t2]) / (t3-t1)
-        #     p1,p3 = self.__item_q[-3][2], self.__item_q[-1][2]
-        #     p2 = p1.interpolate(p3, w1)
-        #     self.on_frame(t2, t2, p2, self.__item_q[-2][2])
-        #     print np.array_str(np.float64([t1, t2, t3]) * 1e-14, precision=6, suppress_small=True), \
-        #         (t2-t1) * 1e-6, (t3-t2) * 1e-6, w1, w2, p2
-
-    def on_frame(self, frame): 
+    def on_frame(self, frame):
         raise NotImplementedError()
-
-    # @abstractmethod
-    # def on_rgb(self, t, img): 
-    #     raise NotImplementedError()
-
-    # @abstractmethod
-    # def on_pose(self, t, pose): 
-    #     raise NotImplementedError()
-
 
 def iter_tango_logs(directory, logs, topics=[]):
     for log in logs: 
@@ -571,3 +563,17 @@ def iter_tango_logs(directory, logs, topics=[]):
         for item in dataset.iterframes(topics=topics): 
             bboxes = item.bboxes
             targets = item.coords
+
+
+# # If RGB_VIO, RGB, RGB_VIO in stream, then interpolate pose
+# # b/w the 1st and 3rd timestamps to match RGB timestamps
+# if len(self.__item_q) >= 3 and \
+#    self.__item_q[-1][0] == self.__item_q[-3][0] == 1 and \
+#    self.__item_q[-2][0] == 0: 
+#     t1,t2,t3 = self.__item_q[-3][1], self.__item_q[-2][1], self.__item_q[-1][1]
+#     w2, w1 = np.float32([t2-t1, t3-t2]) / (t3-t1)
+#     p1,p3 = self.__item_q[-3][2], self.__item_q[-1][2]
+#     p2 = p1.interpolate(p3, w1)
+#     self.on_frame(t2, t2, p2, self.__item_q[-2][2])
+#     print np.array_str(np.float64([t1, t2, t3]) * 1e-14, precision=6, suppress_small=True), \
+#         (t2-t1) * 1e-6, (t3-t2) * 1e-6, w1, w2, p2
