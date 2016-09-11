@@ -473,9 +473,9 @@ class TangoDB(LogDB):
             assert(f.is_annotated)
             yield f, pind
 
-    def keyframedb(self, theta=np.deg2rad(20), displacement=0.25, lookup_history=10): 
+    def keyframedb(self, theta=np.deg2rad(20), displacement=0.25, lookup_history=10, verbose=True): 
         sampler = PoseSampler(theta=theta, displacement=displacement, lookup_history=lookup_history, 
-                              get_sample=lambda (t, channel, frame): frame.pose, verbose=True)
+                              get_sample=lambda (t, channel, frame): frame.pose, verbose=verbose)
         self.iterframes = partial(sampler.iteritems, self.iterframes())
         return self
 

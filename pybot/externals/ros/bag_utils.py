@@ -12,7 +12,7 @@ import os.path
 import tf
 import rosbag
 import rospy
-from message_filters import ApproximateTimeSynchronizer
+# from message_filters import ApproximateTimeSynchronizer
 
 from genpy.rostime import Time
 from sensor_msgs.msg import Image
@@ -125,19 +125,19 @@ class ImageDecoder(Decoder):
         return im_resize(im, scale=self.scale)
 
 
-class ApproximateTimeSynchronizerBag(ApproximateTimeSynchronizer): 
-    """
-    See reference implementation in message_filters.__init__.py 
-    for ApproximateTimeSynchronizer
-    """
+# class ApproximateTimeSynchronizerBag(ApproximateTimeSynchronizer): 
+#     """
+#     See reference implementation in message_filters.__init__.py 
+#     for ApproximateTimeSynchronizer
+#     """
 
-    def __init__(self, topics, queue_size, slop): 
-        ApproximateTimeSynchronizer.__init__(self, [], queue_size, slop)
-        self.queues_ = [{} for f in topics]
-        self.topic_queue_ = {topic: self.queues_[ind] for ind, topic in enumerate(topics)}
+#     def __init__(self, topics, queue_size, slop): 
+#         ApproximateTimeSynchronizer.__init__(self, [], queue_size, slop)
+#         self.queues_ = [{} for f in topics]
+#         self.topic_queue_ = {topic: self.queues_[ind] for ind, topic in enumerate(topics)}
 
-    def add_topic(self, topic, msg):
-        self.add(msg, self.topic_queue_[topic])
+#     def add_topic(self, topic, msg):
+#         self.add(msg, self.topic_queue_[topic])
 
 # class SensorSynchronizer(object): 
 #     def __init__(self, channels, cb_names, decoders, on_synced_cb, slop_seconds=0.1, queue_length=10): 
