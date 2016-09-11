@@ -10,9 +10,9 @@ setup(name='pybot',
       url='https://github.com/spillai/pybot',
       download_url='https://github.com/pybot/tarball/0.0.1',
       license='MIT',
-      # install_requires=['theano', 'pyyaml', 'six'],
+      # install_requires=['tables', 'six'],
       # extras_require={
       #               'h5py': ['h5py'],
       # },
       packages=find_packages())
-      })
+      
