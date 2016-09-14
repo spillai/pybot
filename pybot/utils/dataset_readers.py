@@ -153,6 +153,7 @@ class DatasetReader(object):
             print('Found {:} files with pattern: {:}'.format(nmatches, pattern))
             print('From {:} to {:}'.format(valid_path(self.files[0]), valid_path(self.files[-1])))
         else: 
+            print('Files: {:}'.format(len(files)))
             self.files = files
         
         # print('First file: {:}: {:}'.format(template % start_idx, 'GOOD' if
