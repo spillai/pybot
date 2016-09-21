@@ -163,9 +163,17 @@ class BaseSLAM(_BaseSLAM):
         self._update_estimates()
         self._update_marginals()
 
+    def finish(self): 
+        for j in range(10): 
+            self.update()
+        self.visualize_optimized()
+
 class BaseSLAMWithViz(BaseSLAM): 
     def __init__(self, name='SLAM_', frame_id='origin',
-                 visualize_every=2.0, visualize_factors=False, visualize_marginals=False): 
+                 visualize_every=2.0,
+                 visualize_measurements=False, 
+                 visualize_factors=True, visualize_marginals=False): 
+
         BaseSLAM.__init__(self)
         self.name_ = name
         self.frame_id_ = frame_id
@@ -175,6 +183,7 @@ class BaseSLAMWithViz(BaseSLAM):
 
         self.visualize_factors_ = visualize_factors
         self.visualize_marginals_ = visualize_marginals
+        self.visualize_measurements_ = visualize_measurements
 
     def update(self): 
         super(BaseSLAMWithViz, self).update()
@@ -183,6 +192,10 @@ class BaseSLAMWithViz(BaseSLAM):
         if now - self.t_last_viz_ > self.visualize_every_:
             self.visualize_optimized()
             self.t_last_viz_ = now
+
+    def finish(self): 
+        super(BaseSLAMWithViz, self).finish()
+        self.visualize_optimized()
 
     @timeitmethod
     def visualize_optimized(self):
@@ -231,7 +244,7 @@ class BaseSLAMWithViz(BaseSLAM):
             if len(updated_targets): 
                 # texts = [self.landmark_text_lut_.get(k, str(k)) for k in updated_targets.keys()]
                 draw_utils.publish_pose_list(self.name_ + 'optimized_node_landmark', updated_targets.values(), 
-                                             # texts=texts,
+                                             texts=[str(k) for k in updated_targets.keys()], 
                                              frame_id=self.frame_id_, reset=True)
 
                 # edges = np.vstack([draw_utils.draw_tag_edges(p) for p in updated_targets.itervalues()])
@@ -309,6 +322,9 @@ class BaseSLAMWithViz(BaseSLAM):
 
             
     def visualize_poses(self, p, relative=True):
+        if not self.visualize_measurements_:
+            return
+
         # Draw odom pose
         draw_utils.publish_pose_list(self.name_ + 'measured_odom', 
                                      [Pose.from_rigid_transform(self.latest, self.latest_measurement_pose)], 
@@ -322,7 +338,10 @@ class BaseSLAMWithViz(BaseSLAM):
                                              factor_st, factor_end, c='r', 
                                              frame_id=self.frame_id_, reset=False)
 
-    def visualize_landmarks(self, ids, poses): 
+    def visualize_landmarks(self, ids, poses):
+        if not self.visualize_measurements_:
+            return
+        
         # Draw landmark pose
         draw_utils.publish_pose_list(self.name_ + 'measured_landmarks', 
                                      [Pose.from_rigid_transform(pid + self.latest * 100, self.latest_measurement_pose * p) 
