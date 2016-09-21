@@ -6,6 +6,7 @@ import sys
 import time
 import numpy as np
 from itertools import izip
+from threading import Thread, Lock, Timer
 
 from pybot.geometry.rigid_transform import RigidTransform, Pose, Quaternion
 from pybot.vision.image_utils import to_color, to_gray
@@ -150,16 +151,141 @@ class BaseSLAM(_BaseSLAM):
     def update(self): 
         self._update()
         self._update_estimates()
-        self._update_marginals()
+        # self._update_marginals()
 
 class BaseSLAMWithViz(BaseSLAM): 
-    def __init__(self, name='SLAM_', frame_id='origin'): 
+    def __init__(self, name='SLAM_', frame_id='origin', visualize_factors=False): 
         BaseSLAM.__init__(self)
-        self.q_viz_poses_ = Accumulator(maxlen=2)
-
         self.name_ = name
         self.frame_id_ = frame_id
+        self.visualize_factors_ = visualize_factors
+        # self.viz_th_ = Thread(target=self._viz_optimized)
+        # self.viz_th_.start()
 
+    # def __del__(self):
+    #     self.viz_th_.join()
+        
+    def _viz_optimized(self):
+        """
+        Update SLAM visualizations with optimized factors
+        """
+        while True:
+            time.sleep(1)
+            
+            with self.state_lock_:
+                # =========================================================
+                # POSES/MARGINALS
+
+                # Poses 
+                covars = []
+                updated_poses = {pid : Pose.from_rigid_transform(
+                    pid, RigidTransform.from_matrix(p)) 
+                                 for (pid,p) in self.poses.iteritems()}
+
+                # # Marginals
+                # if self.visualize_marginals_: 
+                #     poses_marginals = self.poses_marginals
+                #     triu_inds = np.triu_indices(3)
+                #     if self.marginals_available: 
+                #         for pid in updated_poses.keys(): 
+                #             covars.append(
+                #                 poses_marginals.get(pid, np.eye(6, dtype=np.float32) * 100)[triu_inds]
+                #             )
+
+                # Draw cameras (with poses and marginals)
+                draw_utils.publish_cameras(self.name_ + 'optimized_node_poses', updated_poses.values(), 
+                                           covars=covars, frame_id=self.frame_id_, draw_edges=False, reset=True)
+
+                # Draw odometry edges (between robot poses)
+                if self.visualize_factors_: 
+                    robot_edges = self.robot_edges
+                    if len(robot_edges): 
+                        factor_st = np.vstack([(updated_poses[xid].tvec).reshape(-1,3) for (xid, _) in robot_edges])
+                        factor_end = np.vstack([(updated_poses[xid].tvec).reshape(-1,3) for (_, xid) in robot_edges])
+
+                        draw_utils.publish_line_segments(self.name_ + 'optimized_factor_odom', factor_st, factor_end, c='b', 
+                                                         frame_id=self.frame_id_, reset=True) 
+
+
+#         # =========================================================
+#         # TARGETS/LANDMARKS
+
+#         if self.landmark_type_ == 'pose': 
+#             # Draw targets (constantly updated, so draw with reset)
+#             updated_targets = {pid : Pose.from_rigid_transform(pid, RigidTransform.from_matrix(p)) 
+#                                for (pid, p) in self.target_poses.iteritems()}
+#             if len(updated_targets): 
+#                 texts = [self.landmark_text_lut_.get(k, str(k)) for k in updated_targets.keys()]
+#                 draw_utils.publish_pose_list('optimized_node_landmark', updated_targets.values(), 
+#                                              texts=texts, reset=True)
+
+#                 # edges = np.vstack([draw_utils.draw_tag_edges(p) for p in updated_targets.itervalues()])
+#                 # draw_utils.publish_line_segments('optimized_node_landmark', edges[:,:3], edges[:,3:6], c='r', 
+#                 #                                  frame_id=frame_id, reset=True)
+#                 # draw_utils.publish_tags('optimized_node_landmark', updated_targets.values(), 
+#                 #                         texts=map(str, updated_targets.keys()), draw_nodes=True, draw_edges=True, 
+#                 #                         frame_id=frame_id, reset=True)
+
+#             # Draw edges (between landmarks and poses)
+#             if self.visualize_factors_: 
+#                 landmark_edges = self.landmark_edges
+#                 if len(landmark_edges): 
+#                     factor_st = np.vstack([(updated_poses[xid].tvec).reshape(-1,3) for (xid, _) in landmark_edges])
+#                     factor_end = np.vstack([(updated_targets[lid].tvec).reshape(-1,3) for (_, lid) in landmark_edges])
+
+#                     draw_utils.publish_line_segments('optimized_factor_landmark', factor_st, factor_end, c='b', 
+#                                                      frame_id=frame_id, reset=True) 
+
+#         elif self.landmark_type_ == 'point': 
+
+#             # Draw targets (constantly updated, so draw with reset)
+#             updated_targets = {pid : pt3
+#                                for (pid, pt3) in self.target_landmarks.iteritems()}
+#             if len(updated_targets): 
+#                 points3d = np.vstack(updated_targets.values())
+#                 draw_utils.publish_cloud('optimized_node_landmark', points3d, c='r', 
+#                                          frame_id=frame_id, reset=True)
+
+#             # Landmark points
+#             if self.visualize_nodes_: 
+#                 covars = []
+#                 poses = [Pose(k, tvec=v) for k, v in updated_targets.iteritems()]
+#                 texts = [self.landmark_text_lut_.get(k, '') for k in updated_targets.keys()] \
+#                         if len(self.landmark_text_lut_) else []
+
+#                 # Marginals
+#                 if self.visualize_marginals_: 
+#                     target_landmarks_marginals = self.target_landmarks_marginals
+#                     triu_inds = np.triu_indices(3)
+#                     if self.marginals_available: 
+#                         for pid in updated_targets.keys(): 
+#                             covars.append(
+#                                 target_landmarks_marginals.get(pid, np.ones(shape=(6,6)) * 10)[triu_inds]
+#                             )
+
+#                 # Draw landmark points
+#                 draw_utils.publish_pose_list('optimized_node_landmark_poses', poses, texts=texts, 
+#                                              covars=covars, frame_id=frame_id, reset=True)
+
+#             # Draw edges (between landmarks and poses)
+#             if self.visualize_factors_: 
+#                 landmark_edges = self.landmark_edges
+#                 if len(landmark_edges): 
+#                     factor_st = np.vstack([(updated_poses[xid].tvec).reshape(-1,3) for (xid, _) in landmark_edges])
+#                     factor_end = np.vstack([(updated_targets[lid]).reshape(-1,3) for (_, lid) in landmark_edges])
+
+#                     draw_utils.publish_line_segments('optimized_factor_landmark', factor_st, factor_end, c='b', 
+#                                                      frame_id=frame_id, reset=True) 
+
+#         else: 
+#             raise ValueError('Unknown landmark_type {:}'.format(self.landmark_type_))
+
+#         # Maintain updated ids
+#         return set(updated_poses.keys())
+
+
+
+            
     def _viz_on_odom(self, p, relative=True):
         # Draw odom pose
         draw_utils.publish_pose_list(self.name_ + 'measured_odom', 

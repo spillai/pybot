@@ -8,6 +8,7 @@ np.set_printoptions(precision=2, suppress=True)
 
 from collections import deque, defaultdict, Counter
 from itertools import izip
+from threading import Lock, RLock
 
 from pybot.utils.timer import SimpleTimer, timeitmethod
 from pybot.utils.db_utils import AttrDict
@@ -72,6 +73,8 @@ class BaseSLAM(object):
  
         # ISAM2 interface
         self.slam_ = ISAM2()
+        self.slam_lock_ = Lock()
+
         self.idx_ = -1
         self.verbose_ = verbose
 
@@ -85,6 +88,7 @@ class BaseSLAM(object):
         self.odo_noise_ = Diagonal.Sigmas(odom_noise)
 
         # Optimized robot state
+        self.state_lock_ = Lock()
         self.xs_ = {}
         self.ls_ = {}
         self.xls_ = []
@@ -164,7 +168,8 @@ class BaseSLAM(object):
             PriorFactorPose3(x_id, pose0, self.prior_noise_)
         )
         self.initial_.insert(x_id, pose0)
-        self.xs_[index] = pose0
+        with self.state_lock_: 
+            self.xs_[index] = pose0
         self.idx_ = index
 
         # Add node to graphviz
@@ -203,12 +208,13 @@ class BaseSLAM(object):
                                            pdelta, self.odo_noise_))
         
         # Predict pose and add as initial estimate
-        pred_pose = self.xs_[xid1].compose(pdelta)
-        self.initial_.insert(x_id2, pred_pose)
-        self.xs_[xid2] = pred_pose
+        with self.state_lock_: 
+            pred_pose = self.xs_[xid1].compose(pdelta)
+            self.initial_.insert(x_id2, pred_pose)
+            self.xs_[xid2] = pred_pose
 
-        # Add to edges
-        self.xxs_.append((xid1, xid2))
+            # Add to edges
+            self.xxs_.append((xid1, xid2))
 
         # Add edge to graphviz
         # if self.export_graph_: 
@@ -231,31 +237,33 @@ class BaseSLAM(object):
             self.graph_.add(BetweenFactorPose3(x_id, l_id, pdelta, 
                                                self.measurement_noise_))
 
-        # Add to landmark measurements
-        self.xls_.extend([(xid, lid) for lid in lids])
+        with self.state_lock_: 
 
-        # Add landmark edge to graphviz
-        # if self.export_graph_: 
-        #     self.gviz_.add_edge(x_id, l_id)
-        
-        # Initialize new landmark pose node from the latest robot
-        # pose. This should be done just once
-        for (l_id, lid, delta) in izip(l_ids, lids, deltas): 
-            if lid not in self.ls_:
-                try: 
-                    pred_pose = self.xs_[xid].compose(Pose3(delta))
-                    self.initial_.insert(l_id, pred_pose)
-                    self.ls_[lid] = pred_pose
-                    self.timer_ls_[xid].append(lid)
-                except: 
-                    raise KeyError('Pose {:} not available'
-                                   .format(xid))
+            # Add to landmark measurements
+            self.xls_.extend([(xid, lid) for lid in lids])
 
-                # Label landmark node
-                # if self.export_graph_: 
-                #     self.gviz_.node[l_id]['label'] = 'L ' + str(lid)            
-                #     self.gviz_.node[l_id]['color'] = 'red'
-                #     self.gviz_.node[l_id]['style'] = 'filled'
+            # Add landmark edge to graphviz
+            # if self.export_graph_: 
+            #     self.gviz_.add_edge(x_id, l_id)
+
+            # Initialize new landmark pose node from the latest robot
+            # pose. This should be done just once
+            for (l_id, lid, delta) in izip(l_ids, lids, deltas): 
+                if lid not in self.ls_:
+                    try: 
+                        pred_pose = self.xs_[xid].compose(Pose3(delta))
+                        self.initial_.insert(l_id, pred_pose)
+                        self.ls_[lid] = pred_pose
+                        self.timer_ls_[xid].append(lid)
+                    except: 
+                        raise KeyError('Pose {:} not available'
+                                       .format(xid))
+
+                    # Label landmark node
+                    # if self.export_graph_: 
+                    #     self.gviz_.node[l_id]['label'] = 'L ' + str(lid)            
+                    #     self.gviz_.node[l_id]['color'] = 'red'
+                    #     self.gviz_.node[l_id]['style'] = 'filled'
             
         return 
 
@@ -291,32 +299,34 @@ class BaseSLAM(object):
                 GenericProjectionFactorPose3Point3Cal3_S2(
                     Point2(vec(*pt)), self.image_measurement_noise_, x_id, l_id, self.K_))
 
-        # # Add to landmark measurements
-        # self.xls_.extend([(xid, lid) for lid in lids])
+        with self.state_lock_: 
 
-        # Add landmark edge to graphviz
-        # if self.export_graph_: 
-        #     for l_id in l_ids: 
-        #         self.gviz_.add_edge(x_id, l_id)
-        
-        # Initialize new landmark pose node from the latest robot
-        # pose. This should be done just once
-        for (l_id, lid, pt3) in izip(l_ids, lids, pts3d): 
-            if lid not in self.ls_: 
-                try: 
-                    pred_pt3 = self.xs_[xid].transform_from(Point3(vec(*pt3)))
-                    self.initial_.insert(l_id, pred_pt3)
-                    self.ls_[lid] = pred_pt3
-                    self.timer_ls_[xid].append(lid)
-                except Exception, e: 
-                    raise RuntimeError('Initialization failed ({:}). xid:{:}, lid:{:}, l_id: {:}'
-                                       .format(e, xid, lid, l_id))
+            # # Add to landmark measurements
+            # self.xls_.extend([(xid, lid) for lid in lids])
 
-                # Label landmark node
-                # if self.export_graph_: 
-                #     self.gviz_.node[l_id]['label'] = 'L ' + str(lid)            
-                #     self.gviz_.node[l_id]['color'] = 'red'
-                #     self.gviz_.node[l_id]['style'] = 'filled'
+            # Add landmark edge to graphviz
+            # if self.export_graph_: 
+            #     for l_id in l_ids: 
+            #         self.gviz_.add_edge(x_id, l_id)
+
+            # Initialize new landmark pose node from the latest robot
+            # pose. This should be done just once
+            for (l_id, lid, pt3) in izip(l_ids, lids, pts3d): 
+                if lid not in self.ls_: 
+                    try: 
+                        pred_pt3 = self.xs_[xid].transform_from(Point3(vec(*pt3)))
+                        self.initial_.insert(l_id, pred_pt3)
+                        self.ls_[lid] = pred_pt3
+                        self.timer_ls_[xid].append(lid)
+                    except Exception, e: 
+                        raise RuntimeError('Initialization failed ({:}). xid:{:}, lid:{:}, l_id: {:}'
+                                           .format(e, xid, lid, l_id))
+
+                    # Label landmark node
+                    # if self.export_graph_: 
+                    #     self.gviz_.node[l_id]['label'] = 'L ' + str(lid)            
+                    #     self.gviz_.node[l_id]['color'] = 'red'
+                    #     self.gviz_.node[l_id]['style'] = 'filled'
         
         return 
 
@@ -348,8 +358,9 @@ class BaseSLAM(object):
     def marginals_available(self): 
         return len(self.xcovs_) > 0 or len(self.lcovs_) > 0
 
-    def save_graph(self, filename): 
-        self.slam_.saveGraph(filename)
+    def save_graph(self, filename):
+        with self.slam_lock_: 
+            self.slam_.saveGraph(filename)
 
     # def save_dot_graph(self, filename): 
     #     nx.write_dot(self.gviz_, filename)
@@ -361,34 +372,38 @@ class BaseSLAM(object):
         # print('.')
 
         # Update ISAM with new nodes/factors and initial estimates
-        self.slam_.update(self.graph_, self.initial_)
-        self.slam_.update()
+        with self.slam_lock_: 
+            self.slam_.update(self.graph_, self.initial_)
+            self.slam_.update()
 
     def _update_estimates(self): 
 
         # Get current estimate
-        self.current_ = self.slam_.calculateEstimate()
+        with self.slam_lock_: 
+            self.current_ = self.slam_.calculateEstimate()
+            
         poses = extractPose3(self.current_)
         landmarks = extractPoint3(self.current_)
 
         if not self.estimate_available: 
             return 
 
-        # Extract and update landmarks and poses
-        for k,v in poses.iteritems():
-            if k.chr() == ord('l'): 
-                self.ls_[k.index()] = v
-            elif k.chr() == ord('x'): 
-                self.xs_[k.index()] = v
-            else: 
-                raise RuntimeError('Unknown key chr {:}'.format(k.chr))
+        with self.state_lock_: 
+            # Extract and update landmarks and poses
+            for k,v in poses.iteritems():
+                if k.chr() == ord('l'): 
+                    self.ls_[k.index()] = v
+                elif k.chr() == ord('x'): 
+                    self.xs_[k.index()] = v
+                else: 
+                    raise RuntimeError('Unknown key chr {:}'.format(k.chr))
 
-        # Extract and update landmarks
-        for k,v in landmarks.iteritems():
-            if k.chr() == ord('l'): 
-                self.ls_[k.index()] = v
-            else: 
-                raise RuntimeError('Unknown key chr {:}'.format(k.chr))
+            # Extract and update landmarks
+            for k,v in landmarks.iteritems():
+                if k.chr() == ord('l'): 
+                    self.ls_[k.index()] = v
+                else: 
+                    raise RuntimeError('Unknown key chr {:}'.format(k.chr))
 
         self.graph_.resize(0)
         self.initial_.clear()
@@ -403,11 +418,12 @@ class BaseSLAM(object):
             return 
 
         # Retrieve marginals for each of the poses
-        for xid in self.xs_: 
-            self.xcovs_[xid] = self.slam_.marginalCovariance(symbol('x', xid))
+        with self.slam_lock_: 
+            for xid in self.xs_: 
+                self.xcovs_[xid] = self.slam_.marginalCovariance(symbol('x', xid))
 
-        for lid in self.ls_: 
-            self.lcovs_[lid] = self.slam_.marginalCovariance(symbol('l', lid))
+            for lid in self.ls_: 
+                self.lcovs_[lid] = self.slam_.marginalCovariance(symbol('l', lid))
 
     def cleanup(self): 
 
