@@ -12,6 +12,7 @@ from pybot.geometry.rigid_transform import RigidTransform, Pose, Quaternion
 from pybot.vision.image_utils import to_color, to_gray
 from pybot.vision.imshow_utils import imshow_cv
 from pybot.utils.pose_utils import PoseAccumulator
+from pybot.utils.timer import timeitmethod
 from pybot.utils.misc import Accumulator, SkippedCounter, CounterWithPeriodicCallback
 from pybot.externals.lcm import draw_utils
 
@@ -37,13 +38,6 @@ class BaseSLAM(_BaseSLAM):
         _BaseSLAM.__init__(self)
         self.q_poses_ = Accumulator(maxlen=2)
         self.update_every_k_odom_ = update_every_k_odom
-
-    # @property
-    # def latest(self):
-    #     print self.q_poses_.index, super(BaseSLAM, self).latest
-    #     # assert(self.q_poses_.index == super(BaseSLAM, self).latest)
-        
-    #     return super(BaseSLAM, self).latest
         
     @property
     def latest_measurement_pose(self): 
@@ -52,6 +46,18 @@ class BaseSLAM(_BaseSLAM):
     def measurement_pose(self, idx):
         return self.q_poses_.items[idx]
 
+    @property
+    def updated_poses(self):
+        return {pid : Pose.from_rigid_transform(
+            pid, RigidTransform.from_matrix(p)) 
+                for (pid,p) in self.poses.iteritems()}
+
+    @property
+    def updated_targets(self):
+        return {pid : Pose.from_rigid_transform(pid, RigidTransform.from_matrix(p)) 
+                for (pid, p) in self.target_poses.iteritems()}
+
+    
     def on_odom_absolute(self, t, p): 
         """
         Accumulate poses (input: absolute odometry) and add relative odometry to 
@@ -151,90 +157,104 @@ class BaseSLAM(_BaseSLAM):
     def update(self): 
         self._update()
         self._update_estimates()
-        # self._update_marginals()
+        self._update_marginals()
 
 class BaseSLAMWithViz(BaseSLAM): 
-    def __init__(self, name='SLAM_', frame_id='origin', visualize_factors=False): 
+    def __init__(self, name='SLAM_', frame_id='origin',
+                 visualize_every=2.0, visualize_factors=False, visualize_marginals=False): 
         BaseSLAM.__init__(self)
         self.name_ = name
         self.frame_id_ = frame_id
-        self.visualize_factors_ = visualize_factors
-        # self.viz_th_ = Thread(target=self._viz_optimized)
-        # self.viz_th_.start()
 
-    # def __del__(self):
-    #     self.viz_th_.join()
-        
-    def _viz_optimized(self):
+        self.visualize_every_ = visualize_every
+        self.t_last_viz_ = time.time()
+
+        self.visualize_factors_ = visualize_factors
+        self.visualize_marginals_ = visualize_marginals
+
+    def update(self): 
+        super(BaseSLAMWithViz, self).update()
+
+        now = time.time()
+        if now - self.t_last_viz_ > self.visualize_every_:
+            self.visualize_optimized()
+            self.t_last_viz_ = now
+
+    @timeitmethod
+    def visualize_optimized(self):
         """
         Update SLAM visualizations with optimized factors
         """
-        while True:
-            time.sleep(1)
+        self.visualize_optimized_poses()
+        self.visualize_optimized_landmarks()
+        
+    def visualize_optimized_poses(self):
+        with self.state_lock_:
+            # Poses 
+            covars = []
+            updated_poses = self.updated_poses
+
+            # Marginals
+            if self.visualize_marginals_: 
+                poses_marginals = self.poses_marginals
+                triu_inds = np.triu_indices(3)
+                if self.marginals_available: 
+                    for pid in updated_poses.keys(): 
+                        covars.append(
+                            poses_marginals.get(pid, np.eye(6, dtype=np.float32) * 100)[triu_inds]
+                        )
+
+            # Draw cameras (with poses and marginals)
+            draw_utils.publish_cameras(self.name_ + 'optimized_node_poses', updated_poses.values(), 
+                                       covars=covars, frame_id=self.frame_id_, draw_edges=False, reset=True)
+
+            # Draw odometry edges (between robot poses)
+            if self.visualize_factors_: 
+                robot_edges = self.robot_edges
+                if len(robot_edges): 
+                    factor_st = np.vstack([(updated_poses[xid].tvec).reshape(-1,3) for (xid, _) in robot_edges])
+                    factor_end = np.vstack([(updated_poses[xid].tvec).reshape(-1,3) for (_, xid) in robot_edges])
+
+                    draw_utils.publish_line_segments(self.name_ + 'optimized_factor_odom', factor_st, factor_end, c='b', 
+                                                     frame_id=self.frame_id_, reset=True) 
+
+    def visualize_optimized_landmarks(self):
+        with self.state_lock_:
+            # Draw targets (constantly updated, so draw with reset)
+            updated_poses = self.updated_poses
+            updated_targets = self.updated_targets
             
-            with self.state_lock_:
-                # =========================================================
-                # POSES/MARGINALS
+            if len(updated_targets): 
+                # texts = [self.landmark_text_lut_.get(k, str(k)) for k in updated_targets.keys()]
+                draw_utils.publish_pose_list(self.name_ + 'optimized_node_landmark', updated_targets.values(), 
+                                             # texts=texts,
+                                             frame_id=self.frame_id_, reset=True)
 
-                # Poses 
-                covars = []
-                updated_poses = {pid : Pose.from_rigid_transform(
-                    pid, RigidTransform.from_matrix(p)) 
-                                 for (pid,p) in self.poses.iteritems()}
+                # edges = np.vstack([draw_utils.draw_tag_edges(p) for p in updated_targets.itervalues()])
+                # draw_utils.publish_line_segments('optimized_node_landmark', edges[:,:3], edges[:,3:6], c='r', 
+                #                                  frame_id=frame_id, reset=True)
+                # draw_utils.publish_tags('optimized_node_landmark', updated_targets.values(), 
+                #                         texts=map(str, updated_targets.keys()), draw_nodes=True, draw_edges=True, 
+                #                         frame_id=frame_id, reset=True)
 
-                # # Marginals
-                # if self.visualize_marginals_: 
-                #     poses_marginals = self.poses_marginals
-                #     triu_inds = np.triu_indices(3)
-                #     if self.marginals_available: 
-                #         for pid in updated_poses.keys(): 
-                #             covars.append(
-                #                 poses_marginals.get(pid, np.eye(6, dtype=np.float32) * 100)[triu_inds]
-                #             )
+            # Draw edges (between landmarks and poses)
+            if self.visualize_factors_: 
+                landmark_edges = self.landmark_edges
+                if len(landmark_edges): 
+                    factor_st = np.vstack([(updated_poses[xid].tvec).reshape(-1,3) for (xid, _) in landmark_edges])
+                    factor_end = np.vstack([(updated_targets[lid].tvec).reshape(-1,3) for (_, lid) in landmark_edges])
 
-                # Draw cameras (with poses and marginals)
-                draw_utils.publish_cameras(self.name_ + 'optimized_node_poses', updated_poses.values(), 
-                                           covars=covars, frame_id=self.frame_id_, draw_edges=False, reset=True)
+                    draw_utils.publish_line_segments(self.name_ + 'optimized_factor_landmark',
+                                                     factor_st, factor_end, c='b', 
+                                                     frame_id=self.frame_id_, reset=True) 
 
-                # Draw odometry edges (between robot poses)
-                if self.visualize_factors_: 
-                    robot_edges = self.robot_edges
-                    if len(robot_edges): 
-                        factor_st = np.vstack([(updated_poses[xid].tvec).reshape(-1,3) for (xid, _) in robot_edges])
-                        factor_end = np.vstack([(updated_poses[xid].tvec).reshape(-1,3) for (_, xid) in robot_edges])
+            
+        
 
-                        draw_utils.publish_line_segments(self.name_ + 'optimized_factor_odom', factor_st, factor_end, c='b', 
-                                                         frame_id=self.frame_id_, reset=True) 
+        # =========================================================
+        # TARGETS/LANDMARKS
 
-
-#         # =========================================================
-#         # TARGETS/LANDMARKS
-
-#         if self.landmark_type_ == 'pose': 
-#             # Draw targets (constantly updated, so draw with reset)
-#             updated_targets = {pid : Pose.from_rigid_transform(pid, RigidTransform.from_matrix(p)) 
-#                                for (pid, p) in self.target_poses.iteritems()}
-#             if len(updated_targets): 
-#                 texts = [self.landmark_text_lut_.get(k, str(k)) for k in updated_targets.keys()]
-#                 draw_utils.publish_pose_list('optimized_node_landmark', updated_targets.values(), 
-#                                              texts=texts, reset=True)
-
-#                 # edges = np.vstack([draw_utils.draw_tag_edges(p) for p in updated_targets.itervalues()])
-#                 # draw_utils.publish_line_segments('optimized_node_landmark', edges[:,:3], edges[:,3:6], c='r', 
-#                 #                                  frame_id=frame_id, reset=True)
-#                 # draw_utils.publish_tags('optimized_node_landmark', updated_targets.values(), 
-#                 #                         texts=map(str, updated_targets.keys()), draw_nodes=True, draw_edges=True, 
-#                 #                         frame_id=frame_id, reset=True)
-
-#             # Draw edges (between landmarks and poses)
-#             if self.visualize_factors_: 
-#                 landmark_edges = self.landmark_edges
-#                 if len(landmark_edges): 
-#                     factor_st = np.vstack([(updated_poses[xid].tvec).reshape(-1,3) for (xid, _) in landmark_edges])
-#                     factor_end = np.vstack([(updated_targets[lid].tvec).reshape(-1,3) for (_, lid) in landmark_edges])
-
-#                     draw_utils.publish_line_segments('optimized_factor_landmark', factor_st, factor_end, c='b', 
-#                                                      frame_id=frame_id, reset=True) 
+        # if self.landmark_type_ == 'pose': 
 
 #         elif self.landmark_type_ == 'point': 
 
@@ -283,24 +303,22 @@ class BaseSLAMWithViz(BaseSLAM):
 #         # Maintain updated ids
 #         return set(updated_poses.keys())
 
-
-
             
-    def _viz_on_odom(self, p, relative=True):
+    def visualize_poses(self, p, relative=True):
         # Draw odom pose
         draw_utils.publish_pose_list(self.name_ + 'measured_odom', 
                                      [Pose.from_rigid_transform(self.latest, self.latest_measurement_pose)], 
                                      frame_id=self.frame_id_, reset=False)
 
         # Draw odom factor
-        if self.latest >= 1: 
+        if self.visualize_factors_ and self.latest >= 1: 
             factor_st = (self.measurement_pose(-2).tvec).reshape(-1,3)
             factor_end = (self.measurement_pose(-1).tvec).reshape(-1,3)
             draw_utils.publish_line_segments(self.name_ + 'measured_factor_odom', 
                                              factor_st, factor_end, c='r', 
                                              frame_id=self.frame_id_, reset=False)
 
-    def _viz_on_pose_landmarks(self, ids, poses): 
+    def visualize_landmarks(self, ids, poses): 
         # Draw landmark pose
         draw_utils.publish_pose_list(self.name_ + 'measured_landmarks', 
                                      [Pose.from_rigid_transform(pid + self.latest * 100, self.latest_measurement_pose * p) 
@@ -308,24 +326,24 @@ class BaseSLAMWithViz(BaseSLAM):
                                      # texts=[str(pid) for pid in ids],
                                      frame_id=self.frame_id_, reset=False)
 
-        # Draw odom factor
-        factor_st = np.vstack([np.zeros((1,3)) for _ in poses])
-        factor_end = np.vstack([p.tvec.reshape(-1,3) for p in poses])
-        draw_utils.publish_line_segments(self.name_ + 'measured_factor_landmark', factor_st, factor_end, c='b', 
-                                         frame_id=self.name_ + 'measured_odom', element_id=self.latest, reset=False) 
-
+        if self.visualize_factors_: 
+            # Draw odom factor
+            factor_st = np.vstack([np.zeros((1,3)) for _ in poses])
+            factor_end = np.vstack([p.tvec.reshape(-1,3) for p in poses])
+            draw_utils.publish_line_segments(self.name_ + 'measured_factor_landmark', factor_st, factor_end, c='b', 
+                                             frame_id=self.name_ + 'measured_odom', element_id=self.latest, reset=False) 
 
     def on_odom_absolute(self, t, p): 
         BaseSLAM.on_odom_absolute(self, t, p)
-        self._viz_on_odom(p, relative=False)
+        self.visualize_poses(p, relative=False)
 
     def on_odom_relative(self, t, p): 
         BaseSLAM.on_odom_relative(self, t, p)
-        self._viz_on_odom(p, relative=True)
+        self.visualize_poses(p, relative=True)
 
     def on_pose_landmarks(self, t, ids, poses): 
         BaseSLAM.on_pose_landmarks(self, t, ids, poses)
-        self._viz_on_pose_landmarks(ids, poses)
+        self.visualize_landmarks(ids, poses)
         
 def SLAM(visualize=False): 
     if visualize: 
