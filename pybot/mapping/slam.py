@@ -38,7 +38,10 @@ class BaseSLAM(_BaseSLAM):
 
     @property
     def latest_pose(self): 
-        return RigidTransform.from_matrix(self.pose(self.latest))
+        return RigidTransform.from_matrix(super(BaseSLAM, self).pose(self.latest))
+
+    def pose(self, k): 
+        return RigidTransform.from_matrix(super(BaseSLAM, self).pose(k))
 
     def on_odom_absolute(self, t, p): 
         """
@@ -62,27 +65,24 @@ class BaseSLAM(_BaseSLAM):
 
         # 2. SLAM: Add relative pose measurements (odometry)
         p_odom = (self.q_poses_.items[-2].inverse()).oplus(self.q_poses_.items[-1])
-        self.add_odom_incremental(p_odom.matrix)
-
-        if self.latest >= 2 and self.latest % 10 == 0: 
-            self.update()
-
-        return self.latest
+        return self.on_odom_relative(t, p_odom)
 
     def on_odom_relative(self, t, p): 
         """
         Accumulate componded pose (input: relative odometry) and add relative odometry to 
         factor graph with appropriate timestamp
         """
+
         # 1. SLAM: Initialize
         if not self.is_initialized: 
             self.initialize(RigidTransform.identity().matrix)
+            return self.latest
         
         # 2. SLAM: Add relative pose measurements (odometry)
         self.add_odom_incremental(p.matrix)
 
-        if self.latest >= 2 and self.latest % 10 == 0: 
-            self.update()
+        # if self.latest >= 2 and self.latest % 10 == 0: 
+        #     self.update()
 
         # 3. Visualize
         # self.vis_optimized()
@@ -139,42 +139,52 @@ class BaseSLAM(_BaseSLAM):
         self._update_marginals()
 
 class BaseSLAMWithViz(BaseSLAM): 
-    def __init__(self, name='SLAM_', frame_id='camera'): 
+    def __init__(self, name='SLAM_', frame_id='origin'): 
         BaseSLAM.__init__(self)
 
         self.name_ = name
         self.frame_id_ = frame_id
 
-    def on_odom_absolute(self, t, p): 
-        BaseSLAM.on_odom_absolute(self, t, p)
-
+    def _viz_on_odom(self): 
         # Draw odom pose
-        draw_utils.publish_pose_list(self.name_ + 'measured_factor_odom', 
+        draw_utils.publish_pose_list(self.name_ + 'measured_odom', 
                                      [Pose.from_rigid_transform(self.latest, self.latest_pose)], 
                                      frame_id=self.frame_id_, reset=False)
 
-        # # Draw odom factor
-        # if len(self.q_poses_) >= 2: 
-        #     factor_st = (self.q_poses_.items[-2].tvec).reshape(-1,3)
-        #     factor_end = (self.q_poses_.items[-1].tvec).reshape(-1,3)
-        #     draw_utils.publish_line_segments(self.name_ + 'measured_factor_odom', 
-        #                                      factor_st, factor_end, c='b', 
-        #                                      frame_id=self.frame_id_, reset=False)
+        # Draw odom factor
+        if self.latest >= 1: 
+            factor_st = (self.pose(self.latest-1).tvec).reshape(-1,3)
+            factor_end = (self.pose(self.latest).tvec).reshape(-1,3)
+            draw_utils.publish_line_segments(self.name_ + 'measured_factor_odom', 
+                                             factor_st, factor_end, c='r', 
+                                             frame_id=self.frame_id_, reset=False)
+
+    def _viz_on_pose_landmarks(self, ids, poses): 
+        # Draw landmark pose
+        draw_utils.publish_pose_list(self.name_ + 'measured_landmarks', 
+                                     [Pose.from_rigid_transform(pid + self.latest * 100, self.latest_pose * p) 
+                                      for (pid, p) in izip(ids, poses)], 
+                                     # texts=[str(pid) for pid in ids],
+                                     frame_id=self.frame_id_, reset=False)
+
+        # Draw odom factor
+        factor_st = np.vstack([np.zeros((1,3)) for _ in poses])
+        factor_end = np.vstack([p.tvec.reshape(-1,3) for p in poses])
+        draw_utils.publish_line_segments(self.name_ + 'measured_factor_landmark', factor_st, factor_end, c='b', 
+                                         frame_id=self.name_ + 'measured_odom', element_id=self.latest, reset=False) 
 
 
+    def on_odom_absolute(self, t, p): 
+        BaseSLAM.on_odom_absolute(self, t, p)
+        self._viz_on_odom()
 
     def on_odom_relative(self, t, p): 
         BaseSLAM.on_odom_relative(self, t, p)
-        # draw_utils.publish_pose_list(self.name_ + 'measured_factor_odom', 
-        #                              [Pose.from_rigid_transform(self.q_poses_.index, self.q_poses_.latest)], 
-        #                              frame_id=self.frame_id_, reset=False)
+        self._viz_on_odom()
 
     def on_pose_landmarks(self, t, ids, poses): 
         BaseSLAM.on_pose_landmarks(self, t, ids, poses)
-        # draw_utils.publish_pose_list(self.name_ + 'landmarks', [Pose.from_rigid_transform(pid, p) 
-        #                                             for (pid, p) in izip(ids, poses)], 
-        #                              frame_id=self.frame_id_, reset=False)
-
+        self._viz_on_pose_landmarks(ids, poses)
         
 def SLAM(visualize=False): 
     if visualize: 

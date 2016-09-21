@@ -134,7 +134,7 @@ class RigidTransform(object):
     def inverse(self):
         """ Returns a new RigidTransform that corresponds to the inverse of this one """
         qinv = self.quat.inverse()
-        return RigidTransform(qinv, qinv.rotate(- self.tvec))
+        return RigidTransform(qinv, qinv.rotate(-self.tvec))
 
     def oplus(self, other): 
         if isinstance(other, RigidTransform): 
