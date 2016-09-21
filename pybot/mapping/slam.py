@@ -16,7 +16,9 @@ from pybot.utils.timer import timeitmethod
 from pybot.utils.misc import Accumulator, SkippedCounter, CounterWithPeriodicCallback
 from pybot.externals.lcm import draw_utils
 
+# ===============================================================================
 # Import GTSAM / ISAM
+
 _BACKEND = 'gtsam'
 if 'PYBOT_SLAM_BACKEND' in os.environ:
     _backend = os.environ['PYBOT_SLAM_BACKEND']
@@ -32,6 +34,8 @@ elif _BACKEND == 'isam':
     raise NotImplementedError('ISAM not yet implemented')
 else:
     raise Exception('Unknown backend: ' + str(_BACKEND))
+
+# ===============================================================================
 
 class BaseSLAM(_BaseSLAM):
     def __init__(self, update_every_k_odom=10): 

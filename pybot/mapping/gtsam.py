@@ -106,59 +106,6 @@ class BaseSLAM(object):
         # if self.export_graph_: 
         #     self.gviz_ = nx.Graph()
 
-    @property
-    def poses(self): 
-        " Robot poses: Expects poses to be Pose3 "
-        return {k: v.matrix() for k,v in self.xs_.iteritems()}
-
-    def pose(self, k): 
-        return self.xs_[k].matrix()
-        
-    @property
-    def target_poses(self): 
-        " Landmark Poses: Expects landmarks to be Pose3 "
-        return {k: v.matrix() for k,v in self.ls_.iteritems()}
-
-    def target_pose(self, k): 
-        return self.ls_[k].matrix()
-        
-    @property
-    def target_landmarks(self): 
-        " Landmark Points: Expects landmarks to be Point3 " 
-        return {k: v.vector().ravel() for k,v in self.ls_.iteritems()}
-
-    def target_landmark(self, k): 
-        return self.ls_[k].vector().ravel()
-
-    @property
-    def poses_marginals(self): 
-        " Marginals for Robot poses: Expects poses to be Pose3 "
-        return self.xcovs_ 
-        
-    @property
-    def target_poses_marginals(self): 
-        " Marginals for Landmark Poses: Expects landmarks to be Pose3 "
-        return self.lcovs_
-        
-    @property
-    def target_landmarks_marginals(self): 
-        " Marginals for Landmark Points: Expects landmarks to be Point3 " 
-        return self.lcovs_
-
-    def pose_marginal(self, node_id): 
-        return self.xcovs_[node_id]
-
-    def landmark_marginal(self, node_id): 
-        return self.lcovs_[node_id]
-        
-    @property
-    def landmark_edges(self): 
-        return self.xls_
-
-    @property
-    def robot_edges(self): 
-        return self.xxs_
-
     def initialize(self, p_init=None, index=0): 
         # print_red('\t\t{:}::add_p0 index: {:}'.format(self.__class__.__name__, index))
         x_id = symbol('x', index)
@@ -349,6 +296,59 @@ class BaseSLAM(object):
     @property
     def is_initialized(self): 
         return self.latest >= 0
+
+    @property
+    def poses(self): 
+        " Robot poses: Expects poses to be Pose3 "
+        return {k: v.matrix() for k,v in self.xs_.iteritems()}
+
+    def pose(self, k): 
+        return self.xs_[k].matrix()
+        
+    @property
+    def target_poses(self): 
+        " Landmark Poses: Expects landmarks to be Pose3 "
+        return {k: v.matrix() for k,v in self.ls_.iteritems()}
+
+    def target_pose(self, k): 
+        return self.ls_[k].matrix()
+        
+    @property
+    def target_landmarks(self): 
+        " Landmark Points: Expects landmarks to be Point3 " 
+        return {k: v.vector().ravel() for k,v in self.ls_.iteritems()}
+
+    def target_landmark(self, k): 
+        return self.ls_[k].vector().ravel()
+
+    @property
+    def poses_marginals(self): 
+        " Marginals for Robot poses: Expects poses to be Pose3 "
+        return self.xcovs_ 
+        
+    @property
+    def target_poses_marginals(self): 
+        " Marginals for Landmark Poses: Expects landmarks to be Pose3 "
+        return self.lcovs_
+        
+    @property
+    def target_landmarks_marginals(self): 
+        " Marginals for Landmark Points: Expects landmarks to be Point3 " 
+        return self.lcovs_
+
+    def pose_marginal(self, node_id): 
+        return self.xcovs_[node_id]
+
+    def landmark_marginal(self, node_id): 
+        return self.lcovs_[node_id]
+        
+    @property
+    def landmark_edges(self): 
+        return self.xls_
+
+    @property
+    def robot_edges(self): 
+        return self.xxs_
 
     @property
     def estimate_available(self): 
@@ -685,62 +685,3 @@ class VisualSLAM(BaseSLAM):
     #         # pred_cov = camera.project(self.lcovs_[lid])
     #         # mahalanobis_distance(pt, pred_pt)
 
-
-# class SLAM3D(BaseSLAM): 
-#     def __init__(self, update_on_odom=False): 
-#         BaseSLAM.__init__(self)
-#         self.update_on_odom_ = update_on_odom
-
-#     def on_odom(self, t, odom): 
-#         print('\ton_odom')
-#         self.add_odom_incremental(odom)
-#         if self.update_on_odom_: self.update()
-#         return self.latest
-
-#     def on_pose_ids(self, t, ids, poses): 
-#         print('\ton_pose_ids')
-#         for (pid, pose) in izip(ids, poses): 
-#             self.add_landmark_incremental(pid, pose)
-#         self.update()
-#         return self.latest
-
-#     def on_landmark(self, p): 
-#         pass
-
-# class Tag3D(BaseSLAM): 
-#     def __init__(self, K): 
-#         BaseSLAM.__init__(self)
-
-#         # TODO: Cal3_S2 datatype
-#         self.K_ = None
-
-#     @staticmethod
-#     def construct_tag_corners(tag_size): 
-#         s = tag_size / 2.0
-#         return [Point3(s,s,0), Point3(s,-s,0), 
-#                 Point3(-s,-s,0), Point3(-s,s,0)]  
-
-#     def set_calib(self, K): 
-#         pass
-
-#     def on_odom(self, t, odom): 
-#         self.add_odom_incremental(odom)
-#         self.update()
-#         return self.latest
-
-#     def on_tags(self, t, tags, use_corners=False): 
-#         """
-#         Add tag measurements as separate  
-#         Pose3-Pose3 constraints        
-#         """
-#         for tag in tags: 
-#             delta = Pose3(tag.getPose())
-#             self.add_landmark_incremental(tag.getId(), delta)
-
-# #     def on_tag_corners(self, t, tags): 
-# #         """
-# #         Add tag measurements as 4 separate 
-# #         Pose3-Point3 constraints        
-# #         """
-# #         camera = SimpleCamera(self.prev_pose_)
-# #         pass
