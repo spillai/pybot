@@ -26,6 +26,8 @@ Dependencies
 
 All the dependencies need to be available in the `PYTHONPATH`. 
 
+With ROS (reading bag files etc): `pip install catkin_pkg rospkg`
+
 Examples
 ---
 All the 3D visualization demos for the works below were created using the above set of tools. <br>
