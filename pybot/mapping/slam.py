@@ -16,8 +16,8 @@ from pybot.externals.lcm import draw_utils
 
 # Import GTSAM / ISAM
 _BACKEND = 'gtsam'
-if 'PYBOT_BACKEND' in os.environ:
-    _backend = os.environ['PYBOT_BACKEND']
+if 'PYBOT_SLAM_BACKEND' in os.environ:
+    _backend = os.environ['PYBOT_SLAM_BACKEND']
     assert _backend in {'gtsam', 'isam'}
     _BACKEND = _backend
 
@@ -35,6 +35,10 @@ class BaseSLAM(_BaseSLAM):
     def __init__(self): 
         _BaseSLAM.__init__(self)
         self.q_poses_ = Accumulator(maxlen=2)
+
+    @property
+    def latest_pose(self): 
+        return RigidTransform.from_matrix(self.pose(self.latest))
 
     def on_odom_absolute(self, t, p): 
         """
@@ -131,36 +135,52 @@ class BaseSLAM(_BaseSLAM):
 
     def update(self): 
         self._update()
+        self._update_estimates()
         self._update_marginals()
 
-
 class BaseSLAMWithViz(BaseSLAM): 
-    def __init__(self, name='SLAM-', frame_id='camera'): 
+    def __init__(self, name='SLAM_', frame_id='camera'): 
         BaseSLAM.__init__(self)
 
         self.name_ = name
         self.frame_id_ = frame_id
 
     def on_odom_absolute(self, t, p): 
-        BaseSLAM.on_odom_absolute(self, t, p_bm)
-        # draw_utils.publish_pose_list(self.name_ + 'measured_factor_odom', 
-        #                              [Pose.from_rigid_transform(self.q_poses_.index, self.q_poses_.latest)], 
-        #                              frame_id=self.frame_id_, reset=False)
+        BaseSLAM.on_odom_absolute(self, t, p)
+
+        # Draw odom pose
+        draw_utils.publish_pose_list(self.name_ + 'measured_factor_odom', 
+                                     [Pose.from_rigid_transform(self.latest, self.latest_pose)], 
+                                     frame_id=self.frame_id_, reset=False)
+
+        # # Draw odom factor
+        # if len(self.q_poses_) >= 2: 
+        #     factor_st = (self.q_poses_.items[-2].tvec).reshape(-1,3)
+        #     factor_end = (self.q_poses_.items[-1].tvec).reshape(-1,3)
+        #     draw_utils.publish_line_segments(self.name_ + 'measured_factor_odom', 
+        #                                      factor_st, factor_end, c='b', 
+        #                                      frame_id=self.frame_id_, reset=False)
+
+
 
     def on_odom_relative(self, t, p): 
-        BaseSLAM.on_odom_relative(self, t, p_bm)
+        BaseSLAM.on_odom_relative(self, t, p)
         # draw_utils.publish_pose_list(self.name_ + 'measured_factor_odom', 
         #                              [Pose.from_rigid_transform(self.q_poses_.index, self.q_poses_.latest)], 
         #                              frame_id=self.frame_id_, reset=False)
 
     def on_pose_landmarks(self, t, ids, poses): 
         BaseSLAM.on_pose_landmarks(self, t, ids, poses)
-        draw_utils.publish_pose_list(self.name_ + 'landmarks', [Pose.from_rigid_transform(pid, p) 
-                                                    for (pid, p) in izip(ids, poses)], 
-                                     frame_id=self.frame_id_, reset=False)
+        # draw_utils.publish_pose_list(self.name_ + 'landmarks', [Pose.from_rigid_transform(pid, p) 
+        #                                             for (pid, p) in izip(ids, poses)], 
+        #                              frame_id=self.frame_id_, reset=False)
 
         
-
+def SLAM(visualize=False): 
+    if visualize: 
+        return BaseSLAMWithViz()
+    else: 
+        return BaseSLAM()
 
 # class RobotSLAMMixin(object): 
 #     def __init__(self, landmark_type='point', smart=False, update_on_odom=False, 

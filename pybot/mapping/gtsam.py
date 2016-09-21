@@ -356,18 +356,23 @@ class BaseSLAM(object):
     #     # nx.draw_graphviz(self.gviz_, prog='neato')
     #     # nx_force_draw(self.gviz_)
 
-    # @timeitmethod
+    @timeitmethod
     def _update(self): 
-        print('.')
+        # print('.')
 
         # Update ISAM with new nodes/factors and initial estimates
         self.slam_.update(self.graph_, self.initial_)
         self.slam_.update()
 
+    def _update_estimates(self): 
+
         # Get current estimate
         self.current_ = self.slam_.calculateEstimate()
         poses = extractPose3(self.current_)
         landmarks = extractPoint3(self.current_)
+
+        if not self.estimate_available: 
+            return 
 
         # Extract and update landmarks and poses
         for k,v in poses.iteritems():

@@ -119,7 +119,7 @@ class Accumulator(Counter):
 
     def accumulate(self, item): 
         self.items_.append(item)
-        self.count()
+        self.poll()
 
     def accumulate_list(self, items): 
         for item in items: 
@@ -156,6 +156,52 @@ class Accumulator(Counter):
     # def length(self): 
     #     return len(self.items_)
 
+# def WithPeriodicCallback(cls): 
+#     assert(type(cls) == Counter or type(cls) == Accumulator)
+    
+#     class _WithPeriodicCallback(cls): 
+#         """
+#         robot_poses = PoseAccumulator(maxlen=1000, relative=True)
+#         robot_poses_counter = CounterWithPeriodicCallback(
+#             every_k=10, 
+#             process_cb=lambda: draw_utils.publish_pose_list('ROBOT_POSES', robot_poses.items, 
+#                                                             frame_id=ref_frame_id, reset=reset_required())   
+#         )
+#         robot_poses_counter.register_callback(robot_poses, 'accumulate')
+#         """
+#         def __init__(self, every_k=2, process_cb=lambda: None): 
+#             Counter.__init__(self)
+#             self.every_k_ = every_k
+#             self.process_cb_ = process_cb
+
+#         @property
+#         def every_k(self): 
+#             return self.every_k_
+
+#         def poll(self): 
+#             self.count()
+#             if self.check_divisibility(self.every_k_):
+#                 self.process_cb_()
+#                 return True
+#             return False
+
+#         def register_callback(self, cls_instance, function_name): 
+#             """ Register a wrapped function that polls the counter """
+
+#             def polled_function_cb(func):
+#                 def polled_function(*args, **kwargs): 
+#                     self.poll()
+#                     return func(*args, **kwargs)
+#                 return polled_function
+
+#             try:
+#                 orig_func = getattr(cls_instance, function_name)
+#                 function_cb = setattr(cls_instance, function_name, polled_function_cb(orig_func))
+#             except Exception, e:
+#                 raise AttributeError('function %s has not been defined in instance {:}'.format(function_name, e))
+
+#             print('Setting new polled callback for %s.%s' % (type(cls_instance).__name__, function_name))
+    
 
 class CounterWithPeriodicCallback(Counter): 
     """
@@ -180,7 +226,6 @@ class CounterWithPeriodicCallback(Counter):
         self.count()
         if self.check_divisibility(self.every_k_):
             self.process_cb_()
-            self.reset()
             return True
         return False
 
@@ -214,7 +259,6 @@ class SkippedCounter(Counter):
     def poll(self): 
         self.skipped_ = True
         if self.check_divisibility(self.skip_):
-            self.reset()
             self.skipped_ = False
         self.count()
         return self.skipped_
