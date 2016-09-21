@@ -298,6 +298,11 @@ class BaseSLAM(object):
         return self.latest >= 0
 
     @property
+    def poses_count(self): 
+        " Robot poses: Expects poses to be Pose3 "
+        return len(self.xs_)
+
+    @property
     def poses(self): 
         " Robot poses: Expects poses to be Pose3 "
         return {k: v.matrix() for k,v in self.xs_.iteritems()}
@@ -310,6 +315,11 @@ class BaseSLAM(object):
         " Landmark Poses: Expects landmarks to be Pose3 "
         return {k: v.matrix() for k,v in self.ls_.iteritems()}
 
+    @property
+    def target_poses_count(self): 
+        " Landmark Poses: Expects landmarks to be Pose3 "
+        return len(self.ls_)
+
     def target_pose(self, k): 
         return self.ls_[k].matrix()
         
@@ -317,6 +327,11 @@ class BaseSLAM(object):
     def target_landmarks(self): 
         " Landmark Points: Expects landmarks to be Point3 " 
         return {k: v.vector().ravel() for k,v in self.ls_.iteritems()}
+
+    @property
+    def target_landmarks_count(self): 
+        " Landmark Points: Expects landmarks to be Point3 " 
+        return len(self.ls_)
 
     def target_landmark(self, k): 
         return self.ls_[k].vector().ravel()

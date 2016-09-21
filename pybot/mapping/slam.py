@@ -179,8 +179,9 @@ class BaseSLAMWithViz(BaseSLAM):
         self.frame_id_ = frame_id
 
         self.visualize_every_ = visualize_every
-        self.t_last_viz_ = time.time()
-
+        self.last_viz_t_ = time.time()
+        self.last_viz_lcount_ = 0
+        
         self.visualize_factors_ = visualize_factors
         self.visualize_marginals_ = visualize_marginals
         self.visualize_measurements_ = visualize_measurements
@@ -189,10 +190,12 @@ class BaseSLAMWithViz(BaseSLAM):
         super(BaseSLAMWithViz, self).update()
 
         now = time.time()
-        if now - self.t_last_viz_ > self.visualize_every_:
+        if now - self.last_viz_t_ > self.visualize_every_ and \
+           self.target_poses_count - self.last_viz_lcount_ > 0: 
             self.visualize_optimized()
-            self.t_last_viz_ = now
-
+            self.last_viz_t_ = now
+            self.last_viz_lcount_ = self.target_poses_count
+            
     def finish(self): 
         super(BaseSLAMWithViz, self).finish()
         self.visualize_optimized()
