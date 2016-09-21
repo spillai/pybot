@@ -32,9 +32,10 @@ else:
     raise Exception('Unknown backend: ' + str(_BACKEND))
 
 class BaseSLAM(_BaseSLAM):
-    def __init__(self): 
+    def __init__(self, update_every_k_odom=10): 
         _BaseSLAM.__init__(self)
         self.q_poses_ = Accumulator(maxlen=2)
+        self.update_every_k_odom_ = update_every_k_odom
 
     @property
     def latest_pose(self): 
@@ -81,11 +82,9 @@ class BaseSLAM(_BaseSLAM):
         # 2. SLAM: Add relative pose measurements (odometry)
         self.add_odom_incremental(p.matrix)
 
-        # if self.latest >= 2 and self.latest % 10 == 0: 
-        #     self.update()
-
-        # 3. Visualize
-        # self.vis_optimized()
+        # 3. Update
+        if self.latest >= 2 and self.latest % self.update_every_k_odom_ == 0: 
+            self.update()
 
         return self.latest
 
