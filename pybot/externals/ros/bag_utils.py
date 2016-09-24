@@ -457,7 +457,7 @@ class ROSBagReader(LogReader):
                 return calib
 
         raise RuntimeError('Failed to retrieve camera calibration {},\n'
-                           'topics are {}\n'.format(topics, ', '.join(info.topics)))
+                           'topics are {}\n'.format(topics, ', '.join(topics)))
                     
     def _index(self): 
         raise NotImplementedError()
