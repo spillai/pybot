@@ -3,7 +3,9 @@
 
 import cv2
 import numpy as np
+
 from pybot.vision.image_utils import to_gray, to_color
+from pybot.vision.camera_utils import Camera, CameraIntrinsic, CameraExtrinsic
 
 def dense_optical_flow(im1, im2, pyr_scale=0.5, levels=3, winsize=5, 
                        iterations=3, poly_n=5, poly_sigma=1.2, fb_threshold=-1, 
@@ -109,6 +111,30 @@ def test_flow(img1, img2):
     cv2.imshow('warp', warp_flow(cur_glitch, flow))
 
 
+class SceneFlow(object):
+    def __init__(self, cam, height, width, sample=1):
+        self.shape_ = (height, width)
+        self.sample_ = sample
+        self.cam_ = Camera.from_intrinsics_extrinsics(
+            cam, CameraExtrinsic.identity()
+        )
+        
+        xs, ys = np.meshgrid(np.arange(0,width,sample), np.arange(0,height,sample))
+        self.grid_ = ((np.dstack([xs,ys])).reshape(-1,2)).astype(np.float32)
+        
+    def process(self, p21, X1):
+        
+        # Project scene points 
+        x2 = self.cam_.project(p21 * X1[::self.sample_, ::self.sample_].reshape(-1,3))
+        x2 = x2.reshape(shape[0] / self.sample_, shape[1] / self.sample_)
+
+        # Compare against expected image points based on VO
+        flow = x2 - self.grid_
+        flow_scaled = cv2.resize(flow, (self.shape_[1],self.shape_[0]), interpolation=cv2.INTER_LINEAR)
+
+        return flow_scaled
+
+    
 # def flow_pts(flow):
 #     valid = (flow > 0.1).all(axis=2)
 #     # valid = np.bitwise_and(valid_flow[:,:,0], valid_flow[:,:,1])
