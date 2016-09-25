@@ -128,9 +128,10 @@ class SceneFlow(object):
         self.grid_ = np.dstack([xs,ys]).astype(np.float32)
         
     def process(self, p21, X1):
-        if X1.shape != self.cam_.shape:
+        if (X1.shape[:2] != self.cam_.shape[:2]).any():
             raise ValueError('''X1 shape does not agree with cam.shape, '''
-                             '''X1.shape needs to be [H x W x 3] ''')
+                             '''X1.shape needs to be [H x W x 3] '''
+                             '''X1: {}, cam.shape: {}'''.format(X1.shape[:2], self.cam_.shape[:2]))
         
         # Project scene points 
         x2 = self.cam_.project(p21 * X1[::self.sample_, ::self.sample_].reshape(-1,3))
