@@ -112,25 +112,33 @@ def test_flow(img1, img2):
 
 
 class SceneFlow(object):
-    def __init__(self, cam, height, width, sample=1):
-        self.shape_ = (height, width)
+    """
+    Computes the scene flow vectors given relative pose and scene depth
+    (Note: assuming static scenes)
+    """
+    def __init__(self, cam, sample=1):
+        assert(cam.shape is not None)
+        H,W = cam.shape[:2]
         self.sample_ = sample
         self.cam_ = Camera.from_intrinsics_extrinsics(
             cam, CameraExtrinsic.identity()
         )
         
-        xs, ys = np.meshgrid(np.arange(0,width,sample), np.arange(0,height,sample))
-        self.grid_ = ((np.dstack([xs,ys])).reshape(-1,2)).astype(np.float32)
+        xs, ys = np.meshgrid(np.arange(0,W,sample), np.arange(0,H,sample))
+        self.grid_ = np.dstack([xs,ys]).astype(np.float32)
         
     def process(self, p21, X1):
+        if X1.shape != self.cam_.shape:
+            raise ValueError('''X1 shape does not agree with cam.shape, '''
+                             '''X1.shape needs to be [H x W x 3] ''')
         
         # Project scene points 
         x2 = self.cam_.project(p21 * X1[::self.sample_, ::self.sample_].reshape(-1,3))
-        x2 = x2.reshape(shape[0] / self.sample_, shape[1] / self.sample_)
+        x2 = x2.reshape(self.grid_.shape)
 
         # Compare against expected image points based on VO
         flow = x2 - self.grid_
-        flow_scaled = cv2.resize(flow, (self.shape_[1],self.shape_[0]), interpolation=cv2.INTER_LINEAR)
+        flow_scaled = cv2.resize(flow, (self.cam_.shape[1], self.cam_.shape[0]), interpolation=cv2.INTER_LINEAR)
 
         return flow_scaled
 
