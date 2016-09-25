@@ -420,7 +420,7 @@ class Camera(CameraIntrinsic, CameraExtrinsic):
     def extrinsics(self): 
         return CameraExtrinsic(self.R, self.t)
 
-    def project(self, X, check_bounds=False, return_depth=False, min_depth=0.1):
+    def project(self, X, check_bounds=False, check_depth=False, return_depth=False, min_depth=0.1):
         """
         Project [Nx3] points onto 2-D image plane [Nx2]
         """
@@ -429,10 +429,13 @@ class Camera(CameraIntrinsic, CameraExtrinsic):
 	proj,_ = cv2.projectPoints(X, rvec, t, self.K, self.D)
         x = proj.reshape(-1,2)
 
-        # Only return positive depths
-        depths = self.depth_from_projection(X)
-        valid = depths >= min_depth
-
+        if check_depth: 
+            # Only return positive depths
+            depths = self.depth_from_projection(X)
+            valid = depths >= min_depth
+        else:
+            valid = np.ones(len(x), dtype=np.bool)
+        
         if check_bounds: 
             if self.shape is None: 
                 raise ValueError('check_bounds cannot proceed. Camera.shape is not set')
