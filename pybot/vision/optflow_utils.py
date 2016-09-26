@@ -116,32 +116,38 @@ class SceneFlow(object):
     Computes the scene flow vectors given relative pose and scene depth
     (Note: assuming static scenes)
     """
-    def __init__(self, cam, sample=1):
+    def __init__(self, cam):
         assert(cam.shape is not None)
         H,W = cam.shape[:2]
-        self.sample_ = sample
-        self.cam_ = Camera.from_intrinsics_extrinsics(
-            cam, CameraExtrinsic.identity()
-        )
+        self.cam_ = Camera.from_intrinsics_extrinsics(cam, CameraExtrinsic.identity())
         
-        xs, ys = np.meshgrid(np.arange(0,W,sample), np.arange(0,H,sample))
-        self.grid_ = np.dstack([xs,ys]).astype(np.float32)
+        self.xs_, self.ys_ = np.meshgrid(np.arange(0,W), np.arange(0,H))
+        self.grid_ = np.dstack([self.xs_,self.ys_]).astype(np.float32)
         
-    def process(self, p21, X1):
-        if (X1.shape[:2] != self.cam_.shape[:2]).any():
-            raise ValueError('''X1 shape does not agree with cam.shape, '''
-                             '''X1.shape needs to be [H x W x 3] '''
-                             '''X1: {}, cam.shape: {}'''.format(X1.shape[:2], self.cam_.shape[:2]))
+    def process(self, dX):
+        """
+        
+        """
+        if (np.int32(dX.shape[:2]) != self.cam_.shape[:2]).any():
+            raise ValueError('''dX shape does not agree with cam.shape, '''
+                             '''dX.shape needs to be [H x W x 3] '''
+                             '''dX: {}, cam.shape: {}'''.format(np.int32(dX.shape[:2]), self.cam_.shape[:2]))
         
         # Project scene points 
-        x2 = self.cam_.project(p21 * X1[::self.sample_, ::self.sample_].reshape(-1,3))
-        x2 = x2.reshape(self.grid_.shape)
+        x2 = self.cam_.project(dX.reshape(-1,3)).astype(np.int32)
+        
+        # Only return points within-image bounds
+        valid = np.bitwise_and(
+                np.bitwise_and(x2[:,0] >= 0, x2[:,0] < self.cam_.shape[1]), \
+                np.bitwise_and(x2[:,1] >= 0, x2[:,1] < self.cam_.shape[0]))
+        xs, ys = x2[:,0], x2[:,1]
 
         # Compare against expected image points based on VO
-        flow = x2 - self.grid_
-        flow_scaled = cv2.resize(flow, (self.cam_.shape[1], self.cam_.shape[0]), interpolation=cv2.INTER_LINEAR)
+        gxs, gys = self.xs_.ravel(), self.ys_.ravel()
+        new_grid = np.copy(self.grid_) * np.nan
+        new_grid[ys[valid], xs[valid]] = self.grid_[gys[valid], gxs[valid]]
 
-        return flow_scaled
+        return new_grid - self.grid_
 
     
 # def flow_pts(flow):
