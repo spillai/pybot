@@ -296,7 +296,12 @@ def query_yes_no(question, default="yes"):
         else:
             sys.stdout.write("Please respond with 'yes' or 'no' "\
                              "(or 'y' or 'n').\n")
-    
+
+def query_yes_or_exit(question, default="yes"):
+    if query_yes_no(question) == "no":
+        sys.stdout.write("Exiting ...\n")        
+        import sys
+        sys.exit(0)
 
 
 # class IndexCounter(object): 
