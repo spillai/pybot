@@ -299,8 +299,8 @@ def query_yes_no(question, default="yes"):
 
 def query_yes_or_exit(question, default="yes"):
     if query_yes_no(question) == "no":
-        sys.stdout.write("Exiting ...\n")        
         import sys
+        sys.stdout.write("Exiting ...\n")        
         sys.exit(0)
 
 
