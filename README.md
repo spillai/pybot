@@ -1,5 +1,4 @@
-pybot
----
+# pybot
 
 Research tools for autonomous systems using Python<br>
 **Author: [Sudeep Pillai](http://people.csail.mit.edu/spillai)** ([spillai@csail.mit.edu](mailto:spillai@csail.mit.edu))<br>
@@ -13,7 +12,23 @@ require computing rigid-body transformations. This is a preliminary version that
 currently deals mostly with **SE(3)** or 6-DOF (3-DoF Rotational + 3-DoF
 translation) and some support for **Sim(3)** motions.
 
-**externals** Bot Viewer capabilities in Python<br>
+**vision** Computer vision package with several tools including
+  camera, tracking, 2d features, 3d features, optical flow,
+  recognition, object proposals, caffe, classifier training,
+  bag-of-words training, geometry, stereo, drawing etc
+
+**utils** Basic tooling that includes attribute dictionaries,
+database-utils including incremental hdf5 tables, dataset readers
+[ImageDatasets, StereoDatasets, VelodyneDatasets etc], dataset helpers
+[KITTI, NYU-RGBD, SUN3D, Tsukuba Stereo, UW-RGBD, caltech101],
+itertools recipes, timing/profiling tools, io utils
+[video/image writing, mkdirs, find_files, config parsers, joblib utils, stdout tee-ing, json],
+other misc tools including pretty prints, progressbars, colored
+prints, counters, accumulators (indexed deques), accumulators with
+periodic callbacks etc.
+
+**externals** ROS/LCM drawing tools, ROS/LCM log readers, Google
+  Project Tango log reader
 
 Installation
 ---
@@ -87,7 +102,8 @@ $ export
 TF_BINARY_URL=https://storage.googleapis.com/tensorflow/mac/cpu/tensorflow-0.10.0-py2-none-any.whl
 ```
 
-# Mac OS X, GPU enabled, Python 2.7:
+Mac OS X, GPU enabled, Python 2.7:
+---
 ```sh
 $ export
 TF_BINARY_URL=https://storage.googleapis.com/tensorflow/mac/gpu/tensorflow-0.10.0-py2-none-any.whl
