@@ -15,22 +15,45 @@ translation) and some support for **Sim(3)** motions.
 
 **externals** Bot Viewer capabilities in Python<br>
 
+Installation
+---
+Most of the installation assumes you have a clean python virtual
+environment to work with. I prefer conda for my development
+environment, but you're free to use any alternative (as long as you do
+not globally install, in which case I can not provide much support).
+
+1. Install miniconda and setup path in `~/.bashrc`
+```sh
+wget --no-check-certificate https://repo.continuum.io/miniconda/Miniconda2-latest-Linux-x86_64.sh
+bash Miniconda2-latest-Linux-x86_64.sh -b -p $HOME/anaconda
+```
+
+2. Install dependencies into a new conda environment
+```sh
+conda config --add channels menpo
+conda create --name pybot --file conda_requirements.txt
+```
+Alternatively, if you'd like to add pybot to an already existing
+environment,
+```sh
+conda config --add channels menpo
+conda install --name pybot --file conda_requirements.txt
+```
+
+3. (Optional) ROS dependencies (reading bag files etc) into the same
+environment. First ensure that you are within the pybot virtual
+environment.
+```sh
+source activate pybot
+pip install catkin_pkg rospkg
+```
+
 Dependencies
 ---
 [bot_geometry](https://github.com/spillai/pybot_geometry), [NumPy](https://github.com/numpy/numpy), [lcm](https://github.com/lcm-proj/lcm), [collections viewer](https://github.mit.edu/mrg/visualization-pod), [libbot](https://github.com/RobotLocomotion/libbot)
 
-Install miniconda and OpenCV from menpo
-```sh
-wget --no-check-certificate https://repo.continuum.io/miniconda/Miniconda2-latest-Linux-x86_64.sh
-bash Miniconda2-latest-Linux-x86_64.sh -b -p $HOME/anaconda
-conda install -c https://conda.anaconda.org/menpo opencv
-```
-Menpo packages: opencv 2.4.11
-[ [OSX](https://anaconda.org/menpo/opencv/2.4.11/download/osx-64/opencv-2.4.11-py27_1.tar.bz2),  [x64](https://anaconda.org/menpo/opencv/2.4.11/download/linux-64/opencv-2.4.11-nppy27_0.tar.bz2) ]
-
-
 All the dependencies need to be available in the `PYTHONPATH`. 
-With ROS (reading bag files etc): `pip install catkin_pkg rospkg`
+
 
 Examples
 ---
@@ -68,4 +91,11 @@ TF_BINARY_URL=https://storage.googleapis.com/tensorflow/mac/cpu/tensorflow-0.10.
 ```sh
 $ export
 TF_BINARY_URL=https://storage.googleapis.com/tensorflow/mac/gpu/tensorflow-0.10.0-py2-none-any.whl
+```
+
+OpenCV
+---
+Install OpenCV 2.4.11 from menpo
+```sh
+conda install -c https://conda.anaconda.org/menpo opencv=2.4.11 -y
 ```
