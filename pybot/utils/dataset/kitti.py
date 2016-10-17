@@ -3,7 +3,6 @@
 
 import os
 import numpy as np
-import cv2
 from itertools import izip, repeat
 
 from pybot.utils.db_utils import AttrDict

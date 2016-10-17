@@ -3,7 +3,7 @@
 
 import cv2
 import numpy as np
-import matplotlib.pylab as plt
+import matplotlib.pyplot as plt
 from matplotlib.colors import colorConverter, ListedColormap
 
 def colormap(im, min_threshold=0.01):

@@ -5,15 +5,15 @@ Basic utilities for dataset reader
 # Author: Sudeep Pillai <spillai@csail.mit.edu>
 # License: MIT
 
+import os
+import re
+import fnmatch
+
 import cv2
 import numpy as np
-import os, fnmatch, time
-import re
 
 from itertools import izip, imap, chain, islice
 from collections import defaultdict, namedtuple, OrderedDict
-# from .async_utils import async_prefetch
-
 from pybot.vision.image_utils import im_resize
 
 def valid_path(path): 
@@ -197,6 +197,13 @@ class DatasetReader(object):
     def frames(self): 
         return self.iteritems()
 
+def read_velodyne_pc(filename):
+    """
+    Read velodyne point clouds from *.bin, 
+    roughly (30ms for 100k points)
+    """
+    return np.fromfile(filename, dtype=np.float32).reshape(-1,4)
+    
 class VelodyneDatasetReader(DatasetReader): 
     """
     Velodyne reader
@@ -206,16 +213,10 @@ class VelodyneDatasetReader(DatasetReader):
     >> reader = DatasetReader(process_cb=lambda fn: read_velodyne_pc(fn), 
                     template='data_%i.txt', start_idx=1, max_files=10000)
     """
-
-
     def __init__(self, template='template_%i.txt', start_idx=0, max_files=10000, files=None):
-        try: 
-            from pybot_vision import read_velodyne_pc
-        except: 
-            raise RuntimeError('read_velodyne_pc missing in pybot_vision. Compile it first!')
-        DatasetReader.__init__(self, process_cb=lambda fn: read_velodyne_pc(fn), template=template, 
+        DatasetReader.__init__(self, process_cb=lambda fn: read_velodyne_pc(fn),
+                               template=template, 
                                start_idx=start_idx, max_files=max_files, files=files)
-        
 
 class ImageDatasetReader(DatasetReader): 
     """
