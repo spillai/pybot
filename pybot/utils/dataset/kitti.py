@@ -78,25 +78,34 @@ class KITTIDatasetReader(object):
                                           left_template=os.path.join(seq_directory,left_template), 
                                           right_template=os.path.join(seq_directory,right_template), 
                                           start_idx=start_idx, max_files=max_files, scale=scale)
-
+        
         # Read poses
         try: 
             pose_fn = os.path.join(os.path.expanduser(directory), 'poses', ''.join([sequence, '.txt']))
-            self.poses = FileReader(pose_fn, process_cb=kitti_load_poses)
+            self.poses_ = FileReader(pose_fn, process_cb=kitti_load_poses)
         except Exception as e:
-            self.poses = repeat(None)
+            self.poses_ = repeat(None)
 
+
+        # Read velodyne
         try: 
-            # Read velodyne
-            self.velodyne = VelodyneDatasetReader(
+            self.velodyne_ = VelodyneDatasetReader(
                 template=os.path.join(seq_directory,velodyne_template), 
                 start_idx=start_idx, max_files=max_files
             )
         except Exception as e: 
-            self.velodyne = repeat(None)
+            self.velodyne_ = repeat(None)
 
         print 'Initialized stereo dataset reader with %f scale' % scale
 
+    @property
+    def velodyne(self):
+        return self.velodyne_
+
+    @property
+    def poses(self):
+        return self.poses_
+        
     def iteritems(self, *args, **kwargs): 
         return self.stereo.left.iteritems(*args, **kwargs)
 
@@ -122,7 +131,7 @@ class KITTIDatasetReader(object):
     def iter_gt_frames(self, *args, **kwargs): 
         for (left, right), pose in izip(self.iter_stereo_frames(*args, **kwargs), self.poses.iteritems(*args, **kwargs)): 
             yield AttrDict(left=left, right=right, velodyne=None, pose=pose)
-
+            
     @property
     def stereo_frames(self): 
         return self.iter_stereo_frames()
@@ -201,7 +210,11 @@ class KITTIStereoGroundTruthDatasetReader(object):
         self.calib = DatasetReader(template=os.path.join(os.path.expanduser(directory), 'calib/%06i.txt'), 
                                    process_cb=lambda fn: calib_read(fn, scale))
 
-        self.poses = repeat(None)
+        self.poses_ = repeat(None)
+
+    @property
+    def poses(self):
+        return self.poses_
 
     def iter_gt_frames(self, *args, **kwargs):
         """
@@ -258,16 +271,21 @@ class KITTIRawDatasetReader(KITTIDatasetReader):
         # Read poses
         try: 
             pose_fn = os.path.join(os.path.expanduser(directory), 'poses', ''.join([sequence, '.txt']))
-            self.poses = FileReader(pose_fn, process_cb=kitti_load_poses)
-        except: 
-            self.poses = repeat(None)
+            self.poses_ = FileReader(pose_fn, process_cb=kitti_load_poses)
+        except Exception, e: 
+            print('Failed to read poses data: {}'.format(e))
+            self.poses_ = repeat(None)
             
         # Read velodyne
-        self.velodyne = VelodyneDatasetReader(
-            template=os.path.join(directory,velodyne_template), 
-            start_idx=start_idx, max_files=max_files
-        )
-
+        try: 
+            self.velodyne_ = VelodyneDatasetReader(
+                template=os.path.join(directory,velodyne_template), 
+                start_idx=start_idx, max_files=max_files
+            )
+        except Exception, e:
+            print('Failed to read velodyne data: {}'.format(e))
+            self.velodyne_ = repeat(None)
+            
         # Read oxts
         def kitti_load_oxts(fn): 
             return (np.fromfile(fn, dtype=np.float64, sep=' '))
@@ -330,12 +348,20 @@ class OmnicamDatasetReader(object):
                                           start_idx=start_idx, max_files=max_files, scale=scale)
 
         # Read velodyne
-        self.velodyne = VelodyneDatasetReader(
-            template=os.path.join(seq_directory,velodyne_template), 
-            start_idx=start_idx, max_files=max_files
-        )
-
+        try: 
+            self.velodyne = VelodyneDatasetReader(
+                template=os.path.join(seq_directory,velodyne_template), 
+                start_idx=start_idx, max_files=max_files
+            )
+        except Exception, e:
+            print('Failed to read velodyne data: {}'.format(e))
+            self.velodyne_ = repeat(None)
+            
         print 'Initialized stereo dataset reader with %f scale' % scale
+        
+    @property
+    def velodyne(self):
+        return self.velodyne_
 
     def iter_stereo_frames(self, *args, **kwargs): 
         return self.stereo.iteritems(*args, **kwargs)
