@@ -237,6 +237,11 @@ class CameraIntrinsic(object):
                                                  p1=self.p1, p2=self.p2, 
                                                  shape=shape)
 
+    def in_view(self, x):
+        """ Only return points within-image bounds """
+        return np.where(np.bitwise_and(np.bitwise_and(x[:,0] >= 0, x[:,0] < self.shape[1]), \
+                                       np.bitwise_and(x[:,1] >= 0, x[:,1] < self.shape[0])))
+
     def ray(self, pts, undistort=True, rotate=False, normalize=False): 
         """
         Returns the ray corresponding to the points. 
@@ -419,7 +424,7 @@ class Camera(CameraIntrinsic, CameraExtrinsic):
     @property
     def extrinsics(self): 
         return CameraExtrinsic(self.R, self.t)
-
+    
     def project(self, X, check_bounds=False, check_depth=False, return_depth=False, min_depth=0.1):
         """
         Project [Nx3] points onto 2-D image plane [Nx2]
@@ -441,6 +446,7 @@ class Camera(CameraIntrinsic, CameraExtrinsic):
                 raise ValueError('check_bounds cannot proceed. Camera.shape is not set')
         
             # Only return points within-image bounds
+            # TODO: call in_bounds method instead
             valid = np.bitwise_and(
                 valid, np.bitwise_and(
                     np.bitwise_and(x[:,0] >= 0, x[:,0] < self.shape[1]), \
