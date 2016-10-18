@@ -240,7 +240,7 @@ class CameraIntrinsic(object):
     def in_view(self, x):
         """ Only return points within-image bounds """
         return np.where(np.bitwise_and(np.bitwise_and(x[:,0] >= 0, x[:,0] < self.shape[1]), \
-                                       np.bitwise_and(x[:,1] >= 0, x[:,1] < self.shape[0])))
+                                       np.bitwise_and(x[:,1] >= 0, x[:,1] < self.shape[0])))[0]
 
     def ray(self, pts, undistort=True, rotate=False, normalize=False): 
         """
