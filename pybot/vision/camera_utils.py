@@ -688,6 +688,7 @@ class StereoCamera(Camera):
     def reconstruct_sparse(self, xyd): 
         """
         Reproject to 3D with calib params
+        TODO FIX: undistort before reconstructing
         """
         N, _ = xyd.shape[:2]
         xyd1 = np.hstack([xyd, np.ones(shape=(N,1))])
