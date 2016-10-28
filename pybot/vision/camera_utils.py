@@ -428,15 +428,18 @@ class Camera(CameraIntrinsic, CameraExtrinsic):
     def project(self, X, check_bounds=False, check_depth=False, return_depth=False, min_depth=0.1):
         """
         Project [Nx3] points onto 2-D image plane [Nx2]
+        TODO: replace check_depth, and min_depth with min_depth=None default
         """
         R, t = self.to_Rt()
 	rvec,_ = cv2.Rodrigues(R)
 	proj,_ = cv2.projectPoints(X, rvec, t, self.K, self.D)
         x = proj.reshape(-1,2)
 
+        if return_depth or check_depth: 
+            depths = self.depth_from_projection(X)
+            
         if check_depth: 
             # Only return positive depths
-            depths = self.depth_from_projection(X)
             valid = depths >= min_depth
         else:
             valid = np.ones(len(x), dtype=np.bool)
