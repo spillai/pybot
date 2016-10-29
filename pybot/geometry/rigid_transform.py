@@ -256,6 +256,10 @@ class RigidTransform(object):
         return self.quat
 
     @property
+    def rpyxyz(self):
+        return self.to_rpyxyz()
+
+    @property
     def translation(self):
         return self.tvec
 

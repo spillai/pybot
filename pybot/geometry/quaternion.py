@@ -220,7 +220,6 @@ class Quaternion(object):
     def xyzw(self):
         return self.to_xyzw()
 
-
     @property
     def rpy(self):
         return self.to_rpy()
