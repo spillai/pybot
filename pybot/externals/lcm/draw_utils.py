@@ -24,19 +24,18 @@ class VisualizationMsgsPub:
     """
     Visualization publisher class
     """
+    CAMERA_POSE = RigidTransform.from_rpyxyz(-np.pi/2, 0, -np.pi/2, 
+                                             0, 0, 2, axes='sxyz')
+    XZ_POSE = RigidTransform.from_rpyxyz(np.pi/2, 0, 0, 0, 0, 0, axes='sxyz')
     def __init__(self): 
         self._channel_uid = dict()
         self._sensor_pose = dict()
 
         self.lc = lcm.LCM()
-        camera_pose = RigidTransform.from_rpyxyz(-np.pi/2, 0, -np.pi/2, 
-                                                               0, 0, 2, axes='sxyz')
-        xz_pose = RigidTransform.from_rpyxyz(np.pi/2, 0, 0, 0, 0, 0, axes='sxyz')
-
         self.reset_visualization()
-        self.publish_sensor_frame('camera', pose=camera_pose)
+        self.publish_sensor_frame('camera', pose=VisualizationMsgsPub.CAMERA_POSE)
         self.publish_sensor_frame('origin', pose=RigidTransform.identity())
-        self.publish_sensor_frame('origin_xz', pose=xz_pose)
+        self.publish_sensor_frame('origin_xz', pose=VisualizationMsgsPub.XZ_POSE)
         
     def channel_uid(self, channel): 
         uid = self._channel_uid.setdefault(channel, len(self._channel_uid))
