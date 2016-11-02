@@ -31,11 +31,6 @@ def kitti_stereo_calib(sequence, scale=1.0):
 #     baseline_px = 386.1448 * scale
 #     return get_calib_params(f, f, cx, cy, baseline_px=baseline_px)
 
-def kitti_load_oxts(formats, fn):
-    """
-    Mostly stripped from pykitti.raw
-    """
-
 def kitti_load_poses(fn): 
     X = (np.fromfile(fn, dtype=np.float64, sep=' ')).reshape(-1,12)
     return map(lambda p: RigidTransform.from_Rt(p[:3,:3], p[:3,3]), 
@@ -311,11 +306,11 @@ class KITTIRawDatasetReader(object):
         #                                             start_idx=start_idx, max_files=max_files, scale=scale)
 
         # Read stereo images
-        self.stereo = StereoDatasetReader(directory=directory, 
-                                          left_template=left_template, 
-                                          right_template=right_template, 
-                                          start_idx=start_idx, max_files=max_files, scale=scale)
-            
+        self.stereo_ = StereoDatasetReader(directory=directory, 
+                                           left_template=left_template, 
+                                           right_template=right_template, 
+                                           start_idx=start_idx, max_files=max_files, scale=scale)
+        
         # Read velodyne
         try: 
             self.velodyne_ = VelodyneDatasetReader(
@@ -327,29 +322,20 @@ class KITTIRawDatasetReader(object):
             self.velodyne_ = NoneReader()
             
         # Read oxts
-        # try: 
-        oxt_format_fn = os.path.join(os.path.expanduser(directory), 'oxts/dataformat.txt')
-        oxt_fn = os.path.join(os.path.expanduser(directory), oxt_template)
-        self.oxts = OXTSReader(oxt_format_fn, template=oxt_fn, start_idx=start_idx, max_files=max_files)
-            
-            # self.oxts = DatasetReader(template=oxt_fn,
-            #                           process_cb=lambda fn: kitti_load_oxts(self.oxt_formats, fn), 
-            #                           start_idx=start_idx, max_files=max_files)
-        # except Exception as e:
-        #     self.oxts = NoneReader()
-
-
+        try: 
+            oxt_format_fn = os.path.join(os.path.expanduser(directory), 'oxts/dataformat.txt')
+            oxt_fn = os.path.join(os.path.expanduser(directory), oxt_template)
+            self.oxts_ = OXTSReader(oxt_format_fn, template=oxt_fn, start_idx=start_idx, max_files=max_files)
+        except Exception as e:
+            self.oxts_ = NoneReader()
             
     def iterframes(self, *args, **kwargs): 
         for (left, right), oxt in izip(self.iter_stereo_frames(*args, **kwargs), 
-                                             self.oxts.iteritems(*args, **kwargs)): 
+                                       self.iter_oxts_frames(*args, **kwargs)): 
             yield AttrDict(left=left, right=right, velodyne=None, pose=oxt)
     
-    def iter_oxts(self, *args, **kwargs): 
-        return self.oxts.iteritems()
-
     def iter_stereo_frames(self, *args, **kwargs): 
-        return self.stereo.iteritems(*args, **kwargs)
+        return self.stereo_.iteritems(*args, **kwargs)
 
     def iter_velodyne_frames(self, *args, **kwargs):         
         return self.velodyne.iteritems(*args, **kwargs)
@@ -360,7 +346,7 @@ class KITTIRawDatasetReader(object):
                     self.velodyne.iteritems(*args, **kwargs))
     @property
     def oxt_fieldnames(self): 
-        return self.oxts.oxt_formats
+        return self.oxts_.oxt_formats
 
     @property
     def poses(self):
@@ -380,6 +366,7 @@ class OmnicamDatasetReader(object):
                  left_template='image_02/data/%010i.png', 
                  right_template='image_03/data/%010i.png', 
                  velodyne_template='velodyne_points/data/%010i.bin',
+                 oxt_template='oxts/data/%010i.txt',
                  start_idx=0, max_files=50000, scale=1.0): 
 
         # Set args
@@ -399,20 +386,29 @@ class OmnicamDatasetReader(object):
         # Read stereo images
         seq_directory = os.path.join(os.path.expanduser(directory), sequence)
         
-        self.stereo = StereoDatasetReader(directory=seq_directory,
+        self.stereo_ = StereoDatasetReader(directory=seq_directory,
                                           left_template=os.path.join(seq_directory,left_template), 
                                           right_template=os.path.join(seq_directory,right_template), 
                                           start_idx=start_idx, max_files=max_files, scale=scale)
 
         # Read velodyne
         try: 
-            self.velodyne = VelodyneDatasetReader(
+            self.velodyne_ = VelodyneDatasetReader(
                 template=os.path.join(seq_directory,velodyne_template), 
                 start_idx=start_idx, max_files=max_files
             )
         except Exception, e:
             print('Failed to read velodyne data: {}'.format(e))
             self.velodyne_ = NoneReader()
+
+        # Read oxts
+        try: 
+            oxt_format_fn = os.path.join(seq_directory, 'oxts/dataformat.txt')
+            oxt_fn = os.path.join(seq_directory, oxt_template)
+            self.oxts_ = OXTSReader(oxt_format_fn, template=oxt_fn, start_idx=start_idx, max_files=max_files)
+        except Exception as e:
+            self.oxts_ = NoneReader()
+
             
         print 'Initialized stereo dataset reader with %f scale' % scale
         
@@ -420,6 +416,19 @@ class OmnicamDatasetReader(object):
     def velodyne(self):
         return self.velodyne_
 
+    @property
+    def oxts(self):
+        return self.oxts_
+
+    @property
+    def stereo(self):
+        return self.stereo_
+
+    def iterframes(self, *args, **kwargs): 
+        for (left, right), oxt in izip(self.iter_stereo_frames(*args, **kwargs), 
+                                       self.iter_oxts_frames(*args, **kwargs)): 
+            yield AttrDict(left=left, right=right, velodyne=None, pose=oxt)
+    
     def iter_stereo_frames(self, *args, **kwargs): 
         return self.stereo.iteritems(*args, **kwargs)
 
@@ -430,6 +439,9 @@ class OmnicamDatasetReader(object):
         return izip(self.left.iteritems(*args, **kwargs), 
                     self.right.iteritems(*args, **kwargs), 
                     self.velodyne.iteritems(*args, **kwargs))
+
+    def iter_oxts_frames(self, *args, **kwargs): 
+        return self.oxts_.iteritems(*args, **kwargs)
 
     @property
     def stereo_frames(self): 
