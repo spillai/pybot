@@ -3,11 +3,11 @@
 
 import os
 import numpy as np
-from itertools import izip, repeat
+from itertools import izip
 
 from pybot.utils.db_utils import AttrDict
 from pybot.utils.dataset_readers import natural_sort, \
-    FileReader, DatasetReader, ImageDatasetReader, \
+    FileReader, NoneReader, DatasetReader, ImageDatasetReader, \
     StereoDatasetReader, VelodyneDatasetReader
 
 from pybot.geometry.rigid_transform import RigidTransform
@@ -84,7 +84,7 @@ class KITTIDatasetReader(object):
             pose_fn = os.path.join(os.path.expanduser(directory), 'poses', ''.join([sequence, '.txt']))
             self.poses_ = FileReader(pose_fn, process_cb=kitti_load_poses)
         except Exception as e:
-            self.poses_ = repeat(None)
+            self.poses_ = NoneReader()
 
 
         # Read velodyne
@@ -94,7 +94,7 @@ class KITTIDatasetReader(object):
                 start_idx=start_idx, max_files=max_files
             )
         except Exception as e: 
-            self.velodyne_ = repeat(None)
+            self.velodyne_ = NoneReader()
 
         print 'Initialized stereo dataset reader with %f scale' % scale
 
@@ -210,7 +210,7 @@ class KITTIStereoGroundTruthDatasetReader(object):
         self.calib = DatasetReader(template=os.path.join(os.path.expanduser(directory), 'calib/%06i.txt'), 
                                    process_cb=lambda fn: calib_read(fn, scale))
 
-        self.poses_ = repeat(None)
+        self.poses_ = NoneReader()
 
     @property
     def poses(self):
@@ -274,7 +274,7 @@ class KITTIRawDatasetReader(KITTIDatasetReader):
             self.poses_ = FileReader(pose_fn, process_cb=kitti_load_poses)
         except Exception, e: 
             print('Failed to read poses data: {}'.format(e))
-            self.poses_ = repeat(None)
+            self.poses_ = NoneReader()
             
         # Read velodyne
         try: 
@@ -284,7 +284,7 @@ class KITTIRawDatasetReader(KITTIDatasetReader):
             )
         except Exception, e:
             print('Failed to read velodyne data: {}'.format(e))
-            self.velodyne_ = repeat(None)
+            self.velodyne_ = NoneReader()
             
         # Read oxts
         def kitti_load_oxts(fn): 
@@ -298,7 +298,7 @@ class KITTIRawDatasetReader(KITTIDatasetReader):
             self.oxts = DatasetReader(template=oxt_fn, process_cb=lambda fn: kitti_load_oxts(fn), 
                                       start_idx=start_idx, max_files=max_files)
         except Exception as e:
-            self.oxts = repeat(None)
+            self.oxts = NoneReader()
         
     def iterframes(self, *args, **kwargs): 
         for (left, right), pose, oxt in izip(self.iter_stereo_frames(*args, **kwargs), 
@@ -355,7 +355,7 @@ class OmnicamDatasetReader(object):
             )
         except Exception, e:
             print('Failed to read velodyne data: {}'.format(e))
-            self.velodyne_ = repeat(None)
+            self.velodyne_ = NoneReader()
             
         print 'Initialized stereo dataset reader with %f scale' % scale
         

@@ -177,6 +177,10 @@ class BaseKLT(object):
         return self.tm_.ids
 
     @property
+    def latest_age(self): 
+        return self.tm_.lengths
+
+    @property
     def latest_pts(self): 
         return self.tm_.pts
 

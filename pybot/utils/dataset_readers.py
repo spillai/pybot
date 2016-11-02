@@ -12,7 +12,7 @@ import fnmatch
 import cv2
 import numpy as np
 
-from itertools import izip, imap, chain, islice
+from itertools import izip, imap, chain, islice, repeat
 from collections import defaultdict, namedtuple, OrderedDict
 from pybot.vision.image_utils import im_resize
 
@@ -99,6 +99,13 @@ def read_dir(directory, pattern='*.png', recursive=True, expected_dirs=[], verbo
         return list(chain([fn for fns in fn_map.values() for fn in fns]))
 
     return fn_map
+
+class NoneReader(object):
+    def __init__(self):
+        pass
+
+    def iteritems(self, *args, **kwargs):
+        return repeat(None)
 
 class FileReader(object): 
     def __init__(self, filename, process_cb, start_idx=0): 
