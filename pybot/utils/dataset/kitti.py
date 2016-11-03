@@ -10,7 +10,7 @@ from pybot.utils.dataset_readers import natural_sort, \
     FileReader, NoneReader, DatasetReader, ImageDatasetReader, \
     StereoDatasetReader, VelodyneDatasetReader
 
-from pybot.geometry.rigid_transform import RigidTransform
+from pybot.geometry.rigid_transform import RigidTransform, Quaternion
 from pybot.vision.camera_utils import StereoCamera
 
 def kitti_stereo_calib(sequence, scale=1.0): 
@@ -51,7 +51,8 @@ class OXTSReader(DatasetReader):
         self.oxt_format_fn_ = dataformat
         self.oxt_formats_ = [line.split(':')[0] for line in open(self.oxt_format_fn_)]
 
-        self.t_0_ = None
+        self.R_init_ = None
+        self.t_init_ = None
         
     @property
     def oxt_formats(self):
@@ -75,12 +76,15 @@ class OXTSReader(DatasetReader):
 
         # We want the initial position to be the origin, but keep the ENU
         # coordinate system
-        if self.t_0_ is None: 
-            self.t_0_ = t
+        if self.t_init_ is None: 
+            self.t_init_ = t
+            self.R_init_ =  Quaternion.from_rpy(packet.roll, packet.pitch, packet.yaw, axes='sxyz')
+
+        rel_R = Quaternion.from_rpy(packet.roll, packet.pitch, packet.yaw, axes='sxyz') * self.R_init_
+        rel_t = t - self.t_init_
         
         # Use the Euler angles to get the rotation matrix
-        rt = t - self.t_0_
-        return RigidTransform.from_rpyxyz(packet.roll, packet.pitch, packet.yaw, rt[0], rt[1], rt[2])
+        return RigidTransform(xyzw=rel_R.xyzw, tvec=rel_t)
         
 
 

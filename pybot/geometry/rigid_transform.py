@@ -368,7 +368,7 @@ class DualQuaternion(object):
     @classmethod
     def from_Rt(cls, R, t):
         T = np.eye(4)
-        T[:3,:3] = R.copy();
+        T[:3,:3] = R.copy()
         T[:3,3] = t.copy()
         return cls.from_matrix(T)
 
