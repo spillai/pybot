@@ -584,7 +584,7 @@ class StereoCamera(Camera):
 
     @property
     def left(self): 
-        return self
+        return Camera.from_intrinsics_extrinsics(self.intrinsics, self.extrinsics)
 
     def __repr__(self): 
         return \
