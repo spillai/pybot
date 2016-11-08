@@ -4,9 +4,16 @@
 import cv2
 import numpy as np
 
-from itertools import imap
+from itertools import imap, izip
 from pybot.utils.plot_utils import colormap
 from pybot.vision.image_utils import to_color
+
+def draw_texts(vis, pts, texts, size=2):
+    for pt,txt in izip(pts.astype(np.int32), texts): 
+        cv2.putText(vis, txt, (pt[0], pt[1]), 
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.2 * size,
+                    (255, 255, 255), thickness=1, lineType=cv2.CV_AA)
+    return vis
 
 def draw_features(im, pts, colors=None, size=2): 
     out = to_color(im)
