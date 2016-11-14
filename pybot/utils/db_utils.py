@@ -6,12 +6,12 @@ import numpy as np
 import pickle
 import time, logging, cPickle, shelve
 from collections import defaultdict
-from itertools import izip, imap
+from itertools import izip, imap, ifilter
 
 import os.path
 from pybot.utils.misc import progressbar
 from pybot.utils.io_utils import create_path_if_not_exists
-from pybot.utils.itertools_recipes import grouper
+from pybot.utils.itertools_recipes import grouper, chunks
 
 # =============================================================================
 # Pytables helpers
@@ -317,8 +317,8 @@ class IterDB(object):
         if key not in self.keys: 
             raise RuntimeError('Key %s not found in dataset. keys: %s' % (key, self.keys))
 
-        chunks = grouper(self.itervalues_for_key(key), batch_size)
-        for chunk in progressbar(chunks, size=self.length(key) / batch_size, verbose=verbose): 
+        itchunks = chunks(self.itervalues_for_key(key), batch_size)
+        for chunk in progressbar(itchunks, size=self.length(key) / batch_size, verbose=verbose): 
             yield chunk
  
     def iterchunks_keys(self, keys, batch_size=10, verbose=False): 
@@ -483,7 +483,7 @@ class IterDBDeprecated(object):
 
         idx, ii = 0, 0
         total_chunks = len(self.meta_file_.chunks)
-        batch_chunks = grouper(range(len(self.meta_file_.chunks)), batch_size)
+        batch_chunks = chunks(range(len(self.meta_file_.chunks)), batch_size)
 
         for chunk_group in progressbar(batch_chunks, size=total_chunks / batch_size, verbose=verbose): 
             items = []
