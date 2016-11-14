@@ -134,7 +134,7 @@ class SUN3DAnnotationDB(object):
         self.basename_ = basename.replace('/','')
         self.shape_ = shape
         self.initialize(data=data)
-
+        
     def __repr__(self): 
        return '{}\n========\n' \
        '\tAnnotations: {}\n' \
@@ -424,9 +424,6 @@ class SUN3DAnnotationDB(object):
     def frames(self): 
         return map(SUN3DAnnotationFrame, self.data_['frames'])
 
-    def save(self): 
-        save_json_dict(self.filename_, self.data_)
-
     @classmethod
     def load(cls, folder, shape=None): 
         filename = os.path.join(os.path.expanduser(folder), 
@@ -435,6 +432,12 @@ class SUN3DAnnotationDB(object):
         data = load_json_dict(filename)
         c = cls(filename, basename, shape=shape, data=data)
         return c
+
+    def __del__(self):
+        self.save()
+    
+    def save(self): 
+        save_json_dict(self.filename_, self.data_)
 
 class SUN3DObjectDB(object): 
     def __init__(self, directory): 
@@ -467,6 +470,12 @@ class SUN3DObjectDB(object):
         
         print('Total objects {}'.format(len(self.target_hash_)))
 
+    def __repr__(self):
+        s = '\n{}: ({} objects)\n'.format(self.__class__.__name__, len(self.target_hash_))
+        for k,v in self.target_hash_.iteritems():
+            s += '\t{}: {}\n'.format(k,v)
+        return s
+    
     @property
     def target_hash(self): 
         return self.target_hash_
