@@ -2,8 +2,7 @@ pybot
 ---
 
 Research tools for autonomous systems using Python  
-**Author: [Sudeep Pillai](http://people.csail.mit.edu/spillai)**
-**([spillai@csail.mit.edu](mailto:spillai@csail.mit.edu))  
+Author: [Sudeep Pillai](http://people.csail.mit.edu/spillai)
 **License: MIT**  
 
 Modules
@@ -37,7 +36,7 @@ periodic callbacks etc.
 **externals:** ROS/LCM drawing tools, ROS/LCM log readers, [Google
   Project Tango](https://get.google.com/tango/) log reader
 
-Upcoming modules: **mapping**, **nnet** with support for visual
+**New (upcoming) modules**: *mapping*, *nnet* with support for visual
 odometry, vSLAM, semi-dense reconstruction, and more recent
 developments in CNN-based object recognition, localization (ROI
 pooling), and SLAM-aware recognition. See [references]() for more details

@@ -1,6 +1,5 @@
 Installation
 ---
-See [INSTALL](INSTALL.md)
 Most of the installation assumes you have a clean python virtual
 environment to work with. I prefer conda for my development
 environment, but you're free to use any alternative (as long as you do
@@ -29,8 +28,8 @@ environment. First ensure that you are within the **pybot** virtual
 environment.
 ```sh
 source activate pybot
-pip install catkin_pkg rospkg```
-
+pip install catkin_pkg rospkg
+```
 
 Dependencies
 ---
