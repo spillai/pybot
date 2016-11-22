@@ -2,7 +2,7 @@ pybot
 ---
 
 Research tools for autonomous systems using Python  
-Author: [Sudeep Pillai](http://people.csail.mit.edu/spillai)
+Author: [Sudeep Pillai](http://people.csail.mit.edu/spillai)  
 **License: MIT**  
 
 Modules
@@ -45,10 +45,3 @@ about specific implementations.
 Installation
 ---
 See [INSTALL](INSTALL.md)
-
-Examples
----
-All the 3D visualization demos for the works below were created using
-the above set of tools.  
-[Monocular SLAM-Supported Object Recognition](https://www.youtube.com/watch?v=m6sStUk3UVk), 
-[High-speed Stereo Reconstruction](http://people.csail.mit.edu/spillai/projects/fast-stereo-reconstruction/pillai_fast_stereo16.mp4)
