@@ -173,6 +173,10 @@ class BaseKLT(object):
         raise NotImplementedError()
 
     @property
+    def tm(self):
+        return self.tm_
+    
+    @property
     def latest_ids(self): 
         return self.tm_.ids
 
