@@ -42,10 +42,5 @@ specific version of OpenCV (that is pre-compiled for your platform).
 ```sh
 conda install -c https://conda.anaconda.org/menpo opencv=2.4.11 -y
 ```
-
-2) Tensorflow [Setup](https://www.tensorflow.org/versions/r0.11/get_started/os_setup.html#pip-installation)  
- Conda handles all the dependencies for **pybot** based on your
- architecture. **pybot** has limited test coverage at the moment, so
- please use at your own risk.  
  
  **Use at your own risk**
