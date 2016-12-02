@@ -31,7 +31,7 @@ matplotlib=1.5.1=np110py27_0
 mkl=11.3.3=0
 numexpr=2.5.2=np110py27_1
 numpy=1.10.4=py27_2
-opencv=2.4.10=np110py27_1
+opencv=2.4.11=nppy27_0
 openssl=1.0.2j=0
 pandas=0.18.1=np110py27_0
 pango=1.39.0=1
