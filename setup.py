@@ -3,7 +3,7 @@ from setuptools import find_packages
 
 
 setup(name='pybot',
-      version='0.0.1',
+      version='0.1',
       description='Research tools for autonomous systems using Python',
       author='Sudeep Pillai',
       author_email='spillai@csail.mit.com',
