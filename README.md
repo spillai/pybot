@@ -39,7 +39,7 @@ periodic callbacks etc.
 **New (upcoming) modules**: *mapping*, *nnet* with support for visual
 odometry, vSLAM, semi-dense reconstruction, and more recent
 developments in CNN-based object recognition, localization (ROI
-pooling), and SLAM-aware recognition. See [references]() for more details
+pooling), and SLAM-aware recognition. See [references](REFERENCES.md) for more details
 about specific implementations. 
 
 Installation
