@@ -142,10 +142,10 @@ class BaseSLAM(object):
             self.initialize()
 
         # Add odometry factor
-        self._add_odom(self.latest, self.latest+1, delta)
+        self.add_relative_pose_constraint(self.latest, self.latest+1, delta)
         self.idx_ += 1
 
-    def _add_odom(self, xid1, xid2, delta): 
+    def add_relative_pose_constraint(self, xid1, xid2, delta): 
         # print_red('\t\t{:}::add_odom {:}->{:}'.format(self.__class__.__name__, xid1, xid2))
 
         # Add odometry factor
@@ -156,9 +156,10 @@ class BaseSLAM(object):
         
         # Predict pose and add as initial estimate
         with self.state_lock_: 
-            pred_pose = self.xs_[xid1].compose(pdelta)
-            self.initial_.insert(x_id2, pred_pose)
-            self.xs_[xid2] = pred_pose
+            if xid2 not in self.xs_: 
+                pred_pose = self.xs_[xid1].compose(pdelta)
+                self.initial_.insert(x_id2, pred_pose)
+                self.xs_[xid2] = pred_pose
 
             # Add to edges
             self.xxs_.append((xid1, xid2))

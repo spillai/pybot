@@ -114,6 +114,22 @@ class BaseSLAM(_BaseSLAM):
 
         return self.latest
 
+    def on_loop_closure_relative(self, t, idx1, idx2, p): 
+        """
+        Accumulate componded pose (input: relative odometry) and add relative odometry to 
+        factor graph with appropriate timestamp
+        """
+        
+        # 1. SLAM: Add relative pose measurements (odometry)
+        self.add_relative_pose_constraint(idx1, idx2, p.matrix)
+
+        # 3. Update
+        if self.latest >= 2 and self.latest % self.update_every_k_odom_ == 0: 
+            self.update()
+
+        return self.latest
+
+    
     # def on_point_landmarks_smart(self, t, ids, pts, keep_tracked=True): 
     #     assert(self.smart_)
     #     self.add_point_landmarks_incremental_smart(ids, pts, keep_tracked=keep_tracked)
@@ -371,9 +387,9 @@ class BaseSLAMWithViz(BaseSLAM):
         BaseSLAM.on_pose_landmarks(self, t, ids, poses)
         self.visualize_landmarks(ids, poses)
         
-def SLAM(visualize=False): 
+def SLAM(visualize=False, name='SLAM_', frame_id='origin'): 
     if visualize: 
-        return BaseSLAMWithViz()
+        return BaseSLAMWithViz(name=name, frame_id=frame_id)
     else: 
         return BaseSLAM()
 
