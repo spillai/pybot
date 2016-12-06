@@ -332,6 +332,9 @@ class KITTIRawDatasetReader(object):
             self.oxts_ = OXTSReader(oxt_format_fn, template=oxt_fn, start_idx=start_idx, max_files=max_files)
         except Exception as e:
             self.oxts_ = NoneReader()
+
+    def iter_oxts_frames(self, *args, **kwargs): 
+        return self.oxts_.iteritems(*args, **kwargs)
             
     def iterframes(self, *args, **kwargs): 
         for (left, right), oxt in izip(self.iter_stereo_frames(*args, **kwargs), 
@@ -354,7 +357,7 @@ class KITTIRawDatasetReader(object):
 
     @property
     def poses(self):
-        return self.poses_
+        return list(self.oxts_.iteritems())
 
     @property
     def stereo_frames(self): 

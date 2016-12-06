@@ -13,10 +13,13 @@ if __name__ == "__main__":
     # KITTI params
     dataset = KITTIRawDatasetReader(directory='/HD1/data/KITTI/data_raw/2011_09_26/2011_09_26_drive_0059_sync')
     print dataset.oxt_fieldnames
+
+    poses = dataset.poses
+    print len(poses)
     
-    for f in dataset.iterframes():
-        print f.pose
-        imshow_cv('frame', np.vstack([f.left, f.right]))
+    # for f in dataset.iterframes():
+    #     print f.pose
+    #     imshow_cv('frame', np.vstack([f.left, f.right]))
         
 
     # # Publish ground truth poses
