@@ -42,51 +42,51 @@ def kitti_poses_to_str(poses):
 
 def kitti_poses_to_mat(poses): 
     return np.vstack(map(lambda x: (x.matrix[:3,:4]).flatten(), poses)).astype(np.float64)
-
-
+    
 class OXTSReader(DatasetReader):
     def __init__(self, dataformat, template='oxts/data/%010i.txt', start_idx=0, max_files=10000): 
         super(OXTSReader, self).__init__(template=template, process_cb=self.oxts_process_cb,
                                          start_idx=start_idx, max_files=max_files)
-        self.oxt_format_fn_ = dataformat
-        self.oxt_formats_ = [line.split(':')[0] for line in open(self.oxt_format_fn_)]
+        self.oxts_format_fn_ = dataformat
+        self.oxts_formats_ = [line.split(':')[0] for line in open(self.oxts_format_fn_)]
 
-        self.R_init_ = None
-        self.t_init_ = None
+        self.scale_ = None
+        self.p_init_ = None
         
     @property
-    def oxt_formats(self):
-        return self.oxt_formats_
+    def oxts_formats(self):
+        return self.oxts_formats_
         
     def oxts_process_cb(self, fn):
         X = np.fromfile(fn, dtype=np.float64, sep=' ')
-        packet = AttrDict({fmt: x for (fmt, x) in zip(self.oxt_formats, X)})
-
+        packet = AttrDict({fmt: x for (fmt, x) in zip(self.oxts_formats, X)})
         er = 6378137.  # earth radius (approx.) in meters
 
         # compute scale from first lat value
-        scale = np.cos(packet.lat * np.pi / 180.)
-
+        if self.scale_ is None: 
+            self.scale_ = np.cos(packet.lat * np.pi / 180.)
+        
         # Use a Mercator projection to get the translation vector
-        tx = scale * packet.lon * np.pi * er / 180.
-        ty = scale * er * \
+        tx = self.scale_ * packet.lon * np.pi * er / 180.
+        ty = self.scale_ * er * \
              np.log(np.tan((90. + packet.lat) * np.pi / 360.))
         tz = packet.alt
         t = np.array([tx, ty, tz])
-
+        
         # We want the initial position to be the origin, but keep the ENU
         # coordinate system
-        if self.t_init_ is None: 
-            self.t_init_ = t
-            self.R_init_ =  Quaternion.from_rpy(packet.roll, packet.pitch, packet.yaw, axes='sxyz')
+        rx, ry, rz = packet.roll, packet.pitch, packet.yaw
+        Rx = np.float32([1,0,0, 0, np.cos(rx), -np.sin(rx), 0, np.sin(rx), np.cos(rx)]).reshape(3,3)
+        Ry = np.float32([np.cos(ry),0,np.sin(ry), 0, 1, 0, -np.sin(ry), 0, np.cos(ry)]).reshape(3,3)
+        Rz = np.float32([np.cos(rz), -np.sin(rz), 0, np.sin(rz), np.cos(rz), 0, 0, 0, 1]).reshape(3,3)
+        R = np.dot(Rz, Ry.dot(Rx))
+        pose = RigidTransform.from_Rt(R, t)
 
-        rel_R = Quaternion.from_rpy(packet.roll, packet.pitch, packet.yaw, axes='sxyz') * self.R_init_
-        rel_t = t - self.t_init_
-        
+        if self.p_init_ is None:
+            self.p_init_ = pose.inverse()
+
         # Use the Euler angles to get the rotation matrix
-        return RigidTransform(xyzw=rel_R.xyzw, tvec=rel_t)
-        
-
+        return AttrDict(packet=packet, pose=self.p_init_ * pose)
 
 class KITTIDatasetReader(object): 
     """
@@ -302,7 +302,7 @@ class KITTIRawDatasetReader(object):
                  left_template='image_00/data/%010i.png', 
                  right_template='image_01/data/%010i.png', 
                  velodyne_template='velodyne_points/data/%010i.bin', 
-                 oxt_template='oxts/data/%010i.txt',
+                 oxts_template='oxts/data/%010i.txt',
                  start_idx=0, max_files=50000, scale=1.0): 
         # super(KITTIRawDatasetReader, self).__init__(directory, sequence, 
         #                                             left_template=left_template, right_template=right_template, 
@@ -327,9 +327,9 @@ class KITTIRawDatasetReader(object):
             
         # Read oxts
         try: 
-            oxt_format_fn = os.path.join(os.path.expanduser(directory), 'oxts/dataformat.txt')
-            oxt_fn = os.path.join(os.path.expanduser(directory), oxt_template)
-            self.oxts_ = OXTSReader(oxt_format_fn, template=oxt_fn, start_idx=start_idx, max_files=max_files)
+            oxts_format_fn = os.path.join(os.path.expanduser(directory), 'oxts/dataformat.txt')
+            oxts_fn = os.path.join(os.path.expanduser(directory), oxts_template)
+            self.oxts_ = OXTSReader(oxts_format_fn, template=oxts_fn, start_idx=start_idx, max_files=max_files)
         except Exception as e:
             self.oxts_ = NoneReader()
 
@@ -337,9 +337,9 @@ class KITTIRawDatasetReader(object):
         return self.oxts_.iteritems(*args, **kwargs)
             
     def iterframes(self, *args, **kwargs): 
-        for (left, right), oxt in izip(self.iter_stereo_frames(*args, **kwargs), 
+        for (left, right), oxts in izip(self.iter_stereo_frames(*args, **kwargs), 
                                        self.iter_oxts_frames(*args, **kwargs)): 
-            yield AttrDict(left=left, right=right, velodyne=None, pose=oxt)
+            yield AttrDict(left=left, right=right, velodyne=None, pose=oxts.pose, oxts=oxts.packet)
     
     def iter_stereo_frames(self, *args, **kwargs): 
         return self.stereo_.iteritems(*args, **kwargs)
@@ -351,17 +351,22 @@ class KITTIRawDatasetReader(object):
         return izip(self.left.iteritems(*args, **kwargs), 
                     self.right.iteritems(*args, **kwargs), 
                     self.velodyne.iteritems(*args, **kwargs))
-    @property
-    def oxt_fieldnames(self): 
-        return self.oxts_.oxt_formats
-
-    @property
-    def poses(self):
-        return list(self.oxts_.iteritems())
 
     @property
     def stereo_frames(self): 
         return self.iter_stereo_frames()
+
+    @property
+    def oxts_fieldnames(self): 
+        return self.oxts_.oxts_formats
+
+    @property
+    def oxts_data(self):
+        return map(lambda oxts: oxts.packet, self.oxts_.iteritems())
+
+    @property
+    def poses(self):
+        return map(lambda oxts: oxts.pose, self.oxts_.iteritems())
 
 class OmnicamDatasetReader(object): 
     """
@@ -373,7 +378,7 @@ class OmnicamDatasetReader(object):
                  left_template='image_02/data/%010i.png', 
                  right_template='image_03/data/%010i.png', 
                  velodyne_template='velodyne_points/data/%010i.bin',
-                 oxt_template='oxts/data/%010i.txt',
+                 oxts_template='oxts/data/%010i.txt',
                  start_idx=0, max_files=50000, scale=1.0): 
 
         # Set args
@@ -410,9 +415,9 @@ class OmnicamDatasetReader(object):
 
         # Read oxts
         try: 
-            oxt_format_fn = os.path.join(seq_directory, 'oxts/dataformat.txt')
-            oxt_fn = os.path.join(seq_directory, oxt_template)
-            self.oxts_ = OXTSReader(oxt_format_fn, template=oxt_fn, start_idx=start_idx, max_files=max_files)
+            oxts_format_fn = os.path.join(seq_directory, 'oxts/dataformat.txt')
+            oxts_fn = os.path.join(seq_directory, oxts_template)
+            self.oxts_ = OXTSReader(oxts_format_fn, template=oxts_fn, start_idx=start_idx, max_files=max_files)
         except Exception as e:
             self.oxts_ = NoneReader()
 
@@ -432,9 +437,9 @@ class OmnicamDatasetReader(object):
         return self.stereo_
 
     def iterframes(self, *args, **kwargs): 
-        for (left, right), oxt in izip(self.iter_stereo_frames(*args, **kwargs), 
+        for (left, right), oxts in izip(self.iter_stereo_frames(*args, **kwargs), 
                                        self.iter_oxts_frames(*args, **kwargs)): 
-            yield AttrDict(left=left, right=right, velodyne=None, pose=oxt)
+            yield AttrDict(left=left, right=right, velodyne=None, pose=oxts.pose, oxts=oxts.packet)
     
     def iter_stereo_frames(self, *args, **kwargs): 
         return self.stereo.iteritems(*args, **kwargs)
@@ -457,6 +462,18 @@ class OmnicamDatasetReader(object):
     @property
     def velodyne_frames(self): 
         return self.iter_velodyne_frames()
+
+    @property
+    def oxts_fieldnames(self): 
+        return self.oxts_.oxts_formats
+
+    @property
+    def oxts_data(self):
+        return map(lambda oxts: oxts.packet, self.oxts_.iteritems())
+
+    @property
+    def poses(self):
+        return map(lambda oxts: oxts.pose, self.oxts_.iteritems())
 
 # def test_omnicam(dire):
 #     return OmnicamDatasetReader(directory='/media/spillai/MRG-HD1/data/omnidirectional/')
