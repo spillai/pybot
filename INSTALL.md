@@ -42,5 +42,8 @@ specific version of OpenCV (that is pre-compiled for your platform).
 ```sh
 conda install -c https://conda.anaconda.org/menpo opencv=2.4.11 -y
 ```
- 
- **Use at your own risk**
+
+2) LCM, Libbot, gtsam, isam, pygtsam
+```sh
+./install_externals.sh
+```
