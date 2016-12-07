@@ -84,8 +84,6 @@ class OXTSReader(DatasetReader):
 
         if self.p_init_ is None:
             self.p_init_ = pose.inverse()
-
-        print pose
             
         # Use the Euler angles to get the rotation matrix
         return AttrDict(packet=packet, pose=self.p_init_ * pose)
@@ -343,15 +341,16 @@ class KITTIRawDatasetReader(object):
         return self.oxts_.iteritems(*args, **kwargs)
             
     def iterframes(self, *args, **kwargs): 
-        for (left, right), oxts in izip(self.iter_stereo_frames(*args, **kwargs), 
-                                       self.iter_oxts_frames(*args, **kwargs)): 
-            yield AttrDict(left=left, right=right, velodyne=None, pose=oxts.pose, oxts=oxts.packet)
+        for (left, right), oxts, velodyne in izip(self.iter_stereo_frames(*args, **kwargs), 
+                                        self.iter_oxts_frames(*args, **kwargs),
+                                        self.iter_velodyne_frames(*args, **kwargs)): 
+            yield AttrDict(left=left, right=right, velodyne=velodyne, pose=oxts.pose, oxts=oxts.packet)
     
     def iter_stereo_frames(self, *args, **kwargs): 
         return self.stereo_.iteritems(*args, **kwargs)
 
     def iter_velodyne_frames(self, *args, **kwargs):         
-        return self.velodyne.iteritems(*args, **kwargs)
+        return self.velodyne_.iteritems(*args, **kwargs)
 
     def iter_stereo_velodyne_frames(self, *args, **kwargs):         
         return izip(self.left.iteritems(*args, **kwargs), 
