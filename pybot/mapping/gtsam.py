@@ -108,6 +108,7 @@ class BaseSLAM(object):
 
     def initialize(self, p_init=None, index=0): 
         # print_red('\t\t{:}::add_p0 index: {:}'.format(self.__class__.__name__, index))
+
         x_id = symbol('x', index)
         pose0 = Pose3(p_init) if p_init is not None else Pose3()
             
@@ -132,6 +133,13 @@ class BaseSLAM(object):
         #     self.gviz_.node[p_id]['style'] = 'filled'
         #     self.gviz_.node[p_id]['shape'] = 'box'
 
+    def add_prior(self, index, p, noise=np.ones(6) * 0.001): 
+        x_id = symbol('x', index)
+        pose = Pose3(p)
+        self.graph_.add(
+            PriorFactorPose3(x_id, pose, Diagonal.Sigmas(noise))
+        )
+        
     def add_odom_incremental(self, delta): 
         """
         Add odometry measurement from the latest robot pose to a new
