@@ -85,6 +85,8 @@ class OXTSReader(DatasetReader):
         if self.p_init_ is None:
             self.p_init_ = pose.inverse()
 
+        print pose
+            
         # Use the Euler angles to get the rotation matrix
         return AttrDict(packet=packet, pose=self.p_init_ * pose)
 
@@ -310,10 +312,14 @@ class KITTIRawDatasetReader(object):
         #                                             start_idx=start_idx, max_files=max_files, scale=scale)
 
         # Read stereo images
-        self.stereo_ = StereoDatasetReader(directory=directory, 
-                                           left_template=left_template, 
-                                           right_template=right_template, 
-                                           start_idx=start_idx, max_files=max_files, scale=scale)
+        try: 
+            self.stereo_ = StereoDatasetReader(directory=directory, 
+                                               left_template=left_template, 
+                                               right_template=right_template, 
+                                               start_idx=start_idx, max_files=max_files, scale=scale)
+        except Exception, e:
+            print('Failed to read stereo data: {}'.format(e))
+            self.stereo_ = NoneReader()
         
         # Read velodyne
         try: 

@@ -20,7 +20,9 @@ if __name__ == "__main__":
     args = parser.parse_args()
     
     # KITTI params
-    dataset = KITTIRawDatasetReader(directory=args.directory, velodyne_template=None)
+    dataset = KITTIRawDatasetReader(directory=args.directory,
+                                    left_template=None, right_template=None, velodyne_template=None)
+    
     # print dataset.oxts_fieldnames, dataset.oxts_data
     # draw_utils.publish_pose_list('ground_truth_poses',
     #                              [Pose.from_rigid_transform(0, dataset.poses[0])],
