@@ -182,15 +182,15 @@ class BaseSLAM(_BaseSLAM):
     def finish(self): 
         for j in range(10): 
             self.update()
-        self.visualize_optimized()
 
 class BaseSLAMWithViz(BaseSLAM): 
     def __init__(self, name='SLAM_', frame_id='origin',
+                 update_every_k_odom=10, 
                  visualize_every=2.0,
                  visualize_measurements=False, 
                  visualize_factors=True, visualize_marginals=False): 
 
-        BaseSLAM.__init__(self)
+        BaseSLAM.__init__(self, update_every_k_odom=update_every_k_odom)
         self.name_ = name
         self.frame_id_ = frame_id
 
@@ -387,11 +387,12 @@ class BaseSLAMWithViz(BaseSLAM):
         BaseSLAM.on_pose_landmarks(self, t, ids, poses)
         self.visualize_landmarks(ids, poses)
         
-def SLAM(visualize=False, name='SLAM_', frame_id='origin'): 
+def SLAM(visualize=False, **kwargs):
+    # kwargs: name='SLAM_', frame_id='origin'
     if visualize: 
-        return BaseSLAMWithViz(name=name, frame_id=frame_id)
+        return BaseSLAMWithViz(**kwargs)
     else: 
-        return BaseSLAM()
+        return BaseSLAM(**kwargs)
 
 # class RobotSLAMMixin(object): 
 #     def __init__(self, landmark_type='point', smart=False, update_on_odom=False, 
