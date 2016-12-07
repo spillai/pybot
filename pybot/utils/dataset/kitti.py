@@ -13,6 +13,10 @@ from pybot.utils.dataset_readers import natural_sort, \
 from pybot.geometry.rigid_transform import RigidTransform, Quaternion
 from pybot.vision.camera_utils import StereoCamera
 
+def body2camera(height=1):
+    return RigidTransform.from_rpyxyz(-np.pi/2, 0, -np.pi/2, 
+                                      0, 0, height, axes='sxyz')
+
 def kitti_stereo_calib(sequence, scale=1.0): 
     seq = int(sequence)
     print('KITTI Dataset Reader: Sequence ({:}) @ Scale ({:})'.format(sequence, scale))
@@ -296,7 +300,6 @@ class KITTIRawDatasetReader(object):
     """
     KITTIRawDatasetReader: KITTIDatasetReader + OXTS reader
     """
-
     def __init__(self, directory, 
                  sequence='',
                  left_template='image_00/data/%010i.png', 
