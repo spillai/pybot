@@ -191,7 +191,6 @@ class AttrDict(dict):
 
     def save_dict(self, fn): 
         save_pickled_dict(fn, self)
-        print 'saving ', self
 
     @staticmethod
     def load_json(fn): 
