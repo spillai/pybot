@@ -19,9 +19,9 @@ if __name__ == "__main__":
 
     # KITTI params
     dataset = OmnicamDatasetReader(directory=args.directory)
-    for idx, oxts in enumerate(dataset.oxts.iteritems()):
+    for idx, f in enumerate(dataset.iterframes()):
         print(f.left.shape)
-        draw_utils.publish_pose_list('ground_truth_poses', [Pose.from_rigid_transform(idx, oxts.pose)], 
+        draw_utils.publish_pose_list('ground_truth_poses', [Pose.from_rigid_transform(idx, f.pose)], 
                                      frame_id='origin', reset=False)
 
     # for idx, f in enumerate(dataset.iterframes()):

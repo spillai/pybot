@@ -376,8 +376,10 @@ class KITTIRawDatasetReader(object):
 class OmnicamDatasetReader(object): 
     """
     OmnicamDatasetReader: ImageDatasetReader + VelodyneDatasetReader + Calib
-    """
 
+    shape: H x W
+    """
+    shape = (1400,1400)
     def __init__(self, directory='', 
                  left_template='image_02/data/%010i.png', 
                  right_template='image_03/data/%010i.png', 
