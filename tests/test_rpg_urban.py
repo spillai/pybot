@@ -18,6 +18,7 @@ if __name__ == "__main__":
     
     # KITTI params
     dataset = RPGUrban(directory=args.directory)
+    print dataset.calib
     # print 'Poses: ', len(dataset.poses)
     
     for idx, f in enumerate(dataset.iterframes()):

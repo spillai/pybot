@@ -10,6 +10,7 @@ from pybot.geometry.rigid_transform import RigidTransform
 from pybot.utils.db_utils import AttrDict
 from pybot.utils.dataset_readers import natural_sort, \
     read_dir, NoneReader, FileReader, DatasetReader, ImageDatasetReader, StereoDatasetReader, VelodyneDatasetReader
+from pybot.vision.camera_utils import Camera, CameraIntrinsic
 
 class VaFRICDatasetReader(object): 
     def __init__(self, directory='', scene=''): 
@@ -103,6 +104,15 @@ class RPGUrban(object):
         # Set args
         self.scale = scale
 
+        # Calibration
+        calib_fn = os.path.join(os.path.expanduser(directory), 'info', 'intrinsics.txt')
+        s = open(calib_fn, 'r').readlines()
+        s = ''.join(s[1:])
+        for item in ['\n', '[', ']', ' ']:
+            s = s.replace(item,'')
+        K = np.fromstring(s, sep=',').reshape(3,3)
+        self.calib_ = Camera.from_intrinsics(CameraIntrinsic(K, shape=RPGUrban.shape[:2]))
+        
         # Read stereo images
         try: 
             self.rgb_ = ImageDatasetReader(template=os.path.join(os.path.expanduser(directory), template), 
@@ -129,7 +139,7 @@ class RPGUrban(object):
 
     @property
     def calib(self):
-        raise NotImplementedError('camera calibration not yet implemented')
+        return self.calib_
         
     @property
     def rgb(self):
