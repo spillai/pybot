@@ -9,7 +9,7 @@ from itertools import izip
 from pybot.geometry.rigid_transform import RigidTransform
 from pybot.utils.db_utils import AttrDict
 from pybot.utils.dataset_readers import natural_sort, \
-    read_dir, DatasetReader, ImageDatasetReader, StereoDatasetReader, VelodyneDatasetReader
+    read_dir, NoneReader, FileReader, DatasetReader, ImageDatasetReader, StereoDatasetReader, VelodyneDatasetReader
 
 class VaFRICDatasetReader(object): 
     def __init__(self, directory='', scene=''): 
@@ -87,3 +87,67 @@ class NewCollegeDatasetReader(object):
     @property
     def stereo_frames(self): 
         return self.iter_stereo_frames()
+
+
+class RPGUrban(object): 
+    """
+    RPGUrban: ImageDatasetReader + Calib
+    shape: H x W
+    """
+    shape = (480,640,3)
+    def __init__(self, directory='', 
+                 template='data/img/img%04i_0.png', 
+                 velodyne_template=None, 
+                 start_idx=1, max_files=100000, scale=1.0): 
+
+        # Set args
+        self.scale = scale
+
+        # Read stereo images
+        try: 
+            self.rgb_ = ImageDatasetReader(template=os.path.join(os.path.expanduser(directory), template), 
+                                           start_idx=start_idx, max_files=max_files, scale=scale)
+        except Exception,e:
+            print('Failed to read rgb data: {}'.format(e))
+            self.rgb_ = NoneReader()
+        
+        # Read poses
+        def load_poses(fn):
+            """
+            poses: image_id tx ty tz qx qy qz qw
+            """
+            X = (np.fromfile(fn, dtype=np.float64, sep=' ')).reshape(-1,8)
+            abs_poses = map(lambda p: RigidTransform(xyzw=p[4:], tvec=p[1:4]), X)
+            rel_poses = [abs_poses[0].inverse() * p for p in abs_poses]
+            return rel_poses
+
+        try:
+            pose_fn = os.path.join(os.path.expanduser(directory), 'info', 'groundtruth.txt')
+            self.poses_ = FileReader(pose_fn, process_cb=load_poses)
+        except Exception as e:
+            self.poses_ = NoneReader()
+
+    @property
+    def calib(self):
+        raise NotImplementedError('camera calibration not yet implemented')
+        
+    @property
+    def rgb(self):
+        return self.rgb_
+
+    def iterframes(self, *args, **kwargs): 
+        for im, pose in izip(self.iter_rgb_frames(*args, **kwargs), 
+                             self.iter_poses(*args, **kwargs)): 
+            yield AttrDict(im=im, velodyne=None, pose=pose)
+
+    def iter_poses(self, *args, **kwargs): 
+        return self.poses_.iteritems(*args, **kwargs)
+    
+    def iter_rgb_frames(self, *args, **kwargs): 
+        return self.rgb.iteritems(*args, **kwargs)
+
+    @property
+    def poses(self):
+        return list(self.poses_.iteritems())
+
+    
