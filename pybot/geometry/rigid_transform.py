@@ -89,7 +89,15 @@ def tf_compose(R, t):
     T[:3,:3] = R.copy()
     T[:3,3] = t.copy()
     return T
-    
+
+###############################################################################
+def rpyxyz(roll, pitch, yaw, x, y, z, axes='rxyz'):
+    return RigidTransform.from_rpyxyz(roll, pitch, yaw, x, y, z, axes=axes)
+
+def pose(pid, rt):
+    assert(isinstance(rt, RigidTransform))
+    return Pose.from_rigid_transform(pid, rt)
+
 ###############################################################################
 class RigidTransform(object):
     """
