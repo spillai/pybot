@@ -25,6 +25,6 @@ if __name__ == "__main__":
     
     for idx, f in enumerate(dataset.iterframes()):
         print f.pose, f.im.shape
-        imshow_cv('Image/Alpha', np.hstack([f.im[:,:,:3], to_color(f.im[:,:,-1])]))
+        imshow_cv('Image/Alpha', np.hstack([f.im, to_color(f.mask)]))
         draw_utils.publish_pose_list('ground_truth_poses', [Pose.from_rigid_transform(idx, f.pose)], frame_id='camera', reset=False)
 
