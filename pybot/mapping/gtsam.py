@@ -43,7 +43,14 @@ def matrix(m):
 def vec(*args):
     return vector(list(args)) 
 
-class BaseSLAM(object): 
+_odom_noise = np.ones(6) * 0.01
+_prior_noise = np.ones(6) * 0.001
+_measurement_noise = np.ones(6) * 0.4
+
+class BaseSLAM(object):
+    odom_noise = _odom_noise
+    prior_noise = _prior_noise
+    measurement_noise = _measurement_noise
     """
     Basic SLAM interface with GTSAM::ISAM2
 
@@ -62,13 +69,10 @@ class BaseSLAM(object):
         Updated slam every landmark addition
 
     """
-    odom_noise = np.ones(6) * 0.01
-    prior_noise = np.ones(6) * 0.001
-    measurement_noise = np.ones(6) * 0.4
     def __init__(self, 
-                 odom_noise=np.ones(6) * 0.01, 
-                 prior_noise=np.ones(6) * 0.001, 
-                 measurement_noise=np.ones(6) * 0.4,
+                 odom_noise=_odom_noise, 
+                 prior_noise=_prior_noise, 
+                 measurement_noise=_measurement_noise,
                  verbose=False, export_graph=False):
  
         # ISAM2 interface
@@ -106,14 +110,17 @@ class BaseSLAM(object):
         # if self.export_graph_: 
         #     self.gviz_ = nx.Graph()
 
-    def initialize(self, p_init=None, index=0): 
+    def initialize(self, p_init=None, index=0, noise=None): 
         # print_red('\t\t{:}::add_p0 index: {:}'.format(self.__class__.__name__, index))
 
         x_id = symbol('x', index)
         pose0 = Pose3(p_init) if p_init is not None else Pose3()
             
         self.graph_.add(
-            PriorFactorPose3(x_id, pose0, self.prior_noise_)
+            PriorFactorPose3(x_id, pose0,
+                             Diagonal.Sigmas(noise)
+                             if noise is not None
+                             else self.prior_noise_)
         )
         self.initial_.insert(x_id, pose0)
         with self.state_lock_: 
@@ -133,14 +140,16 @@ class BaseSLAM(object):
         #     self.gviz_.node[p_id]['style'] = 'filled'
         #     self.gviz_.node[p_id]['shape'] = 'box'
 
-    def add_prior(self, index, p, noise=np.ones(6) * 0.001): 
+    def add_prior(self, index, p, noise=None): 
         x_id = symbol('x', index)
         pose = Pose3(p)
         self.graph_.add(
-            PriorFactorPose3(x_id, pose, Diagonal.Sigmas(noise))
+            PriorFactorPose3(x_id, pose, Diagonal.Sigmas(noise)
+                             if noise is not None
+                             else self.prior_noise_)
         )
         
-    def add_odom_incremental(self, delta): 
+    def add_odom_incremental(self, delta, noise=None): 
         """
         Add odometry measurement from the latest robot pose to a new
         robot pose
@@ -150,17 +159,19 @@ class BaseSLAM(object):
             self.initialize()
 
         # Add odometry factor
-        self.add_relative_pose_constraint(self.latest, self.latest+1, delta)
+        self.add_relative_pose_constraint(self.latest, self.latest+1, delta, noise=noise)
         self.idx_ += 1
 
-    def add_relative_pose_constraint(self, xid1, xid2, delta): 
+    def add_relative_pose_constraint(self, xid1, xid2, delta, noise=None): 
         # print_red('\t\t{:}::add_odom {:}->{:}'.format(self.__class__.__name__, xid1, xid2))
 
         # Add odometry factor
         pdelta = Pose3(delta)
         x_id1, x_id2 = symbol('x', xid1), symbol('x', xid2)
         self.graph_.add(BetweenFactorPose3(x_id1, x_id2, 
-                                           pdelta, self.odo_noise_))
+                                           pdelta, Diagonal.Sigmas(noise)
+                                           if noise is not None
+                                           else self.odo_noise_))
         
         # Predict pose and add as initial estimate
         with self.state_lock_: 
@@ -177,7 +188,7 @@ class BaseSLAM(object):
         #     self.gviz_.add_edge(x_id1, x_id2)
         #     self.gviz_.node[x_id2]['label'] = 'X ' + str(xid2)
 
-    def add_pose_landmarks(self, xid, lids, deltas): 
+    def add_pose_landmarks(self, xid, lids, deltas, noise=None): 
         if self.verbose_: 
             print_red('\t\t{:}::add_landmark x{:} -> lcount: {:}'
                       .format(self.__class__.__name__, xid, len(lids)))
@@ -187,11 +198,12 @@ class BaseSLAM(object):
         l_ids = [symbol('l', lid) for lid in lids]
         
         # Add landmark poses
+        noise = Diagonal.Sigmas(noise) if noise is not None \
+                else self.measurement_noise_
         assert(len(l_ids) == len(deltas))
         for l_id, delta in izip(l_ids, deltas): 
             pdelta = Pose3(delta)
-            self.graph_.add(BetweenFactorPose3(x_id, l_id, pdelta, 
-                                               self.measurement_noise_))
+            self.graph_.add(BetweenFactorPose3(x_id, l_id, pdelta, noise))
 
         with self.state_lock_: 
 
@@ -223,15 +235,15 @@ class BaseSLAM(object):
             
         return 
 
-    def add_pose_landmarks_incremental(self, lid, delta): 
+    def add_pose_landmarks_incremental(self, lid, delta, noise=None): 
         """
         Add landmark measurement (pose3d) 
         from the latest robot pose to the
         specified landmark id
         """
-        self.add_pose_landmarks(self.latest, lid, delta)
+        self.add_pose_landmarks(self.latest, lid, delta, noise=noise)
 
-    def add_point_landmarks(self, xid, lids, pts, pts3d): 
+    def add_point_landmarks(self, xid, lids, pts, pts3d, noise=None): 
         if self.verbose_: 
             print_red('\t\tadd_landmark_points xid:{:}-> lid count:{:}'
                       .format(xid, len(lids)))
@@ -249,11 +261,13 @@ class BaseSLAM(object):
         x_id = symbol('x', xid)
         l_ids = [symbol('l', lid) for lid in lids]
 
+        noise = Diagonal.Sigmas(noise) if noise is not None \
+                else self.image_measurement_noise_
         assert(len(l_ids) == len(pts) == len(pts3d))
         for l_id, pt in izip(l_ids, pts):
             self.graph_.add(
                 GenericProjectionFactorPose3Point3Cal3_S2(
-                    Point2(vec(*pt)), self.image_measurement_noise_, x_id, l_id, self.K_))
+                    Point2(vec(*pt)), noise, x_id, l_id, self.K_))
 
         with self.state_lock_: 
 
@@ -286,13 +300,13 @@ class BaseSLAM(object):
         
         return 
 
-    def add_point_landmarks_incremental(self, lids, pts, pts3d): 
+    def add_point_landmarks_incremental(self, lids, pts, pts3d, noise=None): 
         """
         Add landmark measurement (image features)
         from the latest robot pose to the
         set of specified landmark ids
         """
-        self.add_point_landmarks(self.latest, lids, pts, pts3d)
+        self.add_point_landmarks(self.latest, lids, pts, pts3d, noise=noise)
 
     @property
     def latest(self): 
@@ -472,7 +486,7 @@ class BaseSLAM(object):
 
 class VisualSLAM(BaseSLAM): 
     def __init__(self, calib, min_landmark_obs=3, 
-                 odom_noise=BaseSLAM.odom_noise, prior_noise=BaseSLAM.prior_noise,
+                 odom_noise=_odom_noise, prior_noise=_prior_noise,
                  px_error_threshold=4, px_noise=[1.0, 1.0], verbose=False):
         BaseSLAM.__init__(self, odom_noise=odom_noise, prior_noise=prior_noise, verbose=verbose)
 

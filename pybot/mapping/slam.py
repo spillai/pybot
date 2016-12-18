@@ -61,8 +61,13 @@ class BaseSLAM(_BaseSLAM):
         return {pid : Pose.from_rigid_transform(pid, RigidTransform.from_matrix(p)) 
                 for (pid, p) in self.target_poses.iteritems()}
 
+    def initialize(self, t, p=None, noise=None): 
+        p_init = RigidTransform.identity() \
+                 if p is None else p
+        self.q_poses_.accumulate(p_init)
+        super(BaseSLAM, self).initialize(p_init.matrix, noise=noise)
     
-    def on_odom_absolute(self, t, p): 
+    def on_odom_absolute(self, t, p, noise=None): 
         """
         Accumulate poses (input: absolute odometry) and add relative odometry to 
         factor graph with appropriate timestamp
@@ -84,7 +89,7 @@ class BaseSLAM(_BaseSLAM):
 
         # 2. SLAM: Add relative pose measurements (odometry)
         p_odom = (self.q_poses_.items[-2].inverse()).oplus(self.q_poses_.items[-1])
-        self.add_odom_incremental(p_odom.matrix)
+        self.add_odom_incremental(p_odom.matrix, noise=noise)
 
         # 3. Update
         if self.latest >= 2 and self.latest % self.update_every_k_odom_ == 0: 
@@ -92,7 +97,7 @@ class BaseSLAM(_BaseSLAM):
 
         return self.latest
 
-    def on_odom_relative(self, t, p): 
+    def on_odom_relative(self, t, p, noise=None): 
         """
         Accumulate componded pose (input: relative odometry) and add relative odometry to 
         factor graph with appropriate timestamp
@@ -106,7 +111,7 @@ class BaseSLAM(_BaseSLAM):
         
         # 2. SLAM: Add relative pose measurements (odometry)
         self.q_poses_.accumulate(p * self.q_poses_.latest)
-        self.add_odom_incremental(p.matrix)
+        self.add_odom_incremental(p.matrix, noise=noise)
 
         # 3. Update
         if self.latest >= 2 and self.latest % self.update_every_k_odom_ == 0: 
@@ -114,14 +119,14 @@ class BaseSLAM(_BaseSLAM):
 
         return self.latest
 
-    def on_loop_closure_relative(self, t, idx1, idx2, p): 
+    def on_loop_closure_relative(self, t, idx1, idx2, p, noise=None): 
         """
         Accumulate componded pose (input: relative odometry) and add relative odometry to 
         factor graph with appropriate timestamp
         """
         
         # 1. SLAM: Add relative pose measurements (odometry)
-        self.add_relative_pose_constraint(idx1, idx2, p.matrix)
+        self.add_relative_pose_constraint(idx1, idx2, p.matrix, noise=noise)
 
         # 3. Update
         if self.latest >= 2 and self.latest % self.update_every_k_odom_ == 0: 
@@ -375,12 +380,12 @@ class BaseSLAMWithViz(BaseSLAM):
             draw_utils.publish_line_segments(self.name_ + 'measured_factor_landmark', factor_st, factor_end, c='b', 
                                              frame_id=self.name_ + 'measured_odom', element_id=self.latest, reset=False) 
 
-    def on_odom_absolute(self, t, p): 
-        BaseSLAM.on_odom_absolute(self, t, p)
+    def on_odom_absolute(self, t, p, noise=None): 
+        BaseSLAM.on_odom_absolute(self, t, p, noise=noise)
         self.visualize_poses(p, relative=False)
 
-    def on_odom_relative(self, t, p): 
-        BaseSLAM.on_odom_relative(self, t, p)
+    def on_odom_relative(self, t, p, noise=None): 
+        BaseSLAM.on_odom_relative(self, t, p, noise=noise)
         self.visualize_poses(p, relative=True)
 
     def on_pose_landmarks(self, t, ids, poses): 
