@@ -105,13 +105,17 @@ class RPGUrban(object):
         self.scale = scale
 
         # Calibration
-        calib_fn = os.path.join(os.path.expanduser(directory), 'info', 'intrinsics.txt')
-        s = open(calib_fn, 'r').readlines()
-        s = ''.join(s[1:])
-        for item in ['\n', '[', ']', ' ']:
-            s = s.replace(item,'')
-        K = np.fromstring(s, sep=',').reshape(3,3)
-        self.calib_ = Camera.from_intrinsics(CameraIntrinsic(K, shape=RPGUrban.shape[:2]))
+        try: 
+            calib_fn = os.path.join(os.path.expanduser(directory), 'info', 'intrinsics.txt')
+            s = open(calib_fn, 'r').readlines()
+            s = ''.join(s[1:])
+            for item in ['\n', '[', ']', ' ']:
+                s = s.replace(item,'')
+            K = np.fromstring(s, sep=',').reshape(3,3)
+            self.calib_ = Camera.from_intrinsics(CameraIntrinsic(K, shape=RPGUrban.shape[:2]))
+        except Exception,e:
+            print('Failed to read calibration data: {}'.format(e))
+            self.calib_ = None
         
         # Read stereo images
         try: 

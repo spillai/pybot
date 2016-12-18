@@ -5,6 +5,9 @@ import argparse
 from pybot.geometry.rigid_transform import RigidTransform, Pose
 from pybot.utils.dataset.misc import RPGUrban
 import pybot.externals.lcm.draw_utils as draw_utils
+
+
+from pybot.vision.image_utils import to_color
 from pybot.vision.imshow_utils import imshow_cv
 
 if __name__ == "__main__": 
@@ -18,11 +21,10 @@ if __name__ == "__main__":
     
     # KITTI params
     dataset = RPGUrban(directory=args.directory)
-    print dataset.calib
     # print 'Poses: ', len(dataset.poses)
     
     for idx, f in enumerate(dataset.iterframes()):
         print f.pose, f.im.shape
-        imshow_cv('im', f.im)
+        imshow_cv('Image/Alpha', np.hstack([f.im[:,:,:3], to_color(f.im[:,:,-1])]))
         draw_utils.publish_pose_list('ground_truth_poses', [Pose.from_rigid_transform(idx, f.pose)], frame_id='camera', reset=False)
 
