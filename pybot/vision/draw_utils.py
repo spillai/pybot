@@ -6,6 +6,7 @@ import numpy as np
 
 from itertools import imap, izip
 from pybot.utils.plot_utils import colormap
+from pybot.vision.color_utils import color_from_string
 from pybot.vision.image_utils import to_color
 
 def draw_texts(vis, pts, texts, size=2):
@@ -15,13 +16,20 @@ def draw_texts(vis, pts, texts, size=2):
                     (255, 255, 255), thickness=1, lineType=cv2.CV_AA)
     return vis
 
+def get_color(N, colors=None):
+    if colors is not None:
+        if isinstance(colors, str):
+            cols = (color_from_string(colors, N)[:,:3][:,::-1] * 255.0).astype(np.int64)
+        else:
+            assert(isinstance(colors, np.ndarray))
+            cols = colors.astype(np.int64)
+    else: 
+        cols = np.tile([0, 255, 0], (N, 1)).astype(np.int64)
+    return cols
+
 def draw_features(im, pts, colors=None, size=2): 
     out = to_color(im)
-    if colors is not None: 
-        cols = colors.astype(np.int64)
-    else: 
-        cols = np.tile([0, 255, 0], (len(pts), 1)).astype(np.int64)
-
+    cols = get_color(len(pts), colors=colors)
     for col, pt in zip(cols, pts): 
         tl = np.int32(pt - size)
         br = np.int32(pt + size)
@@ -31,16 +39,13 @@ def draw_features(im, pts, colors=None, size=2):
 
 def draw_lines(im, pts1, pts2, colors=None, thickness=1): 
     out = to_color(im)
-    if colors is not None: 
-        cols = colors.astype(np.int64)
-    else: 
-        cols = np.tile([0, 255, 0], (len(pts1), 1)).astype(np.int64)
-
+    cols = get_color(len(pts1), colors=colors)
     for col, pt1, pt2 in zip(cols, pts1, pts2): 
         cv2.line(out, (pt1[0], pt1[1]), (pt2[0], pt2[1]), tuple(col), thickness)
     return out
 
-def draw_matches(out, pts1, pts2, colors=None, thickness=1, size=2): 
+def draw_matches(out, pts1, pts2, colors=None, thickness=1, size=2):
+    assert(len(pts1) == len(pts2))
     out = draw_lines(out, pts1, pts2, colors=colors, thickness=thickness)
     out = draw_features(out, pts2, colors=colors, size=size)
     return out
