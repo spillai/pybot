@@ -64,7 +64,7 @@ class Quaternion(object):
         return Quaternion(tf.quaternion_conjugate(self.q))
 
     def rotate(self, v):
-        """ Rotate a vector with this quaternion in reverse """
+        """ Rotate a vector with this quaternion """
         qx, qy, qz, qw = self.q
 
         ab  =  qw*qx
