@@ -121,18 +121,13 @@ def publish_image_t(pub_channel, im, jpeg=False, flip_rb=True):
     out.row_stride = w*c
     out.utime = 1
         
-    # Propagate encoded/raw data, 
-    image = cv2.cvtColor(im, cv2.COLOR_GRAY2BGR) if im.ndim == 2 else im
-    if flip_rb and im.ndim == 3: 
-        rarr, barr = image[:,:,2].copy(), image[:,:,0].copy()
-        image[:,:,0], image[:,:,2] = rarr, barr
-
+    # Propagate encoded/raw data,
+    color_code = cv2.COLOR_GRAY2RGB if flip_rb else cv2.COLOR_GRAY2BGR
+    image = cv2.cvtColor(im, color_code) if im.ndim == 2 else im
+    
     # Propagate appropriate encoding 
-    if jpeg: 
-        out.pixelformat = image_t.PIXEL_FORMAT_MJPEG
-    else: 
-        out.pixelformat = image_t.PIXEL_FORMAT_RGB
-        
+    out.pixelformat = image_t.PIXEL_FORMAT_MJPEG if jpeg \
+                      else image_t.PIXEL_FORMAT_RGB
     out.data = cv2.imencode('.jpg', image)[1] if jpeg else image.tostring()
     out.size = len(out.data)
     out.nmetadata = 0

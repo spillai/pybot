@@ -436,13 +436,12 @@ class Pose(RigidTransform):
 
 if __name__ == "__main__":
 
-    import random
-
+    import random as rnd
     def make_random_transform(t=1):
-        q_wxyz = [ random.random(), random.random(), random.random(), random.random() ]
+        q_wxyz = [ rnd.random(), rnd.random(), rnd.random(), rnd.random() ]
         qmag = np.sqrt(sum([x*x for x in q_wxyz]))
         q_wxyz = [ x / qmag for x in q_wxyz ]
-        translation = [ random.uniform(-t, t), random.uniform(-t, t), random.uniform(-t, t) ]
+        translation = [ rnd.uniform(-t, t), rnd.uniform(-t, t), rnd.uniform(-t, t) ]
         return RigidTransform(Quaternion.from_wxyz(q_wxyz), translation)
 
 
