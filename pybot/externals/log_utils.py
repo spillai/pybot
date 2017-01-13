@@ -423,31 +423,6 @@ class LogDB(object):
         tree = cKDTree(valid_inds.reshape(-1,1))
         _, closest = tree.query(invalid_inds.reshape(-1,1), p=1)
         all_inds[invalid_inds] = valid_inds[closest]
-        
-        # for j in range(10): 
-        #     fwd_inds = valid_inds + j
-        #     bwd_inds = valid_inds - j
-
-        #     # Forward fill
-        #     invalid_inds, = np.where(all_inds < 0)
-        #     fwd_fill_inds = np.intersect1d(fwd_inds, invalid_inds)
-        #     all_inds[fwd_fill_inds] = all_inds[fwd_fill_inds-j]
-
-        #     # Backward fill
-        #     invalid_inds, = np.where(all_inds < 0)
-        #     if not len(invalid_inds): break
-        #     bwd_fill_inds = np.intersect1d(bwd_inds, invalid_inds)
-        #     all_inds[bwd_fill_inds] = all_inds[bwd_fill_inds+j]
-
-        #     # Check if any missing 
-        #     invalid_inds, = np.where(all_inds < 0)
-        #     if not len(invalid_inds): break
-
-        # np.set_printoptions(threshold=np.nan)
-
-        # print valid.astype(np.int)
-        # print np.array_str(all_inds)
-        # print np.where(all_inds < 0)
 
         return all_inds
 
