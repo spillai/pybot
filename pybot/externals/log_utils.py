@@ -9,6 +9,7 @@ from itertools import islice, izip
 from abc import ABCMeta, abstractmethod
 from collections import Counter
 from heapq import heappush, heappop
+from scipy.spatial import cKDTree
 
 def take(iterable, max_length=None): 
     return iterable if max_length is None else islice(iterable, max_length)
@@ -414,27 +415,33 @@ class LogDB(object):
         valid_inds,  = np.where(valid)
         invalid_inds,  = np.where(~valid)
 
-        all_inds = np.arange(len(valid))
-        all_inds[invalid_inds] = -1
+        all_inds = np.zeros(len(valid), dtype=np.int32) - 1
+        all_inds[valid_inds] = valid_inds
 
-        for j in range(10): 
-            fwd_inds = valid_inds + j
-            bwd_inds = valid_inds - j
+        # Build a kd tree that finds the closest pose index
+        # corresponding to the image index
+        tree = cKDTree(valid_inds.reshape(-1,1))
+        _, closest = tree.query(invalid_inds.reshape(-1,1), p=1)
+        all_inds[invalid_inds] = valid_inds[closest]
+        
+        # for j in range(10): 
+        #     fwd_inds = valid_inds + j
+        #     bwd_inds = valid_inds - j
 
-            # Forward fill
-            invalid_inds, = np.where(all_inds < 0)
-            fwd_fill_inds = np.intersect1d(fwd_inds, invalid_inds)
-            all_inds[fwd_fill_inds] = all_inds[fwd_fill_inds-j]
+        #     # Forward fill
+        #     invalid_inds, = np.where(all_inds < 0)
+        #     fwd_fill_inds = np.intersect1d(fwd_inds, invalid_inds)
+        #     all_inds[fwd_fill_inds] = all_inds[fwd_fill_inds-j]
 
-            # Backward fill
-            invalid_inds, = np.where(all_inds < 0)
-            if not len(invalid_inds): break
-            bwd_fill_inds = np.intersect1d(bwd_inds, invalid_inds)
-            all_inds[bwd_fill_inds] = all_inds[bwd_fill_inds+j]
+        #     # Backward fill
+        #     invalid_inds, = np.where(all_inds < 0)
+        #     if not len(invalid_inds): break
+        #     bwd_fill_inds = np.intersect1d(bwd_inds, invalid_inds)
+        #     all_inds[bwd_fill_inds] = all_inds[bwd_fill_inds+j]
 
-            # Check if any missing 
-            invalid_inds, = np.where(all_inds < 0)
-            if not len(invalid_inds): break
+        #     # Check if any missing 
+        #     invalid_inds, = np.where(all_inds < 0)
+        #     if not len(invalid_inds): break
 
         # np.set_printoptions(threshold=np.nan)
 
