@@ -40,7 +40,7 @@ class Sampler(object):
 
         self.q_ = deque(maxlen=lookup_history)
         self.on_sampled_cb_ = on_sampled_cb
-        self.force_sample_ = False
+        # self.force_sample_ = False
         
         # Maintain total items pushed and sampled
         self.all_items_ = Counter()
@@ -56,18 +56,22 @@ class Sampler(object):
             self.verbose_all_ = deque()
             self.verbose_index_ = deque()
 
-    def force_check(self): 
-        sample = self.force_sample_
-        self.force_sample_ = False
-        return sample
+    # def force_check(self): 
+    #     sample = self.force_sample_
+    #     self.force_sample_ = False
+    #     return sample
             
-    def force_sample(self): 
-        self.force_sample_ = True
+    # def force_sample(self): 
+    #     self.force_sample_ = True
 
     def length(self, type='samples'): 
         if type=='samples': 
             return self.sampled_items_.length
-
+        elif type == 'all':
+            return self.all_items_.length
+        else:
+            raise ValueError('Request for unknown length attribute')
+        
     def print_stats(self, finish=False): 
         print_green('Sampler: Total: {:}, Samples: {:}, Ratio: {:3.2f} %'
                     .format(self.all_items_.index, self.sampled_items_.index, 
@@ -87,7 +91,7 @@ class Sampler(object):
             if self.append(item): 
                 yield self.latest_sample
     
-    def append(self, item): 
+    def append(self, item, force=False): 
         """
         Add item to the sampler, returns the 
         index of the sampled item and the 
@@ -97,7 +101,7 @@ class Sampler(object):
             self.verbose_all_.append(item)
 
         self.all_items_.count()                    
-        ret = self.check_sample(item) 
+        ret = self.check_sample(item, force=force) 
 
         if ret: 
             self.q_.append(item)
@@ -113,6 +117,9 @@ class Sampler(object):
     def latest_sample(self): 
         return self.q_[-1]
 
+    def item(self, idx):
+        return self.q_[idx]
+    
     @classmethod
     def from_items(cls, items, lookup_history=10):
         raise NotImplementedError()
@@ -137,8 +144,8 @@ class PoseSampler(Sampler):
             return poses, inds
         return poses
 
-    def check_sample(self, item):
-        if self.force_check(): 
+    def check_sample(self, item, force=False):
+        if force: 
             return True
 
         pose = self.get_sample(item)
