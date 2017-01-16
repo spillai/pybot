@@ -421,11 +421,13 @@ class TangoDB(LogDB):
         # self.frame_index_:  rgb/img.png -> TangoFrame
         # self.frame_idx2name_: idx -> rgb/img.png
         # self.frame_name2idx_: rgb/img.png -> idx
+        meta = self.annotationdb
+        get_annotation = lambda key: meta[key] if meta is not None else None
         img_decode = lambda msg_item: \
                     self.dataset.decoder[rgb_channel].decode(msg_item)
         self.frame_index_ = OrderedDict([
             (img_msg, TangoFrame(idx, t, img_msg, poses[pose_inds[idx]], 
-                                 self.annotationdb[img_msg], img_decode))
+                                 get_annotation(img_msg), img_decode))
             for idx, (t, ch, img_msg) in enumerate(self.dataset.itercursors()) \
             if ch == rgb_channel and pose_inds[idx] >= 0
         ])

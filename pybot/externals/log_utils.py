@@ -375,7 +375,11 @@ class LogDB(object):
     def _index(self): 
         raise NotImplementedError()
 
-    def print_index_info(self): 
+    def print_index_info(self):
+        if self.annotationdb is None:
+            print('IndexDB empty')
+            return 
+            
         # Retrieve ground truth information
         gt_str = '{} frames annotated ({} total annotations)'\
             .format(self.annotationdb.num_frame_annotations, 
@@ -435,9 +439,9 @@ class LogDB(object):
         return self.meta_
 
     @property
-    def annotationdb(self): 
+    def annotationdb(self):
         return self.meta_
-
+        
     @property
     def annotated_inds(self): 
         return self.annotationdb.annotated_inds
