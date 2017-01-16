@@ -481,6 +481,10 @@ class TangoDB(LogDB):
         self.iterframes = partial(sampler.iteritems, self.iterframes())
         return self
 
+    @property
+    def poses(self):
+        return map(lambda (ts, msg, frame): frame.pose, self.iterframes())
+    
     # def list_annotations(self, target_name=None): 
     #     " List of lists"
     #     inds = self.annotated_inds
