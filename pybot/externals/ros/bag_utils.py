@@ -20,13 +20,14 @@ from cv_bridge import CvBridge, CvBridgeError
 from cv_bridge.boost.cv_bridge_boost import cvtColor2
 from tf2_msgs.msg import TFMessage
 
+from pybot.geometry.rigid_transform import RigidTransform
 from pybot.utils.misc import Accumulator
-from pybot.externals.log_utils import Decoder, LogReader, LogController, LogDB
+from pybot.utils.dataset.sun3d_utils import SUN3DAnnotationDB
 from pybot.vision.image_utils import im_resize
 from pybot.vision.imshow_utils import imshow_cv
 from pybot.vision.camera_utils import CameraIntrinsic
-from pybot.geometry.rigid_transform import RigidTransform
-from pybot.utils.dataset.sun3d_utils import SUN3DAnnotationDB
+from pybot.externals.log_utils import Decoder, LogReader, LogController, LogDB
+from pybot.externals.ros.pointclouds import pointcloud2_to_xyz_array
 
 class GazeboDecoder(Decoder): 
     """
@@ -124,6 +125,18 @@ class ImageDecoder(Decoder):
 
         return im_resize(im, scale=self.scale)
 
+class PointCloud2Decoder(Decoder): 
+    """
+    PointCloud2 decoder 
+    """
+    def __init__(self, channel='/vehicle/sonar_cloud',
+                 every_k_frames=1, remove_nans=True): 
+        Decoder.__init__(self, channel=channel,
+                         every_k_frames=every_k_frames)
+        self.remove_nans_ = remove_nans
+        
+    def decode(self, msg):
+        return pointcloud2_to_xyz_array(msg, remove_nans=self.remove_nans_)
 
 # class ApproximateTimeSynchronizerBag(ApproximateTimeSynchronizer): 
 #     """
