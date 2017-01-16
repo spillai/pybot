@@ -87,7 +87,7 @@ class BaseSLAM(object):
         self.initial_ = Values()
         
         # Pose3D measurement
-        self.measurement_noise_ = Diagonal.Sigmas(measurement_noise) # Isotropic.Sigma(6, 0.4)
+        self.measurement_noise_ = Diagonal.Sigmas(measurement_noise)
         self.prior_noise_ = Diagonal.Sigmas(prior_noise)
         self.odo_noise_ = Diagonal.Sigmas(odom_noise)
 
@@ -482,7 +482,7 @@ class BaseSLAM(object):
         #         clean_x.append(index)
 
         print clean_l
-                
+        
 
 class VisualSLAM(BaseSLAM): 
     def __init__(self, calib, min_landmark_obs=3, 

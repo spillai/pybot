@@ -118,7 +118,7 @@ class BaseSLAM(_BaseSLAM):
             self.update()
 
         return self.latest
-
+    
     def on_loop_closure_relative(self, t, idx1, idx2, p, noise=None): 
         """
         Accumulate componded pose (input: relative odometry) and add relative odometry to 
@@ -154,7 +154,7 @@ class BaseSLAM(_BaseSLAM):
     #     # self.vis_optimized()
 
     #     return self.latest
-
+        
     def on_pose_landmarks(self, t, ids, poses): 
         deltas = [p.matrix for p in poses]
         self.add_pose_landmarks_incremental(ids, deltas)
@@ -178,6 +178,10 @@ class BaseSLAM(_BaseSLAM):
         # # self.vis_optimized()
 
         return self.latest
+
+    def add_pose_landmarks(self, xid, lids, poses):
+        deltas = [p.matrix for p in poses]
+        super(BaseSLAM, self).add_pose_landmarks(xid, lids, deltas, noise=None)
 
     def update(self): 
         self._update()
