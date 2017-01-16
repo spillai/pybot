@@ -105,7 +105,14 @@ class KITTIDatasetReader(object):
                                                     baseline_px=379.8145, shape=np.int32([376, 1241]))
     baseline = 0.5371 # baseline_px / fx
     velo2cam = 0.27 # Velodyne is 27 cm behind cam_0 (x-forward, y-left, z-up)
-
+    height = 1.65
+    
+    p_bc = RigidTransform.from_rpyxyz(-np.pi/2, 0, -np.pi/2, 0, 0, 0, axes='sxyz').inverse()
+    p_bv = RigidTransform.from_rpyxyz(0, 0, 0, 0.27, 0, 1.65)
+    
+    velodyne2body = p_bv
+    camera2body = p_bc
+    
     def __init__(self, directory='', 
                  sequence='', 
                  left_template='image_0/%06i.png', 
@@ -139,7 +146,7 @@ class KITTIDatasetReader(object):
 
 
         # Read velodyne
-        try: 
+        try:
             self.velodyne_ = VelodyneDatasetReader(
                 template=os.path.join(seq_directory,velodyne_template), 
                 start_idx=start_idx, max_files=max_files
@@ -176,8 +183,10 @@ class KITTIDatasetReader(object):
                     self.velodyne.iteritems(*args, **kwargs))
 
     def iterframes(self, *args, **kwargs): 
-        for (left, right), pose in izip(self.iter_stereo_frames(*args, **kwargs), self.poses.iteritems(*args, **kwargs)): 
-            yield AttrDict(left=left, right=right, velodyne=None, pose=pose)
+        for (left, right), pose, velodyne in izip(self.iter_stereo_frames(*args, **kwargs),
+                                                  self.poses.iteritems(*args, **kwargs),
+                                                  self.velodyne.iteritems(*args, **kwargs)): 
+            yield AttrDict(left=left, right=right, velodyne=velodyne, pose=pose)
 
     def iter_gt_frames(self, *args, **kwargs): 
         for (left, right), pose in izip(self.iter_stereo_frames(*args, **kwargs), self.poses.iteritems(*args, **kwargs)): 
