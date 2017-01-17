@@ -12,6 +12,7 @@ import numpy as np
 
 from cStringIO import StringIO
 from pybot.vision.image_utils import im_resize
+from pybot.utils.misc import query_yes_or_exit
 
 def format_time(t):
     if t > 60:
@@ -19,11 +20,13 @@ def format_time(t):
     else:
         return " %6.2fs" % (t)
 
-def mkdir_p(path):
+def mkdir_p(path, query_on_exception=False):
     try:
         os.makedirs(os.path.expanduser(path))
-    except Exception,e : 
-        print '{}: Failed to create path {}'.format(e,path)
+    except Exception,e :
+        print('{}: Failed to create path {}'.format(e,path))
+        if query_on_exception:
+            query_yes_or_exit('Do you want to re-write directory {}?'.format(path))
 
 def path_exists(path): 
     return os.path.exists(os.path.expanduser(path)) \
