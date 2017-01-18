@@ -66,6 +66,10 @@ def print_status(vis, text=None):
                     (240, 240, 240), thickness = 1)
     return vis
 
+def draw_border(vis, value=128):
+    vis[:,0], vis[0,:], vis[:,-1], vis[-1,:] = value, value, value, value
+    return vis
+
 def imshow_cv(label, im, block=False, text=None, wait=2): 
     vis = im.copy()
     print_status(vis, text=text)
