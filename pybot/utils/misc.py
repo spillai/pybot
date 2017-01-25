@@ -2,7 +2,7 @@
 # License: MIT
 
 import sys
-from collections import deque
+from collections import deque, OrderedDict
 
 def color_red(prt): return "\033[91m {}\033[00m" .format(prt)
 def color_green(prt): return "\033[92m {}\033[00m" .format(prt)
@@ -51,6 +51,21 @@ def progressbar(it, prefix = "", size=100, verbose=True, width=100):
     sys.stdout.write("\n")
     sys.stdout.flush()
 
+class dequedict(OrderedDict):
+    def __init__(self, maxlen=None):
+        self.maxlen_ = maxlen
+        OrderedDict.__init__(self)
+        self._check_size()
+
+    def __setitem__(self, key, value):
+        OrderedDict.__setitem__(self, key, value)
+        self._check_size()
+        
+    def _check_size(self):
+        if self.maxlen_ is not None: 
+            while len(self) > self.maxlen_:
+                self.popitem(last=False)
+                        
 class OneHotLabeler(dict):
     def __init__(self, *args, **kwargs):
         dict.__init__(self, *args, **kwargs)
