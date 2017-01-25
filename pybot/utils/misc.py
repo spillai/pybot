@@ -52,6 +52,10 @@ def progressbar(it, prefix = "", size=100, verbose=True, width=100):
     sys.stdout.flush()
 
 class dequedict(OrderedDict):
+    """
+    Dictionary with fixed length (~ Deque + OrderedDict)
+    popitem ensures (FIFO) similar to deque
+    """
     def __init__(self, maxlen=None):
         self.maxlen_ = maxlen
         OrderedDict.__init__(self)
