@@ -4,6 +4,9 @@
 import sys
 from collections import deque, OrderedDict
 
+import functools
+import multiprocessing
+
 def color_red(prt): return "\033[91m {}\033[00m" .format(prt)
 def color_green(prt): return "\033[92m {}\033[00m" .format(prt)
 def color_yellow(prt): return "\033[93m {}\033[00m" .format(prt)
@@ -51,6 +54,13 @@ def progressbar(it, prefix = "", size=100, verbose=True, width=100):
     sys.stdout.write("\n")
     sys.stdout.flush()
 
+def background(func):
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        p = multiprocessing.Process(target=func, args=args, kwargs=kwargs)
+        p.start()
+    return wrapper
+    
 class dequedict(OrderedDict):
     """
     Dictionary with fixed length (~ Deque + OrderedDict)
