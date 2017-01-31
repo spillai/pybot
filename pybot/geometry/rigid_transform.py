@@ -122,9 +122,11 @@ class RigidTransform(object):
     def __mul__(self, other):
         """ 
         Left-multiply RigidTransform with another rigid transform
-        
+   
         Two variants: 
            RigidTransform: Identical to oplus operation
+              - self * other = self.oplus(other)
+        
            ndarray: transform [N x 3] point set (X_2 = p_21 * X_1)
 
         """
