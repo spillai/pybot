@@ -1,6 +1,7 @@
 # Author: Sudeep Pillai <spillai@csail.mit.edu>
 # License: MIT
 
+import operator
 from itertools import *
 
 def take(iterable, n):
@@ -176,3 +177,17 @@ def tee_lookahead(t, i):
     for value in islice(t.__copy__(), i, None):
         return value
     raise IndexError(i)
+
+def accumulate(iterable, func=operator.add):
+    'Return running totals'
+    # accumulate([1,2,3,4,5]) --> 1 3 6 10 15
+    # accumulate([1,2,3,4,5], operator.mul) --> 1 2 6 24 120
+    it = iter(iterable)
+    try:
+        total = next(it)
+    except StopIteration:
+        return
+    yield total
+    for element in it:
+        total = func(total, element)
+        yield total
