@@ -2,9 +2,10 @@
 # License: MIT
 
 import os
+os.environ["GLOG_minloglevel"] ="3"
+
 import numpy as np
 import cv2
-os.environ["GLOG_minloglevel"] ="3"
 
 def resize_to(labels, im): 
     return cv2.resize(labels, (im.shape[1],im.shape[0]), fx=0., fy=0., interpolation=cv2.INTER_AREA)

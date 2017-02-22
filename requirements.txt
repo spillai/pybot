@@ -3,7 +3,6 @@ scipy==0.18.0
 cycler==0.10.0
 matplotlib==1.5.3
 numexpr==2.6.1
-pandas==0.18.1
 pyparsing==2.1.9
 python-dateutil==2.5.3
 pytz==2016.6.1

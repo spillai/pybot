@@ -33,7 +33,6 @@ numexpr=2.5.2=np110py27_1
 numpy=1.10.4=py27_2
 opencv=2.4.10=np110py27_1
 openssl=1.0.2j=0
-pandas=0.18.1=np110py27_0
 pango=1.39.0=1
 path.py=8.2.1=py27_0
 pathlib2=2.1.0=py27_0
