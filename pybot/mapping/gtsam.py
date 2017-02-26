@@ -414,17 +414,22 @@ class BaseSLAM(object):
             self.slam_.update(self.graph_, self.initial_)
             self.slam_.update()
 
-    def _update_estimates(self): 
-
         # Get current estimate
         with self.slam_lock_: 
             self.current_ = self.slam_.calculateEstimate()
             
+    def _batch_solve(self):
+        # Optimize using Levenberg-Marquardt optimization
+        with self.slam_lock_:
+            opt = LevenbergMarquardtOptimizer(self.graph_, self.initial_)
+            self.current_ = opt.optimize();
+            
+    def _update_estimates(self): 
+        if not self.estimate_available:
+            raise RuntimeError('Estimate unavailable, call update first')
+
         poses = extractPose3(self.current_)
         landmarks = extractPoint3(self.current_)
-
-        if not self.estimate_available: 
-            return 
 
         with self.state_lock_: 
             # Extract and update landmarks and poses
@@ -452,8 +457,8 @@ class BaseSLAM(object):
         #     self.save_dot_graph("slam_graph.dot")
 
     def _update_marginals(self): 
-        if not self.estimate_available: 
-            return 
+        if not self.estimate_available:
+            raise RuntimeError('Estimate unavailable, call update first')
 
         # Retrieve marginals for each of the poses
         with self.slam_lock_: 

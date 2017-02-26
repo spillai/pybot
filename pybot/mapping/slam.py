@@ -188,8 +188,12 @@ class BaseSLAM(_BaseSLAM):
         self._update_estimates()
         self._update_marginals()
 
-    def finish(self): 
-        for j in range(10): 
+    def batch_solve(self):
+        self._batch_solve()
+        self._update_estimates()
+        
+    def finish(self, iterations=10): 
+        for j in range(iterations): 
             self.update()
 
 class BaseSLAMWithViz(BaseSLAM): 
