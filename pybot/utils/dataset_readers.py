@@ -247,7 +247,7 @@ class ImageDatasetReader(DatasetReader):
 
     @staticmethod
     def from_filenames(files, **kwargs): 
-        return DatasetReader(process_cb=ImageDatasetReader.imread_process_cb(), files=files, **kwargs)
+        return DatasetReader(process_cb=ImageDatasetReader.imread_process_cb(**kwargs), files=files)
 
     @staticmethod
     def from_directory(directory, pattern='*.png', **kwargs):
