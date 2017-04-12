@@ -29,12 +29,6 @@ def kitti_stereo_calib(sequence, scale=1.0):
     else:
         return None
 
-# def kitti_stereo_calib_params(scale=1.0): 
-#     f = 718.856*scale
-#     cx, cy = 607.192*scale, 185.2157*scale
-#     baseline_px = 386.1448 * scale
-#     return get_calib_params(f, f, cx, cy, baseline_px=baseline_px)
-
 def kitti_load_poses(fn): 
     X = (np.fromfile(fn, dtype=np.float64, sep=' ')).reshape(-1,12)
     return map(lambda p: RigidTransform.from_Rt(p[:3,:3], p[:3,3]), 
@@ -105,10 +99,11 @@ class KITTIDatasetReader(object):
                                                     baseline_px=379.8145, shape=np.int32([376, 1241]))
     baseline = 0.5371 # baseline_px / fx
     velo2cam = 0.27 # Velodyne is 27 cm behind cam_0 (x-forward, y-left, z-up)
-    height = 1.65
+    velo_height = 1.73
+    cam_height = 1.65
     
     p_bc = RigidTransform.from_rpyxyz(-np.pi/2, 0, -np.pi/2, 0, 0, 0, axes='sxyz').inverse()
-    p_bv = RigidTransform.from_rpyxyz(0, 0, 0, 0.27, 0, 1.65)
+    p_bv = RigidTransform.from_rpyxyz(0, 0, 0, -0.27, 0, 0, axes='sxyz')
     
     velodyne2body = p_bv
     camera2body = p_bc
