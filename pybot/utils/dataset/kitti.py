@@ -97,6 +97,8 @@ class KITTIDatasetReader(object):
                                                  baseline_px=387.5744, shape=np.int32([376, 1241]))
     kitti_04_12 = StereoCamera.from_calib_params(707.0912, 707.0912, 601.8873, 183.1104, 
                                                     baseline_px=379.8145, shape=np.int32([376, 1241]))
+
+    wheel_baseline = 1.6
     baseline = 0.5371 # baseline_px / fx
     velo2cam = 0.27 # Velodyne is 27 cm behind cam_0 (x-forward, y-left, z-up)
     velo_height = 1.73
@@ -157,7 +159,7 @@ class KITTIDatasetReader(object):
 
     @property
     def poses(self):
-        return self.poses_
+        return self.poses_.items
         
     def iteritems(self, *args, **kwargs): 
         return self.stereo.left.iteritems(*args, **kwargs)
@@ -179,12 +181,12 @@ class KITTIDatasetReader(object):
 
     def iterframes(self, *args, **kwargs): 
         for (left, right), pose, velodyne in izip(self.iter_stereo_frames(*args, **kwargs),
-                                                  self.poses.iteritems(*args, **kwargs),
+                                                  self.poses_.iteritems(*args, **kwargs),
                                                   self.velodyne.iteritems(*args, **kwargs)): 
             yield AttrDict(left=left, right=right, velodyne=velodyne, pose=pose)
 
     def iter_gt_frames(self, *args, **kwargs): 
-        for (left, right), pose in izip(self.iter_stereo_frames(*args, **kwargs), self.poses.iteritems(*args, **kwargs)): 
+        for (left, right), pose in izip(self.iter_stereo_frames(*args, **kwargs), self.poses_.iteritems(*args, **kwargs)): 
             yield AttrDict(left=left, right=right, velodyne=None, pose=pose)
             
     @property
