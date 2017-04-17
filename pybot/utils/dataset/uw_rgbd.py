@@ -320,6 +320,10 @@ class UWRGBDSceneDataset(UWRGBDDataset):
                          if aligned_file is not None and version == 'v2' else [None] * len(self.rgb_files)
             assert(len(self.poses) == len(self.rgb_files))
 
+            # Camera
+            intrinsic = CameraIntrinsic(K=UWRGBDSceneDataset.camera_params.K_rgb, shape=UWRGBDDataset.default_rgb_shape)
+            self.camera = Camera.from_intrinsics_extrinsics(intrinsic, CameraExtrinsic.identity())
+            
             # Aligned point cloud
             if aligned_file is not None: 
                 if version != 'v2': 
@@ -333,11 +337,9 @@ class UWRGBDSceneDataset(UWRGBDDataset):
 
                 # Get object info
                 object_info = UWRGBDSceneDataset._reader.cluster_ply_labels(ply_xyz[::30], ply_rgb[::30], ply_label[::30])
-
+                
                 # Add camera info
-                intrinsic = CameraIntrinsic(K=UWRGBDSceneDataset.camera_params.K_rgb, shape=UWRGBDDataset.default_rgb_shape)
-                camera = Camera.from_intrinsics_extrinsics(intrinsic, CameraExtrinsic.identity())
-                self.map_info = AttrDict(camera=camera, objects=object_info)
+                self.map_info = AttrDict(camera=self.camera, objects=object_info)
 
                 # # 1c. Determine centroid of each cluster
                 # unique_centers = np.vstack([np.mean(ply_xyz[ply_label == l], axis=0) for l in unique_labels])
@@ -695,6 +697,7 @@ class UWRGBDSceneDataset(UWRGBDDataset):
         meta_file = self.meta_.get(key, None)
         aligned_file = self.aligned_.get(key, None) if (self.aligned_ and with_ground_truth) else None
 
+        print('Initializing scene {} WITH{} ground truth'.format(key, '' if with_ground_truth else 'OUT'))        
         return UWRGBDSceneDataset._reader(files, meta_file, aligned_file, self.version, key) 
 
     @property

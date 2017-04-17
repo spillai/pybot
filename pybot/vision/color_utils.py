@@ -11,7 +11,6 @@ from matplotlib.colors import colorConverter, ListedColormap
 def colormap(im, min_threshold=0.01):
     mask = im<min_threshold
     if im.ndim == 1: 
-        print im
         hsv = np.zeros((len(im), 3), dtype=np.uint8)
         hsv[:,0] = (im * 180).astype(np.uint8)
         hsv[:,1] = 255

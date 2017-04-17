@@ -94,8 +94,8 @@ class Keyframe(object):
     def from_KeyframeData(cls, kf, is_sim3=False):
         kf_id = kf.getId()
         pose = kf.getPose()
-        kf_pose = Sim3.from_homogenous_matrix(pose) if is_sim3 else \
-                RigidTransform.from_homogenous_matrix(pose)        
+        kf_pose = Sim3.from_matrix(pose) if is_sim3 else \
+                RigidTransform.from_matrix(pose)        
         kf_pose.id = kf_id
 
         points = kf.getPoints()
@@ -111,7 +111,7 @@ class Keyframe(object):
 
         # k_id = kf.getId()
         # f_id = kf.getFrameId()
-        # pose_cw = RigidTransform.from_homogenous_matrix(kf.getPose())
+        # pose_cw = RigidTransform.from_matrix(kf.getPose())
         # pose_wc = pose_cw.inverse()
         # cloud_w = kf.getPoints()
         # # cloud_c = pose_cw * cloud_w
@@ -173,7 +173,7 @@ class Mapper(object):
     mapper.add_pose(p_wc)
 
     """
-    __metaclass__ = ABCMeta
+    # __metaclass__ = ABCMeta
 
     def __init__(self, poses=[], keyframes=OrderedDict(), 
                  incremental=True, update_kf_rate=10, 
@@ -272,8 +272,7 @@ class Mapper(object):
             kf_poses = self.dirty_keyframe_poses
             kf_pts = self.dirty_points
             kf_cols = self.dirty_colors
-
-            print 'kf_poses, kf_ids', len(kf_poses), len(kf_ids)
+            # print 'kf_poses, kf_ids', len(kf_poses), len(kf_ids)
 
             # Draw all the dirty keyframes
             draw_utils.publish_cameras(self.name_ + '_keyframes_cams', kf_poses, draw_faces=False, 
@@ -383,15 +382,10 @@ class MultiViewMapper(Mapper):
       2. Increased patch size in svo depth filter to 16 from 8
     
     """
-    # default_params = AttrDict(
-    #     K = np.array([[528.49404721, 0, 319.5], 
-    #                   [0, 528.49404721, 239.5],
-    #                   [0, 0, 1]], dtype=np.float64), 
-    #     W = 640, H = 480, gridSize=30, nPyrLevels=3, max_n_kfs=4
-    # )
-    def __init__(self, K, W, H, gridSize=30, nPyrLevels=1, max_n_kfs=4, kf_every=5): 
+    def __init__(self, K, W, H, gridSize=30, nPyrLevels=1, max_n_kfs=4, kf_theta=np.deg2rad(20), kf_displacement=0.25): 
         Mapper.__init__(self)
 
+        # SVO Depth Filter (Dependency)
         from pybot_externals import SVO_DepthFilter
         self.depth_filter = SVO_DepthFilter(np.float64(K), int(W), int(H), 
                                             gridSize=gridSize, nPyrLevels=nPyrLevels, max_n_kfs=max_n_kfs)
@@ -400,8 +394,9 @@ class MultiViewMapper(Mapper):
         
         self.mosaics_ = {}
 
-        self.kf_every = kf_every
-        self.idx = 0
+        self.last_kf_inv = None
+        self.kf_theta = kf_theta
+        self.kf_displacement = kf_displacement
 
     def load(self, path):
         db = AttrDict.load(path)
@@ -425,7 +420,7 @@ class MultiViewMapper(Mapper):
             self.mosaics_[kf.id] = kf.visualize(self.cam_intrinsic_)
 
         if len(self.mosaics_): 
-            imshow_cv('kfs', im_mosaic_list(self.mosaics_.values(), scale=0.5))        
+            imshow_cv('kfs', im_mosaic_list(self.mosaics_.values(), scale=0.75))        
 
         # print 'Updated IDS: ', [kf.getId() for kf in kf_data]
         # print 'Dirty IDS: ', [(kf.id, kf.dirty) for kf in self.keyframes.itervalues()]
@@ -435,9 +430,21 @@ class MultiViewMapper(Mapper):
         Incremental reconstruction of the map, given keyframe
         poses and the corresponding image
         """
+
+        # Check if new frame has rotated at-least by theta or moved by displacement
+        if self.last_kf_inv is not None:
+            newp = self.last_kf_inv * pose_wc
+            d, r = np.linalg.norm(newp.tvec), np.fabs(newp.to_rpyxyz()[:3])
+            is_new_kf = not bool(d < self.kf_displacement and (r < self.kf_theta).all())
+        else:
+            is_new_kf = True
+
+        # Set new pose inverse
+        if is_new_kf:
+            self.last_kf_inv = pose_wc.inverse()
+
         # Only process once for semi-dense depth estimation
-        self.depth_filter.process(img, (pose_wc.matrix).astype(np.float64), 
-                                  self.idx % self.kf_every == 0)
+        self.depth_filter.process(img, (pose_wc.matrix).astype(np.float64), is_new_kf)
         imshow_cv('kf_img', img)
 
         # Add pose
@@ -452,8 +459,6 @@ class MultiViewMapper(Mapper):
         #     draw_utils.publish_cloud('depth_keyframe_cloud', cloud, c=colors, frame_id='camera')
         # except Exception as e: 
         #     print e
-
-        self.idx += 1
         
     def run(self):
         """
