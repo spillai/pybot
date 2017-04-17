@@ -18,8 +18,7 @@ from pybot.utils.db_utils import AttrDict
 from pybot.utils.dataset_readers import read_dir, read_files, natural_sort, \
     DatasetReader, ImageDatasetReader
 from pybot.vision.draw_utils import annotate_bbox
-from pybot.vision.camera_utils import kinect_v1_params, \
-    Camera, CameraIntrinsic, CameraExtrinsic, \
+from pybot.vision.camera_utils import Camera, CameraIntrinsic, CameraExtrinsic, \
     check_visibility, get_object_bbox
 
 from pybot.geometry.rigid_transform import Quaternion, RigidTransform
@@ -39,6 +38,19 @@ def create_roidb_item(f):
 # =====================================================================
 # Generic UW-RGBD Dataset class
 # ---------------------------------------------------------------------
+
+kinect_v1_params = AttrDict(
+    K_depth = np.array([[576.09757860, 0, 319.5],
+                        [0, 576.09757860, 239.5],
+                        [0, 0, 1]], dtype=np.float64), 
+    K_rgb = np.array([[528.49404721, 0, 319.5],
+                      [0, 528.49404721, 239.5],
+                      [0, 0, 1]], dtype=np.float64), 
+    H = 480, W = 640, 
+    shift_offset = 1079.4753, 
+    projector_depth_baseline = 0.07214
+)
+
 
 class UWRGBDDataset(object): 
     default_rgb_shape = (480,640,3)
@@ -763,7 +775,7 @@ def test_uw_rgbd_scene(version='v1'):
         vis = rgbd_data_uw.annotate(f)
         imshow_cv('frame', np.hstack([f.img, vis]), text='Image')
         imshow_cv('depth', (f.depth / 16).astype(np.uint8), text='Depth')
-        cv2.waitKey(100)
+        cv2.waitKey(10)
 
     return rgbd_data_uw
 

@@ -6,24 +6,12 @@ import cv2
 import numpy as np
 from numpy.linalg import det, norm
 import numpy.matlib as npm
-from scipy import linalg
+from scipy.linalg import svd
 
 from pybot.vision.color_utils import get_color_by_label
 from pybot.vision.image_utils import to_color
 from pybot.utils.db_utils import AttrDict
 from pybot.geometry.rigid_transform import Quaternion, RigidTransform
-
-kinect_v1_params = AttrDict(
-    K_depth = np.array([[576.09757860, 0, 319.5],
-                        [0, 576.09757860, 239.5],
-                        [0, 0, 1]], dtype=np.float64), 
-    K_rgb = np.array([[528.49404721, 0, 319.5],
-                      [0, 528.49404721, 239.5],
-                      [0, 0, 1]], dtype=np.float64), 
-    H = 480, W = 640, 
-    shift_offset = 1079.4753, 
-    projector_depth_baseline = 0.07214
-)
 
 def colvec(vec): 
     """ Convert to column vector """
@@ -724,9 +712,6 @@ class StereoCamera(Camera):
 
     def save(self, filename): 
         raise NotImplementedError()
-
-def KinectCamera(R=npm.eye(3), t=npm.zeros(3)): 
-    return Camera(kinect_v1_params.K_depth, R, t)
 
 class DepthCamera(CameraIntrinsic): 
     def __init__(self, K, shape=(480,640), skip=1, D=np.zeros(5, dtype=np.float64)):

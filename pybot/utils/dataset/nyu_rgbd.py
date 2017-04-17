@@ -18,8 +18,7 @@ from pybot.utils.db_utils import AttrDict
 from pybot.utils.dataset_readers import read_dir, read_files, natural_sort, \
     DatasetReader, ImageDatasetReader
 from pybot.vision.draw_utils import annotate_bbox
-from pybot.vision.camera_utils import kinect_v1_params, \
-    Camera, CameraIntrinsic, CameraExtrinsic, \
+from pybot.vision.camera_utils import Camera, CameraIntrinsic, CameraExtrinsic, \
     check_visibility, get_object_bbox
 
 from pybot.geometry.rigid_transform import Quaternion, RigidTransform
