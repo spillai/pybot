@@ -839,11 +839,11 @@ def check_visibility(camera, pts_w, zmin=0, zmax=100):
     z = pts_c[:,2]
     v = pts_c / np.linalg.norm(pts_c, axis=1).reshape(-1, 1)
     hangle, vangle = np.arctan2(v[:,0], v[:,2]), np.arctan2(-v[:,1], v[:,2])
-
+    
     # Provides inds mask for all points that are within fov
-    return np.fabs(hangle) < camera.fov[0] * 0.5 and \
-        np.fabs(vangle) < camera.fov[1] * 0.5 and \
-        z >= zmin and z <= zmax
+    return np.bitwise_and.reduce([np.fabs(hangle) < camera.fov[0] * 0.5,
+                                  np.fabs(vangle) < camera.fov[1] * 0.5,
+                                  z >= zmin, z <= zmax])
 
 def get_median_depth(camera, pts, subsample=10): 
     """ 

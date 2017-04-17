@@ -658,8 +658,8 @@ class UWRGBDSceneDataset(UWRGBDDataset):
 
 
     def iteritems(self, every_k_frames=1, verbose=False, with_ground_truth=False): 
-        
-        print 'Scenes: %i %s, With GT: {}' % (len(self.scenes()), self.scenes(), with_ground_truth)
+        print self.scenes(), with_ground_truth
+        print 'Scenes ({}): {}, With GT: {}'.format(len(self.scenes()), ','.join(self.scenes()), with_ground_truth)
         for key, scene in progressbar(
                 self.iterscenes(verbose=verbose, with_ground_truth=with_ground_truth), 
                 size=len(self.scenes()), verbose=verbose): 
