@@ -51,7 +51,6 @@ kinect_v1_params = AttrDict(
     projector_depth_baseline = 0.07214
 )
 
-
 class UWRGBDDataset(object): 
     default_rgb_shape = (480,640,3)
     default_depth_shape = (480,640)
@@ -670,11 +669,10 @@ class UWRGBDSceneDataset(UWRGBDDataset):
 
 
     def iteritems(self, every_k_frames=1, verbose=False, with_ground_truth=False): 
-        print self.scenes(), with_ground_truth
-        print 'Scenes ({}): {}, With GT: {}'.format(len(self.scenes()), ','.join(self.scenes()), with_ground_truth)
+        print 'Scenes ({}): {}, With GT: {}'.format(len(self.scenes), ','.join(self.scenes), with_ground_truth)
         for key, scene in progressbar(
                 self.iterscenes(verbose=verbose, with_ground_truth=with_ground_truth), 
-                size=len(self.scenes()), verbose=verbose): 
+                size=len(self.scenes), verbose=verbose): 
             for frame in scene.iteritems(every_k_frames=every_k_frames): 
                 yield frame
             # break
@@ -699,6 +697,7 @@ class UWRGBDSceneDataset(UWRGBDDataset):
 
         return UWRGBDSceneDataset._reader(files, meta_file, aligned_file, self.version, key) 
 
+    @property
     def scenes(self): 
         return self.dataset_.keys()
 

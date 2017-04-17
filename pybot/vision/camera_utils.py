@@ -772,10 +772,6 @@ class RGBDCamera(object):
     def baseline(self): 
         return self.baseline_
 
-
-def KinectDepthCamera(K=kinect_v1_params.K_depth, shape=(480,640)): 
-    return DepthCamera(K=K, shape=shape)
-
 def compute_fundamental(x1, x2, method=cv2.FM_RANSAC): 
     """
     Computes the fundamental matrix from corresponding points x1, x2 using
