@@ -20,7 +20,7 @@ from collections import OrderedDict
 
 from pybot.geometry.rigid_transform import Pose, RigidTransform, Sim3
 from pybot.utils.db_utils import AttrDict
-from pybot.utils.misc import CounterWithPeriodicCallback
+from pybot.utils.misc import dequedict, CounterWithPeriodicCallback
 from pybot.vision.color_utils import colormap
 from pybot.vision.imshow_utils import imshow_cv
 from pybot.vision.image_utils import to_color, im_mosaic_list
@@ -391,9 +391,7 @@ class MultiViewMapper(Mapper):
                                             gridSize=gridSize, nPyrLevels=nPyrLevels, max_n_kfs=max_n_kfs)
         self.cam_intrinsic_ = CameraIntrinsic(K, shape=(int(H), int(W)))
 
-        
-        self.mosaics_ = {}
-
+        self.mosaics_ = dequedict(maxlen=9)
         self.last_kf_inv = None
         self.kf_theta = kf_theta
         self.kf_displacement = kf_displacement
@@ -416,7 +414,6 @@ class MultiViewMapper(Mapper):
         for kfj in kf_data:
             kf = Keyframe.from_KeyframeData(kfj)
             self.update_keyframe(kf)
-
             self.mosaics_[kf.id] = kf.visualize(self.cam_intrinsic_)
 
         if len(self.mosaics_): 
