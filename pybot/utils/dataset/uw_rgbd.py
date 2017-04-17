@@ -21,7 +21,7 @@ from pybot.vision.draw_utils import annotate_bbox
 from pybot.vision.camera_utils import Camera, CameraIntrinsic, CameraExtrinsic, \
     check_visibility, get_object_bbox
 
-from pybot.geometry.rigid_transform import Quaternion, RigidTransform
+from pybot.geometry.rigid_transform import Quaternion, RigidTransform, Pose
 from pybot.externals.plyfile import PlyData
 
 # __categories__ = ['flashlight', 'cap', 'cereal_box', 'coffee_mug', 'soda_can']
@@ -756,7 +756,8 @@ def test_uw_rgbd_object():
 def test_uw_rgbd_scene(version='v1'): 
     from pybot.vision.image_utils import to_color
     from pybot.vision.imshow_utils import imshow_cv
-
+    from pybot.externals.lcm.draw_utils import publish_pose_list
+    
     v1_directory = '/media/spillai/MRG-HD1/data/rgbd-scenes-v1/'
     v2_directory = '/media/spillai/MRG-HD1/data/rgbd-scenes-v2/rgbd-scenes-v2/'
 
@@ -770,10 +771,11 @@ def test_uw_rgbd_scene(version='v1'):
         raise RuntimeError('''Version %s not supported. '''
                            '''Check dataset and choose v1/v2 scene dataset''' % version)
 
-    for f in rgbd_data_uw.iteritems(every_k_frames=5, with_ground_truth=True): 
+    for idx, f in enumerate(rgbd_data_uw.iteritems(every_k_frames=5, with_ground_truth=True)): 
         vis = rgbd_data_uw.annotate(f)
         imshow_cv('frame', np.hstack([f.img, vis]), text='Image')
         imshow_cv('depth', (f.depth / 16).astype(np.uint8), text='Depth')
+        publish_pose_list('poses', [Pose.from_rigid_transform(idx, f.pose)], frame_id='camera', reset=False)
         cv2.waitKey(10)
 
     return rgbd_data_uw
