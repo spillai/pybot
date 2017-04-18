@@ -391,16 +391,21 @@ class MultiViewMapper(Mapper):
            mv_mapper.process(f.img, f.pose)
                
     """
-    def __init__(self, K, W, H, gridSize=30, nPyrLevels=1, max_n_kfs=4, kf_theta=np.deg2rad(20), kf_displacement=0.25): 
+    def __init__(self, K, W, H, gridSize=30, nPyrLevels=1, max_n_kfs=4,
+                 kf_theta=np.deg2rad(20), kf_displacement=0.25, detector='edge',
+                 use_photometric_disparity_error=False, verbose=False): 
         Mapper.__init__(self)
 
         # SVO Depth Filter (Dependency)
         from pybot_externals import SVO_DepthFilter
         self.depth_filter = SVO_DepthFilter(np.float64(K), int(W), int(H), 
-                                            gridSize=gridSize, nPyrLevels=nPyrLevels, max_n_kfs=max_n_kfs)
+                                            gridSize=gridSize, nPyrLevels=nPyrLevels,
+                                            max_n_kfs=max_n_kfs, detector=detector,
+                                            use_photometric_disparity_error=use_photometric_disparity_error,
+                                            verbose=verbose)
         self.cam_intrinsic_ = CameraIntrinsic(K, shape=(int(H), int(W)))
 
-        self.mosaics_ = dequedict(maxlen=9)
+        self.mosaics_ = dequedict(maxlen=max_n_kfs)
         self.last_kf_inv = None
         self.kf_theta = kf_theta
         self.kf_displacement = kf_displacement
