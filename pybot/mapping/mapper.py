@@ -136,7 +136,7 @@ class Keyframe(object):
         pts, depths = cam.project(self.points_, check_bounds=True, return_depth=True)
 
         colors = np.int64(colormap(depths.astype(np.float32) / 32.0).reshape(-1,3))        
-        return draw_features(vis, pts, colors=colors, size=6)
+        return draw_features(vis, pts, colors=colors, size=4)
 
 class Mapper(object): 
     """ 
@@ -380,7 +380,16 @@ class MultiViewMapper(Mapper):
     Notes: 
       1. Only reconstruct semi-densely after first 5 keyframes
       2. Increased patch size in svo depth filter to 16 from 8
-    
+
+    Use as: 
+
+    >> mv_mapper = MultiViewMapper(cam.K, cam.shape[1], cam.shape[0], gridSize=10, nPyrLevels=1, max_n_kfs=4,
+                                   kf_displacement=0.25, kf_theta=np.deg2rad(15))
+
+    # Reconstruct scene
+    >> for fidx, f in enumerate(scene.iteritems(every_k_frames=1)):
+           mv_mapper.process(f.img, f.pose)
+               
     """
     def __init__(self, K, W, H, gridSize=30, nPyrLevels=1, max_n_kfs=4, kf_theta=np.deg2rad(20), kf_displacement=0.25): 
         Mapper.__init__(self)
