@@ -434,7 +434,7 @@ def publish_tags(pub_channel, poses, c='g', texts=[], covars=[], frame_id='camer
                           frame_id=frame_id, element_id=element_id, reset=reset)
 
 def publish_cameras(pub_channel, poses, c='y', texts=[], covars=[], frame_id='camera', 
-                    draw_faces=False, draw_edges=True, draw_nodes=False, size=1, zmin=0.01, zmax=0.5, reset=True):
+                    draw_faces=False, draw_edges=True, draw_nodes=False, size=1, zmin=0, zmax=0.5, reset=True):
     cam_feats = [draw_camera(pose, zmin=zmin * size, zmax=zmax * size) for pose in poses]
     cam_faces = map(lambda x: x[0], cam_feats)
     cam_edges = map(lambda x: x[1], cam_feats)

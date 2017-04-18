@@ -36,59 +36,62 @@ class Keyframe(object):
     Most variables are persistent except for {dirty_}.
     Only pose, points, colors should be allowed to
     be modified. 
+
+        id, frame_id, pose, points, colors, img
+
     """
-    def __init__(self, kf_id, frame_id, pose, points=None, colors=None, img=None): 
-        self.id_ = kf_id
-        self.frame_id_ = frame_id
-        self.pose_ = pose
-        self.points_ = points
-        self.colors_ = colors
-        self.img_ = img
+    def __init__(self, **kwargs):
+        self.data_ = AttrDict(**kwargs)
+
+        # self.id_ = kf_id
+        # self.frame_id_ = frame_id
+        # self.pose_ = pose
+        # self.points_ = points
+        # self.colors_ = colors
+        # self.img_ = img
 
     @property
     def id(self): 
-        return self.id_
+        return self.data_.id
 
     @property
     def frame_id(self): 
-        return self.frame_id_
+        return self.data_.frame_id
 
     @property
     def pose(self): 
-        return self.pose_
+        return self.data_.pose
 
     @property
     def points(self): 
-        return self.points_
+        return self.data_.points
 
     @property
     def colors(self): 
-        return self.colors_
+        return self.data_.colors
 
     @property
     def img(self): 
-        return self.img_
+        return self.data_.img
 
     @pose.setter
     def pose(self, pose): 
-        self.pose_ = pose
+        self.data_.pose = pose
 
     @points.setter
     def points(self, points): 
-        self.points_ = points
+        self.data_.points = points
 
     @colors.setter
     def colors(self, colors): 
-        self.colors_ = colors
+        self.data_.colors = colors
 
     @classmethod
     def from_dict(self, d): 
-        return cls(d.id, d.frame_id, d.pose, d.points, d.colors, d.img)
+        return cls(**d)
 
     def to_dict(self, d): 
-        return AttrDict(id=self.id, frame_id=self.frame_id, 
-                        pose=Pose.from_rigid_transform(self.id, self.pose), 
-                        points=self.points, colors=self.colors, img=self.img)
+        return self.data_
 
     @classmethod
     def from_KeyframeData(cls, kf, is_sim3=False):
@@ -105,19 +108,10 @@ class Keyframe(object):
             colors = (np.tile([0,0,1.0], [len(points),1])).astype(np.float32)
 
         assert(len(points) == len(colors))
-        return cls(kf_id, kf.getFrameId(), 
-                   pose=kf_pose, points=points, colors=colors, img=kf.getImage())
+        return cls(id=kf_id, frame_id=kf.getFrameId(), 
+                   pose=kf_pose, points=points, colors=colors,
+                   img=kf.getImage(), points2d=kf.getPoints2d(), kf_ids=kf.getKFIds())
 
-
-        # k_id = kf.getId()
-        # f_id = kf.getFrameId()
-        # pose_cw = RigidTransform.from_matrix(kf.getPose())
-        # pose_wc = pose_cw.inverse()
-        # cloud_w = kf.getPoints()
-        # # cloud_c = pose_cw * cloud_w
-        # colors = (np.tile([0,0,1.0], [len(cloud_w),1])).astype(np.float32)
-        # print k_id, len(cloud_w), len(cloud_c)
-    
     def on_changed(self):
         """
         Define callbacks on new updates to keyframe 
@@ -126,14 +120,14 @@ class Keyframe(object):
         raise NotImplementedError()
 
     def visualize(self, camera_intrinsic): 
-        if self.img_ is None: 
+        if self.img is None: 
             raise RuntimeError('Keyframe image is not available to visualize')
 
-        vis = to_color(self.img_)
+        vis = to_color(self.img)
         cam = Camera.from_intrinsics_extrinsics(camera_intrinsic, 
                                                 CameraExtrinsic.identity())
 
-        pts, depths = cam.project(self.points_, check_bounds=True, return_depth=True)
+        pts, depths = cam.project(self.points, check_bounds=True, return_depth=True)
 
         colors = np.int64(colormap(depths.astype(np.float32) / 32.0).reshape(-1,3))        
         return draw_features(vis, pts, colors=colors, size=4)
@@ -216,8 +210,19 @@ class Mapper(object):
               '''Publish (every={:})\n''' \
               '''=============================\n''' \
                 .format(update_kf_rate, publish_rate))
+        
+    @abstractmethod
+    def update_keyframes(self):
+        """ 
+        Abstract method to update the map with keyframe data
 
-
+        keyframes_ need to be
+        updated based on new information, call
+        update_kf on a per-keyframe basis        
+        
+        """
+        raise NotImplementedError()
+        
     def add_pose(self, pose): 
         """
         Add poses to the map
@@ -232,23 +237,6 @@ class Mapper(object):
         # Counter increment for publishing, kf updates
         self.publish_cb_.poll()
         self.update_kf_cb_.poll()
-
-    def update_keyframe(self, kf): 
-        # Add keyframe and set dirty (for publishing)
-        self.keyframes_[kf.id] = kf
-        self.keyframes_dirty_[kf.id] = True
-        
-    @abstractmethod
-    def update_keyframes(self):
-        """ 
-        Abstract method to update the map with keyframe data
-
-        keyframes_ need to be
-        updated based on new information, call
-        update_kf on a per-keyframe basis        
-        
-        """
-        raise NotImplementedError()
         
     def fetch_keyframe(self, frame_id): 
         return self.keyframes_[self.keyframes_lut_[frame_id]]
@@ -410,28 +398,19 @@ class MultiViewMapper(Mapper):
         self.kf_theta = kf_theta
         self.kf_displacement = kf_displacement
 
-    def load(self, path):
-        db = AttrDict.load(path)
-        keyframes = OrderedDict({kf.id:kf for kf in db.keyframes})
-        Mapper.__init__(self, db.poses, keyframes)
-
-    def save(self, path): 
-        print 'Saving keyframe ids: ', self.keyframes.keys()
-        db = AttrDict(poses=self.poses, 
-                      keyframes=self.keyframes.values())
-        db.save(path)
-
     def update_keyframes(self):
         """ Process/Update Keyframe data """
 
+        # Add keyframe and set dirty (for publishing)
         kf_data = self.depth_filter.getKeyframeGraph()
         for kfj in kf_data:
             kf = Keyframe.from_KeyframeData(kfj)
-            self.update_keyframe(kf)
+            self.keyframes_[kf.id] = kf
+            self.keyframes_dirty_[kf.id] = True
             self.mosaics_[kf.id] = kf.visualize(self.cam_intrinsic_)
 
         if len(self.mosaics_): 
-            imshow_cv('kfs', im_mosaic_list(self.mosaics_.values(), scale=0.75))        
+            imshow_cv('kfs', im_mosaic_list(self.mosaics_.values(), scale=0.75, width=3))        
 
         # print 'Updated IDS: ', [kf.getId() for kf in kf_data]
         # print 'Dirty IDS: ', [(kf.id, kf.dirty) for kf in self.keyframes.itervalues()]
@@ -458,18 +437,8 @@ class MultiViewMapper(Mapper):
         self.depth_filter.process(img, (pose_wc.matrix).astype(np.float64), is_new_kf)
         imshow_cv('kf_img', img)
 
-        # Add pose
+        # Add pose (polls publish_cb and update_kf_cb) 
         self.add_pose(pose_wc)
-
-        # self.update_keyframes()
-        # try: 
-        #     cloud = self.depth_filter.getPoints()
-        #     print 'Cloud', len(cloud)
-        #     colors = (self.depth_filter.getColors() * 1.0 / 255).astype(np.float32)
-        #     # colors = (np.tile([1.0,0,0], [len(cloud),1])).astype(np.float32)
-        #     draw_utils.publish_cloud('depth_keyframe_cloud', cloud, c=colors, frame_id='camera')
-        # except Exception as e: 
-        #     print e
         
     def run(self):
         """
@@ -495,3 +464,14 @@ class MultiViewMapper(Mapper):
         # HACK: save to first keyframe
         self.keyframes[0].points = self.depth_filter.getPoints()
         self.keyframes[0].colors = (self.depth_filter.getColors() * 1.0 / 255).astype(np.float32)
+
+    def load(self, path):
+        db = AttrDict.load(path)
+        keyframes = OrderedDict({kf.id:kf for kf in db.keyframes})
+        Mapper.__init__(self, db.poses, keyframes)
+
+    def save(self, path): 
+        print 'Saving keyframe ids: ', self.keyframes.keys()
+        db = AttrDict(poses=self.poses, 
+                      keyframes=self.keyframes.values())
+        db.save(path)
