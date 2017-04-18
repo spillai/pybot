@@ -1,5 +1,9 @@
 """
 UW-RGB-D Object/Scene Dataset reader
+
+Annotations: 
+see uw_annotation_conversion.py
+
 """
 
 # Author: Sudeep Pillai <spillai@csail.mit.edu>
@@ -20,7 +24,6 @@ from pybot.utils.dataset_readers import read_dir, read_files, natural_sort, \
 from pybot.vision.draw_utils import annotate_bbox
 from pybot.vision.camera_utils import Camera, CameraIntrinsic, CameraExtrinsic, \
     construct_K, check_visibility, get_object_bbox
-
 from pybot.geometry.rigid_transform import Quaternion, RigidTransform, Pose
 from pybot.externals.plyfile import PlyData
 
@@ -54,7 +57,8 @@ kinect_v1_params = AttrDict(
 class UWRGBDDataset(object): 
     default_rgb_shape = (480,640,3)
     default_depth_shape = (480,640)
-    fx = 570.3
+    dfx = 570.3
+    fx = 528.5 
     calib = CameraIntrinsic(
         K=construct_K(fx=fx, fy=fx,
                       cx=default_rgb_shape[1]/2-0.5, cy=default_rgb_shape[0]/2-0.5),
@@ -325,7 +329,7 @@ class UWRGBDSceneDataset(UWRGBDDataset):
 
             # Camera
             intrinsic = UWRGBDSceneDataset.calib
-            self.camera = Camera.from_intrinsics_extrinsics(intrinsic, CameraExtrinsic.identity())
+            camera = Camera.from_intrinsics_extrinsics(intrinsic, CameraExtrinsic.identity())
             
             # Aligned point cloud
             if aligned_file is not None: 
@@ -342,7 +346,7 @@ class UWRGBDSceneDataset(UWRGBDDataset):
                 object_info = UWRGBDSceneDataset._reader.cluster_ply_labels(ply_xyz[::30], ply_rgb[::30], ply_label[::30])
                 
                 # Add camera info
-                self.map_info = AttrDict(camera=self.camera, objects=object_info)
+                self.map_info = AttrDict(camera=camera, objects=object_info)
 
                 # # 1c. Determine centroid of each cluster
                 # unique_centers = np.vstack([np.mean(ply_xyz[ply_label == l], axis=0) for l in unique_labels])
