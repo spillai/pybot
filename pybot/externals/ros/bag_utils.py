@@ -341,10 +341,6 @@ class ROSBagReader(LogReader):
     #         self.gt_poses.append(RigidTransform(xyzw=[ori.x,ori.y,ori.z,ori.w], tvec=[tvec.x,tvec.y,tvec.z]))
             
     #     print('Finished publishing gazebo states {:}'.format(len(self.gt_poses)))
-        
-    #     # import pybot.externals.draw_utils as draw_utils
-    #     # draw_utils.publish_pose_list('robot_poses', 
-    #     #                              self.gt_poses[::10], frame_id='origin', reset=True)
 
     def length(self, topic): 
         info = self.log.get_type_and_topic_info()
