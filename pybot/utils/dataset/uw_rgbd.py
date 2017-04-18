@@ -19,7 +19,7 @@ from pybot.utils.dataset_readers import read_dir, read_files, natural_sort, \
     DatasetReader, ImageDatasetReader
 from pybot.vision.draw_utils import annotate_bbox
 from pybot.vision.camera_utils import Camera, CameraIntrinsic, CameraExtrinsic, \
-    check_visibility, get_object_bbox
+    construct_K, check_visibility, get_object_bbox
 
 from pybot.geometry.rigid_transform import Quaternion, RigidTransform, Pose
 from pybot.externals.plyfile import PlyData
@@ -54,8 +54,11 @@ kinect_v1_params = AttrDict(
 class UWRGBDDataset(object): 
     default_rgb_shape = (480,640,3)
     default_depth_shape = (480,640)
-    camera_params = kinect_v1_params
-    calib = CameraIntrinsic(K=kinect_v1_params.K_rgb, shape=default_rgb_shape[:2])
+    fx = 570.3
+    calib = CameraIntrinsic(
+        K=construct_K(fx=fx, fy=fx,
+                      cx=default_rgb_shape[1]/2-0.5, cy=default_rgb_shape[0]/2-0.5),
+        shape=default_rgb_shape[:2])
     class_names = ["apple", "ball", "banana", "bell_pepper", "binder", "bowl", "calculator", "camera", 
                    "cap", "cell_phone", "cereal_box", "coffee_mug", "comb", "dry_battery", "flashlight", 
                    "food_bag", "food_box", "food_can", "food_cup", "food_jar", "garlic", "glue_stick", 
@@ -321,7 +324,7 @@ class UWRGBDSceneDataset(UWRGBDDataset):
             assert(len(self.poses) == len(self.rgb_files))
 
             # Camera
-            intrinsic = CameraIntrinsic(K=UWRGBDSceneDataset.camera_params.K_rgb, shape=UWRGBDDataset.default_rgb_shape)
+            intrinsic = UWRGBDSceneDataset.calib
             self.camera = Camera.from_intrinsics_extrinsics(intrinsic, CameraExtrinsic.identity())
             
             # Aligned point cloud
