@@ -726,12 +726,11 @@ class DepthCamera(CameraIntrinsic):
         
     def _build_mesh(self, shape): 
         H, W = shape
-        xs,ys = np.arange(0,W), np.arange(0,H);
-        fx_inv = 1.0 / self.fx;
+        xs,ys = np.arange(0,W), np.arange(0,H)
 
-        self.xs = (xs-self.cx) * fx_inv
+        self.xs = (xs-self.cx) * 1.0 / self.fx
         self.xs = self.xs[::self.skip]
-        self.ys = (ys-self.cy) * fx_inv
+        self.ys = (ys-self.cy) * 1.0 / self.fy
         self.ys = self.ys[::self.skip]
 
         self.xs, self.ys = np.meshgrid(self.xs, self.ys);
