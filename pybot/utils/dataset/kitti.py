@@ -96,7 +96,7 @@ class KITTIDatasetReader(object):
     kitti_03 = StereoCamera.from_calib_params(721.5377, 721.5377, 609.5593, 172.854, 
                                                  baseline_px=387.5744, shape=np.int32([376, 1241]))
     kitti_04_12 = StereoCamera.from_calib_params(707.0912, 707.0912, 601.8873, 183.1104, 
-                                                    baseline_px=379.8145, shape=np.int32([376, 1241]))
+                                                    baseline_px=379.8145, shape=np.int32([370, 1226]))
 
     wheel_baseline = 1.6
     baseline = 0.5371 # baseline_px / fx

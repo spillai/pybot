@@ -43,13 +43,6 @@ class Keyframe(object):
     def __init__(self, **kwargs):
         self.data_ = AttrDict(**kwargs)
 
-        # self.id_ = kf_id
-        # self.frame_id_ = frame_id
-        # self.pose_ = pose
-        # self.points_ = points
-        # self.colors_ = colors
-        # self.img_ = img
-
     @property
     def id(self): 
         return self.data_.id
@@ -61,6 +54,10 @@ class Keyframe(object):
     @property
     def pose(self): 
         return self.data_.pose
+
+    @property
+    def ids(self): 
+        return self.data_.ids
 
     @property
     def points(self): 
@@ -109,7 +106,7 @@ class Keyframe(object):
 
         assert(len(points) == len(colors))
         return cls(id=kf_id, frame_id=kf.getFrameId(), 
-                   pose=kf_pose, points=points, colors=colors,
+                   pose=kf_pose, points=points, colors=colors, ids=kf.getPointIds(), 
                    img=kf.getImage(), points2d=kf.getPoints2d(), kf_ids=kf.getKFIds())
 
     def on_changed(self):
@@ -167,8 +164,6 @@ class Mapper(object):
     mapper.add_pose(p_wc)
 
     """
-    # __metaclass__ = ABCMeta
-
     def __init__(self, poses=[], keyframes=OrderedDict(), 
                  incremental=True, update_kf_rate=10, 
                  publish=True, publish_rate=10, name='SLAM'): 
@@ -404,6 +399,7 @@ class MultiViewMapper(Mapper):
         # Add keyframe and set dirty (for publishing)
         kf_data = self.depth_filter.getKeyframeGraph()
         for kfj in kf_data:
+            
             kf = Keyframe.from_KeyframeData(kfj)
             self.keyframes_[kf.id] = kf
             self.keyframes_dirty_[kf.id] = True
