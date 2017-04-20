@@ -7,6 +7,9 @@ Map the environment in a keyframe-based fashion.
 Persistent map storage. 
 Update and publish in an incremental manner. 
 
+
+Notes: kf_ids, kf_points2d, 
+
 """
 
 # Author: Sudeep Pillai <spillai@csail.mit.edu>
@@ -16,12 +19,14 @@ import os
 import numpy as np
 
 from abc import ABCMeta, abstractmethod
+from itertools import izip
 from collections import OrderedDict
 
 from pybot.geometry.rigid_transform import Pose, RigidTransform, Sim3
 from pybot.utils.db_utils import AttrDict
 from pybot.utils.misc import dequedict, CounterWithPeriodicCallback
 from pybot.vision.color_utils import colormap
+from pybot.vision.multiview import EpipolarViz
 from pybot.vision.imshow_utils import imshow_cv
 from pybot.vision.image_utils import to_color, im_mosaic_list
 from pybot.vision.draw_utils import draw_features
@@ -43,45 +48,8 @@ class Keyframe(object):
     def __init__(self, **kwargs):
         self.data_ = AttrDict(**kwargs)
 
-    @property
-    def id(self): 
-        return self.data_.id
-
-    @property
-    def frame_id(self): 
-        return self.data_.frame_id
-
-    @property
-    def pose(self): 
-        return self.data_.pose
-
-    @property
-    def ids(self): 
-        return self.data_.ids
-
-    @property
-    def points(self): 
-        return self.data_.points
-
-    @property
-    def colors(self): 
-        return self.data_.colors
-
-    @property
-    def img(self): 
-        return self.data_.img
-
-    @pose.setter
-    def pose(self, pose): 
-        self.data_.pose = pose
-
-    @points.setter
-    def points(self, points): 
-        self.data_.points = points
-
-    @colors.setter
-    def colors(self, colors): 
-        self.data_.colors = colors
+    def __getattr__(self, key):
+        return self.data_[key]
 
     @classmethod
     def from_dict(self, d): 
@@ -107,7 +75,8 @@ class Keyframe(object):
         assert(len(points) == len(colors))
         return cls(id=kf_id, frame_id=kf.getFrameId(), 
                    pose=kf_pose, points=points, colors=colors, ids=kf.getPointIds(), 
-                   img=kf.getImage(), points2d=kf.getPoints2d(), kf_ids=kf.getKFIds())
+                   img=kf.getImage(), points2d=kf.getPoints2d(),
+                   kf_ids=kf.getKFIds(), kf_points2d=kf.getKFPoints2d()) 
 
     def on_changed(self):
         """
@@ -389,6 +358,8 @@ class MultiViewMapper(Mapper):
         self.cam_intrinsic_ = CameraIntrinsic(K, shape=(int(H), int(W)))
 
         self.mosaics_ = dequedict(maxlen=max_n_kfs)
+        # self.epi_viz_ = EpipolarViz(detector=None, max_views=max_n_kfs)
+        
         self.last_kf_inv = None
         self.kf_theta = kf_theta
         self.kf_displacement = kf_displacement
@@ -399,15 +370,22 @@ class MultiViewMapper(Mapper):
         # Add keyframe and set dirty (for publishing)
         kf_data = self.depth_filter.getKeyframeGraph()
         for kfj in kf_data:
-            
             kf = Keyframe.from_KeyframeData(kfj)
             self.keyframes_[kf.id] = kf
             self.keyframes_dirty_[kf.id] = True
             self.mosaics_[kf.id] = kf.visualize(self.cam_intrinsic_)
 
+            # print len(kf.kf_points2d), len(kf.kf_ids), len(kf.points), [item.shape for item in kf.kf_points2d]
+            # print len(kf.kf_points2d), [(type(ids), type(item)) for (ids, item) in izip(kf.kf_ids, kf.kf_points2d)]
+            
+            # # Visualize
+            # camera = Camera.from_intrinsics_extrinsics(self.cam_intrinsic_, kf.pose)
+            # self.epi_viz_.add(kf.img, camera, kf.points2d)
+            
         if len(self.mosaics_): 
             imshow_cv('kfs', im_mosaic_list(self.mosaics_.values(), scale=0.75, width=3))        
 
+        # self.epi_viz_.visualize()
         # print 'Updated IDS: ', [kf.getId() for kf in kf_data]
         # print 'Dirty IDS: ', [(kf.id, kf.dirty) for kf in self.keyframes.itervalues()]
 

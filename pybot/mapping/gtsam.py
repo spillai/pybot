@@ -13,6 +13,7 @@ from threading import Lock, RLock
 from pybot.utils.timer import SimpleTimer, timeitmethod
 from pybot.utils.db_utils import AttrDict
 from pybot.utils.misc import print_red, print_yellow, print_green
+from pybot.mapping import ODOM_NOISE, PRIOR_NOISE, MEASUREMENT_NOISE
 
 from pygtsam import Symbol, extractPose2, extractPose3, extractPoint3, extractKeys
 from pygtsam import symbol as _symbol
@@ -43,16 +44,9 @@ def matrix(m):
 def vec(*args):
     return vector(list(args)) 
 
-_odom_noise = np.ones(6) * 0.01
-_prior_noise = np.ones(6) * 0.001
-_measurement_noise = np.ones(6) * 0.4
-
 class BaseSLAM(object):
-    odom_noise = _odom_noise
-    prior_noise = _prior_noise
-    measurement_noise = _measurement_noise
     """
-    Basic SLAM interface with GTSAM::ISAM2
+    BASIC SLAM interface with GTSAM::ISAM2
 
     This is a basic interface that allows hot-swapping factors without
     having to write much boilerplate and templated code.
@@ -70,9 +64,9 @@ class BaseSLAM(object):
 
     """
     def __init__(self, 
-                 odom_noise=_odom_noise, 
-                 prior_noise=_prior_noise, 
-                 measurement_noise=_measurement_noise,
+                 odom_noise=ODOM_NOISE, 
+                 prior_noise=PRIOR_NOISE, 
+                 measurement_noise=MEASUREMENT_NOISE,
                  verbose=False, export_graph=False):
  
         # ISAM2 interface
@@ -491,7 +485,7 @@ class BaseSLAM(object):
 
 class VisualSLAM(BaseSLAM): 
     def __init__(self, calib, min_landmark_obs=3, 
-                 odom_noise=_odom_noise, prior_noise=_prior_noise,
+                 odom_noise=ODOM_NOISE, prior_noise=PRIOR_NOISE,
                  px_error_threshold=4, px_noise=[1.0, 1.0], verbose=False):
         BaseSLAM.__init__(self, odom_noise=odom_noise, prior_noise=prior_noise, verbose=verbose)
 
@@ -527,10 +521,10 @@ class VisualSLAM(BaseSLAM):
         from the latest robot pose to the
         set of specified landmark ids
         """
-        self.add_point_landmarks_smart(self.latest, lids, pts, keep_tracked=keep_tracked)
+        self._add_point_landmarks_smart(self.latest, lids, pts, keep_tracked=keep_tracked)
 
     @timeitmethod
-    def add_point_landmarks_smart(self, xid, lids, pts, keep_tracked=True): 
+    def _add_point_landmarks_smart(self, xid, lids, pts, keep_tracked=True): 
         """
         keep_tracked: Maintain only tracked measurements in the smart factor list; 
         The alternative is that all measurements are added to the smart factor list

@@ -25,15 +25,16 @@ class SimpleVO(object):
 
 
 def test_vo():
+    import argparse
     from pybot.vision.imshow_utils import imshow_cv
     from pybot.utils.test_utils import test_dataset
-    # from pybot.vision.feature_detection import FeatureDetector
+    from pybot.vision.feature_detection import FeatureDetector
     from pybot.vision.trackers.base_klt import OpenCVKLT
 
     # Setup detector params
     fast_params = FeatureDetector.fast_params
     fast_params.threshold = 20
-    detector_params = dict(method='fast', grid=(8,5), max_corners=args.features, 
+    detector_params = dict(method='fast', grid=(8,5), max_corners=100, 
                                max_levels=1, subpixel=True, params=FeatureDetector.fast_params)
 
     # Setup tracker params (either lk, or dense)
@@ -46,7 +47,7 @@ def test_vo():
     # Create KLT from detector params only
     klt = OpenCVKLT.from_params(detector_params=detector_params, 
                                 tracker_params=tracker_params, 
-                                min_tracks=args.features)
+                                min_tracks=100)
     
     dataset = test_dataset()
     lcam = dataset.calib.left
