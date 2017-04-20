@@ -112,7 +112,7 @@ class RPGUrban(object):
             for item in ['\n', '[', ']', ' ']:
                 s = s.replace(item,'')
             K = np.fromstring(s, sep=',').reshape(3,3)
-            self.calib_ = Camera.from_intrinsics(CameraIntrinsic(K, shape=RPGUrban.shape[:2]))
+            self.calib_ = Camera.from_intrinsics(CameraIntrinsic(K, shape=RPGUrban.shape[:2])).scaled(scale)
         except Exception,e:
             print('Failed to read calibration data: {}'.format(e))
             self.calib_ = None
