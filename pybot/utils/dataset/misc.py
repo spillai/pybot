@@ -152,7 +152,7 @@ class RPGUrban(object):
     def iterframes(self, *args, **kwargs): 
         for im, pose in izip(self.iter_rgb_frames(*args, **kwargs), 
                              self.iter_poses(*args, **kwargs)): 
-            yield AttrDict(im=im[:,:,:3], mask=im[:,:,-1], velodyne=None, pose=pose)
+            yield AttrDict(img=im[:,:,:3], mask=im[:,:,-1], velodyne=None, pose=pose)
 
     def iter_poses(self, *args, **kwargs): 
         return self.poses_.iteritems(*args, **kwargs)
