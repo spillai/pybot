@@ -340,7 +340,7 @@ class MeshReconstruction(object):
 
         # =================
         # Keyframe sampler
-        self.kf_sampler_ = KeyframeSampler(theta=np.deg2rad(15), displacement=0.5, lookup_history=30, 
+        self.kf_sampler_ = KeyframeSampler(theta=np.deg2rad(15), displacement=1, lookup_history=30, 
                                            on_sampled_cb=self.on_keyframe, verbose=False)
 
         # =================
@@ -389,12 +389,12 @@ class MeshReconstruction(object):
         frame = Keyframe(pose=pose, img=img, index=fidx)
         self.kf_sampler_.append(frame)
 
-        # Frame-to-Keyframe tracking
-        # Provide track reconstruction with latest frame ids, and points
-        frame_ids, frame_pts = mids, mpts
-        if len(frame_pts): 
-            frame_pts = self.cam_.undistort_points(frame_pts)
-        self.track_reconstruction_.on_frame(fidx, frame, frame_ids, frame_pts)
+        # # Frame-to-Keyframe tracking
+        # # Provide track reconstruction with latest frame ids, and points
+        # frame_ids, frame_pts = mids, mpts
+        # if len(frame_pts): 
+        #     frame_pts = self.cam_.undistort_points(frame_pts)
+        # self.track_reconstruction_.on_frame(fidx, frame, frame_ids, frame_pts)
 
         # # Visualize keyframes
         # self.track_reconstruction_.frame_visualization(fidx, frame)
@@ -403,12 +403,12 @@ class MeshReconstruction(object):
         self.kf_counter_.count()
         kfidx = self.kf_counter_.index
 
-        # # Keyframe-to-Keyframe tracking
-        # # Provide track reconstruction with latest KF ids, and points
-        # kf_ids, kf_pts = self.mklt_.latest_ids, self.mklt_.latest_pts
-        # if len(kf_pts): 
-        #     kf_pts = self.cam_.undistort_points(kf_pts)
-        # self.track_reconstruction_.on_frame(kfidx, frame, kf_ids, kf_pts)
+        # Keyframe-to-Keyframe tracking
+        # Provide track reconstruction with latest KF ids, and points
+        kf_ids, kf_pts = self.mklt_.latest_ids, self.mklt_.latest_pts
+        if len(kf_pts): 
+            kf_pts = self.cam_.undistort_points(kf_pts)
+        self.track_reconstruction_.on_frame(kfidx, frame, kf_ids, kf_pts)
 
         # Visualize keyframes
         self.track_reconstruction_.frame_visualization(kfidx, frame)
