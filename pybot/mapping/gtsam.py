@@ -13,7 +13,7 @@ from threading import Lock, RLock
 from pybot.utils.timer import SimpleTimer, timeitmethod
 from pybot.utils.db_utils import AttrDict
 from pybot.utils.misc import print_red, print_yellow, print_green
-from pybot.mapping import ODOM_NOISE, PRIOR_NOISE, MEASUREMENT_NOISE
+from pybot.mapping import cfg
 
 from pygtsam import Symbol, extractPose2, extractPose3, extractPoint3, extractKeys
 from pygtsam import symbol as _symbol
@@ -21,7 +21,7 @@ from pygtsam import Point2, Rot2, Pose2, \
     PriorFactorPose2, BetweenFactorPose2, \
     BearingRangeFactorPose2Point2
 from pygtsam import Point3, Rot3, Pose3, \
-    PriorFactorPose3, BetweenFactorPose3
+    PriorFactorPose3, BetweenFactorPose3, PriorFactorPoint3
 from pygtsam import SmartFactor
 from pygtsam import Cal3_S2, SimpleCamera, simpleCamera
 from pygtsam import StereoPoint2, Cal3_S2Stereo, \
@@ -64,9 +64,9 @@ class BaseSLAM(object):
 
     """
     def __init__(self, 
-                 odom_noise=ODOM_NOISE, 
-                 prior_noise=PRIOR_NOISE, 
-                 measurement_noise=MEASUREMENT_NOISE,
+                 odom_noise=cfg.ODOM_NOISE, 
+                 prior_pose_noise=cfg.PRIOR_POSE_NOISE, 
+                 measurement_noise=cfg.MEASUREMENT_NOISE,
                  verbose=False, export_graph=False):
  
         # ISAM2 interface
@@ -82,7 +82,7 @@ class BaseSLAM(object):
         
         # Pose3D measurement
         self.measurement_noise_ = Diagonal.Sigmas(measurement_noise)
-        self.prior_noise_ = Diagonal.Sigmas(prior_noise)
+        self.prior_pose_noise_ = Diagonal.Sigmas(prior_pose_noise)
         self.odo_noise_ = Diagonal.Sigmas(odom_noise)
 
         # Optimized robot state
@@ -105,8 +105,10 @@ class BaseSLAM(object):
         #     self.gviz_ = nx.Graph()
 
     def initialize(self, p_init=None, index=0, noise=None): 
-        # print_red('\t\t{:}::add_p0 index: {:}'.format(self.__class__.__name__, index))
-
+        if self.verbose_:
+            print_red('{}::initialize index: {}={}'
+                      .format(self.__class__.__name__, index, p_init))
+            
         x_id = symbol('x', index)
         pose0 = Pose3(p_init) if p_init is not None else Pose3()
             
@@ -114,7 +116,7 @@ class BaseSLAM(object):
             PriorFactorPose3(x_id, pose0,
                              Diagonal.Sigmas(noise)
                              if noise is not None
-                             else self.prior_noise_)
+                             else self.prior_pose_noise_)
         )
         self.initial_.insert(x_id, pose0)
         with self.state_lock_: 
@@ -134,13 +136,16 @@ class BaseSLAM(object):
         #     self.gviz_.node[p_id]['style'] = 'filled'
         #     self.gviz_.node[p_id]['shape'] = 'box'
 
-    def add_prior(self, index, p, noise=None): 
+    def add_pose_prior(self, index, p, noise=None): 
+        if self.verbose_:
+            print_red('{:}::add_pose_prior {}={}'
+                      .format(self.__class__.__name__, index, p))
         x_id = symbol('x', index)
         pose = Pose3(p)
         self.graph_.add(
             PriorFactorPose3(x_id, pose, Diagonal.Sigmas(noise)
                              if noise is not None
-                             else self.prior_noise_)
+                             else self.prior_pose_noise_)
         )
         
     def add_odom_incremental(self, delta, noise=None): 
@@ -157,7 +162,9 @@ class BaseSLAM(object):
         self.idx_ += 1
 
     def add_relative_pose_constraint(self, xid1, xid2, delta, noise=None): 
-        # print_red('\t\t{:}::add_odom {:}->{:}'.format(self.__class__.__name__, xid1, xid2))
+        if self.verbose_:
+            print_red('{}::add_odom {}->{} = {}'
+                      .format(self.__class__.__name__, xid1, xid2, delta))
 
         # Add odometry factor
         pdelta = Pose3(delta)
@@ -184,7 +191,7 @@ class BaseSLAM(object):
 
     def add_pose_landmarks(self, xid, lids, deltas, noise=None): 
         if self.verbose_: 
-            print_red('\t\t{:}::add_landmark x{:} -> lcount: {:}'
+            print_red('{:}::add_landmark x{:} -> lcount: {:}'
                       .format(self.__class__.__name__, xid, len(lids)))
 
         # Add Pose-Pose landmark factor
@@ -239,7 +246,7 @@ class BaseSLAM(object):
 
     def add_point_landmarks(self, xid, lids, pts, pts3d, noise=None): 
         if self.verbose_: 
-            print_red('\t\tadd_landmark_points xid:{:}-> lid count:{:}'
+            print_red('add_landmark_points xid:{:}-> lid count:{:}'
                       .format(xid, len(lids)))
         
         # Add landmark-ids to ids queue in order to check
@@ -302,6 +309,95 @@ class BaseSLAM(object):
         """
         self.add_point_landmarks(self.latest, lids, pts, pts3d, noise=noise)
 
+    @timeitmethod
+    def _update(self): 
+        # print('.')
+
+        # Update ISAM with new nodes/factors and initial estimates
+        with self.slam_lock_: 
+            try: 
+                # Update with estimates, and then cleanup
+                self.slam_.update(self.graph_, self.initial_)
+                self.graph_.resize(0)
+                self.initial_.clear()
+                self.slam_.update()
+            except Exception, e:
+                s = Symbol(int(e.message.split('\n')[2][:-1])).index()
+                raise RuntimeError('{}\nSymbol: {}'.format(e.message, s))
+
+        # Get current estimate
+        with self.slam_lock_: 
+            self.current_ = self.slam_.calculateEstimate()
+            
+    def _batch_solve(self):
+        # Optimize using Levenberg-Marquardt optimization
+        with self.slam_lock_:
+            opt = LevenbergMarquardtOptimizer(self.graph_, self.initial_)
+            self.current_ = opt.optimize();
+
+    @timeitmethod
+    def _update_estimates(self): 
+        if not self.estimate_available:
+            raise RuntimeError('Estimate unavailable, call update first')
+
+        poses = extractPose3(self.current_)
+        landmarks = extractPoint3(self.current_)
+
+        with self.state_lock_: 
+            # Extract and update landmarks and poses
+            for k,v in poses.iteritems():
+                if k.chr() == ord('l'): 
+                    self.ls_[k.index()] = v
+                elif k.chr() == ord('x'): 
+                    self.xs_[k.index()] = v
+                else: 
+                    raise RuntimeError('Unknown key chr {:}'.format(k.chr))
+
+            # Extract and update landmarks
+            for k,v in landmarks.iteritems():
+                if k.chr() == ord('l'): 
+                    self.ls_[k.index()] = v
+                else: 
+                    raise RuntimeError('Unknown key chr {:}'.format(k.chr))
+            
+        # self.cleanup()
+        
+        # if self.index % 10 == 0 and self.index > 0: 
+        # self.save_graph("slam_fg.dot")
+        # self.save_dot_graph("slam_graph.dot")
+
+    def _update_marginals(self): 
+        if not self.estimate_available:
+            raise RuntimeError('Estimate unavailable, call update first')
+
+        # Retrieve marginals for each of the poses
+        with self.slam_lock_: 
+            for xid in self.xs_: 
+                self.xcovs_[xid] = self.slam_.marginalCovariance(symbol('x', xid))
+
+            for lid in self.ls_: 
+                self.lcovs_[lid] = self.slam_.marginalCovariance(symbol('l', lid))
+
+    def cleanup(self): 
+
+        clean_l = []
+        idx = self.latest
+        for index in self.timer_ls_.keys(): 
+            if abs(idx-index) > 20: 
+                lids = self.timer_ls_[index]
+                for lid in lids: 
+                    self.ls_.pop(lid)
+                    clean_l.append(lid)
+                self.timer_ls_.pop(index)
+                
+        # clean_x = []
+        # for index in self.xs_.keys(): 
+        #     if abs(idx-index) > 20: 
+        #         self.xs_.pop(index)
+        #         clean_x.append(index)
+
+        print clean_l
+    
     @property
     def latest(self): 
         return self.idx_
@@ -399,95 +495,13 @@ class BaseSLAM(object):
     #     # nx.draw_graphviz(self.gviz_, prog='neato')
     #     # nx_force_draw(self.gviz_)
 
-    @timeitmethod
-    def _update(self): 
-        # print('.')
-
-        # Update ISAM with new nodes/factors and initial estimates
-        with self.slam_lock_: 
-            self.slam_.update(self.graph_, self.initial_)
-            self.slam_.update()
-
-        # Get current estimate
-        with self.slam_lock_: 
-            self.current_ = self.slam_.calculateEstimate()
-            
-    def _batch_solve(self):
-        # Optimize using Levenberg-Marquardt optimization
-        with self.slam_lock_:
-            opt = LevenbergMarquardtOptimizer(self.graph_, self.initial_)
-            self.current_ = opt.optimize();
-            
-    def _update_estimates(self): 
-        if not self.estimate_available:
-            raise RuntimeError('Estimate unavailable, call update first')
-
-        poses = extractPose3(self.current_)
-        landmarks = extractPoint3(self.current_)
-
-        with self.state_lock_: 
-            # Extract and update landmarks and poses
-            for k,v in poses.iteritems():
-                if k.chr() == ord('l'): 
-                    self.ls_[k.index()] = v
-                elif k.chr() == ord('x'): 
-                    self.xs_[k.index()] = v
-                else: 
-                    raise RuntimeError('Unknown key chr {:}'.format(k.chr))
-
-            # Extract and update landmarks
-            for k,v in landmarks.iteritems():
-                if k.chr() == ord('l'): 
-                    self.ls_[k.index()] = v
-                else: 
-                    raise RuntimeError('Unknown key chr {:}'.format(k.chr))
-
-        self.graph_.resize(0)
-        self.initial_.clear()
-        # self.cleanup()
-        
-        # if self.index % 10 == 0 and self.index > 0: 
-        #     self.save_graph("slam_fg.dot")
-        #     self.save_dot_graph("slam_graph.dot")
-
-    def _update_marginals(self): 
-        if not self.estimate_available:
-            raise RuntimeError('Estimate unavailable, call update first')
-
-        # Retrieve marginals for each of the poses
-        with self.slam_lock_: 
-            for xid in self.xs_: 
-                self.xcovs_[xid] = self.slam_.marginalCovariance(symbol('x', xid))
-
-            for lid in self.ls_: 
-                self.lcovs_[lid] = self.slam_.marginalCovariance(symbol('l', lid))
-
-    def cleanup(self): 
-
-        clean_l = []
-        idx = self.latest
-        for index in self.timer_ls_.keys(): 
-            if abs(idx-index) > 20: 
-                lids = self.timer_ls_[index]
-                for lid in lids: 
-                    self.ls_.pop(lid)
-                    clean_l.append(lid)
-                self.timer_ls_.pop(index)
-                
-        # clean_x = []
-        # for index in self.xs_.keys(): 
-        #     if abs(idx-index) > 20: 
-        #         self.xs_.pop(index)
-        #         clean_x.append(index)
-
-        print clean_l
-        
 
 class VisualSLAM(BaseSLAM): 
-    def __init__(self, calib, min_landmark_obs=3, 
-                 odom_noise=ODOM_NOISE, prior_noise=PRIOR_NOISE,
-                 px_error_threshold=4, px_noise=[1.0, 1.0], verbose=False):
-        BaseSLAM.__init__(self, odom_noise=odom_noise, prior_noise=prior_noise, verbose=verbose)
+    def __init__(self, calib, min_landmark_obs=cfg.VSLAM_MIN_LANDMARK_OBS,
+                 odom_noise=cfg.ODOM_NOISE, prior_pose_noise=cfg.PRIOR_POSE_NOISE,
+                 prior_point3d_noise=cfg.PRIOR_POINT3D_NOISE, 
+                 px_error_threshold=4, px_noise=cfg.PX_MEASUREMENT_NOISE, verbose=False):
+        BaseSLAM.__init__(self, odom_noise=odom_noise, prior_pose_noise=prior_pose_noise, verbose=verbose)
 
         self.px_error_threshold_ = px_error_threshold
         self.min_landmark_obs_ = min_landmark_obs
@@ -500,7 +514,7 @@ class VisualSLAM(BaseSLAM):
         # that is maintained across the entire
         # pose-graph optimization (assumed static)
         self.K_ = Cal3_S2(calib.fx, calib.fy, 0.0, calib.cx, calib.cy)
-
+        
         # Counter for landmark observations
         self.lid_count_ = Counter()
             
@@ -514,6 +528,19 @@ class VisualSLAM(BaseSLAM):
         
         # Measurement noise (2 px in u and v)
         self.image_measurement_noise_ = Diagonal.Sigmas(vec(*px_noise))
+        self.prior_point3d_noise_ = Diagonal.Sigmas(prior_point3d_noise)
+
+    def add_landmark_prior(self, index, p, noise=None): 
+        if self.verbose_:
+            print_red('{:}::add_landmark_prior {}={}'
+                      .format(self.__class__.__name__, index, p))
+        l_id = symbol('l', index)
+        point = Point3(p)
+        self.graph_.add(
+            PriorFactorPoint3(l_id, point, Diagonal.Sigmas(noise)
+                             if noise is not None
+                             else self.prior_point3d_noise_)
+        )
 
     def add_point_landmarks_incremental_smart(self, lids, pts, keep_tracked=True): 
         """
@@ -521,17 +548,17 @@ class VisualSLAM(BaseSLAM):
         from the latest robot pose to the
         set of specified landmark ids
         """
-        self._add_point_landmarks_smart(self.latest, lids, pts, keep_tracked=keep_tracked)
+        self.add_point_landmarks_smart(self.latest, lids, pts, keep_tracked=keep_tracked)
 
     @timeitmethod
-    def _add_point_landmarks_smart(self, xid, lids, pts, keep_tracked=True): 
+    def add_point_landmarks_smart(self, xid, lids, pts, keep_tracked=True): 
         """
         keep_tracked: Maintain only tracked measurements in the smart factor list; 
         The alternative is that all measurements are added to the smart factor list
         """
-        # print_red('\t\t{:}::add_landmark_points_smart {:}->{:}'.format(self.__class__.__name__, xid, len(lids)))
+        # print_red('{:}::add_landmark_points_smart {:}->{:}'.format(self.__class__.__name__, xid, len(lids)))
         if self.verbose_: 
-            print_red('\t\t{:}::add_landmark_points_smart {:}->{:}'
+            print_red('{:}::add_landmark_points_smart {:}->{:}'
                       .format(self.__class__.__name__, xid, lids))
 
         # Mahalanobis check before adding points to the 
@@ -574,7 +601,8 @@ class VisualSLAM(BaseSLAM):
             # as a smart factor and delay until multiple views have
             # been registered
             else: 
-                # print_yellow('Adding smartfactor measurement: {:}'.format(lid))
+                print_yellow('Adding smartfactor measurement: x{}, l{}'.format(xid, lid))
+
                 # Insert smart factor based on landmark id
                 self.lid_factors_[lid]['factor'].add_single(
                     Point2(vec(*pt)), x_id, self.image_measurement_noise_, self.K_
@@ -615,7 +643,7 @@ class VisualSLAM(BaseSLAM):
         """
         current = self.slam_.calculateEstimate()
 
-        ids, pts3 = [], []
+        lids, pts3 = [], []
         for lid in self.lid_factors_.keys(): 
 
             # No need to initialize smart factor if already 
@@ -637,27 +665,6 @@ class VisualSLAM(BaseSLAM):
             if err > self.px_error_threshold_ or err <= 0.0:
                 continue
 
-            # Add triangulated smart factors back into the graph for
-            # complete point-pose optimization Each of the projection
-            # factors, including the points, and their initial values
-            # are added back to the graph. Optionally, we can choose
-            # to subsample and add only a few measurements from the
-            # set of original measurements
-
-            x_ids = smart.keys()
-            pts = smart.measured()
-            assert len(pts) == len(x_ids)
-
-            # Add each of the smart factor measurements to the 
-            # factor graph
-            for x_id,pt in zip(x_ids, pts): 
-                # self.graph_.add(GenericProjectionFactorPose3Point3Cal3_S2(
-                #     pt, self.image_measurement_noise_, x_id, l_id, self.K_))
-                
-                # # Add to landmark measurements
-                # self.xls_.append((Symbol(x_id).index(), lid))
-                pass
-
             # Initialize the point value, set in_graph, and
             # remove the smart factor once point is computed
             pt3 = smart.point_compute(current)
@@ -672,29 +679,50 @@ class VisualSLAM(BaseSLAM):
             assert(lid not in self.ls_)
             if lid not in self.ls_: 
                 self.initial_.insert(l_id, pt3)
-            self.ls_[lid] = pt3
+                self.ls_[lid] = pt3
             self.timer_ls_[self.latest].append(lid)
 
             # Add the points for visualization 
-            ids.append(lid)
+            lids.append(lid)
             pts3.append(pt3.vector().ravel())
 
+            # Add triangulated smart factors back into the graph for
+            # complete point-pose optimization Each of the projection
+            # factors, including the points, and their initial values
+            # are added back to the graph. Optionally, we can choose
+            # to subsample and add only a few measurements from the
+            # set of original measurements
+
+            x_ids = smart.keys()
+            pts = smart.measured()
+            assert len(pts) == len(x_ids)
+            print len(pts), len(x_ids)
+            
+            # Add each of the smart factor measurements to the 
+            # factor graph
+            for x_id,pt in zip(x_ids, pts): 
+                self.graph_.add(GenericProjectionFactorPose3Point3Cal3_S2(
+                    pt, self.image_measurement_noise_, x_id, l_id, self.K_))
+                
+                # Add to landmark measurements
+                self.xls_.append((Symbol(x_id).index(), lid))
+            
             # if delete_factors: 
             #     # Once all observations are incorporated, 
             #     # remove feature altogether. Can be deleted
             #     # as long as the landmarks are initialized
             #     self.lid_count_.pop(lid)
-
+            
         try: 
-            ids, pts3 = np.int64(ids).ravel(), np.vstack(pts3)            
-            assert(len(ids) == len(pts3))
-            return ids, pts3
+            lids, pts3 = np.int64(lids).ravel(), np.vstack(pts3)            
+            assert(len(lids) == len(pts3))
+            return lids, pts3
         except Exception, e:
             # print('Could not return pts3, {:}'.format(e))
             return np.int64([]), np.array([])        
 
     # def check_point_landmarks(self, xid, lids, pts): 
-    #     print_red('\t\t{:}::check_point_landmarks {:}->{:}, ls:{:}'.format(
+    #     print_red('{:}::check_point_landmarks {:}->{:}, ls:{:}'.format(
     #         self.__class__.__name__, xid, len(lids), len(self.ls_)))
 
 

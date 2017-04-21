@@ -86,10 +86,10 @@ class TrackReconstruction(object):
         
         # Visual ISAM2 with KLT tracks
         self.vslam_ = RobotVisualSLAM(self.cam_.intrinsics, 
-                                      min_landmark_obs=4, px_error_threshold=20, 
+                                      min_landmark_obs=2, px_error_threshold=20, 
                                       odom_noise=np.ones(6) * 0.01, 
-                                      px_noise=np.ones(2) * 1.0, smart=True)
-
+                                      px_noise=np.ones(2) * 1.0, verbose=True)
+        
     @timeitmethod
     def on_frame(self, fidx, frame, kf_ids, kf_pts):
         """
@@ -104,7 +104,9 @@ class TrackReconstruction(object):
         # 1. VSLAM ADD ODOM
         # Add odometry measurements incrementally
         self.vslam_.on_odom_absolute(fidx, frame.pose)
-
+        if fidx == 1:
+            self.vslam_.add_pose_prior(fidx, frame.pose)
+        
         # =================================
         # 2. KF-KF matching
         # Here kf1 (older), kf2 (newer)
@@ -132,7 +134,7 @@ class TrackReconstruction(object):
                 kf_pts1 = np.vstack([ kf_pts1_lut[tid] for tid in matched_ids ])
                 kf_pts2 = np.vstack([ kf_pts2_lut[tid] for tid in matched_ids ])
                 
-                fvis = draw_matches(frame2.img, kf_pts1, kf_pts2, colors=np.tile([0,0,255], [len(kf_pts1), 1]))
+                # fvis = draw_matches(frame2.img, kf_pts1, kf_pts2, colors=np.tile([0,0,255], [len(kf_pts1), 1]))
                 npts1 = len(kf_pts1)
 
                 # ---------------------------
@@ -141,16 +143,16 @@ class TrackReconstruction(object):
                 # Filter matched IDs based on epipolar constraint
                 # use sampson error (two-way pixel error)
                 kf_pts1, kf_pts2, matched_ids = filter_sampson_error(
-                    cam1, cam2, kf_pts1, kf_pts2, matched_ids, error=4
+                    cam1, cam2, kf_pts1, kf_pts2, matched_ids, error=10
                 )
                 if not len(matched_ids): return         
-                fvis = draw_matches(fvis, kf_pts1, kf_pts2, colors=np.tile([0,255,0], [len(kf_pts1), 1]))
+                # fvis = draw_matches(fvis, kf_pts1, kf_pts2, colors=np.tile([0,255,0], [len(kf_pts1), 1]))
                 npts2 = len(kf_pts1)
 
                 npts3 = len(kf_pts1)
 
-                print_yellow('Matches {:}, Sampson Filtered {:}, Parallax filter'.format(npts1, npts2, npts3))
-                imshow_cv('vis_matches', fvis)
+                # print_yellow('Matches {:}, Sampson Filtered {:}, Parallax filter'.format(npts1, npts2, npts3))
+                # imshow_cv('vis_matches', fvis)
 
                 # -----------------------------
                 # VSLAM ADD INLIER MEASUREMENTS
@@ -163,7 +165,7 @@ class TrackReconstruction(object):
                 # Add landmarks incrementally
                 # When enough landmarks observed in the first 2 frames, add them
                 if len(self.kf_items_q_) == 2:
-                    self.vslam_.on_point_landmarks_smart(fidx, matched_ids, kf_pts1, keep_tracked=False)
+                    self.vslam_.on_point_landmarks_smart(fidx-1, matched_ids, kf_pts1, keep_tracked=False)
 
                 # Add landmarks incrementally
                 self.vslam_.on_point_landmarks_smart(fidx, matched_ids, kf_pts2, keep_tracked=False)
@@ -213,9 +215,9 @@ class TrackReconstruction(object):
         # Publish frame pose
         draw_utils.publish_pose_t('CAMERA_POSE', cam.w2o, frame_id='camera')
 
-        # Publish cloud along with keyframe
-        draw_utils.publish_cameras('vio-kf', [Pose.from_rigid_transform(fidx, pose)], frame_id='camera', 
-                                   size=2, zmax=0.1, reset=fidx==0, draw_nodes=False)
+        # # Publish cloud along with keyframe
+        # draw_utils.publish_cameras('vio-kf', [Pose.from_rigid_transform(fidx, pose)], frame_id='camera', 
+        #                            size=2, zmax=0.1, reset=fidx==0, draw_nodes=False)
         
         # Visualize keyframe disparities
         # Color triangulated keypoints based on depth
@@ -345,7 +347,7 @@ class MeshReconstruction(object):
 
         # =================
         # Setup detector params
-        detector_params = AttrDict(method='fast', grid=(12,9), max_corners=200, 
+        detector_params = AttrDict(method='fast', grid=(12,9), max_corners=150, 
                                    max_levels=1, subpixel=True, params=FeatureDetector.fast_params)
 
         # Setup tracker params (either lk, or dense)
