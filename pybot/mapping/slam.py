@@ -165,29 +165,10 @@ class BaseSLAM(_BaseSLAM):
         deltas = [p.matrix for p in poses]
         self.add_pose_landmarks_incremental(ids, deltas)
 
-        # if self.q_poses_.length >= 2 and self.q_poses_.length % 10 == 0: 
-        #     self._update()
-        #     self._update_marginals()
-            
-        #     if self.smart_: 
-        #         ids, pts3 = self.smart_update()
-
-        #     # # Publish pose
-        #     # draw_utils.publish_pose_list('gtsam-pose', [Pose.from_rigid_transform(t, self.q_poses_.latest)], 
-        #     #                              frame_id='camera', reset=False)
-
-        #     # # Publish cloud in latest pose reference frame
-        #     # if len(pts3): 
-        #     #     pts3 = RigidTransform.from_matrix(self.pose(self.latest)).inverse() * pts3
-        #     # draw_utils.publish_cloud('gtsam-pc', [pts3], c='b', frame_id='gtsam-pose', element_id=[t], reset=False)
-
-        # # self.vis_optimized()
+        # 2. Update
+        self._update_check()
 
         return self.latest
-
-    # def add_pose_landmarks(self, xid, lids, poses):
-    #     deltas = [p.matrix for p in poses]
-    #     super(BaseSLAM, self).add_pose_landmarks(xid, lids, deltas, noise=None)
 
     def update(self): 
         self._update()
@@ -202,11 +183,18 @@ class BaseSLAM(_BaseSLAM):
         for j in range(iterations): 
             self.update()
 
+    def visualize_measurements(self):
+        # Publish latest pose
+        latest_idx = self.latest
+        latest_pose = self.q_poses_.latest
+        draw_utils.publish_pose_list('current_pose', [Pose.from_rigid_transform(latest_idx, latest_pose)], 
+                                     frame_id='camera', reset=False)
+
     def visualize_optimized_poses(self, 
                                   visualize_nodes=False, 
                                   visualize_measurements=False,
                                   visualize_factors=False,
-                                  visualize_marginals=False, name='SLAM_', frame_id='origin'):
+                                  visualize_marginals=False, name='SLAM_', frame_id='camera'):
         with self.state_lock_:
             # Poses 
             covars = []
@@ -240,7 +228,7 @@ class BaseSLAM(_BaseSLAM):
                                 visualize_nodes=False, 
                                 visualize_measurements=False,
                                 visualize_factors=False,
-                                visualize_marginals=False, name='SLAM_', frame_id='origin'):
+                                visualize_marginals=False, name='SLAM_', frame_id='camera'):
         with self.state_lock_:
 
             # Draw targets (constantly updated, so draw with reset)
@@ -284,23 +272,38 @@ class BaseSLAM(_BaseSLAM):
 
             
 class VisualSLAM(BaseSLAM, _VisualSLAM):
-    def __init__(self, calib, min_landmark_obs=cfg.VSLAM_MIN_LANDMARK_OBS, 
+    def __init__(self, calib, min_landmark_obs=cfg.VSLAM_MIN_LANDMARK_OBS,
+                 update_every_k_odom=10, 
                  odom_noise=cfg.ODOM_NOISE, prior_pose_noise=cfg.PRIOR_POSE_NOISE,
                  prior_point3d_noise=cfg.PRIOR_POINT3D_NOISE,
                  px_error_threshold=4, px_noise=cfg.PX_MEASUREMENT_NOISE, verbose=False):
         _VisualSLAM.__init__(self, calib, min_landmark_obs=min_landmark_obs, prior_point3d_noise=prior_point3d_noise,
                              px_error_threshold=px_error_threshold, px_noise=px_noise, verbose=verbose)
-        BaseSLAM.__init__(self, odom_noise=odom_noise, prior_pose_noise=prior_pose_noise, verbose=verbose)
+        BaseSLAM.__init__(self, update_every_k_odom=update_every_k_odom,
+                          odom_noise=odom_noise, prior_pose_noise=prior_pose_noise, verbose=verbose)
         assert(hasattr(self, 'smart_update'))
-
         self.smart_ = True
-        self.initialized_ = False
         
     @property
     def updated_targets(self):
         return {pid : pt3
                 for (pid, pt3) in self.target_landmarks.iteritems()}
 
+    def _update_check(self): 
+        """
+        Check whether update is required
+        """
+        if self.latest >= 2 and self.latest % self.update_every_k_odom_ == 0: 
+            self.update()
+            lids, pts3_w = self.smart_update()
+
+            if not len(pts3_w):
+                return
+                
+        # Convert points in the latest reference frame
+        self.visualize_measurements()
+
+            
     def add_landmark_prior(self, index, p, noise=None):
         """
         Add prior to node
@@ -310,23 +313,6 @@ class VisualSLAM(BaseSLAM, _VisualSLAM):
     def on_point_landmarks_smart(self, xid, ids, pts, keep_tracked=True): 
         assert(self.smart_)
         self.add_point_landmarks_smart(xid, ids, pts, keep_tracked=keep_tracked)
-
-        if self.q_poses_.length >= 2: 
-            self.update()
-            lids, pts3_w = self.smart_update()
-            if not len(pts3_w):
-                return
-
-            # Add landmark priors to first set of landmarks
-            if not self.initialized_: 
-                for lid, pt3 in izip(lids, pts3_w): 
-                    self.add_landmark_prior(lid, pt3)
-                self.initialized_ = True
-                
-            # Convert points in the latest reference frame
-            # pts3 = self.pose(self.latest).inverse() * pts3
-            pts3_c = self.q_poses_.latest.inverse() * pts3_w
-            self.visualize_measurements(self.latest, self.q_poses_.latest, pts3_c)
 
         # Update
         self._update_check()
@@ -338,19 +324,22 @@ class VisualSLAM(BaseSLAM, _VisualSLAM):
         lids, pts3 = self.smart_update()
         # print('{} :: Finished/Solved in {:4.2f} s'.format(self.__class__.__name__, time.time() - self.slam_mixin_timing_st_))
 
-    def visualize_measurements(self, latest_idx, latest_pose, pts3):
+    def visualize_measurements(self):
         # Publish latest pose
+        latest_idx = self.latest
+        latest_pose = self.q_poses_.latest
         draw_utils.publish_pose_list('current_pose', [Pose.from_rigid_transform(latest_idx, latest_pose)], 
                                      frame_id='camera', reset=False)
-
-        # Publish cloud in latest pose reference frame
-        draw_utils.publish_cloud('current_cloud', [pts3], c='b', frame_id='current_pose', element_id=[latest_idx], reset=False)
+        
+        # # Publish cloud in latest pose reference frame
+        # pts3_c = self.pose(self.latest).inverse() * pts3_w
+        # draw_utils.publish_cloud('current_cloud', [pts3_c], c='b', frame_id='current_pose', element_id=[latest_idx], reset=False)
         
     def visualize_optimized_landmarks(self,
                                       visualize_nodes=False, 
                                       visualize_measurements=False,
                                       visualize_factors=False,
-                                      visualize_marginals=False, name='SLAM_', frame_id='origin'):
+                                      visualize_marginals=False, name='SLAM_', frame_id='camera'):
         with self.state_lock_:
 
             # Draw targets (constantly updated, so draw with reset)
@@ -390,7 +379,7 @@ class VisualSLAM(BaseSLAM, _VisualSLAM):
         
     
 def with_visualization(cls,
-                       name='SLAM_', frame_id='origin',
+                       name='SLAM_', frame_id='camera',
                        visualize_every=0.5,
                        visualize_nodes=True, 
                        visualize_measurements=False, 
@@ -426,6 +415,10 @@ def with_visualization(cls,
                 super(_SLAM, self).finish()
                 self.visualize_optimized()
 
+            def visualize_measurements(self):
+                if self.visualize_measurements_:
+                    super(_SLAM, self).visualize_measurements()
+                    
             @timeitmethod
             def visualize_optimized(self):
                 """
@@ -449,6 +442,9 @@ def with_visualization(cls,
                                                                           name=self.name_, frame_id=self.frame_id_)
                             
         return _SLAM
+
+RobotVisualSLAM = with_visualization(VisualSLAM,
+                                     frame_id='camera', visualize_measurements=True)
 
 
 
@@ -981,8 +977,6 @@ def with_visualization(cls,
 #         #                         visualize_nodes=visualize_nodes, 
 #         #                         visualize_factors=visualize_factors, 
 #         #                         visualize_marginals=visualize_marginals)
-
-RobotVisualSLAM = with_visualization(VisualSLAM, frame_id='camera')
         
 
 

@@ -77,18 +77,21 @@ class TrackReconstruction(object):
     """
     def __init__(self, mapper, cam):
         self.cam_ = cam
-        self.mapper_ = mapper
+        # self.mapper_ = mapper
 
         # KF-KF (has to be 3 to distinguish between
         # just added 2 frames, and added frames into
         # stream of deque)
-        self.kf_items_q_ = deque(maxlen=3)
+        self.kf_items_q_ = Accumulator(maxlen=2)
         
         # Visual ISAM2 with KLT tracks
         self.vslam_ = RobotVisualSLAM(self.cam_.intrinsics, 
-                                      min_landmark_obs=2, px_error_threshold=20, 
-                                      odom_noise=np.ones(6) * 0.01, 
-                                      px_noise=np.ones(2) * 1.0, verbose=True)
+                                      min_landmark_obs=4, px_error_threshold=10,
+                                      update_every_k_odom=1, 
+                                      odom_noise=np.ones(6) * 0.5, 
+                                      px_noise=np.ones(2) * 2.0,
+                                      prior_point3d_noise=np.ones(3) * 0.01,
+                                      verbose=True)
         
     @timeitmethod
     def on_frame(self, fidx, frame, kf_ids, kf_pts):
@@ -96,80 +99,87 @@ class TrackReconstruction(object):
         Keyframe-to-Keyframe matching
         """
         # Add KF items to queue
-        self.kf_items_q_.append(AttrDict(fidx=fidx, frame=frame, ids=kf_ids, pts=kf_pts, 
-                                         cam=Camera.from_intrinsics_extrinsics(
-                                             self.cam_.intrinsics, frame.pose.inverse())))
+        self.kf_items_q_.accumulate(
+            AttrDict(fidx=fidx, frame=frame, ids=kf_ids, pts=kf_pts, 
+                     cam=Camera.from_intrinsics_extrinsics(
+                         self.cam_.intrinsics, frame.pose.inverse())))
 
-        # =================================
+        # ---------------------------
         # 1. VSLAM ADD ODOM
+
         # Add odometry measurements incrementally
         self.vslam_.on_odom_absolute(fidx, frame.pose)
+
+        # Add pose prior on second pose node (scale ambiguity)
         if fidx == 1:
             self.vslam_.add_pose_prior(fidx, frame.pose)
         
-        # =================================
+        # ---------------------------
         # 2. KF-KF matching
+
         # Here kf1 (older), kf2 (newer)
-        kf2 = self.kf_items_q_[-1]
+        kf2 = self.kf_items_q_.items[-1]
         fidx2, frame2, kf_ids2, kf_pts2, cam2 = kf2.fidx, kf2.frame, kf2.ids, kf2.pts, kf2.cam
 
-        if len(self.kf_items_q_) >= 2:
-            kf1 = self.kf_items_q_[-2]
-            fidx1, frame1, kf_ids1, kf_pts1, cam1 = kf1.fidx, kf1.frame, kf1.ids, kf1.pts, kf1.cam
+        # Continue if only the first frame
+        if len(self.kf_items_q_) < 2:
+            return
+        
+        kf1 = self.kf_items_q_.items[-2]
+        fidx1, frame1, kf_ids1, kf_pts1, cam1 = kf1.fidx, kf1.frame, kf1.ids, kf1.pts, kf1.cam
 
-            kf_pts1_lut = {tid: pt for (tid,pt) in izip(kf_ids1,kf_pts1)}
-            kf_pts2_lut = {tid: pt for (tid,pt) in izip(kf_ids2,kf_pts2)}
+        kf_pts1_lut = {tid: pt for (tid,pt) in izip(kf_ids1,kf_pts1)}
+        kf_pts2_lut = {tid: pt for (tid,pt) in izip(kf_ids2,kf_pts2)}
 
-            # Add features to the map
-            self.mapper_.add_points(fidx, kf_ids2, kf_pts2)
-                
-            # Find matches in the newer keyframe that are consistent from 
-            # the previous frame
-            matched_ids = np.intersect1d(kf_ids2, kf_ids1)
-            # print_yellow('{:}-{:} KF-KF {:} intersect1d {:} = {:}'
-            #              .format(fidx1, fidx2, len(kf_ids1), len(kf_ids2), len(matched_ids)))
+        # # Add features to the map
+        # self.mapper_.add_points(fidx, kf_ids2, kf_pts2)
 
-            if len(matched_ids):
-                # Keyframe and Frame points
-                kf_pts1 = np.vstack([ kf_pts1_lut[tid] for tid in matched_ids ])
-                kf_pts2 = np.vstack([ kf_pts2_lut[tid] for tid in matched_ids ])
-                
-                # fvis = draw_matches(frame2.img, kf_pts1, kf_pts2, colors=np.tile([0,0,255], [len(kf_pts1), 1]))
-                npts1 = len(kf_pts1)
+        # Find matches in the newer keyframe that are consistent from 
+        # the previous frame
+        matched_ids = np.intersect1d(kf_ids2, kf_ids1)
+        if not len(matched_ids):
+            return 
 
-                # ---------------------------
-                # FILTERING VIA SAMPSON ERROR 
+        # Keyframe and Frame points
+        # print_yellow('{:}-{:} KF-KF {:} intersect1d {:} = {:}'
+        #              .format(fidx1, fidx2, len(kf_ids1), len(kf_ids2), len(matched_ids)))
+        kf_pts1 = np.vstack([ kf_pts1_lut[tid] for tid in matched_ids ])
+        kf_pts2 = np.vstack([ kf_pts2_lut[tid] for tid in matched_ids ])
 
-                # Filter matched IDs based on epipolar constraint
-                # use sampson error (two-way pixel error)
-                kf_pts1, kf_pts2, matched_ids = filter_sampson_error(
-                    cam1, cam2, kf_pts1, kf_pts2, matched_ids, error=10
-                )
-                if not len(matched_ids): return         
-                # fvis = draw_matches(fvis, kf_pts1, kf_pts2, colors=np.tile([0,255,0], [len(kf_pts1), 1]))
-                npts2 = len(kf_pts1)
+        fvis = draw_matches(frame2.img, kf_pts1, kf_pts2, colors=np.tile([0,0,255], [len(kf_pts1), 1]))
+        npts1 = len(kf_pts1)
 
-                npts3 = len(kf_pts1)
+        # ---------------------------
+        # 3. FILTERING VIA SAMPSON ERROR 
 
-                # print_yellow('Matches {:}, Sampson Filtered {:}, Parallax filter'.format(npts1, npts2, npts3))
-                # imshow_cv('vis_matches', fvis)
+        # Filter matched IDs based on epipolar constraint
+        # use sampson error (two-way pixel error)
+        kf_pts1, kf_pts2, matched_ids = filter_sampson_error(
+            cam1, cam2, kf_pts1, kf_pts2, matched_ids, error=2
+        )
+        if not len(matched_ids): return         
+        fvis = draw_matches(fvis, kf_pts1, kf_pts2, colors=np.tile([0,255,0], [len(kf_pts1), 1]))
+        npts2 = len(kf_pts1)
 
-                # -----------------------------
-                # VSLAM ADD INLIER MEASUREMENTS
-                
-                # Add measurements for the keyframes (as smartfactors)
-                assert(len(matched_ids) == len(kf_pts2))
+        print_yellow('Matches {:}, Sampson Filtered {:}, Parallax filter'.format(npts1, npts2, npts2))
+        imshow_cv('vis_matches', fvis)
 
-                # =================================
-                # 2. VSLAM ADD LANDMARKS
-                # Add landmarks incrementally
-                # When enough landmarks observed in the first 2 frames, add them
-                if len(self.kf_items_q_) == 2:
-                    self.vslam_.on_point_landmarks_smart(fidx-1, matched_ids, kf_pts1, keep_tracked=False)
+        # -----------------------------
+        # 4. VSLAM ADD LANDMARKS (INLIER MEASUREMENTS)
+        # Add landmarks incrementally
+        # Add measurements for the keyframes (as smartfactors)
 
-                # Add landmarks incrementally
-                self.vslam_.on_point_landmarks_smart(fidx, matched_ids, kf_pts2, keep_tracked=False)
+        # When enough landmarks observed in the first 2 frames,
+        # Add the previous frame's measurements
+        if self.kf_items_q_.length == 2:
+            self.vslam_.on_point_landmarks_smart(fidx-1, matched_ids,
+                                                 kf_pts1, keep_tracked=True)
 
+        # Add landmarks incrementally
+        self.vslam_.on_point_landmarks_smart(fidx, matched_ids,
+                                             kf_pts2, keep_tracked=True)
+
+        
         # # =================================
         # # VSLAM UPDATE
 
@@ -342,7 +352,7 @@ class MeshReconstruction(object):
 
         # =================
         # Keyframe sampler
-        self.kf_sampler_ = KeyframeSampler(theta=np.deg2rad(15), displacement=1, lookup_history=30, 
+        self.kf_sampler_ = KeyframeSampler(theta=np.deg2rad(20), displacement=2, lookup_history=100, 
                                            on_sampled_cb=self.on_keyframe, verbose=False)
 
         # =================

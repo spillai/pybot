@@ -302,7 +302,8 @@ def test_SFMExample_SmartFactor():
             # generate the 2D measurement
             camera = SimpleCamera(posei, K)
             measurement = camera.project(pointj)
-
+            print measurement
+            
             # call add() function to add measurement into a single factor, here we need to add:
             #    1. the 2D measurement
             #    2. the corresponding camera's key
@@ -364,7 +365,8 @@ def test_SFMExample_SmartFactor():
     # for key in keys: 
     #     landmark_result.atPose3()
     # landmark_result.printf("Landmark results:\n")
-            
+
+    
 if __name__ == "__main__": 
     test_odometryExample()
     print('OK')
