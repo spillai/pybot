@@ -37,6 +37,10 @@ def project_points(pts):
     z = colvec(pts[:,2])
     return pts[:,:2] / z
 
+def skew(a):
+    """ Skew matrix A such that a x v = Av for any v. """
+    return array([[0,-a[2],a[1]],[a[2],0,-a[0]],[-a[1],a[0],0]])
+
 def sampson_error(F, pts1, pts2): 
     """
     Computes the sampson error for F, and points pts1, pts2. Sampson
@@ -132,6 +136,200 @@ def get_calib_params(fx, fy, cx, cy, baseline=None, baseline_px=None):
     return AttrDict(R0=R0, R1=R1, K0=K0, K1=K1, P0=P0, P1=P1, Q=Q, T0=T0, T1=T1, 
                     D0=D0, D1=D1, fx=fx, fy=fy, cx=cx, cy=cy, baseline=baseline, baseline_px=baseline * fx)
 
+def decompose_E(E):
+    """
+    u, w, vt = svd(E)
+    """
+    U,S,Vt = svd(E)
+    W = np.float32([[0,-1,0],
+                    [1,0,0],
+                    [0,0,1]])
+    R = U.dot(W).dot(Vt)
+    t = U[:,2]
+    assert(np.fabs(np.linalg.norm(t)-1.0) < 1e-6)
+    
+    R1 = U.dot(W).dot(Vt)
+    if np.det(R1) < 0:
+        R1 = -R1
+    R2 = U.dot(W.T).dot(Vt)
+    if np.det(R2) < 0:
+        R2 = -R2
+
+    return R1, R2, t
+
+def compute_fundamental(x1, x2, method=cv2.FM_RANSAC): 
+    """
+    Computes the fundamental matrix from corresponding points x1, x2 using
+    the 8 point algorithm.
+
+    Options: 
+    CV_FM_7POINT for a 7-point algorithm.  N = 7
+    CV_FM_8POINT for an 8-point algorithm.  N >= 8
+    CV_FM_RANSAC for the RANSAC algorithm.  N >= 8
+    CV_FM_LMEDS for the LMedS algorithm.  N >= 8"
+    """
+    assert(x1.shape == x2.shape)
+    if len(x1) < 8:
+        raise RuntimeError('Fundamental matrix requires N >= 8 pts')
+
+    F, mask = cv2.findFundamentalMat(x1, x2, method)
+    return F, mask
+
+def compute_epipole(F):
+    """ Computes the (right) epipole from a 
+        fundamental matrix F. 
+        (Use with F.T for left epipole.) """
+    
+    # return null space of F (Fx=0)
+    U,S,V = linalg.svd(F)
+    e = V[-1]
+    return e/e[2]
+
+def compute_essential(F, K): 
+    """ Compute the Essential matrix, and R1, R2 """
+    return (K.T).dot(F).dot(K)
+
+def check_visibility(camera, pts_w, zmin=0, zmax=100): 
+    """
+    Check if points are visible given fov of camera. 
+    This method checks for both horizontal and vertical
+    fov.     
+    camera: type Camera
+    """
+    # Transform points in to camera's reference
+    # Camera: p_cw
+    pts_c = camera.c2w(pts_w.reshape(-1, 3))
+    
+    # Determine look-at vector, and check angle 
+    # subtended with camera's z-vector (3rd column)
+    z = pts_c[:,2]
+    v = pts_c / np.linalg.norm(pts_c, axis=1).reshape(-1, 1)
+    hangle, vangle = np.arctan2(v[:,0], v[:,2]), np.arctan2(-v[:,1], v[:,2])
+    
+    # Provides inds mask for all points that are within fov
+    return np.bitwise_and.reduce([np.fabs(hangle) < camera.fov[0] * 0.5,
+                                  np.fabs(vangle) < camera.fov[1] * 0.5,
+                                  z >= zmin, z <= zmax])
+
+def get_median_depth(camera, pts, subsample=10): 
+    """ 
+    Get the median depth of points for a camera reference
+      Transform points in camera frame, and check z-vector: 
+      [p_c = T_cw * p_w]
+    
+    """
+    return np.median((camera * pts[::subsample])[:,2])
+
+def get_bounded_projection(camera, pts, subsample=10): 
+    """ Project points and only return points that are within image bounds """
+
+    # Project points
+    pts2d = camera.project(pts[::subsample].astype(np.float32))
+
+    # Only return points within-image bounds
+    valid = np.bitwise_and(np.bitwise_and(pts2d[:,0] >= 0, pts2d[:,0] < camera.shape[1]), \
+                           np.bitwise_and(pts2d[:,1] >= 0, pts2d[:,1] < camera.shape[0]))
+    return pts2d[valid], valid
+
+def get_discretized_projection(camera, pts, subsample=10, discretize=4): 
+
+    vis = np.ones(shape=(camera.shape[0]/discretize, camera.shape[1]/discretize), dtype=np.float32) * 10000.0
+    pts2d, valid = get_bounded_projection(camera, pts, subsample=subsample)
+
+    if True: 
+        pts3d = pts[valid]
+        depth = (camera * pts3d[::subsample])[:,2]
+        vis[pts2d[::subsample,1], pts2d[::subsample,0]] = depth 
+    else: 
+        pts2d = pts2d.astype(np.int32) / discretize
+        depth = get_median_depth(camera, pts, subsample=subsample)
+        vis[pts2d[:,1], pts2d[:,0]] = depth 
+
+    return vis, depth
+
+def get_object_bbox(camera, pts, subsample=10, scale=1.0, min_height=10, min_width=10): 
+    """
+
+    Returns: 
+       pts2d: Projected points onto camera
+       bbox: Bounding box of the projected points [l, t, r, b]
+       depth: Median depth of the projected points
+
+    """
+
+    pts2d, valid = get_bounded_projection(camera, pts, subsample=subsample)
+
+    if not len(pts2d): 
+        return [None] * 3
+
+    # Min-max bounds
+    x0, x1 = int(max(0, np.min(pts2d[:,0]))), int(min(camera.shape[1]-1, np.max(pts2d[:,0])))
+    y0, y1 = int(max(0, np.min(pts2d[:,1]))), int(min(camera.shape[0]-1, np.max(pts2d[:,1])))
+
+    # Check median center 
+    xmed, ymed = np.median(pts2d[:,0]), np.median(pts2d[:,1])
+    if (xmed >= 0 and ymed >= 0 and xmed <= camera.shape[1] and ymed < camera.shape[0]) and \
+       (y1-y0) >= min_height and (x1-x0) >= min_width: 
+
+        depth = get_median_depth(camera, pts, subsample=subsample)
+        if depth < 0: return [None] * 3
+        # assert(depth >= 0), "Depth is less than zero, add check for this."
+
+        if scale != 1.0: 
+            w2, h2 = (scale-1.0) * (x1-x0) / 2, (scale-1.0) * (y1-y0) / 2
+            x0, x1 = int(max(0, x0 - w2)), int(min(x1 + w2, camera.shape[1]-1))
+            y0, y1 = int(max(0, y0 - h2)), int(min(y1 + h2, camera.shape[0]-1))
+        return pts2d.astype(np.int32), np.float32([x0, y0, x1, y1]), depth
+    else: 
+        return [None] * 3
+
+def epipolar_line(F_10, x_0): 
+    """
+    l_1 = F_10 * x_0
+    line = F.dot(np.hstack([x, np.ones(shape=(len(x),1))]).T)
+    """
+    return cv2.computeCorrespondEpilines(x_0.reshape(-1,1,2), 1, F_10).reshape(-1,3)
+
+def plot_epipolar_line(im_1, F_10, x_0, im_0=None): 
+    """
+    Plot the epipole and epipolar line F * x = 0.
+
+    l[0] * x + l[1] * y + l[2] = 0
+    @ x=0: y = -l[2] / l[1]
+    @ x=W: y = (-l[2] -l[0]*W) / l[1]
+    """
+    
+    H,W = im_1.shape[:2]
+    lines_1 = epipolar_line(F_10, x_0)
+
+    vis_1 = to_color(im_1)
+    vis_0 = to_color(im_0) if im_0 is not None else None
+    
+    N = 20
+    cols = get_color_by_label(np.arange(len(x_0)) % N) * 255
+    # for tid, pt in zip(ids, pts): 
+    #     cv2.circle(vis, tuple(map(int, pt)), 2, 
+    #                tuple(map(int, cols[tid % N])) if colored else (0,240,0),
+    #                -1, lineType=cv2.CV_AA)
+
+    # col = (0,255,0)
+    for col, l1 in zip(cols, lines_1):
+        try: 
+            x0, y0 = map(int, [0, -l1[2] / l1[1] ])
+            x1, y1 = map(int, [W, -(l1[2] + l1[0] * W) / l1[1] ])
+            cv2.line(vis_1, (x0,y0), (x1,y1), col, 1)
+        except: 
+            pass
+            # raise RuntimeWarning('Failed to estimate epipolar line {:s}'.format(l1))
+
+    if vis_0 is not None: 
+        for col, x in zip(cols, x_0): 
+            cv2.circle(vis_0, tuple(x), 3, col, -1)
+        return np.vstack([vis_0, vis_1])
+    
+    return vis_1
+
+    
 class CameraIntrinsic(object): 
     def __init__(self, K, D=np.zeros(5, dtype=np.float64), shape=None): 
         """
@@ -770,178 +968,6 @@ class RGBDCamera(object):
     @property
     def baseline(self): 
         return self.baseline_
-
-def compute_fundamental(x1, x2, method=cv2.FM_RANSAC): 
-    """
-    Computes the fundamental matrix from corresponding points x1, x2 using
-    the 8 point algorithm.
-
-    Options: 
-    CV_FM_7POINT for a 7-point algorithm.  N = 7
-    CV_FM_8POINT for an 8-point algorithm.  N >= 8
-    CV_FM_RANSAC for the RANSAC algorithm.  N >= 8
-    CV_FM_LMEDS for the LMedS algorithm.  N >= 8"
-    """
-    assert(x1.shape == x2.shape)
-    if len(x1) < 8:
-        raise RuntimeError('Fundamental matrix requires N >= 8 pts')
-
-    F, mask = cv2.findFundamentalMat(x1, x2, method)
-    return F, mask
-
-def compute_epipole(F):
-    """ Computes the (right) epipole from a 
-        fundamental matrix F. 
-        (Use with F.T for left epipole.) """
-    
-    # return null space of F (Fx=0)
-    U,S,V = linalg.svd(F)
-    e = V[-1]
-    return e/e[2]
-
-def compute_essential(F, K): 
-    """ Compute the Essential matrix, and R1, R2 """
-    return (K.T).dot(npm.mat(F)).dot(K)
-
-def check_visibility(camera, pts_w, zmin=0, zmax=100): 
-    """
-    Check if points are visible given fov of camera. 
-    This method checks for both horizontal and vertical
-    fov.     
-    camera: type Camera
-    """
-    # Transform points in to camera's reference
-    # Camera: p_cw
-    pts_c = camera.c2w(pts_w.reshape(-1, 3))
-    
-    # Determine look-at vector, and check angle 
-    # subtended with camera's z-vector (3rd column)
-    z = pts_c[:,2]
-    v = pts_c / np.linalg.norm(pts_c, axis=1).reshape(-1, 1)
-    hangle, vangle = np.arctan2(v[:,0], v[:,2]), np.arctan2(-v[:,1], v[:,2])
-    
-    # Provides inds mask for all points that are within fov
-    return np.bitwise_and.reduce([np.fabs(hangle) < camera.fov[0] * 0.5,
-                                  np.fabs(vangle) < camera.fov[1] * 0.5,
-                                  z >= zmin, z <= zmax])
-
-def get_median_depth(camera, pts, subsample=10): 
-    """ 
-    Get the median depth of points for a camera reference
-      Transform points in camera frame, and check z-vector: 
-      [p_c = T_cw * p_w]
-    
-    """
-    return np.median((camera * pts[::subsample])[:,2])
-
-def get_bounded_projection(camera, pts, subsample=10): 
-    """ Project points and only return points that are within image bounds """
-
-    # Project points
-    pts2d = camera.project(pts[::subsample].astype(np.float32))
-
-    # Only return points within-image bounds
-    valid = np.bitwise_and(np.bitwise_and(pts2d[:,0] >= 0, pts2d[:,0] < camera.shape[1]), \
-                           np.bitwise_and(pts2d[:,1] >= 0, pts2d[:,1] < camera.shape[0]))
-    return pts2d[valid], valid
-
-def get_discretized_projection(camera, pts, subsample=10, discretize=4): 
-
-    vis = np.ones(shape=(camera.shape[0]/discretize, camera.shape[1]/discretize), dtype=np.float32) * 10000.0
-    pts2d, valid = get_bounded_projection(camera, pts, subsample=subsample)
-
-    if True: 
-        pts3d = pts[valid]
-        depth = (camera * pts3d[::subsample])[:,2]
-        vis[pts2d[::subsample,1], pts2d[::subsample,0]] = depth 
-    else: 
-        pts2d = pts2d.astype(np.int32) / discretize
-        depth = get_median_depth(camera, pts, subsample=subsample)
-        vis[pts2d[:,1], pts2d[:,0]] = depth 
-
-    return vis, depth
-
-def get_object_bbox(camera, pts, subsample=10, scale=1.0, min_height=10, min_width=10): 
-    """
-
-    Returns: 
-       pts2d: Projected points onto camera
-       bbox: Bounding box of the projected points [l, t, r, b]
-       depth: Median depth of the projected points
-
-    """
-
-    pts2d, valid = get_bounded_projection(camera, pts, subsample=subsample)
-
-    if not len(pts2d): 
-        return [None] * 3
-
-    # Min-max bounds
-    x0, x1 = int(max(0, np.min(pts2d[:,0]))), int(min(camera.shape[1]-1, np.max(pts2d[:,0])))
-    y0, y1 = int(max(0, np.min(pts2d[:,1]))), int(min(camera.shape[0]-1, np.max(pts2d[:,1])))
-
-    # Check median center 
-    xmed, ymed = np.median(pts2d[:,0]), np.median(pts2d[:,1])
-    if (xmed >= 0 and ymed >= 0 and xmed <= camera.shape[1] and ymed < camera.shape[0]) and \
-       (y1-y0) >= min_height and (x1-x0) >= min_width: 
-
-        depth = get_median_depth(camera, pts, subsample=subsample)
-        if depth < 0: return [None] * 3
-        # assert(depth >= 0), "Depth is less than zero, add check for this."
-
-        if scale != 1.0: 
-            w2, h2 = (scale-1.0) * (x1-x0) / 2, (scale-1.0) * (y1-y0) / 2
-            x0, x1 = int(max(0, x0 - w2)), int(min(x1 + w2, camera.shape[1]-1))
-            y0, y1 = int(max(0, y0 - h2)), int(min(y1 + h2, camera.shape[0]-1))
-        return pts2d.astype(np.int32), np.float32([x0, y0, x1, y1]), depth
-    else: 
-        return [None] * 3
-
-def epipolar_line(F_10, x_0): 
-    """
-    l_1 = F_10 * x_0
-    line = F.dot(np.hstack([x, np.ones(shape=(len(x),1))]).T)
-    """
-    return cv2.computeCorrespondEpilines(x_0.reshape(-1,1,2), 1, F_10).reshape(-1,3)
-
-def plot_epipolar_line(im_1, F_10, x_0, im_0=None): 
-    """
-    Plot the epipole and epipolar line F * x = 0.
-
-    l[0] * x + l[1] * y + l[2] = 0
-    @ x=0: y = -l[2] / l[1]
-    @ x=W: y = (-l[2] -l[0]*W) / l[1]
-    """
-    
-    H,W = im_1.shape[:2]
-    lines_1 = epipolar_line(F_10, x_0)
-
-    vis_1 = to_color(im_1)
-    vis_0 = to_color(im_0) if im_0 is not None else None
-    
-    N = 20
-    cols = get_color_by_label(np.arange(len(x_0)) % N) * 255
-    # for tid, pt in zip(ids, pts): 
-    #     cv2.circle(vis, tuple(map(int, pt)), 2, 
-    #                tuple(map(int, cols[tid % N])) if colored else (0,240,0),
-    #                -1, lineType=cv2.CV_AA)
-
-    # col = (0,255,0)
-    for col, l1 in zip(cols, lines_1):
-        try: 
-            x0, y0 = map(int, [0, -l1[2] / l1[1] ])
-            x1, y1 = map(int, [W, -(l1[2] + l1[0] * W) / l1[1] ])
-            cv2.line(vis_1, (x0,y0), (x1,y1), col, 1)
-        except: 
-            pass
-            # raise RuntimeWarning('Failed to estimate epipolar line {:s}'.format(l1))
-
-    if vis_0 is not None: 
-        for col, x in zip(cols, x_0): 
-            cv2.circle(vis_0, tuple(x), 3, col, -1)
-        return np.vstack([vis_0, vis_1])
-    
-    return vis_1
 
 class HalfPlane(object): 
     """
