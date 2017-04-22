@@ -138,7 +138,11 @@ def get_calib_params(fx, fy, cx, cy, baseline=None, baseline_px=None):
 
 def decompose_E(E):
     """
-    u, w, vt = svd(E)
+    Decomposes the essential matrix and returns two possible rotations
+    R1,R2, and the relative translation. Only consider cases where
+    points are in front of the camera.
+
+    [R1,t], [-R1,t], [R2,t], [-R2,t]
     """
     U,S,Vt = svd(E)
     W = np.float32([[0,-1,0],
@@ -149,10 +153,10 @@ def decompose_E(E):
     assert(np.fabs(np.linalg.norm(t)-1.0) < 1e-6)
     
     R1 = U.dot(W).dot(Vt)
-    if np.det(R1) < 0:
+    if det(R1) < 0:
         R1 = -R1
     R2 = U.dot(W.T).dot(Vt)
-    if np.det(R2) < 0:
+    if det(R2) < 0:
         R2 = -R2
 
     return R1, R2, t
@@ -175,6 +179,10 @@ def compute_fundamental(x1, x2, method=cv2.FM_RANSAC):
     F, mask = cv2.findFundamentalMat(x1, x2, method)
     return F, mask
 
+def compute_essential(F, K): 
+    """ Compute the Essential matrix, and R1, R2 """
+    return (K.T).dot(F).dot(K)
+
 def compute_epipole(F):
     """ Computes the (right) epipole from a 
         fundamental matrix F. 
@@ -184,10 +192,6 @@ def compute_epipole(F):
     U,S,V = linalg.svd(F)
     e = V[-1]
     return e/e[2]
-
-def compute_essential(F, K): 
-    """ Compute the Essential matrix, and R1, R2 """
-    return (K.T).dot(F).dot(K)
 
 def check_visibility(camera, pts_w, zmin=0, zmax=100): 
     """

@@ -45,6 +45,18 @@ def matrix(m):
 def vec(*args):
     return vector(list(args)) 
 
+def get_exception_variable(msg):
+    """ 
+    Catch exception and print relevant gtsam symbol
+    """
+    try:
+        s = Symbol(int(msg.split('\n')[2][:-1])).index()
+        custom_message = 'Symbol: {}'.format(s)
+        print(custom_message)
+    except:
+        return 'unknown'
+    return s 
+
 class BaseSLAM(object):
     """
     BASIC SLAM interface with GTSAM::ISAM2
@@ -324,12 +336,9 @@ class BaseSLAM(object):
             self.initial_.clear()
             self.slam_.update()
         except Exception, e:
-            s = None
-            try: 
-                s = Symbol(int(e.message.split('\n')[2][:-1])).index()
-                import IPython; IPython.embed()
-            except:
-                raise RuntimeError('{}\nSymbol: {}'.format(e.message, s))
+            s = get_exception_variable(e)
+            import IPython; IPython.embed()
+            raise RuntimeError()
 
         # Get current estimate
         self.current_ = self.slam_.calculateEstimate()
@@ -501,7 +510,68 @@ class BaseSLAM(object):
     #     # nx.draw_graphviz(self.gviz_, prog='neato')
     #     # nx_force_draw(self.gviz_)
 
+def two_view_BA(K, pts1, pts2, X, p_21, scale_prior=True):
 
+    # Define the camera calibration parameters
+    # format: fx fy skew cx cy
+    K = Cal3_S2(K.fx, K.fy, 0.0, K.cx, K.cy)
+    X = X.astype(np.float64)
+    infront = X[:,2] >= 0
+
+    # Only perform BA on points in front
+    pts1, pts2, X = pts1[infront], pts2[infront], X[infront]    
+    
+    # Create a factor graph
+    graph = NonlinearFactorGraph()
+
+    px_noise = [1., 1.]
+    measurement_noise = Diagonal.Sigmas(vec(*px_noise))
+
+    # Add a prior on pose x0
+    pose_noise = Diagonal.Sigmas(vec(0.3, 0.3, 0.3, 0.1, 0.1, 0.1))
+    graph.add(PriorFactorPose3(symbol('x', 0), Pose3(), pose_noise))
+
+    # Add prior on first landmark (scale prior for monocular case)
+    point_noise = Diagonal.Sigmas(np.ones(3) * 0.1)
+
+    for j in range(5): 
+        point = Point3(X[j,:].ravel())
+        graph.add(PriorFactorPoint3(symbol('l', j), point, point_noise))
+    
+    # Add image measurements
+    for lid, (pt1,pt2) in enumerate(izip(pts1, pts2)):
+        graph.add(
+            GenericProjectionFactorPose3Point3Cal3_S2(
+                Point2(vec(*pt1)), measurement_noise, symbol('x', 0), symbol('l', lid), K))
+
+        graph.add(
+            GenericProjectionFactorPose3Point3Cal3_S2(
+                Point2(vec(*pt2)), measurement_noise, symbol('x', 1), symbol('l', lid), K))
+
+    
+    # Create the initial estimate to the solution
+    # Intentionally initialize the variables off from the ground truth
+    initialEstimate = Values()
+    # delta = Pose3(Rot3.rodriguez(-0.1, 0.2, 0.25), Point3(0.05, -0.10, 0.20))
+    initialEstimate.insert(symbol('x', 0), Pose3())
+    initialEstimate.insert(symbol('x', 1), Pose3(p_21.matrix))
+
+    # Insert intial estimates for landmark
+    for lid, pt in enumerate(X):
+        initialEstimate.insert(symbol('l', lid), Point3(pt.ravel()))
+    
+    # Optimize the graph and print results
+    try: 
+        result = DoglegOptimizer(graph, initialEstimate).optimize()
+        result.printf("Final results:\n")
+    except Exception, e:
+        print(get_exception_variable(e.message))
+        import IPython; IPython.embed()
+        raise RuntimeError()
+
+    print('\nBA SUCCESSFUL\n' + '=' * 80)
+    import IPython; IPython.embed()
+        
 class VisualSLAM(BaseSLAM): 
     def __init__(self, calib, min_landmark_obs=cfg.VSLAM_MIN_LANDMARK_OBS,
                  odom_noise=cfg.ODOM_NOISE, prior_pose_noise=cfg.PRIOR_POSE_NOISE,
@@ -692,7 +762,6 @@ class VisualSLAM(BaseSLAM):
             # Initialize the point value, set in_graph, and
             # remove the smart factor once point is computed
             pt3 = smart.point_compute(current)
-            print pt3.vector()
             
             # Provide initial estimate to factor graph
             assert(lid not in self.ls_)

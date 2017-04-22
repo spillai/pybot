@@ -25,6 +25,10 @@ from pybot.vision.trackers import OpenCVKLT, OpticalFlowTracker
 
 # from pybot_vision import scaled_color_disp
 
+# Testing
+from pybot.mapping.gtsam import two_view_BA
+from pybot.vision.camera_utils import triangulate_points, compute_essential, decompose_E
+
 # MapPoint = namedtuple('MapPoint', ['id', 'pt', 'pt3', 'parallax'], verbose=False)
 
 
@@ -91,7 +95,7 @@ class TrackReconstruction(object):
                                       odom_noise=np.ones(6) * 0.5, 
                                       px_noise=np.ones(2) * 2.0,
                                       prior_point3d_noise=np.ones(3) * 0.01,
-                                      verbose=True)
+                                      verbose=False)
         
     @timeitmethod
     def on_frame(self, fidx, frame, kf_ids, kf_pts):
@@ -152,15 +156,38 @@ class TrackReconstruction(object):
         # ---------------------------
         # 3. FILTERING VIA SAMPSON ERROR 
 
-        # Filter matched IDs based on epipolar constraint
-        # use sampson error (two-way pixel error)
-        kf_pts1, kf_pts2, matched_ids = filter_sampson_error(
-            cam1, cam2, kf_pts1, kf_pts2, matched_ids, error=2
-        )
-        if not len(matched_ids): return         
-        fvis = draw_matches(fvis, kf_pts1, kf_pts2, colors=np.tile([0,255,0], [len(kf_pts1), 1]))
+        # # Filter matched IDs based on epipolar constraint
+        # # use sampson error (two-way pixel error)
+        # kf_pts1, kf_pts2, matched_ids = filter_sampson_error(
+        #     cam1, cam2, kf_pts1, kf_pts2, matched_ids, error=2
+        # )
+        # if not len(matched_ids): return         
+        # npts2 = len(kf_pts1)
+
+        # ---------------------------
+        # 3. FILTERING VIA Fundamental matrix RANSAC
+
+        # Fundamental matrix estimation
+        method, px_dist, conf =  cv2.cv.CV_FM_RANSAC, 3, 0.99
+        (F, inliers) = cv2.findFundamentalMat(kf_pts1, kf_pts2, method, px_dist, conf)
+        inliers = inliers.ravel().astype(np.bool)
+        kf_pts1, kf_pts2 = kf_pts1[inliers], kf_pts2[inliers]
+        matched_ids = matched_ids[inliers]
         npts2 = len(kf_pts1)
 
+        # Test BA
+        E = compute_essential(F, cam1.K)
+        R1, R2, t = decompose_E(E)
+        print 'E', E
+        print 'R1/R2/t', R1, R2, t
+        X = triangulate_points(cam1, kf_pts1, cam2, kf_pts2)
+        two_view_BA(cam1, kf_pts1, kf_pts2,
+                    X, frame1.pose.inverse() * frame2.pose, scale_prior=True)
+        
+        # -----------------------------
+        # Visualize
+        fvis = draw_matches(fvis, kf_pts1, kf_pts2,
+                            colors=np.tile([0,255,0], [len(kf_pts1), 1]))
         print_yellow('Matches {:}, Sampson Filtered {:}, Parallax filter'.format(npts1, npts2, npts2))
         imshow_cv('vis_matches', fvis)
 
@@ -352,7 +379,7 @@ class MeshReconstruction(object):
 
         # =================
         # Keyframe sampler
-        self.kf_sampler_ = KeyframeSampler(theta=np.deg2rad(20), displacement=2, lookup_history=100, 
+        self.kf_sampler_ = KeyframeSampler(theta=np.deg2rad(20), displacement=2, lookup_history=30, 
                                            on_sampled_cb=self.on_keyframe, verbose=False)
 
         # =================
