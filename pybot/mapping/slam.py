@@ -121,8 +121,8 @@ class BaseSLAM(_BaseSLAM):
         p_odom = (self.q_poses_.items[-2].inverse()).oplus(self.q_poses_.items[-1])
         self.add_odom_incremental(p_odom.matrix, noise=noise)
 
-        # 3. Update
-        self._update_check()
+        # # 3. Update
+        # self._update_check()
 
         return self.latest
 
@@ -142,8 +142,8 @@ class BaseSLAM(_BaseSLAM):
         self.q_poses_.accumulate(p * self.q_poses_.latest)
         self.add_odom_incremental(p.matrix, noise=noise)
 
-        # 3. Update
-        self._update_check()
+        # # 3. Update
+        # self._update_check()
         
         return self.latest
     
@@ -156,8 +156,8 @@ class BaseSLAM(_BaseSLAM):
         # 1. SLAM: Add relative pose measurements (odometry)
         self.add_relative_pose_constraint(idx1, idx2, p.matrix, noise=noise)
 
-        # 2. Update
-        self._update_check()
+        # # 2. Update
+        # self._update_check()
 
         return self.latest
         
@@ -165,8 +165,8 @@ class BaseSLAM(_BaseSLAM):
         deltas = [p.matrix for p in poses]
         self.add_pose_landmarks_incremental(ids, deltas)
 
-        # 2. Update
-        self._update_check()
+        # # 2. Update
+        # self._update_check()
 
         return self.latest
 
@@ -293,10 +293,13 @@ class VisualSLAM(BaseSLAM, _VisualSLAM):
         """
         Check whether update is required
         """
-        if self.latest >= 2 and self.latest % self.update_every_k_odom_ == 0: 
+        if self.latest == 3 or \
+           (self.latest >= 3 and self.latest % self.update_every_k_odom_ == 0):
+            
             self.update()
             lids, pts3_w = self.smart_update()
-
+            self.update()
+            
             if not len(pts3_w):
                 return
                 

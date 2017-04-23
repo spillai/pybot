@@ -90,12 +90,12 @@ class TrackReconstruction(object):
         
         # Visual ISAM2 with KLT tracks
         self.vslam_ = RobotVisualSLAM(self.cam_.intrinsics, 
-                                      min_landmark_obs=4, px_error_threshold=10,
+                                      min_landmark_obs=2, px_error_threshold=2,
                                       update_every_k_odom=1, 
-                                      odom_noise=np.ones(6) * 0.5, 
+                                      odom_noise=np.ones(6) * 0.1, 
                                       px_noise=np.ones(2) * 2.0,
-                                      prior_point3d_noise=np.ones(3) * 0.01,
-                                      verbose=False)
+                                      prior_point3d_noise=np.ones(3) * 0.1,
+                                      verbose=True)
         
     @timeitmethod
     def on_frame(self, fidx, frame, kf_ids, kf_pts):
@@ -175,14 +175,16 @@ class TrackReconstruction(object):
         matched_ids = matched_ids[inliers]
         npts2 = len(kf_pts1)
 
-        # Test BA
-        E = compute_essential(F, cam1.K)
-        R1, R2, t = decompose_E(E)
-        print 'E', E
-        print 'R1/R2/t', R1, R2, t
-        X = triangulate_points(cam1, kf_pts1, cam2, kf_pts2)
-        two_view_BA(cam1, kf_pts1, kf_pts2,
-                    X, frame1.pose.inverse() * frame2.pose, scale_prior=True)
+        # # Test BA
+        # E = compute_essential(F, cam1.K)
+        # R1, R2, t = decompose_E(E)
+        
+        # print 'E', E
+        # print 'R1/R2/t', R1, R2, t
+        # X = cam1.triangulate(kf_pts1, cam2, kf_pts2)
+        # # X = triangulate_points(cam1, kf_pts1, cam2, kf_pts2)
+        # two_view_BA(cam1, kf_pts1, kf_pts2,
+        #             X, frame1.pose.inverse() * frame2.pose, scale_prior=True)
         
         # -----------------------------
         # Visualize

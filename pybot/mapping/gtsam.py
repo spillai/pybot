@@ -30,6 +30,7 @@ from pygtsam import StereoPoint2, Cal3_S2Stereo, \
 from pygtsam import NonlinearEqualityPose3
 from pygtsam import Isotropic
 from pygtsam import Diagonal, Values, Marginals
+from pygtsam import ISAM2Params
 from pygtsam import ISAM2, NonlinearOptimizer, \
     NonlinearFactorGraph, LevenbergMarquardtOptimizer, DoglegOptimizer
 
@@ -51,7 +52,7 @@ def get_exception_variable(msg):
     """
     try:
         s = Symbol(int(msg.split('\n')[2][:-1])).index()
-        custom_message = 'Symbol: {}'.format(s)
+        custom_message = '{}\nSymbol: {}'.format(msg, s)
         print(custom_message)
     except:
         return 'unknown'
@@ -85,7 +86,8 @@ class BaseSLAM(object):
         # ISAM2 interface
         self.slam_ = ISAM2()
         self.slam_lock_ = Lock()
-
+        self.batch_init_ = False
+        
         self.idx_ = -1
         self.verbose_ = verbose
 
@@ -111,7 +113,7 @@ class BaseSLAM(object):
 
         # Timestamped look up for landmarks, and poses
         # self.timer_ls_ = defaultdict(list)
-        self.export_graph_ = export_graph
+        # self.export_graph_ = export_graph
 
         # Graph visualization
         # if self.export_graph_: 
@@ -326,20 +328,37 @@ class BaseSLAM(object):
     @timeitmethod
     def _update(self): 
         # print('.')
-
+        print('_update {}'.format(self.idx_))
+        
         # Update ISAM with new nodes/factors and initial estimates
         try: 
-            # Update with estimates, and then cleanup
-            # print self.graph_.printf()
-            self.slam_.update(self.graph_, self.initial_)
-            self.graph_.resize(0)
-            self.initial_.clear()
-            self.slam_.update()
+
+            # Do a full optimization on the first two poses,
+            # before performing updates for subsequent calls
+            if not self.batch_init_:
+                self.batch_init_ = True
+                opt = LevenbergMarquardtOptimizer(self.graph_, self.initial_)
+                current = opt.optimize()
+                self.slam_.update(self.graph_, current)
+
+                print 'Current:'
+                current.printf()
+                
+            # Update with estimates
+            else: 
+                self.slam_.update(self.graph_, self.initial_)
+                self.slam_.update()
+                
         except Exception, e:
-            s = get_exception_variable(e)
+            s = get_exception_variable(e.message)
             import IPython; IPython.embed()
             raise RuntimeError()
 
+        # Graph and initial values cleanup
+        # print self.graph_.printf()
+        self.graph_.resize(0)
+        self.initial_.clear()
+        
         # Get current estimate
         self.current_ = self.slam_.calculateEstimate()
             
@@ -528,13 +547,18 @@ def two_view_BA(K, pts1, pts2, X, p_21, scale_prior=True):
     measurement_noise = Diagonal.Sigmas(vec(*px_noise))
 
     # Add a prior on pose x0
-    pose_noise = Diagonal.Sigmas(vec(0.3, 0.3, 0.3, 0.1, 0.1, 0.1))
+    pose_noise = Diagonal.Sigmas(vec(0.1, 0.1, 0.1, 0.05, 0.05, 0.05))
     graph.add(PriorFactorPose3(symbol('x', 0), Pose3(), pose_noise))
 
+    # Add relative pose constraint between x0-x1
+    pdelta = Pose3(p_21.matrix)
+    odo_noise = Diagonal.Sigmas(np.ones(6) * 0.1)
+    graph.add(BetweenFactorPose3(symbol('x', 0), symbol('x', 1),
+                                 pdelta, odo_noise))
+              
     # Add prior on first landmark (scale prior for monocular case)
-    point_noise = Diagonal.Sigmas(np.ones(3) * 0.1)
-
-    for j in range(5): 
+    point_noise = Diagonal.Sigmas(np.ones(3) * 0.05)
+    for j in range(max(5, len(X))): 
         point = Point3(X[j,:].ravel())
         graph.add(PriorFactorPoint3(symbol('l', j), point, point_noise))
     
@@ -569,6 +593,7 @@ def two_view_BA(K, pts1, pts2, X, p_21, scale_prior=True):
         import IPython; IPython.embed()
         raise RuntimeError()
 
+    print 'Original pose: ', p_21
     print('\nBA SUCCESSFUL\n' + '=' * 80)
     import IPython; IPython.embed()
         
@@ -579,6 +604,12 @@ class VisualSLAM(BaseSLAM):
                  px_error_threshold=4, px_noise=cfg.PX_MEASUREMENT_NOISE, verbose=False):
         BaseSLAM.__init__(self, odom_noise=odom_noise, prior_pose_noise=prior_pose_noise, verbose=verbose)
 
+        # Set relinearizationskip, and factorization method
+        # params = ISAM2Params()
+        # params.setRelinearizeSkip(1)
+        # params.setFactorization('CHOLESKY')
+        # self.slam_ = ISAM2(params)
+        
         self.px_error_threshold_ = px_error_threshold
         self.min_landmark_obs_ = min_landmark_obs
         assert(self.min_landmark_obs_ >= 2)
@@ -751,12 +782,17 @@ class VisualSLAM(BaseSLAM):
 
             # Cannot do much when degenerate or behind camera
             if smart.isDegenerate() or smart.isPointBehindCamera():
+                # Delete smart lid factor and key,val pair
+                del smart
+                del self.lid_factors_[lid]
                 continue
 
             # Check smartfactor reprojection error 
             err = smart.error(current)
             print lid, err
-            if err > self.px_error_threshold_: #  or err <= 0.0:
+            if err > self.px_error_threshold_ or err <= 0.0:
+                del smart
+                del self.lid_factors_[lid]
                 continue
 
             # Initialize the point value, set in_graph, and
@@ -770,6 +806,8 @@ class VisualSLAM(BaseSLAM):
                 self.ls_[lid] = pt3
                 if self.verbose_: 
                     sys.stdout.write('il{}, '.format(lid))
+            else:
+                assert(0)
                     
             # self.timer_ls_[self.latest].append(lid)
 
@@ -798,8 +836,8 @@ class VisualSLAM(BaseSLAM):
                 # if self.verbose_: 
                 #     sys.stdout.write('a{},'.format(Symbol(x_id).index()))
 
-                # self.graph_.add(GenericProjectionFactorPose3Point3Cal3_S2(
-                #     pt, self.image_measurement_noise_, x_id, l_id, self.K_))
+                self.graph_.add(GenericProjectionFactorPose3Point3Cal3_S2(
+                    pt, self.image_measurement_noise_, x_id, l_id, self.K_))
                 
                 # # Add to landmark measurements
                 # self.xls_.append((Symbol(x_id).index(), lid))
@@ -822,11 +860,13 @@ class VisualSLAM(BaseSLAM):
 
 
         # Add landmark priors to first set of landmarks
+        print 'err threshold:', self.px_error_threshold_
         print 'Smart update index: {}, # landmarks: {}'.format(self.index, lids)
-        if self.index <= 2: 
+        if self.index <= 2:
+            
             for lid, pt3 in izip(lids, pts3): 
                 self.add_landmark_prior(lid, pt3)
-                break
+                
         if self.verbose_: 
             print_yellow('smart_update() DONE')
             
