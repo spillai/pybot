@@ -145,7 +145,7 @@ def decompose_E(E):
     TODO Perform Cheirality check: 
     See https://github.com/opencv/opencv/blob/710506e9e220880423ebda5cc5d6d8d72df29a29/modules/calib3d/src/five-point.cpp#L506
 
-    [R1,t], [-R1,t], [R2,t], [-R2,t]
+    [R1,t], [R2,t], [R1,-t], [R2,-t]
     """
     U,S,Vt = svd(E)
     W = np.float32([[0,-1,0],
@@ -163,6 +163,9 @@ def decompose_E(E):
         R2 = -R2
 
     return R1, R2, t
+
+def recover_pose(E, pts1, pts2, K, distance_threshold, mask):
+    raise NotImplementedError()
 
 def compute_fundamental(x1, x2, method=cv2.FM_RANSAC): 
     """
