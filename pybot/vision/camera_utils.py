@@ -142,6 +142,9 @@ def decompose_E(E):
     R1,R2, and the relative translation. Only consider cases where
     points are in front of the camera.
 
+    TODO Perform Cheirality check: 
+    See https://github.com/opencv/opencv/blob/710506e9e220880423ebda5cc5d6d8d72df29a29/modules/calib3d/src/five-point.cpp#L506
+
     [R1,t], [-R1,t], [R2,t], [-R2,t]
     """
     U,S,Vt = svd(E)
@@ -149,7 +152,7 @@ def decompose_E(E):
                     [1,0,0],
                     [0,0,1]])
     R = U.dot(W).dot(Vt)
-    t = U[:,2]
+    t = U[:,2] / np.linalg.norm(U[:,2])
     assert(np.fabs(np.linalg.norm(t)-1.0) < 1e-6)
     
     R1 = U.dot(W).dot(Vt)
