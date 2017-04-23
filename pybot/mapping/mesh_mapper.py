@@ -13,7 +13,7 @@ from pybot.vision.imshow_utils import imshow_cv, print_status
 from pybot.utils.pose_utils import KeyframeSampler, Keyframe
  
 from pybot.vision.camera_utils import Camera, CameraIntrinsic, CameraExtrinsic
-from pybot.vision.camera_utils import triangulate_points, sampson_error, plot_epipolar_line
+from pybot.vision.camera_utils import triangulate_points, filter_sampson_error, plot_epipolar_line
 
 import pybot.externals.draw_utils as draw_utils
 
@@ -31,25 +31,6 @@ from pybot.vision.camera_utils import triangulate_points, compute_essential, dec
 
 # MapPoint = namedtuple('MapPoint', ['id', 'pt', 'pt3', 'parallax'], verbose=False)
 
-
-def filter_sampson_error(cam1, cam2, pts1, pts2, matched_ids, error=4): 
-    """
-    Filter feature matches via sampson error given the
-    two camera extrinsics.
-    """
-
-    # Determine inliers (via sampson error)
-    F = cam1.F(cam2)
-    err = sampson_error(F, pts2, pts1)
-    inliers, = np.where(np.fabs(err) < error)
-
-    # Retain only inliers
-    pts1, pts2, matched_ids = pts1[inliers], \
-                              pts2[inliers], \
-                              matched_ids[inliers]
-
-    assert(len(pts1) == len(pts2) == len(matched_ids))
-    return pts1, pts2, matched_ids
 
 # def filter_parallax(self, cam, kf_pts, frame_pts, matched_ids): 
 

@@ -547,8 +547,8 @@ def two_view_BA(K, pts1, pts2, X, p_21, scale_prior=True):
     measurement_noise = Diagonal.Sigmas(vec(*px_noise))
 
     # Add a prior on pose x0
-    pose_noise = Diagonal.Sigmas(vec(0.1, 0.1, 0.1, 0.05, 0.05, 0.05))
-    graph.add(PriorFactorPose3(symbol('x', 0), Pose3(), pose_noise))
+    prior_pose_noise = Diagonal.Sigmas(vec(0.1, 0.1, 0.1, 0.05, 0.05, 0.05))
+    graph.add(PriorFactorPose3(symbol('x', 0), Pose3(), prior_pose_noise))
 
     # Add relative pose constraint between x0-x1
     pdelta = Pose3(p_21.matrix)

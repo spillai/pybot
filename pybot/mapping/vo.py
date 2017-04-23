@@ -55,13 +55,11 @@ class SimpleVO(object):
         self.klt_.process(im)
         
         # Gather points, ids, flow and age
-        ids, pts, age, flow = self.klt_.latest_ids, self.klt_.latest_pts, \
-                              self.klt_.latest_age, self.klt_.latest_flow
-        inds = age > 1
+        ids, pts, age, flow = self.klt_.latest_ids, self.klt_.latest_pts
         
         # Add KF items to queue
         self.kf_items_q_.accumulate(
-            AttrDict(img=im, ids=ids, pts=pts, age=age, flow=flow)
+            AttrDict(img=im, ids=ids, pts=pts)
         )
 
         # ---------------------------

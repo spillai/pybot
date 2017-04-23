@@ -60,7 +60,26 @@ def sampson_error(F, pts1, pts2):
     # Sampson distance as error measure
     denom = Fx1[0]**2 + Fx1[1]**2 + Fx2[0]**2 + Fx2[1]**2
     return ( np.diag(x1.T.dot(Fx2)) )**2 / denom 
-    
+
+def filter_sampson_error(cam1, cam2, pts1, pts2, matched_ids, error=4): 
+    """
+    Filter feature matches via sampson error given the
+    two camera extrinsics.
+    """
+
+    # Determine inliers (via sampson error)
+    F = cam1.F(cam2)
+    err = sampson_error(F, pts2, pts1)
+    inliers, = np.where(np.fabs(err) < error)
+
+    # Retain only inliers
+    pts1, pts2, matched_ids = pts1[inliers], \
+                              pts2[inliers], \
+                              matched_ids[inliers]
+
+    assert(len(pts1) == len(pts2) == len(matched_ids))
+    return pts1, pts2, matched_ids
+
 def get_baseline(fx, baseline=None, baseline_px=None): 
     """
     Retrieve baseline / baseline(in pixels) using the focal length
