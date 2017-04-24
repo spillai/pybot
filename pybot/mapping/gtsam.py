@@ -51,8 +51,8 @@ def get_exception_variable(msg):
     Catch exception and print relevant gtsam symbol
     """
     try:
-        s = Symbol(int(msg.split('\n')[2][:-1])).index()
-        custom_message = '{}\nSymbol: {}'.format(msg, s)
+        s = Symbol(int(msg.split('\n')[2][:-1]))
+        custom_message = '{}\nSymbol: {} {}'.format(msg, chr(s.chr()), s.index())
         print(custom_message)
     except:
         return 'unknown'
@@ -380,19 +380,19 @@ class BaseSLAM(object):
         with self.state_lock_: 
             # Extract and update landmarks and poses
             for k,v in poses.iteritems():
-                if k.chr() == ord('l'): 
+                if chr(k.chr()) == 'l': 
                     self.ls_[k.index()] = v
-                elif k.chr() == ord('x'): 
+                elif chr(k.chr()) == 'x': 
                     self.xs_[k.index()] = v
                 else: 
-                    raise RuntimeError('Unknown key chr {:}'.format(k.chr))
+                    raise RuntimeError('Unknown key chr {} {}'.format(chr(k.chr()), k.index()))
 
             # Extract and update landmarks
             for k,v in landmarks.iteritems():
-                if k.chr() == ord('l'): 
+                if chr(k.chr()) == 'l': 
                     self.ls_[k.index()] = v
                 else: 
-                    raise RuntimeError('Unknown key chr {:}'.format(k.chr))
+                    raise RuntimeError('Unknown key chr {} {}'.format(chr(k.chr()), k.index()))
             
         # self.cleanup()
         
