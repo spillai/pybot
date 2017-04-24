@@ -46,17 +46,19 @@ def matrix(m):
 def vec(*args):
     return vector(list(args)) 
 
-def get_exception_variable(msg):
+def get_exception_variable(msg, print_message=False):
     """ 
     Catch exception and print relevant gtsam symbol
     """
     try:
-        s = Symbol(int(msg.split('\n')[2][:-1]))
-        custom_message = '{}\nSymbol: {} {}'.format(msg, chr(s.chr()), s.index())
-        print(custom_message)
+        split = msg.split('\n')
+        s = Symbol(int(split[2][:-1]))
+        custom_message = '{} (Symbol: {} {})'.format(split[1], chr(s.chr()), s.index())
+        if print_message:
+            custom_message = custom_message + '{}\n'.format(msg)
     except:
         return 'unknown'
-    return s 
+    return custom_message 
 
 class BaseSLAM(object):
     """
@@ -350,7 +352,7 @@ class BaseSLAM(object):
                 self.slam_.update()
                 
         except Exception, e:
-            s = get_exception_variable(e.message)
+            s = get_exception_variable(e.message); print(s)
             import IPython; IPython.embed()
             raise RuntimeError()
 
@@ -589,7 +591,7 @@ def two_view_BA(K, pts1, pts2, X, p_21, scale_prior=True):
         result = DoglegOptimizer(graph, initialEstimate).optimize()
         result.printf("Final results:\n")
     except Exception, e:
-        print(get_exception_variable(e.message))
+        s = get_exception_variable(e.message); print(s)
         import IPython; IPython.embed()
         raise RuntimeError()
 
