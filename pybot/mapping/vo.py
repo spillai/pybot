@@ -16,6 +16,13 @@ from pybot.geometry.rigid_transform import Pose, RigidTransform
 from pybot.vision.camera_utils import compute_essential, decompose_E
 from pybot.vision.feature_detection import FeatureDetector
 from pybot.vision.trackers.base_klt import OpenCVKLT
+from pybot.vision.draw_utils import draw_features, draw_matches
+from pybot.vision.imshow_utils import imshow_cv, print_status
+
+try: 
+    from pybot_vision import recoverPose
+except Exception,e:
+    raise RuntimeWarning('Failed to import pybot_vision.recoverPose {}'.format(e.message))
 
 class SimpleVO(object):
     def __init__(self, calib):
@@ -25,7 +32,7 @@ class SimpleVO(object):
         # Setup detector params
         fast_params = FeatureDetector.fast_params
         fast_params.threshold = 20
-        detector_params = dict(method='fast', grid=(8,5), max_corners=100, 
+        detector_params = dict(method='fast', grid=(8,5), max_corners=200, 
                                max_levels=1, subpixel=True,
                                params=FeatureDetector.fast_params)
 
@@ -40,7 +47,7 @@ class SimpleVO(object):
         
 
         
-    def process_cv3(self, pts1, pts2):
+    def _process_pts_cv3(self, pts1, pts2):
         focal = self.calib_.fx
         pp = (self.calib_.cx, self.calib_.cy)
         E, mask = cv2.findEssentialMat(pts2, pts1,
@@ -49,13 +56,44 @@ class SimpleVO(object):
         _, R, t, mask = cv2.recoverPose(E, pts2, pts1, focal=focal, pp=pp)
         print E, R, t
 
+    def _process_pts_wrap(self, pts1, pts2):
+        # Fundamental matrix estimation
+        method, px_dist, conf =  cv2.cv.CV_FM_RANSAC, 3, 0.99
+        (F, inliers) = cv2.findFundamentalMat(pts1, pts2, method, px_dist, conf)
+        E = compute_essential(F, self.calib_.K)
+        distance_threshold = 1.0
+        R, t, X, mask = recoverPose(E, pts1, pts2, self.calib_.K, distance_threshold, inliers)
+        print t, X.shape
+        
+    def _process_pts(self, pts1, pts2):
+        
+        # Fundamental matrix estimation
+        method, px_dist, conf =  cv2.cv.CV_FM_RANSAC, 3, 0.99
+        (F, inliers) = cv2.findFundamentalMat(pts1, pts2, method, px_dist, conf)
+        inliers = inliers.ravel().astype(np.bool)
+        pts1, pts2 = pts1[inliers], pts2[inliers]
+        # ids = ids[inliers]
+        npts2 = len(pts1)
+
+        # Test BA
+        E = compute_essential(F, self.calib_.K)
+        R1, R2, t = decompose_E(E)
+
+        print RigidTransform.from_Rt(R1, t), RigidTransform.from_Rt(R2, t)
+
+        # X = triangulate_points(cam1, kf_pts1, cam2, kf_pts2)
+        # two_view_BA(cam1, kf_pts1, kf_pts2,
+        #             X, frame1.pose.inverse() * frame2.pose, scale_prior=True)
+
+        
+        
     def process(self, im):
         # ---------------------------
         # 1. Process image: KLT tracking
         self.klt_.process(im)
         
         # Gather points, ids, flow and age
-        ids, pts, age, flow = self.klt_.latest_ids, self.klt_.latest_pts
+        ids, pts = self.klt_.latest_ids, self.klt_.latest_pts
         
         # Add KF items to queue
         self.kf_items_q_.accumulate(
@@ -86,29 +124,15 @@ class SimpleVO(object):
         kf_pts1 = np.vstack([ kf_pts1_lut[tid] for tid in matched_ids ])
         kf_pts2 = np.vstack([ kf_pts2_lut[tid] for tid in matched_ids ])
 
-        # fvis = draw_matches(frame2.img, kf_pts1, kf_pts2, colors=np.tile([0,0,255], [len(kf_pts1), 1]))
-        # npts1 = len(kf_pts1)
-
+        fvis = draw_matches(im, kf_pts1, kf_pts2, colors=np.tile([0,255,0], [len(kf_pts1), 1]))
+        npts1 = len(kf_pts1)
+        imshow_cv('vis', fvis)
+        
         # ---------------------------
         # 3. FILTERING VIA Fundamental matrix RANSAC
 
-        # Fundamental matrix estimation
-        method, px_dist, conf =  cv2.cv.CV_FM_RANSAC, 3, 0.99
-        (F, inliers) = cv2.findFundamentalMat(kf_pts1, kf_pts2, method, px_dist, conf)
-        inliers = inliers.ravel().astype(np.bool)
-        kf_pts1, kf_pts2 = kf_pts1[inliers], kf_pts2[inliers]
-        matched_ids = matched_ids[inliers]
-        npts2 = len(kf_pts1)
-
-        # Test BA
-        E = compute_essential(F, self.calib_.K)
-        R1, R2, t = decompose_E(E)
-
-        print RigidTransform.from_Rt(R1, t), RigidTransform.from_Rt(R2, t)
-
-        # X = triangulate_points(cam1, kf_pts1, cam2, kf_pts2)
-        # two_view_BA(cam1, kf_pts1, kf_pts2,
-        #             X, frame1.pose.inverse() * frame2.pose, scale_prior=True)
+        # self._process_pts(kf_pts1, kf_pts2)
+        self._process_pts_wrap(kf_pts1, kf_pts2)
 
 
         
