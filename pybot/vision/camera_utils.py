@@ -5,7 +5,6 @@ import cv2
 
 import numpy as np
 from numpy.linalg import det, norm
-import numpy.matlib as npm
 from scipy.linalg import svd
 
 from pybot.vision.color_utils import get_color_by_label
@@ -106,7 +105,7 @@ def construct_K(fx=500.0, fy=500.0, cx=319.5, cy=239.5):
     """
     Create camera intrinsics from focal lengths and focal centers
     """
-    K = npm.eye(3)
+    K = np.eye(3)
     K[0,0], K[1,1] = fx, fy
     K[0,2], K[1,2] = cx, cy
     return K
@@ -523,7 +522,7 @@ class CameraIntrinsic(object):
                                      k1=db.k1, k2=db.k2, k3=db.k3, p1=db.p1, p2=db.p2, shape=shape)
     
 class CameraExtrinsic(RigidTransform): 
-    def __init__(self, R=npm.eye(3), t=npm.zeros(3)):
+    def __init__(self, R=np.eye(3), t=np.zeros(3)):
         """
         Pose is defined as p_cw (pose of the world wrt camera)
         """
@@ -698,7 +697,7 @@ class Camera(CameraIntrinsic, CameraExtrinsic):
         """
         if self.cx is None: 
             raise AssertionError('cx, cy is not set')
-        return npm.matrix([self.cx, self.cy])
+        return np.matrix([self.cx, self.cy])
 
     def set_pose(self, pose): 
         """
