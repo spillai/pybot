@@ -18,6 +18,10 @@ from pybot.vision.feature_detection import FeatureDetector
 from pybot.vision.trackers.base_klt import OpenCVKLT
 from pybot.vision.draw_utils import draw_features, draw_matches
 from pybot.vision.imshow_utils import imshow_cv, print_status
+from pybot.vision.image_utils import to_color
+from pybot.utils.timer import timeitmethod
+
+from pybot.externals.lcm import draw_utils
 
 try: 
     from pybot_vision import recoverPose
@@ -28,25 +32,29 @@ class SimpleVO(object):
     def __init__(self, calib):
         self.calib_ = calib
         self.kf_items_q_ = Accumulator(maxlen=2)
-
+        self.poses_q_ = Accumulator(maxlen=2)
+        self.poses_q_.accumulate(RigidTransform())
+        
         # Setup detector params
+        num_tracks = 500
         fast_params = FeatureDetector.fast_params
         fast_params.threshold = 20
-        detector_params = dict(method='fast', grid=(8,5), max_corners=200, 
+        detector_params = dict(method='fast', grid=(16,9), max_corners=num_tracks, 
                                max_levels=1, subpixel=True,
                                params=FeatureDetector.fast_params)
 
         # Setup tracker params (either lk, or dense)
-        lk_params = dict(winSize=(5,5), maxLevel=3)
+        lk_params = dict(winSize=(21,21), maxLevel=3)
+        # criteria = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 30, 0.01))
         tracker_params = dict(method='lk', fb_check=True, params=lk_params)
 
         # Create KLT from detector params only
         self.klt_ = OpenCVKLT.from_params(detector_params=detector_params, 
                                           tracker_params=tracker_params, 
-                                          min_tracks=100)
-        
+                                          min_tracks=num_tracks)
 
         
+    @timeitmethod
     def _process_pts_cv3(self, pts1, pts2):
         focal = self.calib_.fx
         pp = (self.calib_.cx, self.calib_.cy)
@@ -54,40 +62,41 @@ class SimpleVO(object):
                                        focal=focal, pp=pp, 
                                        method=cv2.RANSAC, prob=0.999, threshold=1.0)
         _, R, t, mask = cv2.recoverPose(E, pts2, pts1, focal=focal, pp=pp)
-        print E, R, t
+        return RigidTransform.from_Rt(R, t.ravel())
 
+    @timeitmethod
     def _process_pts_wrap(self, pts1, pts2):
         # Fundamental matrix estimation
-        method, px_dist, conf =  cv2.cv.CV_FM_RANSAC, 3, 0.99
+        method, px_dist, conf =  cv2.cv.CV_FM_RANSAC, 1, 0.99
         (F, inliers) = cv2.findFundamentalMat(pts1, pts2, method, px_dist, conf)
         E = compute_essential(F, self.calib_.K)
         distance_threshold = 1.0
         R, t, X, mask = recoverPose(E, pts1, pts2, self.calib_.K, distance_threshold, inliers)
-        print t, X.shape
-        
+        return RigidTransform.from_Rt(R, t.ravel())
+
+    @timeitmethod
     def _process_pts(self, pts1, pts2):
         
         # Fundamental matrix estimation
-        method, px_dist, conf =  cv2.cv.CV_FM_RANSAC, 3, 0.99
+        method, px_dist, conf =  cv2.cv.CV_FM_RANSAC, 1, 0.99
         (F, inliers) = cv2.findFundamentalMat(pts1, pts2, method, px_dist, conf)
         inliers = inliers.ravel().astype(np.bool)
         pts1, pts2 = pts1[inliers], pts2[inliers]
-        # ids = ids[inliers]
         npts2 = len(pts1)
 
-        # Test BA
+        # Compute E -> R1,R2,t
         E = compute_essential(F, self.calib_.K)
         R1, R2, t = decompose_E(E)
 
-        print RigidTransform.from_Rt(R1, t), RigidTransform.from_Rt(R2, t)
-
-        # X = triangulate_points(cam1, kf_pts1, cam2, kf_pts2)
-        # two_view_BA(cam1, kf_pts1, kf_pts2,
-        #             X, frame1.pose.inverse() * frame2.pose, scale_prior=True)
-
-        
-        
-    def process(self, im):
+        # Naive strategy: Pick R with the least incremental rotation 
+        rts = [RigidTransform.from_Rt(R1, t), RigidTransform.from_Rt(R2, t)]
+        rts_norm = [np.linalg.norm(rt.rpyxyz[:3]) for rt in rts]
+        rt = rts[1] if rts_norm[0] > rts_norm[1] \
+             else rts[0]
+        return rt
+    
+    @timeitmethod
+    def process(self, im, scale=1.0):
         # ---------------------------
         # 1. Process image: KLT tracking
         self.klt_.process(im)
@@ -124,17 +133,38 @@ class SimpleVO(object):
         kf_pts1 = np.vstack([ kf_pts1_lut[tid] for tid in matched_ids ])
         kf_pts2 = np.vstack([ kf_pts2_lut[tid] for tid in matched_ids ])
 
-        fvis = draw_matches(im, kf_pts1, kf_pts2, colors=np.tile([0,255,0], [len(kf_pts1), 1]))
-        npts1 = len(kf_pts1)
-        imshow_cv('vis', fvis)
+        # fvis = draw_matches(im, kf_pts1, kf_pts2, colors=np.tile([0,255,0], [len(kf_pts1), 1]))
+        # npts1 = len(kf_pts1)
+        # imshow_cv('fvis', fvis)
+
+        # vis = to_color(im)
+        # self.klt_.draw_tracks(vis, colored=True, color_type='unique')
+        # imshow_cv('vis', vis)
+
+        
         
         # ---------------------------
         # 3. FILTERING VIA Fundamental matrix RANSAC
 
         # self._process_pts(kf_pts1, kf_pts2)
-        self._process_pts_wrap(kf_pts1, kf_pts2)
+        rt = self._process_pts(kf_pts1, kf_pts2)
+        print rt
+        
+        R, t = rt.R, rt.tvec
+        crt = self.poses_q_.latest
+        cR, ct = crt.R, crt.tvec
 
+        ct = ct + scale * cR.dot(t)
+        cR = R.dot(cR)
 
+        newp = RigidTransform.from_Rt(cR, ct.ravel())
+        self.poses_q_.accumulate(newp)
+        
+        # newp = self.poses_q_.latest * nrt
+        # print self.poses_q_.index, np.rad2deg(nrt.rpyxyz[2])
+        draw_utils.publish_cameras('camera', [Pose.from_rigid_transform(self.poses_q_.index, newp)],
+                                   reset=False, frame_id='camera_upright')
+        draw_utils.publish_botviewer_image_t(im, jpeg=True)
         
 
 def test_vo():
@@ -142,15 +172,24 @@ def test_vo():
     from pybot.vision.imshow_utils import imshow_cv
     from pybot.utils.test_utils import test_dataset
     
-    dataset = test_dataset()
+    dataset = test_dataset('00')
     lcam = dataset.calib.left
 
     vo = SimpleVO(lcam)
-    for im in dataset.iteritems():
-        imshow_cv('im', im)
+
+    draw_utils.publish_sensor_frame('camera_upright',
+                                    pose=RigidTransform.from_rpyxyz(np.pi/2,np.pi/2,0,0,0,1))
+
+    
+    ppose = None
+    for f in dataset.iterframes():
+        # imshow_cv('im', im)
 
         # Process image: KLT tracking
-        vo.process(im)
+        scale = np.linalg.norm(ppose.tvec - f.pose.tvec) \
+                if ppose is not None else 1.0
+        ppose = f.pose
+        vo.process(f.left, scale=scale)
 
         # # scale
         # if scale > 0.1 and t[2] > t[0] and t[2] > 1:
