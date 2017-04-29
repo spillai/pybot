@@ -57,7 +57,8 @@ class TrackManager(object):
     def __init__(self, maxlen=20, on_delete_cb=lambda tracks: None): 
         # Max track length 
         self.maxlen_ = maxlen
-
+        self.max_id_ = -1
+        
         # Register callbacks on track delete
         self.on_delete_cb_ = on_delete_cb
 
@@ -79,10 +80,13 @@ class TrackManager(object):
         # Retain valid points
         valid = np.isfinite(pts).all(axis=1)
         pts = pts[valid]
+        N = len(pts)
 
         # ID valid points
-        max_id = np.max(self.ids) + 1 if len(self.ids) else 0
-        tids = np.arange(len(pts), dtype=np.int64) + max_id if ids is None else ids[valid].astype(np.int64)
+        max_id = self.max_id_ + 1 # np.max(self.ids) + 1 if len(self.ids) else 0
+        tids = np.arange(N, dtype=np.int64) + max_id if ids is None else ids[valid].astype(np.int64)
+        if ids is None:
+            self.max_id_ = N + max_id - 1
         
         # Add pts to track
         for tid, pt in zip(tids, pts): 
