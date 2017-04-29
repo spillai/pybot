@@ -281,6 +281,76 @@ class RigidTransform(object):
     def matrix(self): 
         return self.to_matrix()
 
+    def scaled(self, scale):
+        " Returns Sim3 representation of rigid-body transformation with scale "
+        return Sim3(xyzw=self.xyzw, tvec=self.tvec, scale=scale)
+
+###############################################################################
+class Sim3(RigidTransform): 
+    def __init__(self, xyzw=[0.,0.,0.,1.], tvec=[0.,0.,0.], scale=1.0):    
+        RigidTransform.__init__(self, xyzw=xyzw, tvec=tvec)
+        self.scale = scale
+
+    @classmethod
+    def from_matrix(cls, T):
+        sR_t = np.eye(4)
+        sR_t[:3,:3] = T[:3,:3] / T[3,3]
+        return cls(Quaternion.from_matrix(sR_t), T[:3,3], scale=1.0 / T[3,3])
+
+    def to_matrix(self):
+        result = self.quat.to_matrix()
+        result[:3, 3] = self.tvec
+        result[3, 3] = 1.0 / self.scale
+        result[:3, :3] /= self.scale
+        return result
+
+    def __mul__(self, other):
+        """ 
+        See RigidTransform.__mul__
+        Left-multiply RigidTransform with another rigid transform
+   
+        Two variants: 
+           RigidTransform: Identical to oplus operation
+            - t = self.t + self.scale * (self.R * o.t)
+            - R = o.R * self.R
+
+              - self * other = self.oplus(other)
+        """
+        if isinstance(other, RigidTransform):
+            return self.oplus(other)
+        else:
+            raise NotImplementedError()
+            # X = np.hstack([other, np.ones((len(other),1))]).T
+            # return (np.dot(self.matrix, X).T)[:,:3]
+
+    def oplus(self, other): 
+        if isinstance(other, RigidTransform): 
+            t = self.scale * self.quat.rotate(other.tvec) + self.tvec
+            r = self.quat * other.quat
+            return RigidTransform(r, t)
+        elif isinstance(other, list) and isinstance(other[0], ): 
+            return map(lambda o: self.oplus(o), other)
+        else: 
+            raise TypeError("Type inconsistent", type(other), other.__class__)
+
+###############################################################################
+        
+class Pose(RigidTransform): 
+    def __init__(self, pid, xyzw=[0.,0.,0.,1.], tvec=[0.,0.,0.]):
+        RigidTransform.__init__(self, xyzw=xyzw, tvec=tvec)
+        self.id = pid
+
+    @classmethod
+    def from_rigid_transform(cls, pid, pose):
+        return cls(pid, pose.quat, pose.tvec)
+    
+    def __repr__(self): 
+        return 'Pose ID: %i, rpy (rxyz): %s tvec: %s' % \
+            (self.id, 
+             np.array_str(self.quat.to_rpy(axes='rxyz'), precision=2), 
+             np.array_str(self.tvec, precision=2))
+
+    
 ###############################################################################
 class DualQuaternion(object):
     """
@@ -402,40 +472,6 @@ class DualQuaternion(object):
         return cls()
 
     
-###############################################################################
-class Sim3(RigidTransform): 
-    def __init__(self, xyzw=[0.,0.,0.,1.], tvec=[0.,0.,0.], scale=1.0):    
-        RigidTransform.__init__(self, xyzw=xyzw, tvec=tvec)
-        self.scale = scale
-
-    @classmethod
-    def from_matrix(cls, T):
-        sR_t = np.eye(4)
-        sR_t[:3,:3] = T[:3,:3] / T[3,3]
-        return cls(Quaternion.from_matrix(sR_t), T[:3,3], scale=1.0 / T[3,3])
-
-    def to_matrix(self):
-        result = self.quat.to_matrix()
-        result[:3, 3] = self.tvec
-        result[3, 3] = 1.0 / self.scale
-        result[:3, :3] /= self.scale
-        return result
-
-class Pose(RigidTransform): 
-    def __init__(self, pid, xyzw=[0.,0.,0.,1.], tvec=[0.,0.,0.]):
-        RigidTransform.__init__(self, xyzw=xyzw, tvec=tvec)
-        self.id = pid
-
-    @classmethod
-    def from_rigid_transform(cls, pid, pose):
-        return cls(pid, pose.quat, pose.tvec)
-    
-    def __repr__(self): 
-        return 'Pose ID: %i, rpy (rxyz): %s tvec: %s' % \
-            (self.id, 
-             np.array_str(self.quat.to_rpy(axes='rxyz'), precision=2), 
-             np.array_str(self.tvec, precision=2))
-
 if __name__ == "__main__":
 
     import random as rnd
