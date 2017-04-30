@@ -29,8 +29,10 @@ except Exception,e:
     raise RuntimeWarning('Failed to import pybot_vision.recoverPose {}'.format(e.message))
 
 class SimpleVO(object):
-    def __init__(self, calib):
+    def __init__(self, calib, restrict_2d=False):
         self.calib_ = calib
+        self.restrict_2d_ = restrict_2d
+
         self.kf_items_q_ = Accumulator(maxlen=2)
         self.poses_q_ = Accumulator(maxlen=2)
         self.poses_q_.accumulate(RigidTransform())
@@ -52,7 +54,6 @@ class SimpleVO(object):
         self.klt_ = OpenCVKLT.from_params(detector_params=detector_params, 
                                           tracker_params=tracker_params, 
                                           min_tracks=num_tracks)
-
         
     @timeitmethod
     def _process_pts_cv3(self, pts1, pts2):
@@ -76,6 +77,7 @@ class SimpleVO(object):
 
     @timeitmethod
     def _process_pts(self, vis, pts1, pts2):
+        " F matrix estimation using Nister 5-pt (X-left, Y-up, Z-fwd)"
         
         # Fundamental matrix estimation
         method, px_dist, conf =  cv2.cv.CV_FM_RANSAC, 1, 0.999
@@ -148,12 +150,19 @@ class SimpleVO(object):
         # ---------------------------
         # 3. FILTERING VIA Fundamental matrix RANSAC
         rt = self._process_pts(fvis, kf_pts1, kf_pts2)
-
+        
+        # Restrict 2D
+        if self.restrict_2d_:
+            rpyxyz = rt.to_rpyxyz(axes='sxyz')
+            rpyxyz[0], rpyxyz[2], rpyxyz[4] = 0, 0, 0
+            rt = RigidTransform.from_rpyxyz(*rpyxyz, axes='sxyz').scaled(rt.scale)
+        
         # Sim3 scaled transformation
         crt = self.poses_q_.latest
         newp = crt.scaled(scale) * rt
 
         self.poses_q_.accumulate(newp)
+        draw_utils.publish_pose_t('CAMERA_POSE', newp, frame_id='camera_upright')
         draw_utils.publish_cameras('camera', [Pose.from_rigid_transform(self.poses_q_.index, newp)],
                                    reset=False, frame_id='camera_upright')
         draw_utils.publish_botviewer_image_t(im, jpeg=True)
@@ -168,7 +177,7 @@ def test_vo():
     lcam = dataset.calib.left
     poses = dataset.poses
     
-    vo = SimpleVO(lcam)
+    vo = SimpleVO(lcam, restrict_2d=True)
     draw_utils.publish_sensor_frame('camera_upright',
                                     pose=RigidTransform.from_rpyxyz(np.pi/2,np.pi/2,0,0,0,1))
 
