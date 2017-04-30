@@ -8,6 +8,7 @@ Visual odometry tools
 import numpy as np
 import cv2
 from itertools import izip
+from collections import deque
 
 from pybot.utils.misc import Accumulator
 from pybot.utils.db_utils import AttrDict
@@ -29,19 +30,22 @@ except Exception,e:
     raise RuntimeWarning('Failed to import pybot_vision.recoverPose {}'.format(e.message))
 
 class SimpleVO(object):
-    def __init__(self, calib, restrict_2d=False):
+    def __init__(self, calib, restrict_2d=False, visualize=False):
         self.calib_ = calib
         self.restrict_2d_ = restrict_2d
-
-        self.kf_items_q_ = Accumulator(maxlen=2)
+        self.visualize_ = visualize
+        
+        self.kf_q_ = deque(maxlen=2)
         self.poses_q_ = Accumulator(maxlen=2)
         self.poses_q_.accumulate(RigidTransform())
-        
+
         # Setup detector params
-        num_tracks = 300
+        num_tracks = 500
         fast_params = FeatureDetector.fast_params
-        fast_params.threshold = 20
-        detector_params = dict(method='fast', grid=(16,9), max_corners=num_tracks, 
+        fast_params.threshold = 10
+        GH, GW = self.calib_.shape[:2] / 30
+        print('Setting grid size ({},{})'.format(GW,GH))
+        detector_params = dict(method='fast', grid=(GW,GH), max_corners=num_tracks, 
                                max_levels=1, subpixel=False,
                                params=FeatureDetector.fast_params)
 
@@ -85,9 +89,10 @@ class SimpleVO(object):
         inliers = inliers.ravel().astype(np.bool)
         pts1, pts2 = pts1[inliers], pts2[inliers]
         npts2 = len(pts1)
-        
-        vis = draw_matches(vis, pts1, pts2, colors=np.tile([0,255,0], [len(pts1), 1]))
-        imshow_cv('fvis', vis)
+
+        if self.visualize_: 
+            vis = draw_matches(vis, pts1, pts2, colors=np.tile([0,255,0], [len(pts1), 1]))
+            imshow_cv('fvis', vis)
 
         # Compute E -> R1,R2,t
         E = compute_essential(F, self.calib_.K)
@@ -110,7 +115,7 @@ class SimpleVO(object):
         ids, pts, age = self.klt_.latest_ids, self.klt_.latest_pts, self.klt_.latest_age
         
         # Add KF items to queue
-        self.kf_items_q_.accumulate(
+        self.kf_q_.append(
             AttrDict(img=im, ids=ids, pts=pts, age=age)
         )
 
@@ -118,14 +123,14 @@ class SimpleVO(object):
         # 2. KF-KF matching
 
         # Here kf1 (older), kf2 (newer)
-        kf2 = self.kf_items_q_.items[-1]
+        kf2 = self.kf_q_[-1]
         kf_ids2, kf_pts2 = kf2.ids, kf2.pts
 
         # Continue if only the first frame
-        if len(self.kf_items_q_) < 2:
+        if len(self.kf_q_) < 2:
             return
         
-        kf1 = self.kf_items_q_.items[-2]
+        kf1 = self.kf_q_[-2]
         kf_ids1, kf_pts1 = kf1.ids, kf1.pts
 
         kf_pts1_lut = {tid: pt for (tid,pt) in izip(kf_ids1,kf_pts1)}
@@ -138,10 +143,10 @@ class SimpleVO(object):
         kf_pts1 = np.vstack([ kf_pts1_lut[tid] for tid in matched_ids ])
         kf_pts2 = np.vstack([ kf_pts2_lut[tid] for tid in matched_ids ])
 
-        fvis = to_color(im)
-        fvis = draw_matches(im, kf_pts1, kf_pts2, colors=np.tile([0,0,255], [len(kf_pts1), 1]))
-        npts1 = len(kf_pts1)
-        # imshow_cv('fvis', fvis)
+        fvis = im.copy()
+        if self.visualize_: 
+            fvis = draw_matches(fvis, kf_pts1, kf_pts2, colors=np.tile([0,0,255], [len(kf_pts1), 1]))
+            npts1 = len(kf_pts1)
 
         # vis = to_color(im)
         # self.klt_.draw_tracks(vis, colored=True, color_type='unique')
@@ -160,12 +165,12 @@ class SimpleVO(object):
         # Sim3 scaled transformation
         crt = self.poses_q_.latest
         newp = crt.scaled(scale) * rt
-
-        self.poses_q_.accumulate(newp)
         draw_utils.publish_pose_t('CAMERA_POSE', newp, frame_id='camera_upright')
+        
+        self.poses_q_.accumulate(newp)
         draw_utils.publish_cameras('camera', [Pose.from_rigid_transform(self.poses_q_.index, newp)],
                                    reset=False, frame_id='camera_upright')
-        draw_utils.publish_botviewer_image_t(im, jpeg=True)
+        # draw_utils.publish_botviewer_image_t(im, jpeg=True)
         
 
 def test_vo():
@@ -173,11 +178,11 @@ def test_vo():
     from pybot.vision.imshow_utils import imshow_cv
     from pybot.utils.test_utils import test_dataset
     
-    dataset = test_dataset(sequence='08', scale=0.5)
+    dataset = test_dataset(sequence='00', scale=0.5)
     lcam = dataset.calib.left
     poses = dataset.poses
     
-    vo = SimpleVO(lcam, restrict_2d=True)
+    vo = SimpleVO(lcam, restrict_2d=True, visualize=True)
     draw_utils.publish_sensor_frame('camera_upright',
                                     pose=RigidTransform.from_rpyxyz(np.pi/2,np.pi/2,0,0,0,1))
 
@@ -188,8 +193,6 @@ def test_vo():
     
     ppose = None
     for f in dataset.iterframes():
-        # imshow_cv('im', im)
-
         # Process image: KLT tracking
         scale = np.linalg.norm(ppose.tvec - f.pose.tvec) \
                 if ppose is not None else 1.0
