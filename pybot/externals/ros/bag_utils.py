@@ -114,7 +114,7 @@ class ImageDecoder(Decoder):
         self.bridge = CvBridge()
         self.compressed = compressed
 
-    def decode(self, msg): 
+    def decode(self, msg):
         try: 
             if self.compressed: 
                 im = compressed_imgmsg_to_cv2(msg, self.encoding)
@@ -460,8 +460,12 @@ class ROSBagReader(LogReader):
         calib = [None for topic in topics]
         idx_lut = {topic: idx for idx, topic in enumerate(topics)}
         print('{} :: Retrieve camera calibration for {}'.format(self.__class__.__name__, topics))
-        for self.idx, (channel, msg, t) in enumerate(self.log.read_messages(topics=topics)): 
+        for self.idx, (channel, msg, t) in enumerate(self.log.read_messages(topics=topics)):
+
+            # Decode calibration  to channel
             calib[idx_lut[channel]] = dec.decode(msg)
+
+            # If all the calibration channels have been populated, return
             if all([c is not None for c in calib]): 
                 return calib
 

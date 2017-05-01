@@ -193,16 +193,10 @@ def test_vo():
     
     ppose = None
     for f in dataset.iterframes():
-        # Process image: KLT tracking
         scale = np.linalg.norm(ppose.tvec - f.pose.tvec) \
                 if ppose is not None else 1.0
         ppose = f.pose
         vo.process(f.left, scale=scale)
-
-        # # scale
-        # if scale > 0.1 and t[2] > t[0] and t[2] > 1:
-        #     t = t + s * (R * t_o)
-        #     R_new = R_old * R_new
 
 if __name__ == "__main__":
     test_vo()        
