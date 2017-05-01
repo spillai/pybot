@@ -7,7 +7,7 @@ import sys
 import numpy as np
 np.set_printoptions(precision=2, suppress=True)
 
-from collections import deque, defaultdict, Counter
+from collections import deque, defaultdict, Counter, namedtuple
 from itertools import izip
 from threading import Lock, RLock
 
@@ -46,6 +46,7 @@ def matrix(m):
 def vec(*args):
     return vector(list(args)) 
 
+GTSAMException = namedtuple('GTSAMException', ['message', 'symbol'])
 def get_exception_variable(msg, print_message=False):
     """ 
     Catch exception and print relevant gtsam symbol
@@ -57,8 +58,8 @@ def get_exception_variable(msg, print_message=False):
         if print_message:
             custom_message = custom_message + '{}\n'.format(msg)
     except:
-        return 'unknown'
-    return custom_message 
+        s, custom_message = None, msg
+    return GTSAMException(custom_message, s)
 
 class BaseSLAM(object):
     """
