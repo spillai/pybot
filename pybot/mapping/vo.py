@@ -30,7 +30,7 @@ except Exception,e:
     raise RuntimeWarning('Failed to import pybot_vision.recoverPose {}'.format(e.message))
 
 class VO(object):
-    def __init__(self, im_shape,
+    def __init__(self, calib, 
                  num_tracks=300, min_tracks=200,
                  lk_window_size=21, lk_levels=3, grid_size=30,
                  visualize=False):
@@ -44,7 +44,7 @@ class VO(object):
         fast_params.threshold = 20
 
         # Grid-sampling
-        GH, GW = im_shape / grid_size
+        GH, GW = calib.shape[:2] / grid_size
         print('Setting grid size ({},{})'.format(GW,GH))
 
         # Detector
@@ -55,16 +55,20 @@ class VO(object):
         
         # Setup tracker params (either lk, or dense)
         W = lk_window_size
-        lk_params = dict(winSize=(W,W), maxLevel=lk_levels)
-        # criteria = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 30, 0.01))
+        criteria = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 30, 0.01)
+        lk_params = dict(winSize=(W,W), maxLevel=lk_levels, criteria=criteria)
         tracker_params = dict(method='lk', fb_check=True, params=lk_params)
 
         # Create KLT from detector params only
+        self.calib_ = calib
         self.kf_q_ = Accumulator(maxlen=2)
         self.klt_ = OpenCVKLT.from_params(detector_params=detector_params, 
                                           tracker_params=tracker_params, 
                                           min_tracks=min_tracks)
         
+    @property
+    def initialized(self):
+        return len(self.kf_q_) >= 2
 
     @timeitmethod
     def _process_image(self, im):
@@ -73,63 +77,61 @@ class VO(object):
         self.klt_.process(im)
 
         if self.visualize_: 
+            self.vis_ = to_color(im)
             vis = to_color(im)
             vis = self.klt_.visualize(vis, colored=True)
             imshow_cv('colored-vis', vis)
         
         # Add KF items to queue
-        ids, pts, age = self.klt_.latest_ids, self.klt_.latest_pts, self.klt_.latest_age
+        ids, pts = self.klt_.latest_ids, self.klt_.latest_pts
+
+        # Undistort pts before inserting into queue
+        pts = self.calib_.undistort_points(pts)
         self.kf_q_.append(
-            AttrDict(ids=ids, pts=pts, age=age)
+            AttrDict(ids=ids, pts=pts)
         )
 
+    @property
+    def matches(self): 
+        assert(self.initialized)
+        
         # ---------------------------
         # 2. KF-KF matching
 
-        # Here kf1 (older), kf2 (newer)
-        kf2 = self.kf_q_[-1]
-
-        # Continue if only the first frame
-        if len(self.kf_q_) < 2:
-            return None
-        
-        kf1 = self.kf_q_[-2]
-        kf_ids2, kf_pts2 = kf2.ids, kf2.pts
+        # kf1 -> kf2: kf1 (older), kf2 (newer)
+        kf1, kf2 = self.kf_q_[-2], self.kf_q_[-1]
         kf_ids1, kf_pts1 = kf1.ids, kf1.pts
+        kf_ids2, kf_pts2 = kf2.ids, kf2.pts
 
-        kf_pts1_lut = {tid: pt for (tid,pt) in izip(kf_ids1,kf_pts1)}
-        kf_pts2_lut = {tid: pt for (tid,pt) in izip(kf_ids2,kf_pts2)}
+        kf_pts1_lut = {tid: pt for (tid,pt) in zip(kf_ids1,kf_pts1)}
+        kf_pts2_lut = {tid: pt for (tid,pt) in zip(kf_ids2,kf_pts2)}
 
         # Find matches in the newer keyframe that are consistent from 
         # the previous frame
         matched_ids = np.intersect1d(kf_ids2, kf_ids1)
         if not len(matched_ids):
-            return None
+            return [], [], []
         
         kf_pts1 = np.vstack([ kf_pts1_lut[tid] for tid in matched_ids ])
         kf_pts2 = np.vstack([ kf_pts2_lut[tid] for tid in matched_ids ])
 
         # Visualize
         if self.visualize_: 
-            self.vis_ = im.copy()
-            if self.visualize_: 
-                fvis = draw_matches(self.vis_, kf_pts1, kf_pts2, colors=np.tile([0,0,255], [len(kf_pts1), 1]))
-                npts1 = len(kf_pts1)
-
-            # vis = to_color(im)
-            # self.klt_.draw_tracks(vis, colored=True, color_type='unique')
-            # imshow_cv('vis', vis)
-
-        return (kf_pts1, kf_pts2)
+            self.vis_ = draw_matches(self.vis_, kf_pts1, kf_pts2, colors=np.tile([0,0,255], [len(kf_pts1), 1]))
+            npts1 = len(kf_pts1)
+        
+        return (matched_ids, kf_pts1, kf_pts2)
 
     @timeitmethod
     def process(self, im, scale=1.0):
         # 1. Process image: KLT tracking
-        result = self._process_image(im)
-        if result is None:
-            assert(self.kf_q_.length < 2)
-            return 
-        (kf_pts1, kf_pts2) = result
+        self._process_image(im)
+
+        # Only continue on sufficient frames for init.
+        if not self.initialized:
+            return
+
+        ids, pts1, pts2 = self.matches
 
         # 2. Do something
         raise NotImplementedError()
@@ -140,12 +142,11 @@ class NisterVO(VO):
                  lk_window_size=21, lk_levels=3, grid_size=30,
                  visualize=False):
         super(NisterVO, self).__init__(
-            calib.shape[:2], num_tracks=num_tracks, min_tracks=min_tracks,
+            calib, num_tracks=num_tracks, min_tracks=min_tracks,
             lk_window_size=lk_window_size, lk_levels=lk_levels, grid_size=grid_size,
             visualize=visualize)
         
-        # Calibration and optionally restricted 2D pose estimation
-        self.calib_ = calib
+        # Optionally restricted 2D pose estimation
         self.restrict_2d_ = restrict_2d
 
         # Poses for compounding
@@ -165,7 +166,7 @@ class NisterVO(VO):
     @timeitmethod
     def _process_pts_wrap(self, pts1, pts2):
         # Fundamental matrix estimation
-        method, px_dist, conf =  cv2.cv.CV_FM_RANSAC, 1, 0.99
+        method, px_dist, conf =  cv2.cv.CV_FM_RANSAC, 1.0, 0.999
         (F, inliers) = cv2.findFundamentalMat(pts1, pts2, method, px_dist, conf)
         E = compute_essential(F, self.calib_.K)
         distance_threshold = 1.0
@@ -177,7 +178,7 @@ class NisterVO(VO):
         " F matrix estimation using Nister 5-pt (X-left, Y-up, Z-fwd)"
         
         # Fundamental matrix estimation
-        method, px_dist, conf =  cv2.cv.CV_FM_RANSAC, 1, 0.999
+        method, px_dist, conf =  cv2.cv.CV_FM_RANSAC, 1.0, 0.999
         (F, inliers) = cv2.findFundamentalMat(pts1, pts2, method, px_dist, conf)
         inliers = inliers.ravel().astype(np.bool)
         pts1, pts2 = pts1[inliers], pts2[inliers]
@@ -200,14 +201,16 @@ class NisterVO(VO):
             
     @timeitmethod
     def process(self, im, scale=1.0):
-
         # 1. Process image: KLT tracking
-        result = self._process_image(im)
-        if result is None:
-            assert(self.kf_q_.length < 2)
-            return 
-        (kf_pts1, kf_pts2) = result
-        
+        self._process_image(im)
+
+        # Only continue on sufficient frames for init.
+        if not self.initialized:
+            return
+
+        # Get matches
+        kf_ids, kf_pts1, kf_pts2 = self.matches
+        if not len(kf_ids): assert(0)
 
         # 2. FILTERING VIA Fundamental matrix RANSAC
         rt = self._process_pts(kf_pts1, kf_pts2)
@@ -228,23 +231,39 @@ class NisterVO(VO):
                                    reset=False, frame_id='camera_upright')
         # draw_utils.publish_botviewer_image_t(im, jpeg=True)
 
+        
 class SlidingWindowVO(VO):
     def __init__(self, calib, restrict_2d=False, 
                  num_tracks=300, min_tracks=200,
                  lk_window_size=21, lk_levels=3, grid_size=30,
                  visualize=False):
         super(SlidingWindowVO, self).__init__(
-            calib.shape[:2], num_tracks=num_tracks, min_tracks=min_tracks,
+            calib, num_tracks=num_tracks, min_tracks=min_tracks,
             lk_window_size=lk_window_size, lk_levels=lk_levels, grid_size=grid_size,
             visualize=visualize)
         
-        # Calibration and optionally restricted 2D pose estimation
-        self.calib_ = calib
+        # Optionally restricted 2D pose estimation
         self.restrict_2d_ = restrict_2d
 
         # Poses for compounding
         self.poses_q_ = Accumulator(maxlen=2)
         self.poses_q_.append(RigidTransform())
+            
+    @timeitmethod
+    def process(self, im, scale=1.0):
+        # 1. Process image: KLT tracking
+        self._process_image(im)
+
+        # Only continue on sufficient frames for init.
+        if not self.initialized:
+            return
+
+        # Get matches
+        kf_ids, kf_pts1, kf_pts2 = self.matches
+        if not len(kf_ids): assert(0)
+
+        
+    
         
 
 def test_vo():
@@ -255,7 +274,9 @@ def test_vo():
     lcam = dataset.calib.left
     poses = dataset.poses
     
-    vo = NisterVO(lcam, restrict_2d=True, visualize=True)
+    vo = NisterVO(lcam, restrict_2d=True,
+                         num_tracks=500, min_tracks=300, grid_size=30,
+                         lk_window_size=25, lk_levels=3, visualize=True)
     draw_utils.publish_sensor_frame('camera_upright',
                                     pose=RigidTransform.from_rpyxyz(np.pi/2,np.pi/2,0,0,0,1))
 
@@ -268,6 +289,7 @@ def test_vo():
     for f in dataset.iterframes():
         scale = np.linalg.norm(ppose.tvec - f.pose.tvec) \
                 if ppose is not None else 1.0
+
         ppose = f.pose
         vo.process(f.left, scale=scale)
 
@@ -279,9 +301,19 @@ def test_slidingwindowvo():
     lcam = dataset.calib.left
     poses = dataset.poses
 
-    vo = SlidingWindowVO(num_tracks=500, min_tracks=300, grid_size=30,
-                         lk_window_size=5, lk_levels=3, visualize=True)
-  
+    vo = SlidingWindowVO(lcam, restrict_2d=True,
+                         num_tracks=500, min_tracks=300, grid_size=30,
+                         lk_window_size=25, lk_levels=3, visualize=True)
+
+    ppose = None
+    for f in dataset.iterframes():
+        scale = np.linalg.norm(ppose.tvec - f.pose.tvec) \
+                if ppose is not None else 1.0
+        
+        ppose = f.pose
+        vo.process(f.left, scale=scale)
+
+    
 if __name__ == "__main__":
-    # test_vo()        
-    test_slidingwindowvo()
+    test_vo()        
+    # test_slidingwindowvo()
