@@ -87,9 +87,9 @@ def TangoOdomDecoder(channel, every_k_frames=1, noise=[0,0]):
                           xyzw=[0.707940, 0.706271, 0.001000, 0.000585])
     p_DC = p_ID.inverse() * p_IC
     p_DF = p_ID.inverse() * p_IF
-    # print('\nCalibration\n==============')
-    # print('\tp_ID: {}, \n\tp_IC: {}, \n\tp_DC: {}, \n\tp_DF: {}'
-    #       .format(p_ID, p_IC, p_DC, p_DF))
+    print('\nCalibration\n==============')
+    print('\tp_ID: {}, \n\tp_IC: {}, \n\tp_DC: {}, \n\tp_DF: {}\n'
+          .format(p_ID, p_IC, p_DC, p_DF))
 
     # SS->CAM
     p_S_CAM = RigidTransform.from_rpyxyz(
@@ -321,12 +321,10 @@ class TangoFrame(object):
 
     """
 
-    def __init__(self, index, t, img_msg, pose, annotation, img_decode): 
-        # print 'should be tangoframe self: ', self
-        # print 'img_decoder', img_decode
+    def __init__(self, index, t, img_fn, pose, annotation, img_decode): 
         self.index_ = index
         self.t_ = t
-        self.img_msg_ = img_msg
+        self.img_fn_ = img_fn
         self.pose_ = pose
         self.annotation_ = annotation
         self.img_decode = img_decode
@@ -349,20 +347,26 @@ class TangoFrame(object):
 
     @property
     def img_filename(self): 
-        return self.img_msg_
+        return self.img_fn_
 
+    def attribute_filename(self, label, img_fn):
+        return self.img_filename.replace('rgb', label)
+
+    def attribute(self, label, img_fn):
+        return self.img_decode(self.attribute_filename(label, img_fn))
+    
     @property
     def img(self): 
         """
         Decoded only at request, avoids in-memory storage
         """
-        return self.img_decode(self.img_msg_)
+        return self.img_decode(self.img_fn_)
 
     # def __repr__(self): 
-    #     return 'img={}, t={}, pose={}'.format(self.img_msg_, self.timestamp, self.pose)
+    #     return 'img={}, t={}, pose={}'.format(self.img_fn_, self.timestamp, self.pose)
 
     def __repr__(self): 
-        return 'TangoFrame::img={}'.format(self.img_msg_)
+        return 'TangoFrame::img={}'.format(self.img_fn_)
 
 class TangoDB(LogDB): 
     def __init__(self, dataset): 
