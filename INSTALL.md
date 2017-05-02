@@ -9,6 +9,7 @@ not globally install, in which case I can not provide much support).
 ```sh
 wget --no-check-certificate https://repo.continuum.io/miniconda/Miniconda2-latest-Linux-x86_64.sh
 bash Miniconda2-latest-Linux-x86_64.sh -b -p $HOME/anaconda
+echo 'export PATH="$HOME/anaconda/bin:$PATH"' >> ~/.bashrc; source ~/.bashrc;
 conda install anaconda-client
 ```
 
