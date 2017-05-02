@@ -202,9 +202,11 @@ class LKTracker(OpticalFlowTracker):
     """
 
     default_params = OpticalFlowTracker.lk_params
-    def __init__(self, fb_check=True, winSize=(5,5), maxLevel=4):
+    def __init__(self, fb_check=True,
+                 winSize=(5,5), maxLevel=4,
+                 criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 30, 0.01)):
         OpticalFlowTracker.__init__(self, fb_check=fb_check)
-        self.lk_params_ = AttrDict(winSize=winSize, maxLevel=maxLevel)
+        self.lk_params_ = AttrDict(winSize=winSize, maxLevel=maxLevel, criteria=criteria)
 
     # @timeitmethod
     def track(self, im0, im1, p0): 
