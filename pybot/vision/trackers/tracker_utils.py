@@ -54,7 +54,7 @@ class IndexedDeque(object):
         return self.length_
 
 class TrackManager(object): 
-    def __init__(self, maxlen=20, on_delete_cb=lambda tracks: None): 
+    def __init__(self, maxlen=2, on_delete_cb=lambda tracks: None): 
         # Max track length 
         self.maxlen_ = maxlen
         self.max_id_ = -1
@@ -216,15 +216,17 @@ class LKTracker(OpticalFlowTracker):
 
         # Forward flow
         p1, st1, err1 = cv2.calcOpticalFlowPyrLK(im0, im1, p0, None, **self.lk_params_)
-        p1[st1 == 0] = np.nan
+        inds,_ = np.where(st1 == 0)
+        p1[inds] = 1e5
 
         if self.fb_check_: 
             # Backward flow
             p0r, st0, err0 = cv2.calcOpticalFlowPyrLK(im1, im0, p1, None, **self.lk_params_)
-            p0r[st0 == 0] = np.nan
+            inds,_ = np.where(st0 == 0)
+            p0r[inds] = 1e5
             
             # Set only good
-            fb_good = (np.fabs(p0r-p0) < 3).all(axis=1)
+            fb_good = (np.fabs(p0r-p0) < 1.5).all(axis=1)
             p1[~fb_good] = np.nan
 
         return p1
@@ -282,7 +284,7 @@ class FarnebackTracker(OpticalFlowTracker):
             
             # Check diff
             p0r = p1 + flow_p1
-            fb_good = (np.fabs(p0r-p0) < 3).all(axis=1)
+            fb_good = (np.fabs(p0r-p0) < 2).all(axis=1)
 
             # Set only good flow 
             flow_p0[~fb_good] = np.nan

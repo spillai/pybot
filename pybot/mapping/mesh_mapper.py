@@ -84,7 +84,7 @@ class TrackReconstruction(object):
         Keyframe-to-Keyframe matching
         """
         # Add KF items to queue
-        self.kf_items_q_.accumulate(
+        self.kf_items_q_.append(
             AttrDict(fidx=fidx, frame=frame, ids=kf_ids, pts=kf_pts, 
                      cam=Camera.from_intrinsics_extrinsics(
                          self.cam_.intrinsics, frame.pose.inverse())))

@@ -148,13 +148,16 @@ class Mapper(object):
         self.name_ = name
 
         # Setup a counter that publishes the map every k frames
-        self.publish_cb_ = CounterWithPeriodicCallback(
+        publish_cb = CounterWithPeriodicCallback(
             every_k=publish_rate, process_cb=self.publish)
 
         # Setup a counter that updates the keyframe graph every k frames
-        self.update_kf_cb_ = CounterWithPeriodicCallback(
+        update_kf_cb = CounterWithPeriodicCallback(
             every_k=update_kf_rate, process_cb=self.update_keyframes)
 
+        # Setup callbacks
+        self.callbacks_ = [publish_cb, update_kf_cb]
+        
         # Clean up keyframe points, colors
         for k_id in self.keyframes_.keys(): 
             points = self.keyframes_[k_id].points
@@ -199,8 +202,7 @@ class Mapper(object):
         draw_utils.publish_pose_list(self.name_ + '_poses', [p], frame_id='camera', reset=False)
         
         # Counter increment for publishing, kf updates
-        self.publish_cb_.poll()
-        self.update_kf_cb_.poll()
+        for cb in self.callbacks_: cb.poll()
         
     def fetch_keyframe(self, frame_id): 
         return self.keyframes_[self.keyframes_lut_[frame_id]]
@@ -326,8 +328,10 @@ class Mapper(object):
     
 class MultiViewMapper(Mapper): 
     """ 
-    
     SVO-Depth-Filter based reconstruction
+
+    Reconstruct map points
+    given poses, and images (using dense epipolar matching).
     
     Notes: 
       1. Only reconstruct semi-densely after first 5 keyframes
@@ -355,7 +359,7 @@ class MultiViewMapper(Mapper):
                                             max_n_kfs=max_n_kfs, detector=detector,
                                             use_photometric_disparity_error=use_photometric_disparity_error,
                                             verbose=verbose)
-        self.cam_intrinsic_ = CameraIntrinsic(K, shape=(int(H), int(W)))
+        self.calib_ = CameraIntrinsic(K, shape=(int(H), int(W)))
 
         self.mosaics_ = dequedict(maxlen=max_n_kfs)
         # self.epi_viz_ = EpipolarViz(detector=None, max_views=max_n_kfs)
@@ -373,7 +377,7 @@ class MultiViewMapper(Mapper):
             kf = Keyframe.from_KeyframeData(kfj)
             self.keyframes_[kf.id] = kf
             self.keyframes_dirty_[kf.id] = True
-            self.mosaics_[kf.id] = kf.visualize(self.cam_intrinsic_)
+            self.mosaics_[kf.id] = kf.visualize(self.calib_)
 
             # print len(kf.kf_points2d), len(kf.kf_ids), len(kf.points), [item.shape for item in kf.kf_points2d]
             # print len(kf.kf_points2d), [(type(ids), type(item)) for (ids, item) in izip(kf.kf_ids, kf.kf_points2d)]

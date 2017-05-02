@@ -88,7 +88,7 @@ class BaseSLAM(_BaseSLAM):
         """
         p_init = RigidTransform.identity() \
                  if p is None else p
-        self.q_poses_.accumulate(p_init)
+        self.q_poses_.append(p_init)
         super(BaseSLAM, self).initialize(p_init.matrix, noise=noise)
 
     def add_pose_prior(self, index, p, noise=None):
@@ -109,7 +109,7 @@ class BaseSLAM(_BaseSLAM):
         """
         # Initialize keyframes if not previously done
         # Add odometry measurements incrementally
-        self.q_poses_.accumulate(p) 
+        self.q_poses_.append(p) 
 
         # 1. SLAM: Initialize
         if not self.is_initialized: 
@@ -135,11 +135,11 @@ class BaseSLAM(_BaseSLAM):
         # 1. SLAM: Initialize and add (do not return if not initialized)
         if not self.is_initialized:
             p_init = RigidTransform.identity()
-            self.q_poses_.accumulate(p_init)
+            self.q_poses_.append(p_init)
             self.initialize(p_init.matrix)
         
         # 2. SLAM: Add relative pose measurements (odometry)
-        self.q_poses_.accumulate(p * self.q_poses_.latest)
+        self.q_poses_.append(p * self.q_poses_.latest)
         self.add_odom_incremental(p.matrix, noise=noise)
 
         # # 3. Update
@@ -269,7 +269,6 @@ class BaseSLAM(_BaseSLAM):
 
                     draw_utils.publish_line_segments(name + 'optimized_factor_landmark', factor_st, factor_end, c='b', 
                                                      frame_id=frame_id, reset=True) 
-
             
 class VisualSLAM(BaseSLAM, _VisualSLAM):
     def __init__(self, calib, min_landmark_obs=cfg.VSLAM_MIN_LANDMARK_OBS,
@@ -381,73 +380,78 @@ class VisualSLAM(BaseSLAM, _VisualSLAM):
                                                      frame_id=frame_id, reset=True) 
         
     
-def with_visualization(cls,
-                       name='SLAM_', frame_id='camera',
-                       visualize_every=0.5,
-                       visualize_nodes=True, 
-                       visualize_measurements=False, 
-                       visualize_factors=False, visualize_marginals=False): 
+def with_visualization(
+        cls,
+        name='SLAM_', frame_id='camera',
+        visualize_every=0.5,
+        visualize_nodes=True, 
+        visualize_measurements=False, 
+        visualize_factors=False, visualize_marginals=False): 
 
-        class _SLAM(cls):
-            def __init__(self, *args, **kwargs): 
-                cls.__init__(self, *args, **kwargs)
+    class _SLAM(cls):
+        def __init__(self, *args, **kwargs): 
+            cls.__init__(self, *args, **kwargs)
 
-                self.name_ = name
-                self.frame_id_ = frame_id
+            self.name_ = name
+            self.frame_id_ = frame_id
 
-                self.visualize_nodes_ = visualize_nodes
-                self.visualize_factors_ = visualize_factors
-                self.visualize_marginals_ = visualize_marginals
-                self.visualize_measurements_ = visualize_measurements
+            self.visualize_nodes_ = visualize_nodes
+            self.visualize_factors_ = visualize_factors
+            self.visualize_marginals_ = visualize_marginals
+            self.visualize_measurements_ = visualize_measurements
 
-                self.publish_cb_ = CounterWithPeriodicCallback(
-                    every_k=visualize_every, process_cb=self.visualize_optimized)
+            self.publish_cb_ = CounterWithPeriodicCallback(
+                every_k=visualize_every, process_cb=self.visualize_optimized)
 
-                self.write_cb_ = CounterWithPeriodicCallback(
-                    every_k=1, process_cb=self.save_dot_graph)
+            self.write_cb_ = CounterWithPeriodicCallback(
+                every_k=1, process_cb=self.save_dot_graph)
 
-            def save_dot_graph(self):
-                self.save_graph('test.dot')
-                
-            def update(self): 
-                super(_SLAM, self).update()
-                self.publish_cb_.poll()
-                self.write_cb_.poll()
+        def save_dot_graph(self):
+            self.save_graph('test.dot')
 
-            def finish(self):
-                super(_SLAM, self).finish()
-                self.visualize_optimized()
+        def update(self): 
+            super(_SLAM, self).update()
+            self.publish_cb_.poll()
+            self.write_cb_.poll()
 
-            def visualize_measurements(self):
-                if self.visualize_measurements_:
-                    super(_SLAM, self).visualize_measurements()
-                    
-            @timeitmethod
-            def visualize_optimized(self):
-                """
-                Update SLAM visualizations with optimized factors
-                """
-                self.visualize_optimized_poses()
-                self.visualize_optimized_landmarks()
+        def finish(self):
+            super(_SLAM, self).finish()
+            self.visualize_optimized()
 
-            def visualize_optimized_poses(self):
-                super(_SLAM, self).visualize_optimized_poses(visualize_nodes=self.visualize_nodes_,
-                                                                      visualize_measurements=self.visualize_measurements_, 
-                                                                      visualize_factors=self.visualize_factors_, 
-                                                                      visualize_marginals=self.visualize_marginals_,
-                                                                      name=self.name_, frame_id=self.frame_id_)
+        def visualize_measurements(self):
+            if self.visualize_measurements_:
+                super(_SLAM, self).visualize_measurements()
 
-            def visualize_optimized_landmarks(self):
-                super(_SLAM, self).visualize_optimized_landmarks(visualize_nodes=self.visualize_nodes_,
-                                                                          visualize_measurements=self.visualize_measurements_, 
-                                                                          visualize_factors=self.visualize_factors_, 
-                                                                          visualize_marginals=self.visualize_marginals_,
-                                                                          name=self.name_, frame_id=self.frame_id_)
-                            
-        return _SLAM
+        @timeitmethod
+        def visualize_optimized(self):
+            """
+            Update SLAM visualizations with optimized factors
+            """
+            self.visualize_optimized_poses()
+            self.visualize_optimized_landmarks()
 
-RobotVisualSLAM = with_visualization(VisualSLAM,
-                                     frame_id='camera', visualize_measurements=True)
+        def visualize_optimized_poses(self):
+            super(_SLAM, self).visualize_optimized_poses(
+                visualize_nodes=self.visualize_nodes_,
+                visualize_measurements=self.visualize_measurements_, 
+                visualize_factors=self.visualize_factors_, 
+                visualize_marginals=self.visualize_marginals_,
+                name=self.name_, frame_id=self.frame_id_)
+
+        def visualize_optimized_landmarks(self):
+            super(_SLAM, self).visualize_optimized_landmarks(
+                visualize_nodes=self.visualize_nodes_,
+                visualize_measurements=self.visualize_measurements_, 
+                visualize_factors=self.visualize_factors_, 
+                visualize_marginals=self.visualize_marginals_,
+                name=self.name_, frame_id=self.frame_id_)
+
+    return _SLAM
+
+RobotVisualSLAM = with_visualization(
+    VisualSLAM,
+    frame_id='camera',
+    visualize_measurements=True)
 
 
 

@@ -29,35 +29,128 @@ try:
 except Exception,e:
     raise RuntimeWarning('Failed to import pybot_vision.recoverPose {}'.format(e.message))
 
-class SimpleVO(object):
-    def __init__(self, calib, restrict_2d=False, visualize=False):
-        self.calib_ = calib
-        self.restrict_2d_ = restrict_2d
+class VO(object):
+    def __init__(self, im_shape,
+                 num_tracks=300, min_tracks=200,
+                 lk_window_size=21, lk_levels=3, grid_size=30,
+                 visualize=False):
+
+        # Setup visualizations
+        self.vis_ = None
         self.visualize_ = visualize
-        
-        self.kf_q_ = deque(maxlen=2)
-        self.poses_q_ = Accumulator(maxlen=2)
-        self.poses_q_.accumulate(RigidTransform())
 
         # Setup detector params
-        num_tracks = 500
         fast_params = FeatureDetector.fast_params
-        fast_params.threshold = 10
-        GH, GW = self.calib_.shape[:2] / 30
-        print('Setting grid size ({},{})'.format(GW,GH))
-        detector_params = dict(method='fast', grid=(GW,GH), max_corners=num_tracks, 
-                               max_levels=1, subpixel=False,
-                               params=FeatureDetector.fast_params)
+        fast_params.threshold = 20
 
+        # Grid-sampling
+        GH, GW = im_shape / grid_size
+        print('Setting grid size ({},{})'.format(GW,GH))
+
+        # Detector
+        detector_params = dict(
+            method='fast', grid=(GW,GH), max_corners=num_tracks, 
+            max_levels=1, subpixel=True,
+            params=FeatureDetector.fast_params)
+        
         # Setup tracker params (either lk, or dense)
-        lk_params = dict(winSize=(21,21), maxLevel=1)
+        W = lk_window_size
+        lk_params = dict(winSize=(W,W), maxLevel=lk_levels)
         # criteria = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 30, 0.01))
         tracker_params = dict(method='lk', fb_check=True, params=lk_params)
 
         # Create KLT from detector params only
+        self.kf_q_ = Accumulator(maxlen=2)
         self.klt_ = OpenCVKLT.from_params(detector_params=detector_params, 
                                           tracker_params=tracker_params, 
-                                          min_tracks=num_tracks)
+                                          min_tracks=min_tracks)
+        
+
+    @timeitmethod
+    def _process_image(self, im):
+        # ---------------------------
+        # 1. Process image: KLT tracking
+        self.klt_.process(im)
+
+        if self.visualize_: 
+            vis = to_color(im)
+            vis = self.klt_.visualize(vis, colored=True)
+            imshow_cv('colored-vis', vis)
+        
+        # Add KF items to queue
+        ids, pts, age = self.klt_.latest_ids, self.klt_.latest_pts, self.klt_.latest_age
+        self.kf_q_.append(
+            AttrDict(ids=ids, pts=pts, age=age)
+        )
+
+        # ---------------------------
+        # 2. KF-KF matching
+
+        # Here kf1 (older), kf2 (newer)
+        kf2 = self.kf_q_[-1]
+
+        # Continue if only the first frame
+        if len(self.kf_q_) < 2:
+            return None
+        
+        kf1 = self.kf_q_[-2]
+        kf_ids2, kf_pts2 = kf2.ids, kf2.pts
+        kf_ids1, kf_pts1 = kf1.ids, kf1.pts
+
+        kf_pts1_lut = {tid: pt for (tid,pt) in izip(kf_ids1,kf_pts1)}
+        kf_pts2_lut = {tid: pt for (tid,pt) in izip(kf_ids2,kf_pts2)}
+
+        # Find matches in the newer keyframe that are consistent from 
+        # the previous frame
+        matched_ids = np.intersect1d(kf_ids2, kf_ids1)
+        if not len(matched_ids):
+            return None
+        
+        kf_pts1 = np.vstack([ kf_pts1_lut[tid] for tid in matched_ids ])
+        kf_pts2 = np.vstack([ kf_pts2_lut[tid] for tid in matched_ids ])
+
+        # Visualize
+        if self.visualize_: 
+            self.vis_ = im.copy()
+            if self.visualize_: 
+                fvis = draw_matches(self.vis_, kf_pts1, kf_pts2, colors=np.tile([0,0,255], [len(kf_pts1), 1]))
+                npts1 = len(kf_pts1)
+
+            # vis = to_color(im)
+            # self.klt_.draw_tracks(vis, colored=True, color_type='unique')
+            # imshow_cv('vis', vis)
+
+        return (kf_pts1, kf_pts2)
+
+    @timeitmethod
+    def process(self, im, scale=1.0):
+        # 1. Process image: KLT tracking
+        result = self._process_image(im)
+        if result is None:
+            assert(self.kf_q_.length < 2)
+            return 
+        (kf_pts1, kf_pts2) = result
+
+        # 2. Do something
+        raise NotImplementedError()
+        
+class NisterVO(VO):
+    def __init__(self, calib, restrict_2d=False, 
+                 num_tracks=300, min_tracks=200,
+                 lk_window_size=21, lk_levels=3, grid_size=30,
+                 visualize=False):
+        super(NisterVO, self).__init__(
+            calib.shape[:2], num_tracks=num_tracks, min_tracks=min_tracks,
+            lk_window_size=lk_window_size, lk_levels=lk_levels, grid_size=grid_size,
+            visualize=visualize)
+        
+        # Calibration and optionally restricted 2D pose estimation
+        self.calib_ = calib
+        self.restrict_2d_ = restrict_2d
+
+        # Poses for compounding
+        self.poses_q_ = Accumulator(maxlen=2)
+        self.poses_q_.append(RigidTransform())
         
     @timeitmethod
     def _process_pts_cv3(self, pts1, pts2):
@@ -80,7 +173,7 @@ class SimpleVO(object):
         return RigidTransform.from_Rt(R, t.ravel())
 
     @timeitmethod
-    def _process_pts(self, vis, pts1, pts2):
+    def _process_pts(self, pts1, pts2):
         " F matrix estimation using Nister 5-pt (X-left, Y-up, Z-fwd)"
         
         # Fundamental matrix estimation
@@ -91,8 +184,8 @@ class SimpleVO(object):
         npts2 = len(pts1)
 
         if self.visualize_: 
-            vis = draw_matches(vis, pts1, pts2, colors=np.tile([0,255,0], [len(pts1), 1]))
-            imshow_cv('fvis', vis)
+            self.vis_ = draw_matches(self.vis_, pts1, pts2, colors=np.tile([0,255,0], [len(pts1), 1]))
+            imshow_cv('fvis', self.vis_)
 
         # Compute E -> R1,R2,t
         E = compute_essential(F, self.calib_.K)
@@ -104,57 +197,20 @@ class SimpleVO(object):
         rt = rts[1] if rts_norm[0] > rts_norm[1] \
              else rts[0]
         return rt.scaled(1.0)
-    
+            
     @timeitmethod
     def process(self, im, scale=1.0):
-        # ---------------------------
+
         # 1. Process image: KLT tracking
-        self.klt_.process(im)
+        result = self._process_image(im)
+        if result is None:
+            assert(self.kf_q_.length < 2)
+            return 
+        (kf_pts1, kf_pts2) = result
         
-        # Gather points, ids, flow and age
-        ids, pts, age = self.klt_.latest_ids, self.klt_.latest_pts, self.klt_.latest_age
-        
-        # Add KF items to queue
-        self.kf_q_.append(
-            AttrDict(img=im, ids=ids, pts=pts, age=age)
-        )
 
-        # ---------------------------
-        # 2. KF-KF matching
-
-        # Here kf1 (older), kf2 (newer)
-        kf2 = self.kf_q_[-1]
-        kf_ids2, kf_pts2 = kf2.ids, kf2.pts
-
-        # Continue if only the first frame
-        if len(self.kf_q_) < 2:
-            return
-        
-        kf1 = self.kf_q_[-2]
-        kf_ids1, kf_pts1 = kf1.ids, kf1.pts
-
-        kf_pts1_lut = {tid: pt for (tid,pt) in izip(kf_ids1,kf_pts1)}
-        kf_pts2_lut = {tid: pt for (tid,pt) in izip(kf_ids2,kf_pts2)}
-
-        # Find matches in the newer keyframe that are consistent from 
-        # the previous frame
-        matched_ids = np.intersect1d(kf_ids2, kf_ids1)
-        if not len(matched_ids): return 
-        kf_pts1 = np.vstack([ kf_pts1_lut[tid] for tid in matched_ids ])
-        kf_pts2 = np.vstack([ kf_pts2_lut[tid] for tid in matched_ids ])
-
-        fvis = im.copy()
-        if self.visualize_: 
-            fvis = draw_matches(fvis, kf_pts1, kf_pts2, colors=np.tile([0,0,255], [len(kf_pts1), 1]))
-            npts1 = len(kf_pts1)
-
-        # vis = to_color(im)
-        # self.klt_.draw_tracks(vis, colored=True, color_type='unique')
-        # imshow_cv('vis', vis)
-        
-        # ---------------------------
-        # 3. FILTERING VIA Fundamental matrix RANSAC
-        rt = self._process_pts(fvis, kf_pts1, kf_pts2)
+        # 2. FILTERING VIA Fundamental matrix RANSAC
+        rt = self._process_pts(kf_pts1, kf_pts2)
         
         # Restrict 2D
         if self.restrict_2d_:
@@ -167,14 +223,31 @@ class SimpleVO(object):
         newp = crt.scaled(scale) * rt
         draw_utils.publish_pose_t('CAMERA_POSE', newp, frame_id='camera_upright')
         
-        self.poses_q_.accumulate(newp)
+        self.poses_q_.append(newp)
         draw_utils.publish_cameras('camera', [Pose.from_rigid_transform(self.poses_q_.index, newp)],
                                    reset=False, frame_id='camera_upright')
         # draw_utils.publish_botviewer_image_t(im, jpeg=True)
+
+class SlidingWindowVO(VO):
+    def __init__(self, calib, restrict_2d=False, 
+                 num_tracks=300, min_tracks=200,
+                 lk_window_size=21, lk_levels=3, grid_size=30,
+                 visualize=False):
+        super(SlidingWindowVO, self).__init__(
+            calib.shape[:2], num_tracks=num_tracks, min_tracks=min_tracks,
+            lk_window_size=lk_window_size, lk_levels=lk_levels, grid_size=grid_size,
+            visualize=visualize)
+        
+        # Calibration and optionally restricted 2D pose estimation
+        self.calib_ = calib
+        self.restrict_2d_ = restrict_2d
+
+        # Poses for compounding
+        self.poses_q_ = Accumulator(maxlen=2)
+        self.poses_q_.append(RigidTransform())
         
 
 def test_vo():
-    import argparse
     from pybot.vision.imshow_utils import imshow_cv
     from pybot.utils.test_utils import test_dataset
     
@@ -182,7 +255,7 @@ def test_vo():
     lcam = dataset.calib.left
     poses = dataset.poses
     
-    vo = SimpleVO(lcam, restrict_2d=True, visualize=True)
+    vo = NisterVO(lcam, restrict_2d=True, visualize=True)
     draw_utils.publish_sensor_frame('camera_upright',
                                     pose=RigidTransform.from_rpyxyz(np.pi/2,np.pi/2,0,0,0,1))
 
@@ -198,5 +271,17 @@ def test_vo():
         ppose = f.pose
         vo.process(f.left, scale=scale)
 
+def test_slidingwindowvo():
+    from pybot.vision.imshow_utils import imshow_cv
+    from pybot.utils.test_utils import test_dataset
+    
+    dataset = test_dataset(sequence='00', scale=0.5)
+    lcam = dataset.calib.left
+    poses = dataset.poses
+
+    vo = SlidingWindowVO(num_tracks=500, min_tracks=300, grid_size=30,
+                         lk_window_size=5, lk_levels=3, visualize=True)
+  
 if __name__ == "__main__":
-    test_vo()        
+    # test_vo()        
+    test_slidingwindowvo()
