@@ -51,3 +51,7 @@ def get_random_colors(n, colormap='random'):
 
 def color_from_string(c, n): 
     return np.tile(np.array(colorConverter.to_rgb(c)), [n,1])
+
+def color_by_lut(labels, colors):
+    dlabels = np.dstack([labels, labels, labels])
+    return cv2.LUT(dlabels, colors)

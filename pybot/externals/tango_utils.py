@@ -139,7 +139,7 @@ def TangoOdomDecoder(channel, every_k_frames=1, noise=[0,0]):
 class TangoImageDecoder(Decoder): 
     """
     """
-    def __init__(self, directory, channel='RGB', color=True, 
+    def __init__(self, directory, channel='RGB', 
                  every_k_frames=1, shape=(1280,720)): 
         Decoder.__init__(self, channel=channel, every_k_frames=every_k_frames)
         self.shape_ = shape 
@@ -147,14 +147,11 @@ class TangoImageDecoder(Decoder):
             raise RuntimeError('W > H requirement failed, W: {}, H: {}'
                                .format(self.shape_[0], self.shape_[1]))
         self.directory_ = directory
-        self.color_ = color
 
     def decode(self, msg): 
         fn = os.path.join(self.directory_, msg)
         if os.path.exists(fn): 
-            im = cv2.imread(fn, 
-                            cv2.CV_LOAD_IMAGE_COLOR if self.color_ \
-                            else cv2.CV_LOAD_IMAGE_GRAYSCALE)
+            im = cv2.imread(fn, -1)
             return im_resize(im, shape=self.shape_)
         else: 
             raise Exception('File does not exist')
@@ -255,7 +252,7 @@ class TangoLogReader(LogReader):
                                  every_k_frames=every_k_frames, 
                                  noise=noise), 
                 TangoImageDecoder(
-                    self.directory_, channel=TANGO_RGB_CHANNEL, color=True, 
+                    self.directory_, channel=TANGO_RGB_CHANNEL, 
                     shape=(W,H), every_k_frames=every_k_frames)]
         )
 
@@ -352,9 +349,10 @@ class TangoFrame(object):
     def attribute_filename(self, label):
         return self.img_filename.replace('rgb', label)
 
-    def attribute(self, label):
-        return self.img_decode(self.attribute_filename(label))
-    
+    def attribute(self, label, ext='png'):
+        fn = self.attribute_filename(label)
+        fn = os.path.splitext(fn)[0] + '.' + ext
+        return self.img_decode(fn)
     @property
     def img(self): 
         """

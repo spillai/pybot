@@ -8,7 +8,9 @@ import numpy as np
 import caffe
 caffe.set_mode_gpu()
 
+from pybot.vision.color_utils import color_by_lut
 from pybot.utils.timer import timeit, timeitmethod
+from pybot.utils.dataset import data_file
 
 @timeit
 def convert_image(im, input_shape): 
@@ -25,7 +27,8 @@ def segnet_extract(net, input_image, layer='conv1_1_D'):
     out = net.forward_all(data=input_image)
     return np.squeeze(net.blobs[layer].data, axis=0)
 
-class SegNet(object): 
+class SegNet(object):
+    sun3d_lut = cv2.imread(data_file('sun3d/sun.png')).astype(np.uint8)
     def __init__(self, model_file, weights_file): 
         if not os.path.exists(model_file) or \
            not os.path.exists(weights_file): 
@@ -35,7 +38,7 @@ class SegNet(object):
         # Init caffe with model
         self.net_ = caffe.Net(model_file, weights_file, caffe.TEST)
         self.input_shape_ = self.net_.blobs['data'].data.shape    
-        
+
     @timeitmethod
     def forward(self, im): 
         input_image = convert_image(im, self.input_shape_)
@@ -49,3 +52,7 @@ class SegNet(object):
     def describe(self, im, layer='conv1_1_D'):
         self.forward(im)
         return self.extract(layer=layer)
+
+    @staticmethod
+    def visualize(labels, colors):
+        return color_by_lut(labels, colors)
