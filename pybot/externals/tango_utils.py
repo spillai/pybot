@@ -349,11 +349,11 @@ class TangoFrame(object):
     def img_filename(self): 
         return self.img_fn_
 
-    def attribute_filename(self, label, img_fn):
+    def attribute_filename(self, label):
         return self.img_filename.replace('rgb', label)
 
-    def attribute(self, label, img_fn):
-        return self.img_decode(self.attribute_filename(label, img_fn))
+    def attribute(self, label):
+        return self.img_decode(self.attribute_filename(label))
     
     @property
     def img(self): 
