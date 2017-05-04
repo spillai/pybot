@@ -39,6 +39,10 @@ class SegNet(object):
         self.net_ = caffe.Net(model_file, weights_file, caffe.TEST)
         self.input_shape_ = self.net_.blobs['data'].data.shape    
 
+    @property
+    def layers(self):
+        return self.net_.blobs.keys()
+        
     @timeitmethod
     def forward(self, im): 
         input_image = convert_image(im, self.input_shape_)

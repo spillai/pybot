@@ -14,9 +14,12 @@ import scipy as sp
 import caffe
 caffe.set_mode_gpu()
 
-from fast_rcnn.test import _get_blobs, nms, apply_nms
 from fast_rcnn.config import cfg
+cfg.TEST.HAS_RPN = True
+from fast_rcnn.test import _get_blobs, nms, apply_nms
 from fast_rcnn.bbox_transform import clip_boxes, bbox_transform_inv
+
+from pybot.utils.timer import timeitmethod
 
 def im_detect(net, im, boxes=None, layer='fc7'):
     """Detect object classes in an image given object proposals.
@@ -104,13 +107,41 @@ def im_detect(net, im, boxes=None, layer='fc7'):
 
     # return scores, pred_boxes
 
+# def demo(net, image_name):
+#     """Detect object classes in an image using pre-computed object proposals."""
+
+#     # Load the demo image
+#     im_file = os.path.join(cfg.DATA_DIR, 'demo', image_name)
+#     im = cv2.imread(im_file)
+
+#     # Detect all object classes and regress object bounds
+#     timer = Timer()
+#     timer.tic()
+#     scores, boxes = im_detect(net, im)
+#     timer.toc()
+#     print ('Detection took {:.3f}s for '
+#            '{:d} object proposals').format(timer.total_time, boxes.shape[0])
+
+#     # Visualize detections for each class
+#     CONF_THRESH = 0.8
+#     NMS_THRESH = 0.3
+#     for cls_ind, cls in enumerate(CLASSES[1:]):
+#         cls_ind += 1 # because we skipped background
+#         cls_boxes = boxes[:, 4*cls_ind:4*(cls_ind + 1)]
+#         cls_scores = scores[:, cls_ind]
+#         dets = np.hstack((cls_boxes,
+#                           cls_scores[:, np.newaxis])).astype(np.float32)
+#         keep = nms(dets, NMS_THRESH)
+#         dets = dets[keep, :]
+#         vis_detections(im, cls, dets, thresh=CONF_THRESH)
+
 
 class FasterRCNNDescription(caffe.Net): 
     NETS = {'vgg16': ('VGG16',
                       'VGG16_faster_rcnn_final.caffemodel'),
             'zf': ('ZF',
                    'ZF_faster_rcnn_final.caffemodel')}
-    def __init__(self, rcnn_dir, with_rpn=True, net='zf', model_dir='pascal_voc', opt_dir='fast_rcnn_end2end'): 
+    def __init__(self, rcnn_dir, with_rpn=False, net='zf', model_dir='pascal_voc', opt_dir='fast_rcnn_end2end'): 
         """
         net: vgg16, zf
         model_dir: [pascal_voc, coco]
@@ -119,12 +150,14 @@ class FasterRCNNDescription(caffe.Net):
     
         model_file = os.path.join(
             rcnn_dir, 'models', model_dir, 
-            FasterRCNNDescription.NETS[net][0], 
-            opt_dir, 'test.prototxt')
+            FasterRCNNDescription.NETS[net][0],
+            'faster_rcnn_alt_opt', 'faster_rcnn_test.pt')
+            # opt_dir, 'test.prototxt')
+            
         pretrained_file = os.path.join(
             rcnn_dir, 'data', 'faster_rcnn_models', 
             FasterRCNNDescription.NETS[net][1])
-
+        
         if not os.path.exists(model_file) or \
            not os.path.exists(pretrained_file): 
             raise ValueError('Unknown net {}, use one of {}, \n'
@@ -134,41 +167,21 @@ class FasterRCNNDescription(caffe.Net):
                                      model_file, pretrained_file))
 
         # Init caffe with model
-        cfg.TEST.HAS_RPN = with_rpn
-        cfg.TEST.BBOX_REG = False
+        # cfg.TEST.HAS_RPN = with_rpn
+        # cfg.TEST.BBOX_REG = False
         caffe.Net.__init__(self, model_file, pretrained_file, caffe.TEST)
 
+    @property
+    def layers(self):
+        return self.blobs.keys()
+
+    @timeitmethod
     def describe(self, im, boxes=None, layer='fc7'):
         return im_detect(self, im, boxes=boxes, layer=layer)
+
+    def extract(self, layer='fc7'):
+        return np.squeeze(self.blobs[layer].data, axis=0).transpose(1,2,0)
 
     # def hypercolumn(self, im, boxes=None):
     #     return extract_hypercolumns(self, im, boxes=boxes)
 
-
-def demo(net, image_name):
-    """Detect object classes in an image using pre-computed object proposals."""
-
-    # Load the demo image
-    im_file = os.path.join(cfg.DATA_DIR, 'demo', image_name)
-    im = cv2.imread(im_file)
-
-    # Detect all object classes and regress object bounds
-    timer = Timer()
-    timer.tic()
-    scores, boxes = im_detect(net, im)
-    timer.toc()
-    print ('Detection took {:.3f}s for '
-           '{:d} object proposals').format(timer.total_time, boxes.shape[0])
-
-    # Visualize detections for each class
-    CONF_THRESH = 0.8
-    NMS_THRESH = 0.3
-    for cls_ind, cls in enumerate(CLASSES[1:]):
-        cls_ind += 1 # because we skipped background
-        cls_boxes = boxes[:, 4*cls_ind:4*(cls_ind + 1)]
-        cls_scores = scores[:, cls_ind]
-        dets = np.hstack((cls_boxes,
-                          cls_scores[:, np.newaxis])).astype(np.float32)
-        keep = nms(dets, NMS_THRESH)
-        dets = dets[keep, :]
-        vis_detections(im, cls, dets, thresh=CONF_THRESH)

@@ -483,10 +483,12 @@ class UWRGBDSceneDataset(UWRGBDDataset):
         def scene_files(files, version): 
             if version == 'v1': 
                 depth_files = natural_sort(filter(lambda  fn: '_depth.png' in fn, files))
-                rgb_files = natural_sort(list(set(files) - set(depth_files)))
-            elif version == 'v2': 
+                rgb_files = natural_sort(filter(lambda  fn: '-color.png' in fn, files))
+
+            elif version == 'v2':
                 depth_files = natural_sort(filter(lambda  fn: '-depth.png' in fn, files))
-                rgb_files = natural_sort(list(set(files) - set(depth_files)))    
+                rgb_files = natural_sort(filter(lambda  fn: '-color.png' in fn, files))
+                
             else: 
                 raise ValueError('''Version %s not supported. '''
                                  '''Check dataset and choose either v1 or v2 scene dataset''' % version)
@@ -653,13 +655,14 @@ class UWRGBDSceneDataset(UWRGBDDataset):
         self.blacklist = blacklist
 
         # Recursively read, and categorize items based on folder
+        scene_name = lambda idx: 'scene_{:02d}'.format(idx)
         self.dataset_ = read_dir(os.path.expanduser(directory), pattern='*.png', recursive=False)
 
         # Setup meta data
         if version == 'v1': 
             self.meta_ = UWRGBDSceneDataset._reader.meta_files(directory, version)
             self.aligned_ = None
-        elif version == 'v2': 
+        elif version == 'v2':
             self.meta_ = UWRGBDSceneDataset._reader.meta_files(os.path.join(directory, 'imgs'), version)
             self.aligned_ = UWRGBDSceneDataset._reader.aligned_files(os.path.join(directory, 'pc'), version)
         else: 

@@ -41,7 +41,7 @@ def setup_rcnn(method, data_dir, net):
         from pybot.vision.caffe.faster_rcnn_utils import FasterRCNNDescription
         rcnn = FasterRCNNDescription(
             data_dir, with_rpn=False, 
-            net=net, opt_dir='fast_rcnn')
+            net=net, opt_dir='fast_rcnn') # TODO opt_dir
     else: 
         raise ValueError('Unknown rcnn method {}'.format(method))
 
