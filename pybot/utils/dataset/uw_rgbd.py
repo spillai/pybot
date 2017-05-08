@@ -12,11 +12,13 @@ see uw_annotation_conversion.py
 import os, time
 import numpy as np
 import cv2
+import fnmatch
 
 from itertools import izip
 from collections import defaultdict
 from scipy.io import loadmat
 
+from pybot.utils.timer import SimpleTimer
 from pybot.utils.misc import progressbar
 from pybot.utils.db_utils import AttrDict
 from pybot.utils.dataset_readers import read_dir, read_files, natural_sort, \
@@ -85,7 +87,7 @@ class UWRGBDDataset(object):
     # train_names = ["bowl", "cap", "cereal_box", "coffee_mug", "soda_can"]
     train_names = ["bowl", "cap", "cereal_box", "coffee_mug", "flashlight", 
                    "keyboard", "kleenex", "scissors",  "soda_can", 
-                   "stapler", "background"]
+                   "stapler", "sofa", "table", "background"]
     # train_names = class_names
 
     train_ids = [target_hash[name] for name in train_names]
@@ -289,6 +291,27 @@ class UWRGBDObjectDataset(UWRGBDDataset):
 # UW-RGBD Scene Dataset Reader
 # ---------------------------------------------------------------------
 
+class LazyDir(object):
+    def __init__(self, path, pattern='*.png'): 
+        self.path_ = path
+        self.keys_ = os.listdir(os.path.expanduser(path))
+        self.pattern_ = pattern
+        print path, self.keys_
+        
+    def keys(self):
+        return self.keys_
+        
+    def iterkeys(self):
+        return (k for k in self.keys_)
+
+    def __len__(self):
+        return len(self.keys_)
+    
+    def __getitem__(self, key):
+        assert(key in self.keys_)
+        return read_files(os.path.join(self.path_, key), pattern=self.pattern_)
+
+        
 class UWRGBDSceneDataset(UWRGBDDataset):
     """
     RGB-D Scene Dataset reader 
@@ -298,6 +321,28 @@ class UWRGBDSceneDataset(UWRGBDDataset):
                        office_chair=6, soda_can=7, sofa=8, table=9, background=10)
     # v2_target_unhash = dict((v,k) for k,v in v2_target_hash.iteritems())
     v2_to_v1 = dict((v2,UWRGBDDataset.target_hash[k2]) for k2,v2 in v2_target_hash.iteritems())
+
+    def __init__(self, version, directory, targets=None, num_targets=None, blacklist=['']):
+        if version not in ['v1', 'v2']: 
+            raise ValueError('Version %s not supported. '''
+                             '''Check dataset and choose either v1 or v2 scene dataset''' % version)
+        self.version = version
+        self.blacklist = blacklist
+
+        # Recursively read, and categorize items based on folder
+        scene_name = lambda idx: 'scene_{:02d}'.format(idx)
+        self.dataset_ = LazyDir(os.path.join(os.path.expanduser(directory), 'imgs'), pattern='*.png')
+
+        # Setup meta data
+        if version == 'v1': 
+            self.meta_ = UWRGBDSceneDataset._reader.meta_files(directory, version)
+            self.aligned_ = None
+        elif version == 'v2':
+            self.meta_ = UWRGBDSceneDataset._reader.meta_files(os.path.join(directory, 'pc'), version)
+            self.aligned_ = UWRGBDSceneDataset._reader.aligned_files(os.path.join(directory, 'pc'), version)
+        else: 
+            raise ValueError('Version %s not supported. '''
+                             '''Check dataset and choose either v1 or v2 scene dataset''' % version)
 
     class _reader(object): 
         """
@@ -310,7 +355,7 @@ class UWRGBDSceneDataset(UWRGBDDataset):
 
             self.rgb_files, self.depth_files = UWRGBDSceneDataset._reader.scene_files(files, version)
             assert(len(self.depth_files) == len(self.rgb_files))
-
+            
             # RGB, Depth
             # TODO: Check depth seems scaled by 256 not 16
             self.rgb = ImageDatasetReader.from_filenames(self.rgb_files)
@@ -320,7 +365,7 @@ class UWRGBDSceneDataset(UWRGBDDataset):
             self.bboxes = UWRGBDSceneDataset._reader.load_bboxes(meta_file, version) \
                          if meta_file is not None else [None] * len(self.rgb_files)
             assert(len(self.bboxes) == len(self.rgb_files))
-            
+
             # POSE
             # Version 2 only supported! Version 1 support for rgbd scene (unclear)
             self.poses = UWRGBDSceneDataset._reader.load_poses(aligned_file.pose, version) \
@@ -330,31 +375,27 @@ class UWRGBDSceneDataset(UWRGBDDataset):
             # Camera
             intrinsic = UWRGBDSceneDataset.calib
             camera = Camera.from_intrinsics_extrinsics(intrinsic, CameraExtrinsic.identity())
-            
+
+            # TODO: Performance/Speedup: with SimpleTimer('aligned'): 
             # Aligned point cloud
             if aligned_file is not None: 
                 if version != 'v2': 
                     raise RuntimeError('Version v2 is only supported')
 
                 ply_xyz, ply_rgb = UWRGBDSceneDataset._reader.load_ply(aligned_file.ply, version)
-                ply_label = UWRGBDSceneDataset._reader.load_plylabel(aligned_file.label, version)
+                ply_label_ = UWRGBDSceneDataset._reader.load_plylabel(aligned_file.label, version)
 
                 # Remapping to v1 index
-                ply_label = np.array([UWRGBDSceneDataset.v2_to_v1[l] for l in ply_label], dtype=np.int32)
+                ply_label = ply_label_.copy()
+                for l in np.unique(ply_label_):
+                    lmask = ply_label_ == l
+                    ply_label[lmask] = UWRGBDSceneDataset.v2_to_v1[l]
 
                 # Get object info
                 object_info = UWRGBDSceneDataset._reader.cluster_ply_labels(ply_xyz[::30], ply_rgb[::30], ply_label[::30])
-                
+
                 # Add camera info
                 self.map_info = AttrDict(camera=camera, objects=object_info)
-
-                # # 1c. Determine centroid of each cluster
-                # unique_centers = np.vstack([np.mean(ply_xyz[ply_label == l], axis=0) for l in unique_labels])
-
-                # self.map_info = AttrDict(
-                #     points=ply_xyz, color=ply_rgb, labels=ply_label, 
-                #     unique_labels=unique_labels, unique_centers=unique_centers, camera=camera
-                # ) 
                 assert(len(ply_xyz) == len(ply_rgb))
 
             print('*********************************')
@@ -393,6 +434,7 @@ class UWRGBDSceneDataset(UWRGBDDataset):
 
                 linds = euclidean_clustering(l_xyz.astype(np.float32), tolerance=0.1, scale=1.0, min_cluster_size=10)
                 unique_linds = np.unique(linds)
+
                 # print 'Output ', unique_linds
                 for lind in unique_linds: 
                     object_info.append(AttrDict(label=l, uid=len(object_info),  
@@ -450,7 +492,7 @@ class UWRGBDSceneDataset(UWRGBDDataset):
                                  '''Check dataset and choose either v1 or v2 scene dataset''' % version)
                 # P = np.loadtxt(os.path.expanduser(fn), usecols=(2,3,4,5,6,7,8), dtype=np.float64)
                 # return map(lambda p: RigidTransform(Quaternion.from_wxyz(p[:4]), p[4:]), P)
-            elif version == 'v2': 
+            elif version == 'v2':
                 ply = PlyData.read(os.path.expanduser(fn))
                 xyz = np.vstack([ply['vertex'].data['x'], 
                                  ply['vertex'].data['y'], 
@@ -472,8 +514,8 @@ class UWRGBDSceneDataset(UWRGBDDataset):
             if version == 'v1': 
                 raise ValueError('''Version %s not supported. '''
                                  '''Check dataset and choose either v1 or v2 scene dataset''' % version)
-            elif version == 'v2': 
-                return np.loadtxt(fn, dtype=np.int32)[1:]
+            elif version == 'v2':
+                return np.fromfile(fn, sep='\n', dtype=np.int32)[1:]
             else: 
                 raise ValueError('''Version %s not supported. '''
                                  '''Check dataset and choose either v1 or v2 scene dataset''' % version)
@@ -499,7 +541,7 @@ class UWRGBDSceneDataset(UWRGBDDataset):
             if version == 'v1': 
                 mat_files = read_files(os.path.expanduser(directory), pattern='*.mat')
                 return dict(((fn.split('/')[-1]).replace('.mat',''), fn) for fn in mat_files)
-            elif version == 'v2': 
+            elif version == 'v2':
                 label_files = read_files(os.path.expanduser(directory), pattern='*.label')
                 return dict(((fn.split('/')[-1]).replace('.label',''), fn) for fn in label_files)
             else: 
@@ -646,29 +688,6 @@ class UWRGBDSceneDataset(UWRGBDDataset):
                                                             [self.poses[ind] for ind in inds]): 
                 yield self._process_items(index, rgb_im, depth_im, bbox, pose)
 
-
-    def __init__(self, version, directory, targets=None, num_targets=None, blacklist=['']):
-        if version not in ['v1', 'v2']: 
-            raise ValueError('Version %s not supported. '''
-                             '''Check dataset and choose either v1 or v2 scene dataset''' % version)
-        self.version = version
-        self.blacklist = blacklist
-
-        # Recursively read, and categorize items based on folder
-        scene_name = lambda idx: 'scene_{:02d}'.format(idx)
-        self.dataset_ = read_dir(os.path.expanduser(directory), pattern='*.png', recursive=False)
-
-        # Setup meta data
-        if version == 'v1': 
-            self.meta_ = UWRGBDSceneDataset._reader.meta_files(directory, version)
-            self.aligned_ = None
-        elif version == 'v2':
-            self.meta_ = UWRGBDSceneDataset._reader.meta_files(os.path.join(directory, 'imgs'), version)
-            self.aligned_ = UWRGBDSceneDataset._reader.aligned_files(os.path.join(directory, 'pc'), version)
-        else: 
-            raise ValueError('Version %s not supported. '''
-                             '''Check dataset and choose either v1 or v2 scene dataset''' % version)
-
     # @classmethod
     # def get_v2_category_name(cls, target_id): 
     #     return cls.v2_target_unhash[target_id] # \
@@ -702,7 +721,7 @@ class UWRGBDSceneDataset(UWRGBDDataset):
 
         # Get scene files
         files = self.dataset_[key]
-
+        
         # Get meta data 
         meta_file = self.meta_.get(key, None)
         aligned_file = self.aligned_.get(key, None) if (self.aligned_ and with_ground_truth) else None
