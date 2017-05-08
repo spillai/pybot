@@ -7,12 +7,17 @@
 # Written by Ross Girshick
 # --------------------------------------------------------
 
+import sys
 import os
 import numpy as np
 import scipy as sp
 
-import caffe
-caffe.set_mode_gpu()
+_PYCAFFE_PATH = os.getenv('PYCAFFE')
+assert _PYCAFFE_PATH, 'PYCAFFE environment path not set'
+
+sys.path.append(os.path.join(_PYCAFFE_PATH, 'caffe-fast-rcnn', 'python'))
+sys.path.append(os.path.join(_PYCAFFE_PATH, 'lib'))
+import caffe; caffe.set_mode_gpu(); caffe.set_device(0)
 
 from fast_rcnn.config import cfg
 cfg.TEST.HAS_RPN = True

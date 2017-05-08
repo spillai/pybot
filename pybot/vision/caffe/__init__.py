@@ -1,12 +1,17 @@
 # Author: Sudeep Pillai <spillai@csail.mit.edu>
 # License: MIT
 
+import cv2
 import os
 os.environ["GLOG_minloglevel"] ="3"
 
-import numpy as np
-import cv2
+_PYCAFFE_PATH = os.getenv('PYCAFFE')
+assert _PYCAFFE_PATH, 'PYCAFFE environment path not set'
+print('PYCAFFE: {}'.format(_PYCAFFE_PATH))
 
+import numpy as np
+
+# Initialize RCNN Caffe / GPU (set GPU via CUDA_VISIBLE_DEVICES=GPU_ID)
 def resize_to(labels, im): 
     return cv2.resize(labels, (im.shape[1],im.shape[0]), fx=0., fy=0., interpolation=cv2.INTER_AREA)
 
