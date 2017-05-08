@@ -85,10 +85,10 @@ class UWRGBDDataset(object):
     # train_names = ["bowl", "cap", "cereal_box", "soda_can", "background"]
     # train_names = ["bowl", "cap", "cereal_box", "coffee_mug", "soda_can", "background"]
     # train_names = ["bowl", "cap", "cereal_box", "coffee_mug", "soda_can"]
-    train_names = ["bowl", "cap", "cereal_box", "coffee_mug", "flashlight", 
-                   "keyboard", "kleenex", "scissors",  "soda_can", 
-                   "stapler", "sofa", "table", "background"]
-    # train_names = class_names
+    # train_names = ["bowl", "cap", "cereal_box", "coffee_mug", "flashlight", 
+    #                "keyboard", "kleenex", "scissors",  "soda_can", 
+    #                "stapler", "sofa", "table", "background"]
+    train_names = class_names
 
     train_ids = [target_hash[name] for name in train_names]
     train_names_set, train_ids_set = set(train_names), set(train_ids)
@@ -433,7 +433,7 @@ class UWRGBDSceneDataset(UWRGBDDataset):
                 l_rgb = ply_rgb[ply_label == l]
                 # print 'Clustering: ', l_xyz.shape, l_rgb.shape
 
-                linds = euclidean_clustering(l_xyz.astype(np.float32), tolerance=0.1, scale=1.0, min_cluster_size=500)
+                linds = euclidean_clustering(l_xyz.astype(np.float32), tolerance=0.05, scale=1.0, min_cluster_size=500)
                 unique_linds = np.unique(linds)
 
                 # print 'Output ', unique_linds
@@ -446,7 +446,8 @@ class UWRGBDSceneDataset(UWRGBDDataset):
                     # draw_utils.publish_cloud('aligned_cloud_' + str(oidx), object_info[-1].points,
                     #                          c={k:v for k,v in enumerate(['r','g','b','m','k','y'])}[oidx % 6], reset=True)
                     
-            print 'Total unique objects in dataset: ', len(object_info)
+            print 'Total unique objects in dataset: ', len(object_info), \
+                [UWRGBDDataset.target_unhash[obj.label] for obj in object_info]
 
             return object_info
 
