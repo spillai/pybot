@@ -85,10 +85,10 @@ class UWRGBDDataset(object):
     # train_names = ["bowl", "cap", "cereal_box", "soda_can", "background"]
     # train_names = ["bowl", "cap", "cereal_box", "coffee_mug", "soda_can", "background"]
     # train_names = ["bowl", "cap", "cereal_box", "coffee_mug", "soda_can"]
-    train_names = ["bowl", "cap", "cereal_box", "coffee_mug", "flashlight", 
-                   "keyboard", "kleenex", "scissors",  "soda_can", 
-                   "stapler", "sofa", "table", "background"]
-    # train_names = class_names
+    # train_names = ["bowl", "cap", "cereal_box", "coffee_mug", "flashlight", 
+    #                "keyboard", "kleenex", "scissors",  "soda_can", 
+    #                "stapler", "sofa", "table", "background"]
+    train_names = class_names
 
     train_ids = [target_hash[name] for name in train_names]
     train_names_set, train_ids_set = set(train_names), set(train_ids)
@@ -392,7 +392,7 @@ class UWRGBDSceneDataset(UWRGBDDataset):
                     ply_label[lmask] = UWRGBDSceneDataset.v2_to_v1[l]
 
                 # Get object info
-                object_info = UWRGBDSceneDataset._reader.cluster_ply_labels(ply_xyz[::20], ply_rgb[::20], ply_label[::20])
+                object_info = UWRGBDSceneDataset._reader.cluster_ply_labels(ply_xyz[::30], ply_rgb[::30], ply_label[::30])
 
                 # Add camera info
                 self.map_info = AttrDict(camera=camera, objects=object_info)
@@ -431,24 +431,45 @@ class UWRGBDSceneDataset(UWRGBDDataset):
 
                 l_xyz = ply_xyz[ply_label == l]
                 l_rgb = ply_rgb[ply_label == l]
-                # print 'Clustering: ', l_xyz.shape, l_rgb.shape
+                std = np.std(l_xyz, axis=0).min() * 1.0
+                # print 'Clustering: ', l_xyz.shape, l_rgb.shape, std, UWRGBDDataset.target_unhash[l], len(l_xyz)
 
-                linds = euclidean_clustering(l_xyz.astype(np.float32), tolerance=0.05, scale=1.0, min_cluster_size=500)
+                linds = euclidean_clustering(l_xyz.astype(np.float32), tolerance=std,
+                                             scale=1.0, min_cluster_size=int(len(l_xyz)/3))
                 unique_linds = np.unique(linds)
 
-                # print 'Output ', unique_linds
-                for lind in unique_linds: 
+                ocounts = 0
+                for lind in unique_linds:
+                    if lind < 0: continue
+                    
+                    spoints = l_xyz[linds == lind]
+                    scolors = l_rgb[linds == lind]
+
+                    # At least 30% of the original point cloud
+                    if len(spoints) * 1. / len(l_xyz) < 0.3:
+                        continue
+
+                    ocounts += 1
                     object_info.append(AttrDict(label=l, uid=len(object_info),  
-                                                points=l_xyz[linds == lind], 
-                                                colors=l_rgb[linds == lind], 
-                                                center=np.mean(l_xyz[linds == lind], axis=0)))
+                                                points=spoints, 
+                                                colors=scolors, 
+                                                center=np.mean(spoints, axis=0)))
                     # oidx = len(object_info)
                     # draw_utils.publish_cloud('aligned_cloud_' + str(oidx), object_info[-1].points,
                     #                          c={k:v for k,v in enumerate(['r','g','b','m','k','y'])}[oidx % 6], reset=True)
-                    
+                    # draw_utils.publish_pose_list('aligned_poses_' + str(oidx),
+                    #                              [RigidTransform(tvec=object_info[-1].center)], 
+                    #                              texts=[UWRGBDDataset.target_unhash[object_info[-1].label] + str(oidx)],
+                    #                              reset=True)
+
+                    # print 'Pts: ', len(object_info[-1].points)
+
+                # Ensure that at least one object is filtered from the clustering
+                assert(ocounts)
+                
             print 'Total unique objects in dataset: ', len(object_info), \
                 [UWRGBDDataset.target_unhash[obj.label] for obj in object_info]
-
+            
             return object_info
 
 
