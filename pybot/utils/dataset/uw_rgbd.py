@@ -392,7 +392,7 @@ class UWRGBDSceneDataset(UWRGBDDataset):
                     ply_label[lmask] = UWRGBDSceneDataset.v2_to_v1[l]
 
                 # Get object info
-                object_info = UWRGBDSceneDataset._reader.cluster_ply_labels(ply_xyz[::30], ply_rgb[::30], ply_label[::30])
+                object_info = UWRGBDSceneDataset._reader.cluster_ply_labels(ply_xyz[::20], ply_rgb[::20], ply_label[::20])
 
                 # Add camera info
                 self.map_info = AttrDict(camera=camera, objects=object_info)
@@ -418,11 +418,12 @@ class UWRGBDSceneDataset(UWRGBDDataset):
             candidate projection becomes inconsistent
             """
             from pybot_pcl import euclidean_clustering            
+            import pybot.externals.lcm.draw_utils as draw_utils
 
             object_info = []
             unique_labels = np.unique(ply_label)
 
-            for l in unique_labels: 
+            for lidx, l in enumerate(unique_labels): 
 
                 # Only add clusters that are in target/train and not background
                 if l not in UWRGBDDataset.train_ids or l == UWRGBDDataset.target_hash['background']: 
@@ -432,7 +433,7 @@ class UWRGBDSceneDataset(UWRGBDDataset):
                 l_rgb = ply_rgb[ply_label == l]
                 # print 'Clustering: ', l_xyz.shape, l_rgb.shape
 
-                linds = euclidean_clustering(l_xyz.astype(np.float32), tolerance=0.1, scale=1.0, min_cluster_size=10)
+                linds = euclidean_clustering(l_xyz.astype(np.float32), tolerance=0.1, scale=1.0, min_cluster_size=500)
                 unique_linds = np.unique(linds)
 
                 # print 'Output ', unique_linds
@@ -441,7 +442,10 @@ class UWRGBDSceneDataset(UWRGBDDataset):
                                                 points=l_xyz[linds == lind], 
                                                 colors=l_rgb[linds == lind], 
                                                 center=np.mean(l_xyz[linds == lind], axis=0)))
-
+                    # oidx = len(object_info)
+                    # draw_utils.publish_cloud('aligned_cloud_' + str(oidx), object_info[-1].points,
+                    #                          c={k:v for k,v in enumerate(['r','g','b','m','k','y'])}[oidx % 6], reset=True)
+                    
             print 'Total unique objects in dataset: ', len(object_info)
 
             return object_info
@@ -577,14 +581,19 @@ class UWRGBDSceneDataset(UWRGBDDataset):
                                  '''Check dataset and choose v1 scene dataset''' % version)
 
         def visualize_ground_truth(self): 
+
+            from pybot.vision.color_utils import get_color_by_label
             import pybot.externals.lcm.draw_utils as draw_utils
 
             # Publish ground truth poses, and aligned point clouds
             draw_utils.publish_pose_list('ground_truth_poses', self.poses)
 
-            # carr = get_color_by_label(scene.map_info.labels) 
-            draw_utils.publish_cloud('aligned_cloud', [obj.points for obj in self.map_info.objects], 
-                                     c=[obj.colors for obj in self.map_info.objects]) 
+            
+            # carr = [get_color_by_label(self.map_info.labels)]
+            carr = np.hstack([np.ones(len(obj.points)) * obj.label for obj in self.map_info.objects])
+            carr = get_color_by_label(carr)
+            # carr = [obj.colors for obj in self.map_info.objects]
+            draw_utils.publish_cloud('aligned_cloud', np.vstack([obj.points for obj in self.map_info.objects]), c=carr)
             draw_utils.publish_pose_list('aligned_poses', [RigidTransform(tvec=obj.center) for obj in self.map_info.objects], 
                                          texts=[str(obj.label) for obj in self.map_info.objects])
 
