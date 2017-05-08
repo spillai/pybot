@@ -437,7 +437,7 @@ class MultiViewMapper(Mapper):
             if kf_id < 20: 
                 continue
             self.process(self.keyframes[kf_id].img, self.keyframes[kf_id].pose)
-            draw_utils.publish_cameras('current_keyframe', [self.keyframes[kf_id].pose], frame_id='camera', size=2)
+            draw_utils.publish_cameras('current_keyframe', [self.keyframes[kf_id].pose], frame_id='camera', size=1)
 
         # HACK: save to first keyframe
         self.keyframes[0].points = self.depth_filter.getPoints()
