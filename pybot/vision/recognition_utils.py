@@ -21,6 +21,7 @@ from sklearn.grid_search import GridSearchCV
 from sklearn.cross_validation import train_test_split, ShuffleSplit
 
 import matplotlib.pyplot as plt
+from pybot.utils.misc import print_yellow
 from pybot.vision.geom_utils import brute_force_match, intersection_over_union
 from pybot.vision.image_utils import im_resize, gaussian_blur, median_blur, box_blur
 from pybot.utils.io_utils import memory_usage_psutil, format_time
@@ -353,15 +354,15 @@ class HistogramClassifier(object):
         self.st_time_ = time.time()
 
         # Setup classifier
-        print('-------------------------------')        
-        print('====> Building Classifier, setting class weights') 
+        print_yellow('-------------------------------')        
+        print_yellow('====> Building Classifier, setting class weights') 
         if classifier == 'svm': 
             self.clf_hyparams_ = {'C':[0.01, 0.1, 1.0, 10.0, 100.0], 'class_weight': ['balanced']}
             self.clf_base_ = LinearSVC(random_state=self.seed_)
         elif classifier == 'sgd': 
             self.clf_hyparams_ = {'alpha':[0.0001, 0.001, 0.01, 0.1, 1.0, 10.0], 'class_weight':['auto']} # 'loss':['hinge'], 
             self.clf_ = SGDClassifier(loss='log', penalty='l2', shuffle=False, random_state=self.seed_, 
-                                      warm_start=True, n_jobs=-1, n_iter=1, verbose=4)
+                                      warm_start=True, n_jobs=-1, n_iter=1, verbose=1)
         else: 
             raise Exception('Unknown classifier type %s. Choose from [sgd, svm, gradient-boosting, extra-trees]' 
                             % classifier)
@@ -369,12 +370,12 @@ class HistogramClassifier(object):
     def fit(self, X, y, test_size=0.3):
         # Grid search cross-val (best C param)
         cv = ShuffleSplit(len(X), n_iter=1, test_size=0.3, random_state=self.seed_)
-        clf_cv = GridSearchCV(self.clf_base_, self.clf_hyparams_, cv=cv, n_jobs=-1, verbose=4)
+        clf_cv = GridSearchCV(self.clf_base_, self.clf_hyparams_, cv=cv, n_jobs=-1, verbose=1)
 
-        print('====> Training Classifier (with grid search hyperparam tuning) .. ')
-        print('====> BATCH Training (in-memory): {:4.3f} MB'.format(X.nbytes / 1024.0 / 1024.0) )
+        print_yellow('====> Training Classifier (with grid search hyperparam tuning) .. ')
+        print_yellow('====> BATCH Training (in-memory): {:4.3f} MB'.format(X.nbytes / 1024.0 / 1024.0) )
         clf_cv.fit(X, y)
-        print('BEST: {}, {}'.format(clf_cv.best_score_, clf_cv.best_params_))
+        print_yellow('BEST: {}, {}'.format(clf_cv.best_score_, clf_cv.best_params_))
 
         # Setting clf to best estimator
         self.clf_ = clf_cv.best_estimator_
@@ -408,9 +409,9 @@ class HistogramClassifier(object):
         return self.clf_.decision_function(X)
 
     def report(self, y, y_pred, background=None): 
-        print('-------------------------------')
-        print(' Accuracy score (Training): {:4.3f}'.format((metrics.accuracy_score(y, y_pred))))
-        print(' Report (Training):\n {}'.format(
+        print_yellow('-------------------------------')
+        print_yellow(' Accuracy score (Training): {:4.3f}'.format((metrics.accuracy_score(y, y_pred))))
+        print_yellow(' Report (Training):\n {}'.format(
             classification_report(y, y_pred, 
                                   labels=self.target_map_.keys(), 
                                   target_names=self.target_map_.values())))
@@ -423,14 +424,14 @@ class HistogramClassifier(object):
         inds = np.argsort(xyc[:,2])[-20:]
         xyc_top = xyc[inds,:]
 
-        print('-------------------------------')
-        print('{} :: Confusion table (top 20 entries)'.format(self.__class__.__name__))
+        print_yellow('-------------------------------')
+        print_yellow('{} :: Confusion table (top 20 entries)'.format(self.__class__.__name__))
         for xyct in xyc_top: 
             if xyct[0] != xyct[1]: 
-                print('confusion: {}\t{}\t{}'.format(xyct[2], 
+                print_yellow('confusion: {}\t{}\t{}'.format(xyct[2], 
                                                      self.target_map_.values()[xyct[0]], 
                                                      self.target_map_.values()[xyct[1]]))        
-        print('\n')
+        print_yellow('\n')
 
         # import ipdb; ipdb.set_trace()
 
@@ -447,7 +448,7 @@ class HistogramClassifier(object):
             target_map = self.target_map_
             if background in target_map: 
                 del target_map[background]
-            print(' Report (Training without background):\n {}'.format(
+            print_yellow(' Report (Training without background):\n {}'.format(
                 classification_report(y[inds], y_pred[inds], 
                                       labels=target_map.keys(),
                                       target_names=target_map.values())))
@@ -456,13 +457,13 @@ class HistogramClassifier(object):
             #                                                        columns=target_map.values(), 
             #                                                        index=target_map.values()))
 
-        print('Training Classifier took {}'.format(format_time(time.time() - self.st_time_)))              
+        print_yellow('Training Classifier took {}'.format(format_time(time.time() - self.st_time_)))              
 
     def get_categories(self): 
         return self.clf_.classes_
 
     def save(self, filename): 
-        print('====> Saving classifier ')
+        print_yellow('====> Saving classifier ')
         db = AttrDict(clf=self.clf_, target_map=self.target_map_)
 
         # db = AttrDict(params=self.params_, 
@@ -471,15 +472,15 @@ class HistogramClassifier(object):
         #               clf_prob=self.clf_prob_, target_map=self.target_map_)
 
         db.save(filename)
-        print('-------------------------------')
+        print_yellow('-------------------------------')
 
     @classmethod
     def load(cls, path): 
-        print('====> Loading classifier {}'.format(path))
+        print_yellow('====> Loading classifier {}'.format(path))
         db = AttrDict.load(path)
         c = cls(path, target_map=dict((int(key), item) for key,item in db.target_map.iteritems()))
         c.clf_ = db.clf
-        print('-------------------------------')
+        print_yellow('-------------------------------')
         return c
 
 class NegativeMiningGenerator(object): 
@@ -488,10 +489,10 @@ class NegativeMiningGenerator(object):
     and object proposal technique
     """
     def __init__(self, dataset, proposer, target, num_proposals=50):
-        print('NegativeMiningGenerator: '
+        print_yellow('NegativeMiningGenerator: '
               'Generating negative samples with {}, num_proposals: {}'
               .format(proposer, num_proposals))
-        print('-------------------------------')
+        print_yellow('-------------------------------')
 
         self.dataset_ = dataset
         self.proposer_ = proposer

@@ -996,7 +996,6 @@ class UWRGBDSceneDataset(UWRGBDDataset):
                         cv2.FONT_HERSHEY_SIMPLEX, 0.4, (240, 240, 240), thickness = 1)
         return vis
 
-
 def test_uw_rgbd_object(): 
     from pybot.vision.image_utils import to_color
     from pybot.vision.imshow_utils import imshow_cv
@@ -1012,7 +1011,7 @@ def test_uw_rgbd_object():
                   (bbox['category'], rgbd_data_uw.get_category_name(bbox['category']), bbox['instance']))
         imshow_cv('depth', (f.depth / 16).astype(np.uint8), text='Depth')
 
-def test_uw_rgbd_scene(version='v1'): 
+def test_uw_rgbd_scene(version='v1', return_dataset=False): 
     from pybot.vision.image_utils import to_color
     from pybot.vision.imshow_utils import imshow_cv
     from pybot.externals.lcm.draw_utils import publish_pose_list
@@ -1030,6 +1029,9 @@ def test_uw_rgbd_scene(version='v1'):
         raise RuntimeError('''Version %s not supported. '''
                            '''Check dataset and choose v1/v2 scene dataset''' % version)
 
+    if return_dataset:
+        return rgbd_data_uw
+    
     for idx, f in enumerate(rgbd_data_uw.iteritems(every_k_frames=5, with_ground_truth=True)): 
         vis = rgbd_data_uw.annotate(f)
         imshow_cv('frame', np.hstack([f.img, vis]), text='Image')
@@ -1037,12 +1039,23 @@ def test_uw_rgbd_scene(version='v1'):
         publish_pose_list('poses', [Pose.from_rigid_transform(idx, f.pose)], frame_id='camera', reset=False)
         cv2.waitKey(10)
 
-    return rgbd_data_uw
+def test_uw_rgbd_scene_iterscenes():
+    dataset = test_uw_rgbd_scene(version='v2', return_dataset=True)
+    for key, scene in dataset.iterscenes(with_ground_truth=True):
+        for f in scene.iteritems(every_k_frames=10):
+            print f.img.shape
 
-
+def test_uw_rgbd_scene_roidb():
+    dataset = test_uw_rgbd_scene(version='v2', return_dataset=True)
+    for key, scene in dataset.iterscenes(with_ground_truth=True):
+        for (im,bboxes,targets) in scene.roidb(every_k_frames=10, skip_empty=True): 
+            print im.shape, bboxes.shape
 
 if __name__ == "__main__":
     # test_uw_rgbd_object()
     # test_uw_rgbd_scene('v1')
-    test_uw_rgbd_scene('v2')
+    # test_uw_rgbd_scene('v2')
+    # test_uw_rgbd_scene_iterscenes()
+    # test_uw_rgbd_scene_roidb()
+    print test_uw_rgbd_scene('v2', return_dataset=True).scenes
     

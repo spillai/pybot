@@ -32,6 +32,10 @@ def path_exists(path):
     return os.path.exists(os.path.expanduser(path)) \
         or not len(path)
 
+def check_path_exists(path):
+    if not path_exists(path):
+        raise RuntimeError('Path {} does not exist'.format(path))
+
 def create_directory_if_not_exists(dir_path): 
     """ Create directory path if it doesn't exist """
     
@@ -66,6 +70,7 @@ def read_config(conf_path, section):
     Recipe mostly taken from
     http://blog.vwelch.com/2011/04/combining-configparser-and-argparse.html 
     """
+    check_path_exists(conf_path)
     # Try reading the conf file
     try: 
         import ConfigParser
@@ -92,20 +97,26 @@ def config_and_args_parser(conf_path, section, description=''):
     args, remaining_argv = parser.parse_known_args()
 
     # Try reading the conf file
-    try: 
-        import ConfigParser
-        config = ConfigParser.SafeConfigParser()
-        config.read([args.config_file])
-        defaults = dict(config.items(section))
-        print('Loading config file: {}'.format(args.config_file))
-    except Exception as e: 
-        raise RuntimeError('Failed reading %s: %s' % (args.config_file, e))
-
+    defaults = read_config(args.config_file, section=section)
     parser.set_defaults(**defaults)
     # parser.add_argument("--option1", help="some option")
     args = parser.parse_args(remaining_argv)        
     return args
 
+def config_parser(conf_path, section, description=''): 
+    
+    # Parse directory
+    parser = argparse.ArgumentParser(
+        description=description)
+    parser.add_argument('-c', '--config-file', required=False, 
+                        default=conf_path, help='Specify config file', metavar='FILE')
+    args, remaining_argv = parser.parse_known_args()
+
+    # Try reading the conf file
+    defaults = read_config(args.config_file, section=section)
+    parser.set_defaults(**defaults)
+
+    return parser
 
 def joblib_dump(item, path): 
     import joblib
