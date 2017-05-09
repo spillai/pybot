@@ -159,9 +159,9 @@ def dmap(X, d, targets, shape, size=10,
         xs, ys = (Xi[:,0] / size).astype(np.int32), (Xi[:,1] / size).astype(np.int32)
 
         # Min-max bounds
-        x0, x1 = int(max(0, xs.min())), int(min(BW-1, xs.max()+1))
-        y0, y1 = int(max(0, ys.min())), int(min(BH-1, ys.max()+1))
-        bboxes[lind] = np.float32([x0, y0, x1, y1]) * size
+        x0, x1 = int(max(0, Xi[:,0].min())), int(min(W-1, Xi[:,0].max()))
+        y0, y1 = int(max(0, Xi[:,1].min())), int(min(H-1, Xi[:,1].max()))
+        bboxes[lind] = np.float32([x0, y0, x1, y1])
         
         zinds = ys * BW + xs
         dinds = np.where(di < zbuffer[zinds])
@@ -191,13 +191,14 @@ def dmap(X, d, targets, shape, size=10,
         # Finally, check IoU w.r.t original bbox >= 0.3
         iou = intersection_over_union(vbbox, bboxes[lind])
         if iou >= IoU: 
-            visible_bboxes[lind] = vbbox
+            visible_bboxes[lind] = vbbox # bboxes[lind]
         
         
     return im_resize(zbuffer, shape=(W,H),
                      interpolation=interpolation), \
         im_resize(zbufferl, shape=(W,H),
-                  interpolation=interpolation), visible_bboxes
+                  interpolation=interpolation), \
+        visible_bboxes
     
 # =====================================================================
 # Generic UW-RGBD Dataset class
@@ -1041,7 +1042,7 @@ def test_uw_rgbd_scene(version='v1'):
 
 
 if __name__ == "__main__":
-    test_uw_rgbd_object()
-    test_uw_rgbd_scene('v1')
+    # test_uw_rgbd_object()
+    # test_uw_rgbd_scene('v1')
     test_uw_rgbd_scene('v2')
     
