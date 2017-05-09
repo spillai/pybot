@@ -8,7 +8,7 @@ from collections import deque
 def flip_rb(im): 
     return cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
 
-def im_resize(im, shape=None, scale=0.5, interpolation=cv2.INTER_AREA): 
+def im_resize(im, shape=None, scale=1.0, interpolation=cv2.INTER_AREA): 
     if shape is not None: 
         return cv2.resize(im, dsize=shape, fx=0., fy=0., interpolation=interpolation)
     else:

@@ -7,6 +7,7 @@ import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib.colors import colorConverter, ListedColormap
+from pybot.vision.image_utils import im_normalize
 
 def colormap(im, min_threshold=0.01):
     mask = im<min_threshold

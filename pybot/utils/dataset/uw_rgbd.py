@@ -24,8 +24,9 @@ from pybot.utils.db_utils import AttrDict
 from pybot.utils.dataset_readers import read_dir, read_files, natural_sort, \
     DatasetReader, ImageDatasetReader
 from pybot.vision.draw_utils import annotate_bbox
+from pybot.vision.image_utils import im_resize
 from pybot.vision.camera_utils import Camera, CameraIntrinsic, CameraExtrinsic, \
-    construct_K, check_visibility, get_object_bbox
+    construct_K, check_visibility, get_object_bbox, get_discretized_projection
 from pybot.geometry.rigid_transform import Quaternion, RigidTransform, Pose
 from pybot.externals.plyfile import PlyData
 
@@ -40,6 +41,120 @@ def create_roidb_item(f):
         targets = []
     return f.img, bboxes, targets
 
+class CustomInterpolator(object):
+    """
+    NearestNDInterpolator(points, values)
+
+    Nearest-neighbour interpolation in N dimensions.
+
+    Notes
+    -----
+    Uses ``scipy.spatial.cKDTree``
+
+    """
+
+    def __init__(self, X, y, target, k=4): 
+        from scipy.spatial import cKDTree
+        # self.tree = cKDTree(X)
+        # self.values = y
+        self.K = k
+        self.target = target
+
+        # self.llut = {}
+        # self.tree, self.values, self.target = {}, {}, {}
+        # for lind in np.unique(target):
+        #     inds, = np.where(target == lind)
+        #     self.llut[lind] = inds
+        #     self.tree[lind] = cKDTree(X[inds,:])
+        #     self.values[lind] = y[inds]
+        #     self.target[lind] = target[inds]
+            
+    def __call__(self, X, targets):
+        """
+        Evaluate interpolator at given points.
+
+        Parameters
+        ----------
+        xi : ndarray of float, shape (..., ndim)
+            Points where to interpolate data at.
+
+        Only validate with neighboring pixels
+         : check distances (x,y) and depth disparities 
+       """
+        assert(X.ndim == 2 and X.shape[1] == 2)
+        assert(len(X) == len(y))
+        assert(len(X) == len(target))
+            
+        xs = np.arange(0, W, 5, dtype=np.int32)
+        ys = np.arange(0, H, 5, dtype=np.int32)
+        xys = np.dstack(np.meshgrid(xs, ys)).reshape(-1,2)
+
+        D, L = len(self.llut), len(xys)
+
+        zbuffer = np.ones((L, D)) * 100.0
+        for lind in self.llut: 
+            xids = self.tree[lind].query_ball_point(xys, r=20)
+
+            for idx, xind in enumerate(xids): 
+                d, l = self.values[lind][xind], self.target[lind][xind]
+                dmin = np.argmin(d)
+
+                if d[dmin] < zbuffer[idx,1]: 
+                    zbuffer[idx,0] = l[dmin]
+                    zbuffer[idx,1] = d[dmin]
+
+            
+        # Determine ordering of ids
+        self.target[ids]
+        
+        # # Check if neighbors are good indicators
+        # valid_nn = np.sum(dists > 10, axis=1) < self.K / 2
+        # self.values[~valid_nn] = np.inf
+        
+        # # Check if disparities are within 3 px of neighbors
+        # valid_disp = np.fabs(np.median(self.values[ids], axis=1) - self.values) < 0.3
+        # self.values[~valid_disp] = np.inf
+
+        return self.values
+
+def dmap(X, d, targets, shape, size=10, dmin=0.1, interpolation=cv2.INTER_NEAREST):
+    assert(len(X) == len(d) == len(targets))
+    H, W = shape[:2]
+    BH, BW = shape[:2] / size
+
+    zbuffer = np.ones(BH * BW, dtype=np.float32) * 100.
+    zbufferl = np.ones(BH * BW, dtype=np.int32) * -1
+    
+    # Prune by minimum depth 
+    mask = d > dmin
+    if not mask.any():
+        return im_resize(zbuffer.reshape(BH, BW), shape=(W,H),
+                         interpolation=interpolation), \
+            im_resize(zbufferl.reshape(BH, BW), shape=(W,H),
+                      interpolation=interpolation)
+    X, d, targets = X[mask], d[mask], targets[mask]
+
+    # Z-buffer for each of the targets
+    assert(len(targets) == len(X))
+    for lind in np.unique(targets):
+        inds, = np.where(lind == targets)
+        Xi, di = X[inds], d[inds]
+        xs, ys = (Xi[:,0] / size).astype(np.int32), (Xi[:,1] / size).astype(np.int32)
+
+        zinds = ys * BW + xs
+        dinds = np.where(di < zbuffer[zinds])
+        
+        zinds = zinds[dinds]
+        ninds = inds[dinds]
+        
+        zbufferl[zinds] = lind
+        zbuffer[zinds] = d[ninds]
+
+    return im_resize(zbuffer.reshape(BH, BW), shape=(W,H),
+                     interpolation=interpolation), \
+        im_resize(zbufferl.reshape(BH, BW), shape=(W,H),
+                  interpolation=interpolation)
+    
 # =====================================================================
 # Generic UW-RGBD Dataset class
 # ---------------------------------------------------------------------
@@ -633,6 +748,44 @@ class UWRGBDSceneDataset(UWRGBDDataset):
                 print 'Failed to find pose'
                 return None
 
+            from pybot.vision.color_utils import colormap, im_normalize
+            from pybot.vision.imshow_utils import imshow_cv
+            from pybot.vision.draw_utils import draw_features
+            from scipy.interpolate import NearestNDInterpolator, LinearNDInterpolator, CloughTocher2DInterpolator
+            
+            # 2. Recover bboxes for non-occluded objects in view
+            H, W = self.map_info.camera.shape[:2]
+
+
+            shape = self.map_info.camera.shape[:2]
+            pts3d = np.vstack([obj.points[::4] for obj in self.map_info.objects])
+            targets = np.hstack([obj.label * np.ones(len(obj.points[::4]), dtype=np.int32)
+                                 for obj in self.map_info.objects])
+
+            pts2d, depth, valid = self.map_info.camera.project(
+                pts3d, check_bounds=True, check_depth=True, min_depth=0.1,
+                return_depth=True, return_valid=True)
+
+            # Create depth map
+            zbuffer, zbufferl = dmap(pts2d, depth, targets[valid], shape, size=10)
+                    
+            # vis = np.zeros(self.map_info.camera.shape[:2], dtype=np.uint8)
+            # for obj in self.map_info.objects:
+            #     # if obj.label != 5: continue
+            #     pts3d = obj.points[::10].copy()
+                
+            #     # print len(obj.points), obj.points.dtype, obj.points.shape
+            #     # print obj.points[::4,:].shape, obj.points[::4,:].dtype
+            #     pts2d, depth = self.map_info.camera.project(
+            #         pts3d, check_bounds=True, check_depth=True, min_depth=0.1, return_depth=True)
+            #     if len(pts2d): 
+            #         cols = colormap(depth / 10.0)
+            #         vis = draw_features(vis, pts2d, colors=cols[:,:3], size=2)
+                    
+            # imshow_cv('dvis', np.vstack([vis, colormap(im_normalize(zbufferl))]))
+            imshow_cv('vis', colormap(zbuffer / 10.0))
+            
+            
             # 2. Determine bounding boxes for visible clusters
             object_centers = np.vstack([obj.center for obj in self.map_info.objects])
             visible_inds, = np.where(check_visibility(self.map_info.camera, object_centers))
@@ -642,6 +795,7 @@ class UWRGBDSceneDataset(UWRGBDDataset):
                 obj = self.map_info.objects[ind]
                 label = obj.label
                 pts2d, coords, depth = get_object_bbox(self.map_info.camera, obj.points, subsample=3, scale=1)
+
                 if coords is not None: 
                     object_candidates.append(
                         AttrDict(
@@ -844,3 +998,9 @@ def test_uw_rgbd_scene(version='v1'):
     return rgbd_data_uw
 
 
+
+if __name__ == "__main__":
+    test_uw_rgbd_object()
+    test_uw_rgbd_scene('v1')
+    test_uw_rgbd_scene('v2')
+    
