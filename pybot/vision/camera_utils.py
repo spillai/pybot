@@ -248,7 +248,7 @@ def get_median_depth(camera, pts, subsample=10):
     """
     return np.median((camera * pts[::subsample])[:,2])
 
-def get_bounded_projection(camera, pts, subsample=10): 
+def get_bounded_projection(camera, pts, subsample=10, return_depth=False): 
     """ Project points and only return points that are within image bounds """
 
     # Project points
@@ -639,7 +639,8 @@ class Camera(CameraIntrinsic, CameraExtrinsic):
     def extrinsics(self): 
         return CameraExtrinsic(self.R, self.t)
     
-    def project(self, X, check_bounds=False, check_depth=False, return_depth=False, min_depth=0.1):
+    def project(self, X, check_bounds=False, check_depth=False,
+                return_depth=False, return_valid=False, min_depth=0.1):
         """
         Project [Nx3] points onto 2-D image plane [Nx2]
         TODO: replace check_depth, and min_depth with min_depth=None default
@@ -649,6 +650,8 @@ class Camera(CameraIntrinsic, CameraExtrinsic):
 	proj,_ = cv2.projectPoints(X, rvec, t, self.K, self.D)
         x = proj.reshape(-1,2)
 
+        output = []
+        
         if return_depth or check_depth: 
             depths = self.depth_from_projection(X)
             
@@ -670,10 +673,14 @@ class Camera(CameraIntrinsic, CameraExtrinsic):
                     np.bitwise_and(x[:,1] >= 0, x[:,1] < self.shape[0]))
             )
 
-        if return_depth: 
-            return x[valid], depths[valid]
+        output = [x[valid]]
+        if return_depth:
+            output.append(depths[valid])
+            
+        if return_valid: 
+            output.append(valid)
 
-        return x[valid]
+        return output if len(output) > 1 else output[0]
 
     def depth_from_projection(self, X): 
         """
