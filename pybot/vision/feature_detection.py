@@ -12,6 +12,7 @@ def finite_and_within_bounds(xys, shape):
     return np.bitwise_and(np.isfinite(xys).all(axis=1), 
                           reduce(lambda x,y: np.bitwise_and(x,y), [xys[:,0] >= 0, xys[:,0] < W, 
                                                                    xys[:,1] >= 0, xys[:,1] < H]))
+
 def to_kpt(pt, size=1): 
     return cv2.KeyPoint(pt[0], pt[1], size)
 
