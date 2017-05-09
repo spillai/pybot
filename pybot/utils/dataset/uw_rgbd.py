@@ -161,7 +161,7 @@ def dmap(X, d, targets, shape, size=10,
         # Min-max bounds
         x0, x1 = int(max(0, Xi[:,0].min())), int(min(W-1, Xi[:,0].max()))
         y0, y1 = int(max(0, Xi[:,1].min())), int(min(H-1, Xi[:,1].max()))
-        bboxes[lind] = np.float32([x0, y0, x1, y1])
+        bboxes[lind] = np.int32([x0, y0, x1, y1])
         
         zinds = ys * BW + xs
         dinds = np.where(di < zbuffer[zinds])
@@ -186,7 +186,7 @@ def dmap(X, d, targets, shape, size=10,
         assert(len(xs) and len(ys))
         x0, x1 = int(max(0, xs[0])), int(min(BW-1, xs[-1]+1))
         y0, y1 = int(max(0, ys[0])), int(min(BH-1, ys[-1]+1))
-        vbbox = np.float32([x0, y0, x1, y1]) * size
+        vbbox = np.int32([x0, y0, x1, y1]) * size
 
         # Finally, check IoU w.r.t original bbox >= 0.3
         iou = intersection_over_union(vbbox, bboxes[lind])
@@ -245,10 +245,10 @@ class UWRGBDDataset(object):
     # train_names = ["bowl", "cap", "cereal_box", "soda_can", "background"]
     # train_names = ["bowl", "cap", "cereal_box", "coffee_mug", "soda_can", "background"]
     # train_names = ["bowl", "cap", "cereal_box", "coffee_mug", "soda_can"]
-    # train_names = ["bowl", "cap", "cereal_box", "coffee_mug", "flashlight", 
-    #                "keyboard", "kleenex", "scissors",  "soda_can", 
-    #                "stapler", "sofa", "table", "background"]
-    train_names = class_names
+    train_names = ["bowl", "cap", "cereal_box", "coffee_mug", "flashlight", 
+                   "keyboard", "kleenex", "scissors",  "soda_can", 
+                   "stapler", "sofa", "table", "background"]
+    # train_names = class_names
 
     train_ids = [target_hash[name] for name in train_names]
     train_names_set, train_ids_set = set(train_names), set(train_ids)

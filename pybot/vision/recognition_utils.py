@@ -362,7 +362,7 @@ class HistogramClassifier(object):
         elif classifier == 'sgd': 
             self.clf_hyparams_ = {'alpha':[0.0001, 0.001, 0.01, 0.1, 1.0, 10.0], 'class_weight':['auto']} # 'loss':['hinge'], 
             self.clf_ = SGDClassifier(loss='log', penalty='l2', shuffle=False, random_state=self.seed_, 
-                                      warm_start=True, n_jobs=-1, n_iter=1, verbose=1)
+                                      warm_start=True, n_jobs=-1, n_iter=1, verbose=0)
         else: 
             raise Exception('Unknown classifier type %s. Choose from [sgd, svm, gradient-boosting, extra-trees]' 
                             % classifier)
@@ -370,7 +370,7 @@ class HistogramClassifier(object):
     def fit(self, X, y, test_size=0.3):
         # Grid search cross-val (best C param)
         cv = ShuffleSplit(len(X), n_iter=1, test_size=0.3, random_state=self.seed_)
-        clf_cv = GridSearchCV(self.clf_base_, self.clf_hyparams_, cv=cv, n_jobs=-1, verbose=1)
+        clf_cv = GridSearchCV(self.clf_base_, self.clf_hyparams_, cv=cv, n_jobs=-1, verbose=0)
 
         print_yellow('====> Training Classifier (with grid search hyperparam tuning) .. ')
         print_yellow('====> BATCH Training (in-memory): {:4.3f} MB'.format(X.nbytes / 1024.0 / 1024.0) )
