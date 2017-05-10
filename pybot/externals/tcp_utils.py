@@ -118,7 +118,7 @@ class TCPPub:
         self.server_uid_ = dict()
         self.get_uid = lambda ip, port: '{}:{}'.format(ip,port)
 
-    def publish_image(self, im, ip='mrg-liljon.csail.mit.edu', port=12347, scale=1.0): 
+    def publish_image(self, im, ip='', port=12347, scale=1.0): 
         s = None
         suid = self.get_uid(ip,port)
         if suid not in self.server_uid_: 
@@ -140,7 +140,7 @@ class TCPPub:
 global g_tcp_pub
 g_tcp_pub = TCPPub()
 
-def publish_image(im, ip='mrg-liljon.csail.mit.edu', port=12347, flip_rb=True, scale=1.0): 
+def publish_image(im, ip='', port=12347, flip_rb=True, scale=1.0): 
     global g_tcp_pub
     g_tcp_pub.publish_image(cv2.cvtColor(im, cv2.COLOR_BGR2RGB) 
                             if flip_rb else np.copy(im), scale=scale)
