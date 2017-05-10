@@ -390,16 +390,15 @@ class HistogramClassifier(object):
         # pred_targets = self.clf_.predict(X)
 
         if self.epoch_no_ % 10 == 0: 
-            self.save(self.filename_.replace('.h5', '_iter_{}.h5'.format(self.epoch_no_)))
-        self.save(self.filename_)
+            self._save(self.filename_.replace('.h5', '_iter_{}.h5'.format(self.epoch_no_)))
+        self._save(self.filename_)
         self.epoch_no_ += 1
 
     def partial_fit(self, X, y): 
         self.clf_.partial_fit(X, y, classes=self.target_ids_, sample_weight=None)
 
         if self.epoch_no_ % 10 == 0: 
-            self.save(self.filename_.replace('.h5', '_iter_{}.h5'.format(self.epoch_no_)))
-        self.save(self.filename_)
+            self._save(self.filename_.replace('.h5', '_iter_{}.h5'.format(self.epoch_no_)))
         self.epoch_no_ += 1
 
     def predict(self, X): 
@@ -462,7 +461,10 @@ class HistogramClassifier(object):
     def get_categories(self): 
         return self.clf_.classes_
 
-    def save(self, filename): 
+    def save(self): 
+        self._save(self.filename_)
+    
+    def _save(self, filename): 
         print_yellow('====> Saving classifier ')
         db = AttrDict(clf=self.clf_, target_map=self.target_map_)
 
