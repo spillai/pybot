@@ -317,7 +317,7 @@ class IterDB(object):
             raise RuntimeError('Key %s not found in dataset. keys: %s' % (key, self.keys))
 
         itchunks = chunks(self.itervalues_for_key(key), batch_size)
-        for chunk in progressbar(itchunks, size=self.length(key) / batch_size, verbose=verbose): 
+        for chunk in itchunks: 
             yield chunk
  
     def iterchunks_keys(self, keys, batch_size=10, verbose=False): 
@@ -429,7 +429,7 @@ class IterDBDeprecated(object):
             warnings.warn('{}::itervalues indices provided must be sorted'.format(self.__class__.__name__))
             inds = np.sort(inds)
 
-        for chunk_idx, chunk in enumerate(progressbar(self.meta_file_.chunks, size=total_chunks, verbose=verbose)): 
+        for chunk_idx, chunk in enumerate(self.meta_file_.chunks): 
             data = AttrDict.load(self.get_chunk_filename(chunk_idx))
             if inds is None: 
                 for item in data[key]: 
@@ -460,7 +460,7 @@ class IterDBDeprecated(object):
         total_chunks = len(self.meta_file_.chunks)
         inds = np.sort(inds) if inds is not None else None
 
-        for chunk_idx, chunk in enumerate(progressbar(self.meta_file_.chunks, size=total_chunks, verbose=verbose)): 
+        for chunk_idx, chunk in enumerate(self.meta_file_.chunks): 
             data = AttrDict.load(self.get_chunk_filename(chunk_idx))
             
             # if inds is None: 

@@ -35,7 +35,7 @@ def print_color(prt, color='green'):
     except: 
         raise KeyError('print_color lookup failed, use from {:}'.format(cols_lut.keys()))
 
-def progressbar(it, prefix = "", size=100, verbose=True, width=100):
+def progressbar(it, prefix = "", size=100, verbose=True, width=40):
     """
     Optional progress bar, if verbose == True
     """
