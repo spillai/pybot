@@ -21,7 +21,6 @@ from pybot.utils.dataset.sun3d_utils import SUN3DAnnotationDB
 from pybot.utils.pose_utils import PoseSampler
 from pybot.utils.misc import Accumulator
 
-
 TANGO_RGB_CHANNEL = 'RGB'
 TANGO_VIO_CHANNEL = 'RGB_VIO'
 
@@ -166,7 +165,7 @@ class TangoFile(LogFile):
 
     def __repr__(self): 
         # Get distance traveled (accumulate relative motion)
-        distance = self._get_distance_travelled()
+        distance = self.distance_travelled
         messages_str = ', '.join(['{:} ({:})'.format(k,v) 
                                   for k,v in self.topic_lengths_.iteritems()])
         return '\n{} \n========\n' \
@@ -178,8 +177,9 @@ class TangoFile(LogFile):
             self.filename_, 
             self.topics_, messages_str, 
             distance)
-              
-    def _get_distance_travelled(self): 
+
+    @property
+    def distance_travelled(self):
         " Retrieve distance traveled through relative motion "
 
         prev_pose, tvec = None, 0
@@ -276,6 +276,11 @@ class TangoLogReader(LogReader):
     def load_log(self, filename): 
         return TangoFile(filename)
 
+    @property
+    def distance_travelled(self):
+        " Retrieve distance traveled through relative motion "
+        return self.log.distance_travelled
+    
     def itercursors(self, topics=[], reverse=False): 
         if self.index is not None: 
             raise NotImplementedError('Cannot provide items indexed')
@@ -482,6 +487,10 @@ class TangoDB(LogDB):
                               get_sample=lambda (t, channel, frame): frame.pose, verbose=verbose)
         self.iterframes = partial(sampler.iteritems, self.iterframes())
         return self
+
+    @property
+    def length(self):
+        return len(self.frame_index_)
 
     @property
     def poses(self):
