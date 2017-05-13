@@ -31,7 +31,15 @@ def setup_posenet(model_file, weights_file, imagemean_file):
     from pybot.vision.caffe.posenet_utils import PoseNet
     return PoseNet(model_file, weights_file, imagemean_file)
 
-# RCNN
+# Places365
+# =================================================================================
+
+def setup_places365(model_file, weights_file, imagemean_file): 
+    print('=====> Places365')
+    from pybot.vision.caffe.places365_utils import Places365Net
+    return Places365Net(model_file, weights_file)
+
+# RCNN (Fast-RCNN, Faster-RCNN)
 # =================================================================================
 
 def setup_rcnn(method, data_dir, net): 

@@ -13,20 +13,26 @@ spillai: added detect_bboxes, with fc7 output
 
 """
 
+# Author: Sudeep Pillai <spillai@csail.mit.edu>
+# License: MIT
+
 import os
 import sys
+
 import numpy as np
 import scipy as sp
 
 _PYCAFFE_PATH = os.getenv('PYCAFFE')
 assert _PYCAFFE_PATH, 'PYCAFFE environment path not set'
 
+sys.path.append(os.path.join(_PYCAFFE_PATH, 'python'))
 sys.path.append(os.path.join(_PYCAFFE_PATH, 'caffe-fast-rcnn', 'python'))
 sys.path.append(os.path.join(_PYCAFFE_PATH, 'lib'))
 import caffe; caffe.set_mode_gpu(); caffe.set_device(0)
 
 from fast_rcnn.test import _get_blobs, _bbox_pred, _clip_boxes, nms
 from fast_rcnn.config import cfg
+
 from pybot.utils.timer import timeitmethod
 
 def im_detect(net, im, boxes, layer='fc7'):

@@ -2,11 +2,16 @@
 # License: MIT
 
 import os
+import sys
 import cv2
 import numpy as np
 
-import caffe
-caffe.set_mode_gpu()
+_PYCAFFE_PATH = os.getenv('PYCAFFE')
+assert _PYCAFFE_PATH, 'PYCAFFE environment path not set'
+
+sys.path.append(os.path.join(_PYCAFFE_PATH, 'lib'))
+sys.path.append(os.path.join(_PYCAFFE_PATH, 'python'))
+import caffe; caffe.set_mode_gpu(); caffe.set_device(0)
 
 from pybot.vision.color_utils import color_by_lut
 from pybot.utils.timer import timeit, timeitmethod
@@ -50,7 +55,8 @@ class SegNet(object):
         return 
 
     def extract(self, layer='conv1_1_D'): 
-        return np.squeeze(self.net_.blobs[layer].data, axis=0).transpose(1,2,0)
+        return np.squeeze(self.net_.blobs[layer].data,
+                          axis=0).transpose(1,2,0)
         
     @timeitmethod
     def describe(self, im, layer='conv1_1_D'):

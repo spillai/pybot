@@ -7,14 +7,15 @@
 # Written by Ross Girshick
 # --------------------------------------------------------
 
-import sys
 import os
+import sys
 import numpy as np
 import scipy as sp
 
 _PYCAFFE_PATH = os.getenv('PYCAFFE')
 assert _PYCAFFE_PATH, 'PYCAFFE environment path not set'
 
+sys.path.append(os.path.join(_PYCAFFE_PATH, 'python'))
 sys.path.append(os.path.join(_PYCAFFE_PATH, 'caffe-fast-rcnn', 'python'))
 sys.path.append(os.path.join(_PYCAFFE_PATH, 'lib'))
 import caffe; caffe.set_mode_gpu(); caffe.set_device(0)
