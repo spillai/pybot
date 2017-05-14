@@ -15,6 +15,8 @@ spillai: added detect_bboxes, with fc7 output
 
 # Author: Sudeep Pillai <spillai@csail.mit.edu>
 # License: MIT
+#
+# Based on https://github.com/rbgirshick/fast-rcnn
 
 import os
 import sys

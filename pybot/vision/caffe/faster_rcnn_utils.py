@@ -7,6 +7,11 @@
 # Written by Ross Girshick
 # --------------------------------------------------------
 
+# Author: Sudeep Pillai <spillai@csail.mit.edu>
+# License: MIT
+#
+# Based on https://github.com/rbgirshick/py-faster-rcnn
+
 import os
 import sys
 import numpy as np

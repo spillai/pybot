@@ -1,5 +1,8 @@
 # Author: Sudeep Pillai <spillai@csail.mit.edu>
 # License: MIT
+# 
+# Based on https://github.com/alexgkendall/caffe-segnet 
+# https://github.com/alexgkendall/SegNet-Tutorial
 
 import os
 import sys

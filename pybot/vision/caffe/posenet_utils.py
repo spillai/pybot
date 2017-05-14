@@ -1,5 +1,7 @@
 # Author: Sudeep Pillai <spillai@csail.mit.edu>
 # License: MIT
+# 
+# Based on https://github.com/alexgkendall/caffe-posenet.git
 
 import os
 import cv2
