@@ -393,13 +393,16 @@ class TangoDB(LogDB):
         LogDB.__init__(self, dataset, meta=meta)
         self.attr_db_ = {}
 
-    def attribute(self, attr_name):
+    def attribute_filename(self, attr_name): 
+        return os.path.join(self.dataset.directory, 'attributes', attr_name)
+        
+    def attribute(self, attr_name, default={}):
         print('Loading attribute {}'.format(attr_name))
 
-        path = os.path.join(self.dataset.directory, 'attributes', attr_name + '.pkl')
+        path = self.attribute_filename(attr_name) + '.pkl'
         if not os.path.exists(path):
             print('Failed to load attribute {}, no file {}, returning empty'.format(attr_name, path))
-            self.attr_db_[attr_name] = {}
+            self.attr_db_[attr_name] = default
             return False, self.attr_db_[attr_name]
         
         with open(path, 'rb') as fd:
@@ -417,10 +420,10 @@ class TangoDB(LogDB):
     
     def save_attributes(self):
         for attr_name, value in self.attr_db_.iteritems():
-            path = os.path.join(self.dataset.directory, 'attributes', attr_name + '.pkl')
+            path = self.attribute_filename(attr_name) + '.pkl'
             if not os.path.exists(path):
                 print('Saving {}'.format(path))        
-                with open(os.path.join(self.dataset.directory, 'attributes', attr_name + '.pkl'), 'wb') as fd:
+                with open(path, 'wb') as fd:
                     pickle.dump(value, fd, protocol=pickle.HIGHEST_PROTOCOL)        
                 
     def _index(self, pose_channel=TANGO_VIO_CHANNEL, rgb_channel=TANGO_RGB_CHANNEL): 

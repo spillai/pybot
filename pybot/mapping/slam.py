@@ -82,21 +82,21 @@ class BaseSLAM(_BaseSLAM):
         if self.latest >= 2 and self.latest % self.update_every_k_odom_ == 0: 
             self.update()
     
-    def initialize(self, t, p=None, noise=None):
+    def initialize(self, p=None, index=0, noise=None):
         """
         Initialize factor graph with prior on node
         """
         p_init = RigidTransform.identity() \
                  if p is None else p
         self.q_poses_.append(p_init)
-        super(BaseSLAM, self).initialize(p_init.matrix, noise=noise)
+        super(BaseSLAM, self).initialize(p=p_init.matrix, index=index, noise=noise)
 
     def add_pose_prior(self, index, p, noise=None):
         """
         Add prior to node
         """
         super(BaseSLAM, self).add_pose_prior(index, p.matrix, noise=noise)
-        
+
     def on_odom_absolute(self, t, p, noise=None): 
         """
         Accumulate poses (input: absolute odometry) and add relative odometry to 
@@ -113,7 +113,7 @@ class BaseSLAM(_BaseSLAM):
 
         # 1. SLAM: Initialize
         if not self.is_initialized: 
-            self.initialize(self.q_poses_.latest.matrix)
+            self.initialize(p=self.q_poses_.latest.matrix)
             return self.latest
         assert(self.q_poses_.length >= 2)
 
@@ -121,8 +121,8 @@ class BaseSLAM(_BaseSLAM):
         p_odom = (self.q_poses_.items[-2].inverse()).oplus(self.q_poses_.items[-1])
         self.add_odom_incremental(p_odom.matrix, noise=noise)
 
-        # # 3. Update
-        # self._update_check()
+        # 3. Update
+        self._update_check()
 
         return self.latest
 
@@ -142,10 +142,18 @@ class BaseSLAM(_BaseSLAM):
         self.q_poses_.append(p * self.q_poses_.latest)
         self.add_odom_incremental(p.matrix, noise=noise)
 
-        # # 3. Update
-        # self._update_check()
+        # 3. Update
+        self._update_check()
         
         return self.latest
+
+    def add_relative_pose_constraint(self, idx1, idx2, p, noise=None):
+        super(BaseSLAM, self).add_relative_pose_constraint(idx1, idx2, p.matrix, noise=noise)        
+        return None
+
+    def add_pose_landmarks(self, xid, lids, poses): 
+        super(BaseSLAM, self).add_pose_landmarks(xid, lids, [p.matrix for p in poses])
+        return None
     
     def on_loop_closure_relative(self, t, idx1, idx2, p, noise=None): 
         """
@@ -154,10 +162,10 @@ class BaseSLAM(_BaseSLAM):
         """
         
         # 1. SLAM: Add relative pose measurements (odometry)
-        self.add_relative_pose_constraint(idx1, idx2, p.matrix, noise=noise)
+        self.add_relative_pose_constraint(idx1, idx2, p, noise=noise)
 
-        # # 2. Update
-        # self._update_check()
+        # 2. Update
+        self._update_check()
 
         return self.latest
         
@@ -165,8 +173,8 @@ class BaseSLAM(_BaseSLAM):
         deltas = [p.matrix for p in poses]
         self.add_pose_landmarks_incremental(ids, deltas)
 
-        # # 2. Update
-        # self._update_check()
+        # 2. Update
+        self._update_check()
 
         return self.latest
 
@@ -223,52 +231,63 @@ class BaseSLAM(_BaseSLAM):
 
                     draw_utils.publish_line_segments(name + 'optimized_factor_odom', factor_st, factor_end, c='b', 
                                                      frame_id=frame_id, reset=True) 
-
-    def vis_optimized_landmarks(self,
-                                visualize_nodes=False, 
-                                visualize_measurements=False,
-                                visualize_factors=False,
-                                visualize_marginals=False, name='SLAM_', frame_id='camera'):
+    
+    def visualize_optimized_landmarks(self,
+                                      visualize_nodes=False, 
+                                      visualize_measurements=False,
+                                      visualize_factors=False,
+                                      visualize_marginals=False, name='SLAM_', frame_id='camera'):
         with self.state_lock_:
 
             # Draw targets (constantly updated, so draw with reset)
-            updated_targets = {pid : pt3
-                               for (pid, pt3) in self.target_landmarks.iteritems()}
-            if len(updated_targets): 
-                points3d = np.vstack(updated_targets.values())
-                draw_utils.publish_cloud(name + 'optimized_node_landmark', points3d, c='r', 
-                                         frame_id=frame_id, reset=True)
-
-            # Landmark points
-            if visualize_nodes: 
-                covars = []
-                poses = [Pose(k, tvec=v) for k, v in updated_targets.iteritems()]
-                # texts = [self.landmark_text_lut_.get(k, '') for k in updated_targets.keys()] \
-                #         if len(self.landmark_text_lut_) else []
-
-                # Marginals
-                if self.visualize_marginals_: 
-                    target_landmarks_marginals = self.target_landmarks_marginals
-                    triu_inds = np.triu_indices(3)
-                    if self.marginals_available: 
-                        for pid in updated_targets.keys(): 
-                            covars.append(
-                                target_landmarks_marginals.get(pid, np.ones(shape=(6,6)) * 10)[triu_inds]
-                            )
-
-                # Draw landmark points
+            updated_poses = self.updated_poses
+            updated_targets = self.updated_targets
+            if len(updated_targets):
+                poses = updated_targets.values()
+                texts, covars = map(str, updated_targets.keys()), []
                 draw_utils.publish_pose_list(name + 'optimized_node_landmark_poses', poses, texts=texts, 
                                              covars=covars, frame_id=frame_id, reset=True)
 
             # Draw edges (between landmarks and poses)
-            if visualize_factors: 
+            if self.visualize_factors_: 
                 landmark_edges = self.landmark_edges
                 if len(landmark_edges): 
                     factor_st = np.vstack([(updated_poses[xid].tvec).reshape(-1,3) for (xid, _) in landmark_edges])
-                    factor_end = np.vstack([(updated_targets[lid]).reshape(-1,3) for (_, lid) in landmark_edges])
-
-                    draw_utils.publish_line_segments(name + 'optimized_factor_landmark', factor_st, factor_end, c='b', 
+                    factor_end = np.vstack([(updated_targets[lid].tvec).reshape(-1,3) for (_, lid) in landmark_edges])
+                    draw_utils.publish_line_segments(name + 'optimized_factor_landmark',
+                                                     factor_st, factor_end, c='b', 
                                                      frame_id=frame_id, reset=True) 
+
+            # # Landmark points
+            # if visualize_nodes: 
+            #     covars = []
+            #     poses = [Pose(k, tvec=v) for k, v in updated_targets.iteritems()]
+            #     # texts = [self.landmark_text_lut_.get(k, '') for k in updated_targets.keys()] \
+            #     #         if len(self.landmark_text_lut_) else []
+
+            #     # Marginals
+            #     if self.visualize_marginals_: 
+            #         target_landmarks_marginals = self.target_landmarks_marginals
+            #         triu_inds = np.triu_indices(3)
+            #         if self.marginals_available: 
+            #             for pid in updated_targets.keys(): 
+            #                 covars.append(
+            #                     target_landmarks_marginals.get(pid, np.ones(shape=(6,6)) * 10)[triu_inds]
+            #                 )
+
+            #     # Draw landmark points
+            #     draw_utils.publish_pose_list(name + 'optimized_node_landmark_poses', poses, texts=texts, 
+            #                                  covars=covars, frame_id=frame_id, reset=True)
+
+            # # Draw edges (between landmarks and poses)
+            # if visualize_factors: 
+            #     landmark_edges = self.landmark_edges
+            #     if len(landmark_edges): 
+            #         factor_st = np.vstack([(updated_poses[xid].tvec).reshape(-1,3) for (xid, _) in landmark_edges])
+            #         factor_end = np.vstack([(updated_targets[lid]).reshape(-1,3) for (_, lid) in landmark_edges])
+
+            #         draw_utils.publish_line_segments(name + 'optimized_factor_landmark', factor_st, factor_end, c='b', 
+            #                                          frame_id=frame_id, reset=True) 
             
 class VisualSLAM(BaseSLAM, _VisualSLAM):
     def __init__(self, calib, min_landmark_obs=cfg.VSLAM_MIN_LANDMARK_OBS,
@@ -386,7 +405,7 @@ def with_visualization(
         visualize_every=0.5,
         visualize_nodes=True, 
         visualize_measurements=False, 
-        visualize_factors=False, visualize_marginals=False): 
+        visualize_factors=True, visualize_marginals=False): 
 
     class _SLAM(cls):
         def __init__(self, *args, **kwargs): 
@@ -447,6 +466,11 @@ def with_visualization(
                 name=self.name_, frame_id=self.frame_id_)
 
     return _SLAM
+
+RobotSLAM = with_visualization(
+    BaseSLAM,
+    frame_id='camera',
+    visualize_measurements=True)
 
 RobotVisualSLAM = with_visualization(
     VisualSLAM,

@@ -63,7 +63,7 @@ class Sampler(object):
             
     # def force_sample(self): 
     #     self.force_sample_ = True
-
+    
     def length(self, type='samples'): 
         if type=='samples': 
             return self.sampled_items_.length
