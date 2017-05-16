@@ -202,7 +202,8 @@ class VideoWriter:
         
     def _write_video(self, im):
         im = self._check_image_size(im)
-        
+
+        # Initialize writers (either opencv-based or ffmpeg)
         if self.writer is None: 
             h, w = im.shape[:2]
             if self.use_opencv: 

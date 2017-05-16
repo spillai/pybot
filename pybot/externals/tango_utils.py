@@ -8,6 +8,7 @@ import numpy as np
 import os.path
 import json
 
+import cPickle as pickle
 from functools import partial 
 from itertools import izip
 from collections import deque, namedtuple, OrderedDict
@@ -332,6 +333,10 @@ class TangoFrame(object):
         self.img_decode = img_decode
 
     @property
+    def index(self): 
+        return self.index_
+
+    @property
     def timestamp(self): 
         return self.t_
 
@@ -386,7 +391,38 @@ class TangoDB(LogDB):
             meta = None
 
         LogDB.__init__(self, dataset, meta=meta)
+        self.attr_db_ = {}
+
+    def attribute(self, attr_name):
+        print('Loading attribute {}'.format(attr_name))
+
+        path = os.path.join(self.dataset.directory, 'attributes', attr_name + '.pkl')
+        if not os.path.exists(path):
+            print('Failed to load attribute {}, no file {}, returning empty'.format(attr_name, path))
+            self.attr_db_[attr_name] = {}
+            return False, self.attr_db_[attr_name]
         
+        with open(path, 'rb') as fd:
+            self.attr_db_[attr_name] = pickle.load(fd)
+        print('Done loading attribute {}'.format(attr_name))
+        
+        return True, self.attr_db_[attr_name]
+    
+    def load_attributes(self):
+        attrs = os.listdir(self.dataset.directory, 'attributes')
+        for path in attrs:
+            if os.path.isfile(path):
+                attr_name = os.path.basename(path)
+                self.load_attribute(attr_name)
+    
+    def save_attributes(self):
+        for attr_name, value in self.attr_db_.iteritems():
+            path = os.path.join(self.dataset.directory, 'attributes', attr_name + '.pkl')
+            if not os.path.exists(path):
+                print('Saving {}'.format(path))        
+                with open(os.path.join(self.dataset.directory, 'attributes', attr_name + '.pkl'), 'wb') as fd:
+                    pickle.dump(value, fd, protocol=pickle.HIGHEST_PROTOCOL)        
+                
     def _index(self, pose_channel=TANGO_VIO_CHANNEL, rgb_channel=TANGO_RGB_CHANNEL): 
         """
         Constructs a look up table for the following variables: 
@@ -495,6 +531,12 @@ class TangoDB(LogDB):
     @property
     def poses(self):
         return map(lambda (ts, msg, frame): frame.pose, self.iterframes())
+
+    def set_attribute(self, attr_name, frame_index, value):
+        pass
+
+    def get_attribute(self, attr_name, frame_index):
+        pass
     
     # def list_annotations(self, target_name=None): 
     #     " List of lists"
