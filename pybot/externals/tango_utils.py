@@ -395,6 +395,10 @@ class TangoDB(LogDB):
 
     def attribute_filename(self, attr_name): 
         return os.path.join(self.dataset.directory, 'attributes', attr_name)
+
+    @property
+    def attributes(self):
+        return os.listdir(self.dataset.directory, 'attributes')
         
     def attribute(self, attr_name, default={}):
         print('Loading attribute {}'.format(attr_name))
@@ -411,21 +415,28 @@ class TangoDB(LogDB):
         
         return True, self.attr_db_[attr_name]
     
-    def load_attributes(self):
-        attrs = os.listdir(self.dataset.directory, 'attributes')
-        for path in attrs:
-            if os.path.isfile(path):
-                attr_name = os.path.basename(path)
-                self.load_attribute(attr_name)
-    
+    # def load_attributes(self):
+    #     attrs = self.attributes
+    #     for path in attrs:
+    #         if os.path.isfile(path):
+    #             attr_name = os.path.basename(path)
+    #             self.load_attribute(attr_name)
+
+    def save_attribute(self, attr_name, value=None, force=False):
+        assert(attr_name in self.attr_db_ or value is not None)
+        value = self.attr_db_.get(attr_name, value)
+        path = self.attribute_filename(attr_name) + '.pkl'
+        if not os.path.exists(path) or force:
+            print('Saving {}'.format(path))        
+            with open(path, 'wb') as fd:
+                pickle.dump(value, fd, protocol=pickle.HIGHEST_PROTOCOL)
+        else:
+            print('Did not save {}, path already exists'.format(path))
+                
     def save_attributes(self):
         for attr_name, value in self.attr_db_.iteritems():
-            path = self.attribute_filename(attr_name) + '.pkl'
-            if not os.path.exists(path):
-                print('Saving {}'.format(path))        
-                with open(path, 'wb') as fd:
-                    pickle.dump(value, fd, protocol=pickle.HIGHEST_PROTOCOL)        
-                
+            self.save_attribute(attr_name)
+            
     def _index(self, pose_channel=TANGO_VIO_CHANNEL, rgb_channel=TANGO_RGB_CHANNEL): 
         """
         Constructs a look up table for the following variables: 

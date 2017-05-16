@@ -322,7 +322,7 @@ class BaseSLAM(object):
         # with self.slam_lock_:
         opt = LevenbergMarquardtOptimizer(self.graph_, self.initial_)
         self.current_ = opt.optimize();
-
+        
     @timeitmethod
     def _update_estimates(self): 
         if not self.estimate_available:
