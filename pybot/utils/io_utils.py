@@ -161,7 +161,7 @@ class Capturing(list):
         sys.stdout = self._stdout
 
 class VideoWriter: 
-    def __init__(self, filename, as_images=False): 
+    def __init__(self, filename, as_images=False, use_opencv=False): 
         if as_images: 
             directory = os.path.join(''.join([filename, '-imgs']))
             create_path_if_not_exists(os.path.join(directory, 'movie.avi'))
@@ -174,7 +174,8 @@ class VideoWriter:
         self.directory = directory
         self.writer = None
         self.idx = 0
-
+        self.use_opencv = use_opencv
+        
     def __del__(self): 
         self.close()
         print 'Closing video writer and saving %s' % self.filename
@@ -189,12 +190,37 @@ class VideoWriter:
         cv2.imwrite(os.path.join(self.directory, 'imgs-%06i.png' % self.idx), im)
         self.idx += 1
 
+    def _check_image_size(self, im): 
+        " FFMPEG yuv420p requires (H,W) % 2 == 0 "
+
+        if not self.use_opencv:
+            H, W = im.shape[:2]
+            rH, rW = H % 2, W % 2
+            im = im[:H-rH, :W-rW]
+
+        return im
+        
     def _write_video(self, im):
+        im = self._check_image_size(im)
+        
         if self.writer is None: 
             h, w = im.shape[:2]
-            self.writer = cv2.VideoWriter(self.filename, cv2.cv.CV_FOURCC(*'mp42'), 
-                                          30.0, (w, h), im.ndim == 3)
-            print('{} :: creating {} ({},{})'.format(self.__class__.__name__, self.filename, w, h))
+            if self.use_opencv: 
+                self.writer = cv2.VideoWriter(self.filename,
+                                              cv2.cv.CV_FOURCC(*'mp42'), 
+                                              30.0, (w, h), im.ndim == 3)
+                
+            else:
+                from pybot.utils.ffmpeg_writer import FFMPEG_VideoWriter
+                self.writer = FFMPEG_VideoWriter(self.filename, size=(w,h),
+                                                 codec='libx264', fps=30)
+                self.writer.write = self.writer.write_frame
+                self.writer.release = self.writer.close
+                
+            print('{} - {} :: creating {} ({},{})'
+                        .format('cv2' if self.use_opencv else 'ffmpeg',
+                                self.__class__.__name__, self.filename, w, h))
+            
         self.writer.write(im)
 
     def close(self): 
