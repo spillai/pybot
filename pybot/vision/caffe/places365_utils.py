@@ -54,10 +54,14 @@ class Places365Net(object):
     def labels(self):
         return self.labels_
         
-    def top_k(self, k):
+    def top_k(self, k, return_labels=False):
         K = (k+1)
         top = self.net_.blobs['prob'].data[0].flatten().argsort()[-1:-K:-1]
-        return [self.labels_[k] for k in top]
+
+        if return_labels:
+            return [self.labels_[k] for k in top]
+        
+        return top
         
     @property
     def layers(self):
@@ -69,9 +73,9 @@ class Places365Net(object):
         self.net_.forward()
         return 
 
-    def extract(self, layer='conv5'): 
+    def extract(self, layer='fc8'): 
         return np.squeeze(self.net_.blobs[layer].data,
-                          axis=0).transpose(1,2,0)
+                          axis=0)
         
     @timeitmethod
     def describe(self, im, layer='conv5'):

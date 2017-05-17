@@ -190,8 +190,8 @@ class FasterRCNNDescription(caffe.Net):
     def describe(self, im, boxes=None, layer='fc7'):
         return im_detect(self, im, boxes=boxes, layer=layer)
 
-    def extract(self, layer='fc7'):
-        return np.squeeze(self.blobs[layer].data, axis=0).transpose(1,2,0)
+    # def extract(self, layer='fc7'):
+    #     return np.squeeze(self.blobs[layer].data, axis=0).transpose(1,2,0)
 
     # def hypercolumn(self, im, boxes=None):
     #     return extract_hypercolumns(self, im, boxes=boxes)
