@@ -495,6 +495,15 @@ class TangoDB(LogDB):
             (k, idx) for idx, k in enumerate(self.frame_index_.keys())
         ])
 
+    def frame(self, frame_index):
+        try: 
+            msg = self.frame_idx2name_[frame_index]
+            frame = self.frame_index_[msg]
+        except Exception, e:
+            print(e)
+            return None
+        return frame
+        
     def iterframes(self): 
         """
         Ground truth reader interface for Images 
