@@ -225,7 +225,7 @@ class AttrDict(dict):
         return save_pytable(fn, self)
 
 class IterDB(object): 
-    def __init__(self, filename, mode, batch_size=5): 
+    def __init__(self, filename, mode): 
         """
         An iterable database that should theoretically allow 
         scalable reading/writing of datasets. 
@@ -238,9 +238,9 @@ class IterDB(object):
         """
         fn = os.path.expanduser(filename)
         if mode == 'w' or mode == 'a': 
-            print('{}::{} with batch size: {}'.format(
+            print('{}::{}'.format(
                 'Writing' if mode == 'w' else 'Appending', 
-                self.__class__.__name__, batch_size))
+                self.__class__.__name__))
             self.h5f_ = tb.open_file(fn, mode=mode, title='%s' % fn)
             self.data_ = {}
         elif mode == 'r': 
@@ -249,6 +249,9 @@ class IterDB(object):
         else: 
             raise RuntimeError('Unknown mode %s' % mode)
 
+    def __del__(self):
+        self.close()
+        
     @property
     def keys(self): 
         return [child._v_name for child in self.h5f_.list_nodes(self.h5f_.root)]

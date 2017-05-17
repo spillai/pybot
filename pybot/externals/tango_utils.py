@@ -387,7 +387,7 @@ class TangoDB(LogDB):
             meta_directory = os.path.expanduser(dataset.directory)
             meta = SUN3DAnnotationDB.load(meta_directory, shape=(W,H))
         except Exception, e:
-            print e
+            print(e)
             meta = None
 
         LogDB.__init__(self, dataset, meta=meta)
