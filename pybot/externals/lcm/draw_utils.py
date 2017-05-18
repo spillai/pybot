@@ -88,6 +88,10 @@ class VisualizationMsgsPub:
 global g_viz_pub
 g_viz_pub = VisualizationMsgsPub()
 
+def reset():
+    global g_viz_pub
+    g_viz_pub = VisualizationMsgsPub()
+
 def get_sensor_pose(frame_id='camera'): 
     global g_viz_pub
     return g_viz_pub.get_sensor_pose(frame_id)
