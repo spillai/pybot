@@ -87,9 +87,10 @@ def TangoOdomDecoder(channel, every_k_frames=1, noise=[0,0]):
                           xyzw=[0.707940, 0.706271, 0.001000, 0.000585])
     p_DC = p_ID.inverse() * p_IC
     p_DF = p_ID.inverse() * p_IF
-    print('\nCalibration\n==============')
-    print('\tp_ID: {}, \n\tp_IC: {}, \n\tp_DC: {}, \n\tp_DF: {}\n'
-          .format(p_ID, p_IC, p_DC, p_DF))
+
+    # print('\nCalibration\n==============')
+    # print('\tp_ID: {}, \n\tp_IC: {}, \n\tp_DC: {}, \n\tp_DF: {}\n'
+    #       .format(p_ID, p_IC, p_DC, p_DF))
 
     # SS->CAM
     p_S_CAM = RigidTransform.from_rpyxyz(
