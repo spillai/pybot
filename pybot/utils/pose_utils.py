@@ -139,9 +139,12 @@ class PoseSampler(Sampler):
     def from_items(cls, items, theta=np.deg2rad(20), displacement=0.25, lookup_history=10, return_indices=False):
         c = cls(theta=theta, displacement=displacement, lookup_history=lookup_history)
         items = [(c.latest_sample, idx) for idx, item in enumerate(items) if c.append(item)]
-        poses, inds = zip(*items)
+
+        # Unzip returns tuples: inds and poses must be lists
+        poses, inds = map(list, zip(*items))
         if return_indices: 
             return poses, inds
+        
         return poses
 
     def check_sample(self, item, force=False):
