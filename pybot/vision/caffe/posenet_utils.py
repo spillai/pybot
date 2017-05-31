@@ -8,11 +8,18 @@ import cv2
 import numpy as np
 
 _PYCAFFE_PATH = os.getenv('PYCAFFE')
+_CUDA_VISIBLE_DEVICES = os.getenv('CUDA_VISIBLE_DEVICES')
 assert _PYCAFFE_PATH, 'PYCAFFE environment path not set'
 
 sys.path.append(os.path.join(_PYCAFFE_PATH, 'lib'))
 sys.path.append(os.path.join(_PYCAFFE_PATH, 'python'))
-import caffe; # caffe.set_mode_gpu(); caffe.set_device(0)
+import caffe;
+if _CUDA_VISIBLE_DEVICES:
+    caffe.set_mode_gpu(); caffe.set_device(0)
+else:
+    import warnings
+    warnings.warn('CUDA_VISIBILE_DEVICES is not set. Caffe in CPU Mode')
+    caffe.set_mode_cpu()
 
 from pybot.geometry.rigid_transform import RigidTransform, Quaternion
 from pybot.utils.timer import timeit, timeitmethod

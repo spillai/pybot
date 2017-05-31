@@ -18,13 +18,20 @@ import numpy as np
 import scipy as sp
 
 _PYCAFFE_PATH = os.getenv('PYCAFFE')
+_CUDA_VISIBLE_DEVICES = os.getenv('CUDA_VISIBLE_DEVICES')
 assert _PYCAFFE_PATH, 'PYCAFFE environment path not set'
 
 sys.path.append(os.path.join(_PYCAFFE_PATH, 'python'))
 sys.path.append(os.path.join(_PYCAFFE_PATH, 'caffe-fast-rcnn', 'python'))
 sys.path.append(os.path.join(_PYCAFFE_PATH, 'lib'))
-import caffe; # caffe.set_mode_gpu(); caffe.set_device(0)
-
+import caffe;
+if _CUDA_VISIBLE_DEVICES:
+    caffe.set_mode_gpu(); caffe.set_device(0)
+else:
+    import warnings
+    warnings.warn('CUDA_VISIBILE_DEVICES is not set. Caffe in CPU Mode')
+    caffe.set_mode_cpu()
+    
 from fast_rcnn.config import cfg
 cfg.TEST.HAS_RPN = True
 from fast_rcnn.test import _get_blobs, nms, apply_nms
