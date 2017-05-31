@@ -4,6 +4,7 @@ General-purpose class for rigid-body transformations.
 # Author: Sudeep Pillai <spillai@csail.mit.edu>
 # License: MIT
 
+import random as rnd
 import numpy as np
 import transformations as tf
 from pybot.geometry.quaternion import Quaternion
@@ -90,6 +91,7 @@ def tf_compose(R, t):
     T[:3,3] = t.copy()
     return T
 
+
 ###############################################################################
 def rpyxyz(roll, pitch, yaw, x, y, z, axes='rxyz'):
     return RigidTransform.from_rpyxyz(roll, pitch, yaw, x, y, z, axes=axes)
@@ -97,6 +99,7 @@ def rpyxyz(roll, pitch, yaw, x, y, z, axes='rxyz'):
 def pose(pid, rt):
     assert(isinstance(rt, RigidTransform))
     return Pose.from_rigid_transform(pid, rt)
+
 
 ###############################################################################
 class RigidTransform(object):
@@ -277,6 +280,14 @@ class RigidTransform(object):
     def identity(cls):
         return cls()
 
+    @classmethod
+    def random(cls, t=1):
+        q_wxyz = [ rnd.random(), rnd.random(), rnd.random(), rnd.random() ]
+        qmag = np.sqrt(sum([x*x for x in q_wxyz]))
+        q_wxyz = [ x / qmag for x in q_wxyz ]
+        translation = [ rnd.uniform(-t, t), rnd.uniform(-t, t), rnd.uniform(-t, t) ]
+        return cls(Quaternion.from_wxyz(q_wxyz), translation)
+    
     @property
     def matrix(self): 
         return self.to_matrix()
@@ -474,15 +485,8 @@ class DualQuaternion(object):
     
 if __name__ == "__main__":
 
-    import random as rnd
-    def make_random_transform(t=1):
-        q_wxyz = [ rnd.random(), rnd.random(), rnd.random(), rnd.random() ]
-        qmag = np.sqrt(sum([x*x for x in q_wxyz]))
-        q_wxyz = [ x / qmag for x in q_wxyz ]
-        translation = [ rnd.uniform(-t, t), rnd.uniform(-t, t), rnd.uniform(-t, t) ]
-        return RigidTransform(Quaternion.from_wxyz(q_wxyz), translation)
-
-
+    make_random_transform = RigidTransform.random
+    
     q = Quaternion.identity()
     t = [ 1, 2, 3 ]
     m = RigidTransform(q, t)
