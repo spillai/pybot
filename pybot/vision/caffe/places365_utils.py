@@ -11,7 +11,7 @@ assert _PYCAFFE_PATH, 'PYCAFFE environment path not set'
 
 sys.path.append(os.path.join(_PYCAFFE_PATH, 'lib'))
 sys.path.append(os.path.join(_PYCAFFE_PATH, 'python'))
-import caffe; caffe.set_mode_gpu(); caffe.set_device(0)
+import caffe; # caffe.set_mode_gpu(); caffe.set_device(0)
 
 import cv2
 import pickle

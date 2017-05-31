@@ -60,7 +60,10 @@ def setup_rcnn(method, data_dir, net):
 
     return rcnn
 
-class FastRCNNObjectDetector(object): 
+class FastRCNNObjectDetector(object):
+    """
+    Detector for Fast-RCNN
+    """
     def __init__(self, proposer, rcnn, clf): 
         self.proposer_ = proposer
         self.rcnn_ = rcnn
@@ -78,6 +81,9 @@ class FastRCNNObjectDetector(object):
 
 
 class FasterRCNNObjectDetector(object): 
+    """
+    Detector for Faster-RCNN
+    """
     def __init__(self, rcnn, clf): 
         self.rcnn_ = rcnn
         self.clf_ = clf

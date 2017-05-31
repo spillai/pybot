@@ -138,7 +138,7 @@ def extract_hypercolumns(net, im, boxes):
     # data = net.blobs['fc7'].data
     # return data[inv_index, :] 
 
-class FastRCNNDescription(caffe.Net): 
+class FastRCNNDescription(object): 
 
     NETS = {'vgg16': ('VGG16',
               'vgg16_fast_rcnn_iter_40000.caffemodel'),
@@ -165,18 +165,18 @@ class FastRCNNDescription(caffe.Net):
 
         # Init caffe with model
         cfg.TEST.BBOX_REG = False
-        caffe.Net.__init__(self, model_file, pretrained_file, caffe.TEST)        
+        self.net_ = caffe.Net(model_file, pretrained_file, caffe.TEST)        
 
     @property
     def layers(self):
-        return self.blobs.keys()
+        return self.net_.blobs.keys()
 
     @timeitmethod
     def describe(self, im, boxes, layer='fc7'):
-        return im_detect(self, im, boxes, layer=layer)
+        return im_detect(self.net_, im, boxes, layer=layer)
 
     # def extract(self, layer='fc7'):
     #     return np.squeeze(self.blobs[layer].data, axis=0).transpose(1,2,0)
 
     def hypercolumn(self, im, boxes):
-        return extract_hypercolumns(self, im, boxes)
+        return extract_hypercolumns(self.net_, im, boxes)

@@ -23,7 +23,7 @@ assert _PYCAFFE_PATH, 'PYCAFFE environment path not set'
 sys.path.append(os.path.join(_PYCAFFE_PATH, 'python'))
 sys.path.append(os.path.join(_PYCAFFE_PATH, 'caffe-fast-rcnn', 'python'))
 sys.path.append(os.path.join(_PYCAFFE_PATH, 'lib'))
-import caffe; caffe.set_mode_gpu(); caffe.set_device(0)
+import caffe; # caffe.set_mode_gpu(); caffe.set_device(0)
 
 from fast_rcnn.config import cfg
 cfg.TEST.HAS_RPN = True
@@ -32,7 +32,7 @@ from fast_rcnn.bbox_transform import clip_boxes, bbox_transform_inv
 
 from pybot.utils.timer import timeitmethod
 
-def im_detect(net, im, boxes=None, layer='fc7'):
+def im_detect(net, im, boxes=None, layer='fc7', forward=False):
     """Detect object classes in an image given object proposals.
 
     Arguments:
@@ -79,13 +79,20 @@ def im_detect(net, im, boxes=None, layer='fc7'):
     else:
         forward_kwargs['rois'] = blobs['rois'].astype(np.float32, copy=False)
     blobs_out = net.forward(**forward_kwargs)
-
+    
     if cfg.TEST.HAS_RPN:
         assert len(im_scales) == 1, "Only single-image batch implemented"
         rois = net.blobs['rois'].data.copy()
         # unscale back to raw image space
         boxes = rois[:, 1:5] / im_scales[0]
 
+    # If only requesting forward pass, return RPN bboxes or None
+    if forward:
+        if cfg.TEST.HAS_RPN: 
+            return boxes
+        else: 
+            return None
+    
     data = net.blobs[layer].data
     print 'Boxes: {}, data: {}'.format(data.shape, boxes.shape)
     
@@ -147,7 +154,7 @@ def im_detect(net, im, boxes=None, layer='fc7'):
 #         vis_detections(im, cls, dets, thresh=CONF_THRESH)
 
 
-class FasterRCNNDescription(caffe.Net): 
+class FasterRCNNDescription(object): 
     NETS = {'vgg16': ('VGG16',
                       'VGG16_faster_rcnn_final.caffemodel'),
             'zf': ('ZF',
@@ -157,6 +164,15 @@ class FasterRCNNDescription(caffe.Net):
         net: vgg16, zf
         model_dir: [pascal_voc, coco]
         opt_dir: [fast_rcnn, fast_rcnn_alt_opt, fast_rcnn_end2end]
+
+        Layers: data, im_info, conv1, norm1, pool1, conv2, norm2,
+        pool2, conv3, conv4, conv5, conv5_relu5_0_split_0,
+        conv5_relu5_0_split_1, rpn_conv1,
+        rpn_conv1_rpn_relu1_0_split_0, rpn_conv1_rpn_relu1_0_split_1,
+        rpn_cls_score, rpn_bbox_pred, rpn_cls_score_reshape,
+        rpn_cls_prob, rpn_cls_prob_reshape, rois, roi_pool_conv5, fc6,
+        fc7, fc7_drop7_0_split_0, fc7_drop7_0_split_1, cls_score,
+        bbox_pred, cls_prob
         """
     
         model_file = os.path.join(
@@ -180,18 +196,22 @@ class FasterRCNNDescription(caffe.Net):
         # Init caffe with model
         # cfg.TEST.HAS_RPN = with_rpn
         # cfg.TEST.BBOX_REG = False
-        caffe.Net.__init__(self, model_file, pretrained_file, caffe.TEST)
+        self.net_ = caffe.Net(model_file, pretrained_file, caffe.TEST)
 
     @property
     def layers(self):
-        return self.blobs.keys()
+        return self.net_.blobs.keys()
 
     @timeitmethod
     def describe(self, im, boxes=None, layer='fc7'):
-        return im_detect(self, im, boxes=boxes, layer=layer)
-
-    # def extract(self, layer='fc7'):
-    #     return np.squeeze(self.blobs[layer].data, axis=0).transpose(1,2,0)
+        return im_detect(self.net_, im, boxes=boxes, layer=layer)
+        
+    @timeitmethod
+    def forward(self, im, boxes=None):
+        return im_detect(self.net_, im, boxes=boxes, forward=True)
+        
+    def extract(self, layer='fc7'):
+        return self.net_.blobs[layer].data
 
     # def hypercolumn(self, im, boxes=None):
     #     return extract_hypercolumns(self, im, boxes=boxes)
