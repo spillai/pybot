@@ -20,7 +20,6 @@ spillai: added detect_bboxes, with fc7 output
 
 import os
 import sys
-
 import numpy as np
 import scipy as sp
 
@@ -30,14 +29,14 @@ assert _PYCAFFE_PATH, 'PYCAFFE environment path not set'
 sys.path.append(os.path.join(_PYCAFFE_PATH, 'python'))
 sys.path.append(os.path.join(_PYCAFFE_PATH, 'caffe-fast-rcnn', 'python'))
 sys.path.append(os.path.join(_PYCAFFE_PATH, 'lib'))
-import caffe; caffe.set_mode_gpu(); caffe.set_device(0)
+import caffe; # caffe.set_mode_gpu(); caffe.set_device(0)
 
 from fast_rcnn.test import _get_blobs, _bbox_pred, _clip_boxes, nms
 from fast_rcnn.config import cfg
 
 from pybot.utils.timer import timeitmethod
 
-def im_detect(net, im, boxes, layer='fc7'):
+def im_detect(net, im, boxes, layer='fc7', forward=False):
     """Detect object classes in an image given object proposals.
 
     Arguments:
@@ -69,6 +68,10 @@ def im_detect(net, im, boxes, layer='fc7'):
     net.blobs['rois'].reshape(*(blobs['rois'].shape))
     blobs_out = net.forward(data=blobs['data'].astype(np.float32, copy=False),
                             rois=blobs['rois'].astype(np.float32, copy=False))
+
+    # If only requesting forward pass, return
+    if forward:
+        return None
 
     data = net.blobs[layer].data
     return data[inv_index, :] 
@@ -175,8 +178,12 @@ class FastRCNNDescription(object):
     def describe(self, im, boxes, layer='fc7'):
         return im_detect(self.net_, im, boxes, layer=layer)
 
-    # def extract(self, layer='fc7'):
-    #     return np.squeeze(self.blobs[layer].data, axis=0).transpose(1,2,0)
+    @timeitmethod
+    def forward(self, im, boxes=None):
+        return im_detect(self.net_, im, boxes=boxes, forward=True)
+        
+    def extract(self, layer='fc7'):
+        return self.net_.blobs[layer].data
 
-    def hypercolumn(self, im, boxes):
-        return extract_hypercolumns(self.net_, im, boxes)
+    # def hypercolumn(self, im, boxes):
+    #     return extract_hypercolumns(self.net_, im, boxes)

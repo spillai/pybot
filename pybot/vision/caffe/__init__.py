@@ -42,7 +42,7 @@ def setup_places365(model_file, weights_file, labels_file):
 # RCNN (Fast-RCNN, Faster-RCNN)
 # =================================================================================
 
-def setup_rcnn(method, data_dir, net): 
+def setup_rcnn(method, data_dir, net, num_proposals=300): 
     if method == 'fast_rcnn':
         print('=====> Fast RCNN')
         # fast_rcnn: ['vgg16', 'vgg_cnn_m_1024', 'caffenet']
@@ -53,7 +53,7 @@ def setup_rcnn(method, data_dir, net):
         # faster_rcnn: ['vgg16', 'zf']
         from pybot.vision.caffe.faster_rcnn_utils import FasterRCNNDescription
         rcnn = FasterRCNNDescription(
-            data_dir, with_rpn=False, 
+            data_dir, num_proposals=num_proposals, with_rpn=True, 
             net=net, opt_dir='fast_rcnn') # TODO opt_dir
     else: 
         raise ValueError('Unknown rcnn method {}'.format(method))

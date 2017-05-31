@@ -159,7 +159,8 @@ class FasterRCNNDescription(object):
                       'VGG16_faster_rcnn_final.caffemodel'),
             'zf': ('ZF',
                    'ZF_faster_rcnn_final.caffemodel')}
-    def __init__(self, rcnn_dir, with_rpn=False, net='zf', model_dir='pascal_voc', opt_dir='fast_rcnn_end2end'): 
+    def __init__(self, rcnn_dir, num_proposals=300, with_rpn=False,
+                 net='zf', model_dir='pascal_voc', opt_dir='fast_rcnn_end2end'): 
         """
         net: vgg16, zf
         model_dir: [pascal_voc, coco]
@@ -194,8 +195,10 @@ class FasterRCNNDescription(object):
                                      model_file, pretrained_file))
 
         # Init caffe with model
-        # cfg.TEST.HAS_RPN = with_rpn
-        # cfg.TEST.BBOX_REG = False
+        cfg.TEST.HAS_RPN = with_rpn
+        cfg.TEST.BBOX_REG = False
+        cfg.TEST.RPN_POST_NMS_TOP_N = num_proposals
+
         self.net_ = caffe.Net(model_file, pretrained_file, caffe.TEST)
 
     @property
