@@ -377,6 +377,7 @@ def test_RobotSLAM():
     cfg.SLAM_BACKEND = 'gtsam'
     from pybot.mapping.slam import RobotSLAM
 
+    # Initalize SLAM object with visualization    
     slam_cls = RobotSLAM(frame_id='origin',
                          visualize_nodes=True, visualize_measurements=True,
                          visualize_factors=True, visualize_marginals=False,
@@ -391,9 +392,10 @@ def test_RobotSLAM():
         slam.on_odom_relative(j, rt)
     slam.update()
 
+    # Add loop closure constraint
     slam.on_loop_closure_relative(None, 0,9,RigidTransform.from_rpyxyz(0,0,np.pi/2,-1.0,2.0,0))
     slam.update(iterations=10)
-
+    slam.finish()
     
 if __name__ == "__main__": 
     test_odometryExample()
@@ -404,6 +406,5 @@ if __name__ == "__main__":
     print('OK')
     test_SFMExample_SmartFactor()
     print('OK')
-    
     test_RobotSLAM()
     print('OK')

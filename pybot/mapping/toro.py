@@ -48,13 +48,13 @@ class BaseSLAM(object):
                  odom_noise=cfg.ODOM_NOISE, 
                  prior_pose_noise=cfg.PRIOR_POSE_NOISE, 
                  measurement_noise=cfg.MEASUREMENT_NOISE,
-                 verbose=False, export_graph=False):
+                 verbose=False, export_graph=False, batch_mode=False):
 
         # Toro interface
         self.pg_ = TreeOptimizer3()
         self.pg_.verboseLevel = 0
         self.pg_.restartOnDivergence = False
-        self.tree_initialized_ = False
+        self.batch_mode_ = batch_mode
         
         self.idx_ = -1
         self.verbose_ = verbose
@@ -69,31 +69,31 @@ class BaseSLAM(object):
 
         self.xcovs_ = {}
         self.current_ = None
+        
+    def _init_mode(self):
+        if self.batch_mode_: 
+            self.pg_.buildSimpleTree()
+            self.pg_.initializeOnTree()
+            self.pg_.initializeTreeParameters()
+            self.pg_.initializeOptimization(compare_mode='level');
+        else:
+            self.pg_.initializeOnlineOptimization()
 
-    def initialize(self, p=None, index=0, noise=None): 
+    def initialize(self, p=RigidTransform.identity(), index=0, noise=None): 
         if self.verbose_:
             print_red('{}::initialize index: {}={}'
                       .format(self.__class__.__name__, index, p))
-            print_red('{:}::add_pose_prior {}={}'
-                      .format(self.__class__.__name__, index, p))
 
-        pose0 = p if p is not None else RigidTransform.identity()
-        self.pg_.addVertex(index, rt_vec(pose0))
-        self.xs_[index] = pose0 
+        self._init_mode()
+        self.pg_.addVertex(index, rt_vec(p))
+        self.xs_[index] = p
         self.idx_ = index
-
+        
     def add_incremental_pose_constraint(self, delta, noise=None):
         # Add prior on first pose
         if not self.is_initialized:
-            self.initialize(p=None, index=0)
+            self.initialize(index=0)
 
-        # Predict pose and add as initial estimate
-        assert(self.latest + 1 not in self.xs_)
-        assert(self.latest in self.xs_)
-        pred_pose = self.xs_[self.latest].oplus(delta)
-        self.pg_.addVertex(self.latest + 1, rt_vec(pred_pose))
-        self.xs_[self.latest + 1] = pred_pose
-            
         # Add odometry factor
         self.add_relative_pose_constraint(self.latest, self.latest+1, delta, noise=noise)
         self.idx_ += 1
@@ -103,35 +103,47 @@ class BaseSLAM(object):
             print_red('{}::add_odom {}->{} = {}'
                       .format(self.__class__.__name__, xid1, xid2, delta))
 
+        # Predict pose and add as initial estimate
+        assert(self.latest + 1 not in self.xs_)
+        assert(self.latest in self.xs_)
+        pred_pose = self.xs_[xid1].oplus(delta)
+        exists = self.pg_.vertex_exists(xid2)
+        # added = self.pg_.addVertex(xid2, rt_vec(pred_pose)) >= 0
+        # print added
+        # if added:
+        if not exists: 
+            self.xs_[xid2] = pred_pose
+
         # Add odometry factor
         sxyz, srpy = 0.01, 0.001
         inf_m = 1. / noise.astype(FLOAT) if noise else \
                 1. / self.odo_noise_
-        self.pg_.addEdge(xid1, xid2, rt_vec(delta), inf_m)
+        self.pg_.addIncrementalEdge(xid1, xid2, rt_vec(delta), inf_m)
+        # self.pg_.addEdge(xid1, xid2, rt_vec(delta), inf_m)
 
+        
         # Add to edges
         self.xxs_.append((xid1, xid2))
 
         # Check loop closure
         if self.verbose_:
-            if xid2-xid1 > 1 and xid1 in self.xs_ and xid2 in self.xs_:
+            if xid2-xid1 > 1 and exists: # xid1 in self.xs_ and xid2 in self.xs_:
                 print_yellow('Loop closure inserted')
 
     @timeitmethod
     def _update(self, iterations=1): 
         # print('.')
         # print('_update {}'.format(self.idx_))
-        
-        # Initialize tree, and iterate
-        if not self.tree_initialized_: 
-            self.pg_.buildSimpleTree()
-            self.pg_.initializeOnTree()
-            self.pg_.initializeTreeParameters()
-            self.pg_.initializeOptimization(compare_mode='level');
-            self.tree_initialized_ = True
 
+        if not self.batch_mode_: 
+            self.pg_.initializeOnlineIterations()
+
+        st_err = self.pg_.error()
         for j in range(iterations): 
             self.pg_.iterate([], noPreconditioner=False)
+            # self.pg_.iterate(vset, noPredconditioner=True)
+        end_err = self.pg_.error()
+        self.pg_.recomputeAllTransformations()
             
         # Get current estimate
         self.current_ = self.pg_.vertices()
@@ -246,6 +258,13 @@ class BaseSLAM(object):
         if not self.pg_.load(filename, overrideCovariances, twoDimensions):
             print('FATAL ERROR: Could not read file. Abrting.')
             sys.exit(1)
+
+        if not self.batch_mode_:
+            text = """Cannot load pose graph in incremental mode, """ \
+                   """Setting batch_mode=True"""
+            import warnings; warnings.warn(text)
+            self.batch_mode_ = True
+        self._init_mode()
             
     # print 'V / E', pg.nvertices, pg.nedges
     # print('Done')

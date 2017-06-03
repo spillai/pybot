@@ -138,8 +138,6 @@ def test_odometryExample():
 
     slam.pg_.verboseLevel = 0
     slam.pg_.restartOnDivergence = False
-
-
     
     for j in range(10): 
         slam.add_incremental_pose_constraint(rand_yaw()) 
@@ -164,20 +162,25 @@ def test_RobotSLAM():
     cfg.SLAM_BACKEND = 'toro'
     from pybot.mapping.slam import RobotSLAM
 
+    # Initalize SLAM object with visualization
     slam_cls = RobotSLAM(frame_id='origin',
                          visualize_nodes=True, visualize_measurements=True,
                          visualize_factors=True, visualize_marginals=False,
                          pose_type='pose')
     slam = slam_cls(verbose=True)
-    
-    # slam.initialize(index=0)
+
+    # Initialization: slam.initialize(index=0, p=RigidTransform.identity())
+    # on_odom_relative automatically initializes
+    # if pose graph is not already intiailized
     for j in range(10):
         rt = fixed_yaw()
         slam.on_odom_relative(j, rt)
     slam.update()
 
+    # Add loop closure constraint
     slam.on_loop_closure_relative(None, 0,9,RigidTransform.from_rpyxyz(0,0,np.pi/2,-1.0,2.0,0))
     slam.update(iterations=10)
+    slam.finish()
 
 def test_toro_pose_graph_file(): 
     print("test_toro_pose_graph_file\n")
@@ -187,20 +190,22 @@ def test_toro_pose_graph_file():
     cfg.SLAM_BACKEND = 'toro'
     from pybot.mapping.slam import RobotSLAM
 
+    # Initalize SLAM object with visualization
     slam_cls = RobotSLAM(frame_id='origin',
                          visualize_every=1, visualize_nodes=True, visualize_measurements=True,
                          visualize_factors=True, visualize_marginals=False,
                          pose_type='point')
     slam = slam_cls(verbose=True)
 
-    # load file
+    # Load pose graph file
     slam.load('data/sphere_mednoise.graph')
     for j in range(100): 
         slam.update(iterations=1)
+    slam.finish()
     
 if __name__ == "__main__": 
-    # test_odometryExample()
-    # print('OK')
+    test_odometryExample()
+    print('OK')
 
     test_RobotSLAM()
     print('OK')
