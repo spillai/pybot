@@ -231,6 +231,22 @@ class BaseSLAM(object):
     # def marginals_available(self): 
     #     return len(self.xcovs_) > 0 or len(self.lcovs_) > 0
 
+    def load(self, filename):
+        print('Loading graph file {}... '.format(filename))
+        import os.path
+        if not os.path.exists(os.path.expanduser(filename)):
+            raise RuntimeError('File not found {}'.format(filename))
+
+        overrideCovariances = False
+        twoDimensions = False
+
+        if not self.pg_.load(filename, overrideCovariances, twoDimensions):
+            print('FATAL ERROR: Could not read file. Abrting.')
+            sys.exit(1)
+            
+    # print 'V / E', pg.nvertices, pg.nedges
+    # print('Done')
+
     def save_graph(self, filename):
         pass # raise NotImplementedError()
         # with self.slam_lock_: 

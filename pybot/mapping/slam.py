@@ -49,6 +49,9 @@ class BaseSLAM(_BaseSLAM):
         self.q_poses_ = Accumulator(maxlen=2)
 
         self.state_lock_ = Lock()
+
+    # def load(self, filename):
+    #     raise NotImplementedError()
         
     def pose(self, k):
         return super(BaseSLAM, self).pose(k)

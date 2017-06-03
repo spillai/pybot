@@ -179,13 +179,31 @@ def test_RobotSLAM():
     slam.on_loop_closure_relative(None, 0,9,RigidTransform.from_rpyxyz(0,0,np.pi/2,-1.0,2.0,0))
     slam.update(iterations=10)
 
-    
+def test_toro_pose_graph_file(): 
+    print("test_toro_pose_graph_file\n")
+    print("=================================")
+
+    from pybot.mapping import cfg
+    cfg.SLAM_BACKEND = 'toro'
+    from pybot.mapping.slam import RobotSLAM
+
+    slam_cls = RobotSLAM(frame_id='origin',
+                         visualize_every=1, visualize_nodes=True, visualize_measurements=True,
+                         visualize_factors=True, visualize_marginals=False)
+    slam = slam_cls(verbose=True)
+
+    # load file
+    slam.load('data/sphere_mednoise.graph')
+    slam.update(iterations=100)
     
 if __name__ == "__main__": 
     # test_odometryExample()
     # print('OK')
 
-    test_RobotSLAM()
+    # test_RobotSLAM()
+    # print('OK')
+
+    test_toro_pose_graph_file()
     print('OK')
 
     # test_solveFromFile()
