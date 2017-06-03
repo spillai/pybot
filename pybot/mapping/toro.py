@@ -78,7 +78,8 @@ class BaseSLAM(object):
             self.pg_.initializeOptimization(compare_mode='level');
         else:
             self.pg_.initializeOnlineOptimization()
-
+        print('Initializing in {} mode'.format('BATCH' if self.batch_mode_ else 'INCREMENTAL'))
+        
     def initialize(self, p=RigidTransform.identity(), index=0, noise=None): 
         if self.verbose_:
             print_red('{}::initialize index: {}={}'
@@ -127,6 +128,9 @@ class BaseSLAM(object):
             if xid2-xid1 > 1 and exists: # xid1 in self.xs_ and xid2 in self.xs_:
                 print_yellow('Loop closure inserted')
 
+    def remove_constraint(self, xid1, xid2):
+        return self.pg_.removeEdge(xid1, xid2)
+                
     @timeitmethod
     def _update(self, iterations=1): 
         # print('.')
