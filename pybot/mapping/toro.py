@@ -109,8 +109,6 @@ class BaseSLAM(object):
         pred_pose = self.xs_[xid1].oplus(delta)
         exists = self.pg_.vertex_exists(xid2)
         # added = self.pg_.addVertex(xid2, rt_vec(pred_pose)) >= 0
-        # print added
-        # if added:
         if not exists: 
             self.xs_[xid2] = pred_pose
 
@@ -120,7 +118,6 @@ class BaseSLAM(object):
                 1. / self.odo_noise_
         self.pg_.addIncrementalEdge(xid1, xid2, rt_vec(delta), inf_m)
         # self.pg_.addEdge(xid1, xid2, rt_vec(delta), inf_m)
-
         
         # Add to edges
         self.xxs_.append((xid1, xid2))
@@ -147,7 +144,9 @@ class BaseSLAM(object):
             
         # Get current estimate
         self.current_ = self.pg_.vertices()
-
+        if self.verbose_:
+            self.print_error()
+        
     @timeitmethod
     def _update_estimates(self): 
         if not self.estimate_available:
@@ -274,3 +273,14 @@ class BaseSLAM(object):
         # with self.slam_lock_: 
         # self.slam_.saveGraph(filename)
             
+    def print_error(self): 
+        l = self.pg_.totalPathLength()
+        nEdges = self.pg_.nedges
+        apl = l / nEdges
+
+        ei = self.pg_.error()
+        error = ei['error']
+
+        print('Iteration {} RotGain={}'.format(self.idx_, self.pg_.rotGain))
+        print('   global error = {}   error/constraint = {}'.format(error, error / nEdges))
+        print('mte={} mre={} are={} ate={}'.format(ei['mte'], ei['mre'], ei['are'], ei['ate']))
