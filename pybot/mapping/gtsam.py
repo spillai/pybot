@@ -11,6 +11,7 @@ from collections import deque, defaultdict, Counter, namedtuple
 from itertools import izip
 from threading import Lock, RLock
 
+from pybot.geometry.rigid_transform import RigidTransform
 from pybot.utils.timer import SimpleTimer, timeitmethod
 from pybot.utils.db_utils import AttrDict
 from pybot.utils.misc import print_red, print_yellow, print_green
@@ -114,7 +115,7 @@ class BaseSLAM(object):
         self.lcovs_ = {}
         self.current_ = None
 
-    def initialize(self, p=None, index=0, noise=None): 
+    def initialize(self, p=RigidTransform.identity(), index=0, noise=None): 
         if self.verbose_:
             print_red('{}::initialize index: {}={}'
                       .format(self.__class__.__name__, index, p))
@@ -122,7 +123,7 @@ class BaseSLAM(object):
                       .format(self.__class__.__name__, index, p))
             
         x_id = symbol('x', index)
-        pose0 = Pose3(p) if p is not None else Pose3()
+        pose0 = Pose3(p.matrix)
         self.graph_.add(
             PriorFactorPose3(x_id, pose0,
                              Diagonal.Sigmas(noise)
@@ -131,7 +132,7 @@ class BaseSLAM(object):
         )
         self.initial_.insert(x_id, pose0)
         with self.state_lock_: 
-            self.xs_[index] = pose0
+            self.xs_[index] = p
         self.idx_ = index
 
     def add_pose_prior(self, index, p, noise=None): 
@@ -139,7 +140,7 @@ class BaseSLAM(object):
             print_red('{:}::add_pose_prior {}={}'
                       .format(self.__class__.__name__, index, p))
         x_id = symbol('x', index)
-        pose = Pose3(p)
+        pose = Pose3(p.matrix)
         self.graph_.add(
             PriorFactorPose3(x_id, pose, Diagonal.Sigmas(noise)
                              if noise is not None
@@ -165,7 +166,7 @@ class BaseSLAM(object):
                       .format(self.__class__.__name__, xid1, xid2, delta))
 
         # Add odometry factor
-        pdelta = Pose3(delta)
+        pdelta = Pose3(delta.matrix)
         x_id1, x_id2 = symbol('x', xid1), symbol('x', xid2)
         self.graph_.add(BetweenFactorPose3(x_id1, x_id2, 
                                            pdelta, Diagonal.Sigmas(noise)
@@ -175,8 +176,8 @@ class BaseSLAM(object):
         # Predict pose and add as initial estimate
         with self.state_lock_: 
             if xid2 not in self.xs_: 
-                pred_pose = self.xs_[xid1].compose(pdelta)
-                self.initial_.insert(x_id2, pred_pose)
+                pred_pose = self.xs_[xid1].oplus(delta)
+                self.initial_.insert(x_id2, Pose3(pred_pose.matrix))
                 self.xs_[xid2] = pred_pose
 
             # Add to edges
@@ -196,8 +197,7 @@ class BaseSLAM(object):
                 else self.measurement_noise_
         assert(len(l_ids) == len(deltas))
         for l_id, delta in izip(l_ids, deltas): 
-            pdelta = Pose3(delta)
-            self.graph_.add(BetweenFactorPose3(x_id, l_id, pdelta, noise))
+            self.graph_.add(BetweenFactorPose3(x_id, l_id, Pose3(delta.matrix), noise))
 
         with self.state_lock_: 
 
@@ -209,8 +209,8 @@ class BaseSLAM(object):
             for (l_id, lid, delta) in izip(l_ids, lids, deltas): 
                 if lid not in self.ls_:
                     try: 
-                        pred_pose = self.xs_[xid].compose(Pose3(delta))
-                        self.initial_.insert(l_id, pred_pose)
+                        pred_pose = self.xs_[xid].oplus(delta)
+                        self.initial_.insert(l_id, Pose3(pred_pose.matrix))
                         self.ls_[lid] = pred_pose                        
                     except: 
                         raise KeyError('Pose {:} not available'
@@ -264,7 +264,7 @@ class BaseSLAM(object):
                     try: 
                         pred_pt3 = self.xs_[xid].transform_from(Point3(vec(*pt3)))
                         self.initial_.insert(l_id, pred_pt3)
-                        self.ls_[lid] = pred_pt3
+                        self.ls_[lid] = pred_pt3.vector().ravel()
                     except Exception, e: 
                         raise RuntimeError('Initialization failed ({:}). xid:{:}, lid:{:}, l_id: {:}'
                                            .format(e, xid, lid, l_id))
@@ -336,16 +336,16 @@ class BaseSLAM(object):
             # Extract and update landmarks and poses
             for k,v in poses.iteritems():
                 if chr(k.chr()) == 'l': 
-                    self.ls_[k.index()] = v
+                    self.ls_[k.index()] = RigidTransform.from_matrix(v.matrix())
                 elif chr(k.chr()) == 'x': 
-                    self.xs_[k.index()] = v
+                    self.xs_[k.index()] = RigidTransform.from_matrix(v.matrix())
                 else: 
                     raise RuntimeError('Unknown key chr {} {}'.format(chr(k.chr()), k.index()))
 
             # Extract and update landmarks
             for k,v in landmarks.iteritems():
                 if chr(k.chr()) == 'l': 
-                    self.ls_[k.index()] = v
+                    self.ls_[k.index()] = v.vector().ravel()
                 else: 
                     raise RuntimeError('Unknown key chr {} {}'.format(chr(k.chr()), k.index()))
             
@@ -387,7 +387,7 @@ class BaseSLAM(object):
     @property
     def poses(self): 
         " Robot poses: Expects poses to be Pose3 "
-        return {k: v.matrix() for k,v in self.xs_.iteritems()}
+        return self.xs_ # {k: v.matrix() for k,v in self.xs_.iteritems()}
 
     def pose(self, k): 
         return self.xs_[k].matrix()
@@ -395,7 +395,7 @@ class BaseSLAM(object):
     @property
     def target_poses(self): 
         " Landmark Poses: Expects landmarks to be Pose3 "
-        return {k: v.matrix() for k,v in self.ls_.iteritems()}
+        return self.ls_ # {k: v.matrix() for k,v in self.ls_.iteritems()}
 
     @property
     def target_poses_count(self): 
@@ -403,12 +403,12 @@ class BaseSLAM(object):
         return len(self.ls_)
 
     def target_pose(self, k): 
-        return self.ls_[k].matrix()
+        return self.ls_[k] # .matrix()
         
     @property
     def target_landmarks(self): 
         " Landmark Points: Expects landmarks to be Point3 " 
-        return {k: v.vector().ravel() for k,v in self.ls_.iteritems()}
+        return self.ls_ # {k: v.vector().ravel() for k,v in self.ls_.iteritems()}
 
     @property
     def target_landmarks_count(self): 
@@ -733,7 +733,7 @@ class VisualSLAM(BaseSLAM):
             assert(lid not in self.ls_)
             if lid not in self.ls_: 
                 self.initial_.insert(l_id, pt3)
-                self.ls_[lid] = pt3
+                self.ls_[lid] = pt3.vector().ravel()
                 if self.verbose_: 
                     sys.stdout.write('il{}, '.format(lid))
             else:

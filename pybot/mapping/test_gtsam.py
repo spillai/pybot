@@ -26,6 +26,7 @@ from pygtsam import ISAM2, NonlinearOptimizer, \
     NonlinearFactorGraph, LevenbergMarquardtOptimizer, DoglegOptimizer
 
 from gtsam import symbol, vector, vec, matrix
+from pybot.geometry.rigid_transform import RigidTransform
 
 # Helper functions for tests
 # ======================================================================
@@ -366,6 +367,33 @@ def test_SFMExample_SmartFactor():
     #     landmark_result.atPose3()
     # landmark_result.printf("Landmark results:\n")
 
+fixed_yaw = lambda: RigidTransform.from_rpyxyz(0, 0, 0.2, 0, 0.2, 0)
+    
+def test_RobotSLAM(): 
+    print("test_RobotSLAM\n")
+    print("=================================")
+
+    from pybot.mapping import cfg
+    cfg.SLAM_BACKEND = 'gtsam'
+    from pybot.mapping.slam import RobotSLAM
+
+    slam_cls = RobotSLAM(frame_id='origin',
+                         visualize_nodes=True, visualize_measurements=True,
+                         visualize_factors=True, visualize_marginals=False,
+                         pose_type='pose')
+    slam = slam_cls(verbose=True)
+
+    # Initialization: slam.initialize(index=0, p=RigidTransform.identity())
+    # on_odom_relative automatically initializes
+    # if fg is not already intiailized
+    for j in range(10):
+        rt = fixed_yaw()
+        slam.on_odom_relative(j, rt)
+    slam.update()
+
+    slam.on_loop_closure_relative(None, 0,9,RigidTransform.from_rpyxyz(0,0,np.pi/2,-1.0,2.0,0))
+    slam.update(iterations=10)
+
     
 if __name__ == "__main__": 
     test_odometryExample()
@@ -377,3 +405,5 @@ if __name__ == "__main__":
     test_SFMExample_SmartFactor()
     print('OK')
     
+    test_RobotSLAM()
+    print('OK')

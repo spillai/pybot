@@ -130,6 +130,8 @@ def test_odometryExample():
     print("=================================")
 
     from toro import BaseSLAM
+    from pybot.geometry.rigid_transform import Pose
+    from pybot.externals.lcm.draw_utils import publish_pose_list
 
     # Init
     slam = BaseSLAM(verbose=True)
@@ -137,9 +139,6 @@ def test_odometryExample():
     slam.pg_.verboseLevel = 0
     slam.pg_.restartOnDivergence = False
 
-
-    from pybot.geometry.rigid_transform import Pose
-    from pybot.externals.lcm.draw_utils import publish_pose_list
 
     
     for j in range(10): 
@@ -208,6 +207,3 @@ if __name__ == "__main__":
 
     test_toro_pose_graph_file()
     print('OK')
-
-    # test_solveFromFile()
-    # print('OK')
