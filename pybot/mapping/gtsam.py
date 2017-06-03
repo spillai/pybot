@@ -146,7 +146,7 @@ class BaseSLAM(object):
                              else self.prior_pose_noise_)
         )
         
-    def add_odom_incremental(self, delta, noise=None): 
+    def add_incremental_pose_constraint(self, delta, noise=None): 
         """
         Add odometry measurement from the latest robot pose to a new
         robot pose
@@ -280,7 +280,7 @@ class BaseSLAM(object):
         self.add_point_landmarks(self.latest, lids, pts, pts3d, noise=noise)
 
     @timeitmethod
-    def _update(self): 
+    def _update(self, iterations=1): 
         # print('.')
         # print('_update {}'.format(self.idx_))
         
@@ -299,6 +299,7 @@ class BaseSLAM(object):
                 # current.printf()
                 
             # Update with estimates
+            # TODO: (iterate ?)
             else: 
                 self.slam_.update(self.graph_, self.initial_)
                 self.slam_.update()

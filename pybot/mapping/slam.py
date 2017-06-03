@@ -19,25 +19,20 @@ from pybot.externals.lcm import draw_utils
 
 # ===============================================================================
 # Import GTSAM / ISAM Backend
-from pybot import get_environment
 from pybot.mapping import cfg
-
-_PYBOT_SLAM_BACKEND = get_environment('PYBOT_SLAM_BACKEND',
-                                      default='gtsam',
-                                      choices=['gtsam', 'isam'])
-
-if _PYBOT_SLAM_BACKEND == 'gtsam':
+if cfg.SLAM_BACKEND == 'gtsam':
     sys.stderr.write('Using GTSAM backend.\n')
     from pybot.mapping.gtsam import BaseSLAM as _BaseSLAM
     from pybot.mapping.gtsam import VisualSLAM as _VisualSLAM
-elif _PYBOT_SLAM_BACKEND == 'isam':
+elif cfg.SLAM_BACKEND == 'isam':
     sys.stderr.write('Using iSAM backend.\n')
     raise NotImplementedError('ISAM not yet implemented')
+elif cfg.SLAM_BACKEND == 'toro':
+    sys.stderr.write('Using Toro backend.\n')
+    from pybot.mapping.toro import BaseSLAM as _BaseSLAM
+    from pybot.mapping.toro import BaseSLAM as _VisualSLAM
 else:
-    raise Exception('Unknown backend: {}'.format(_PYBOT_SLAM_BACKEND))
-
-def backend():
-    return _PYBOT_SLAM_BACKEND
+    raise Exception('Unknown backend: {}'.format(cfg.SLAM_BACKEND))
 
 # ===============================================================================
 # BaseSLAM
@@ -53,9 +48,10 @@ class BaseSLAM(_BaseSLAM):
         self.update_every_k_odom_ = update_every_k_odom
         self.q_poses_ = Accumulator(maxlen=2)
 
+        self.state_lock_ = Lock()
+        
     def pose(self, k):
-        pmat = super(BaseSLAM, self).pose(k)
-        return RigidTransform.from_matrix(pmat)
+        return super(BaseSLAM, self).pose(k)
         
     @property
     def latest_measurement_pose(self): 
@@ -66,13 +62,12 @@ class BaseSLAM(_BaseSLAM):
 
     @property
     def updated_poses(self):
-        return {pid : Pose.from_rigid_transform(
-            pid, RigidTransform.from_matrix(p)) 
+        return {pid : Pose.from_rigid_transform(pid, p)
                 for (pid,p) in self.poses.iteritems()}
 
     @property
     def updated_targets(self):
-        return {pid : Pose.from_rigid_transform(pid, RigidTransform.from_matrix(p)) 
+        return {pid : Pose.from_rigid_transform(pid, p)
                 for (pid, p) in self.target_poses.iteritems()}
 
     def _update_check(self): 
@@ -81,6 +76,8 @@ class BaseSLAM(_BaseSLAM):
         """
         if self.latest >= 2 and self.latest % self.update_every_k_odom_ == 0: 
             self.update()
+                
+        self.visualize_measurements()
     
     def initialize(self, p=None, index=0, noise=None):
         """
@@ -89,13 +86,13 @@ class BaseSLAM(_BaseSLAM):
         p_init = RigidTransform.identity() \
                  if p is None else p
         self.q_poses_.append(p_init)
-        super(BaseSLAM, self).initialize(p=p_init.matrix, index=index, noise=noise)
+        super(BaseSLAM, self).initialize(p=p_init, index=index, noise=noise)
 
     def add_pose_prior(self, index, p, noise=None):
         """
         Add prior to node
         """
-        super(BaseSLAM, self).add_pose_prior(index, p.matrix, noise=noise)
+        super(BaseSLAM, self).add_pose_prior(index, p, noise=noise)
 
     def on_odom_absolute(self, t, p, noise=None): 
         """
@@ -112,14 +109,14 @@ class BaseSLAM(_BaseSLAM):
         self.q_poses_.append(p) 
 
         # 1. SLAM: Initialize
-        if not self.is_initialized: 
-            self.initialize(p=self.q_poses_.latest.matrix)
+        if not self.is_initialized:
+            super(BaseSLAM, self).initialize(self.q_poses_.latest)
             return self.latest
         assert(self.q_poses_.length >= 2)
 
         # 2. SLAM: Add relative pose measurements (odometry)
         p_odom = (self.q_poses_.items[-2].inverse()).oplus(self.q_poses_.items[-1])
-        self.add_odom_incremental(p_odom.matrix, noise=noise)
+        self.add_incremental_pose_constraint(p_odom, noise=noise)
 
         # 3. Update
         self._update_check()
@@ -136,11 +133,11 @@ class BaseSLAM(_BaseSLAM):
         if not self.is_initialized:
             p_init = RigidTransform.identity()
             self.q_poses_.append(p_init)
-            self.initialize(p_init.matrix)
+            super(BaseSLAM, self).initialize(p_init)
         
         # 2. SLAM: Add relative pose measurements (odometry)
         self.q_poses_.append(p * self.q_poses_.latest)
-        self.add_odom_incremental(p.matrix, noise=noise)
+        self.add_incremental_pose_constraint(p, noise=noise)
 
         # 3. Update
         self._update_check()
@@ -148,11 +145,11 @@ class BaseSLAM(_BaseSLAM):
         return self.latest
 
     def add_relative_pose_constraint(self, idx1, idx2, p, noise=None):
-        super(BaseSLAM, self).add_relative_pose_constraint(idx1, idx2, p.matrix, noise=noise)        
+        super(BaseSLAM, self).add_relative_pose_constraint(idx1, idx2, p, noise=noise)        
         return None
 
     def add_pose_landmarks(self, xid, lids, poses): 
-        super(BaseSLAM, self).add_pose_landmarks(xid, lids, [p.matrix for p in poses])
+        super(BaseSLAM, self).add_pose_landmarks(xid, lids, poses) 
         return None
     
     def on_loop_closure_relative(self, t, idx1, idx2, p, noise=None): 
@@ -170,16 +167,15 @@ class BaseSLAM(_BaseSLAM):
         return self.latest
         
     def on_pose_landmarks(self, t, ids, poses): 
-        deltas = [p.matrix for p in poses]
-        self.add_pose_landmarks_incremental(ids, deltas)
+        self.add_pose_landmarks_incremental(ids, poses)
 
         # 2. Update
         self._update_check()
 
         return self.latest
 
-    def update(self): 
-        self._update()
+    def update(self, iterations=1): 
+        self._update(iterations=iterations)
         self._update_estimates()
         # self._update_marginals()
 
@@ -195,19 +191,46 @@ class BaseSLAM(_BaseSLAM):
         # Publish latest pose
         latest_idx = self.latest
         latest_pose = self.q_poses_.latest
-        draw_utils.publish_pose_list('current_pose', [Pose.from_rigid_transform(latest_idx, latest_pose)], 
-                                     frame_id='camera', reset=False)
+        draw_utils.publish_pose_list(
+            'current_pose',
+            [Pose.from_rigid_transform(latest_idx, latest_pose)], 
+            frame_id=self.frame_id_, reset=False)
+        
+        # Visualize all poses
+        self.visualize_poses()
+        
+    def visualize_poses(self):
+        if not self.visualize_measurements_:
+            return
 
-    def visualize_optimized_poses(self, 
-                                  visualize_nodes=False, 
-                                  visualize_measurements=False,
-                                  visualize_factors=False,
-                                  visualize_marginals=False, name='SLAM_', frame_id='camera'):
+        with self.state_lock_:
+            # Draw odom pose
+            draw_utils.publish_pose_list(
+                self.name_ + 'measured_odom', 
+                [Pose.from_rigid_transform(self.latest, self.latest_measurement_pose)], 
+                frame_id=self.frame_id_, reset=False)
+            
+            # Draw odom factor
+            if self.visualize_factors_ and self.latest >= 1: 
+                factor_st = (self.measurement_pose(-2).tvec).reshape(-1,3)
+                factor_end = (self.measurement_pose(-1).tvec).reshape(-1,3)
+                draw_utils.publish_line_segments(
+                    self.name_ + 'measured_factor_odom', 
+                    factor_st, factor_end, c='r', 
+                    frame_id=self.frame_id_, reset=False)
+
+    def visualize_optimized_poses(
+            self, 
+            visualize_nodes=False, 
+            visualize_measurements=False,
+            visualize_factors=False,
+            visualize_marginals=False, name='SLAM_', frame_id='camera'):
+        
         with self.state_lock_:
             # Poses 
-            covars = []
             updated_poses = self.updated_poses
-
+            texts, covars = map(str, updated_poses.keys()), []
+            
             # Marginals
             if visualize_marginals: 
                 poses_marginals = self.poses_marginals
@@ -219,9 +242,10 @@ class BaseSLAM(_BaseSLAM):
                         )
 
             # Draw cameras (with poses and marginals)
-            draw_utils.publish_cameras(name + 'optimized_node_poses', updated_poses.values(), 
-                                       covars=covars, frame_id=frame_id, draw_edges=False, reset=True)
-
+            draw_utils.publish_cameras(
+                name + 'optimized_node_poses', updated_poses.values(), 
+                covars=covars, frame_id=frame_id, draw_edges=False, reset=True)
+            
             # Draw odometry edges (between robot poses)
             if visualize_factors: 
                 robot_edges = self.robot_edges
@@ -229,14 +253,17 @@ class BaseSLAM(_BaseSLAM):
                     factor_st = np.vstack([(updated_poses[xid].tvec).reshape(-1,3) for (xid, _) in robot_edges])
                     factor_end = np.vstack([(updated_poses[xid].tvec).reshape(-1,3) for (_, xid) in robot_edges])
 
-                    draw_utils.publish_line_segments(name + 'optimized_factor_odom', factor_st, factor_end, c='b', 
-                                                     frame_id=frame_id, reset=True) 
-    
-    def visualize_optimized_landmarks(self,
-                                      visualize_nodes=False, 
-                                      visualize_measurements=False,
-                                      visualize_factors=False,
-                                      visualize_marginals=False, name='SLAM_', frame_id='camera'):
+                    draw_utils.publish_line_segments(
+                        name + 'optimized_factor_odom', factor_st, factor_end, c='b', 
+                        frame_id=frame_id, reset=True) 
+            
+    def visualize_optimized_landmarks(
+            self,
+            visualize_nodes=False, 
+            visualize_measurements=False,
+            visualize_factors=False,
+            visualize_marginals=False, name='SLAM_', frame_id='camera'):
+        
         with self.state_lock_:
 
             # Draw targets (constantly updated, so draw with reset)
@@ -245,8 +272,9 @@ class BaseSLAM(_BaseSLAM):
             if len(updated_targets):
                 poses = updated_targets.values()
                 texts, covars = map(str, updated_targets.keys()), []
-                draw_utils.publish_pose_list(name + 'optimized_node_landmark_poses', poses, texts=texts, 
-                                             covars=covars, frame_id=frame_id, reset=True)
+                draw_utils.publish_pose_list(
+                    name + 'optimized_node_landmark_poses', poses, texts=texts, 
+                    covars=covars, frame_id=frame_id, reset=True)
 
             # Draw edges (between landmarks and poses)
             if self.visualize_factors_: 
@@ -254,9 +282,10 @@ class BaseSLAM(_BaseSLAM):
                 if len(landmark_edges): 
                     factor_st = np.vstack([(updated_poses[xid].tvec).reshape(-1,3) for (xid, _) in landmark_edges])
                     factor_end = np.vstack([(updated_targets[lid].tvec).reshape(-1,3) for (_, lid) in landmark_edges])
-                    draw_utils.publish_line_segments(name + 'optimized_factor_landmark',
-                                                     factor_st, factor_end, c='b', 
-                                                     frame_id=frame_id, reset=True) 
+                    draw_utils.publish_line_segments(
+                        name + 'optimized_factor_landmark',
+                        factor_st, factor_end, c='b', 
+                        frame_id=frame_id, reset=True) 
 
             # # Landmark points
             # if visualize_nodes: 
@@ -349,18 +378,21 @@ class VisualSLAM(BaseSLAM, _VisualSLAM):
         # Publish latest pose
         latest_idx = self.latest
         latest_pose = self.q_poses_.latest
-        draw_utils.publish_pose_list('current_pose', [Pose.from_rigid_transform(latest_idx, latest_pose)], 
-                                     frame_id='camera', reset=False)
+        draw_utils.publish_pose_list(
+            'current_pose', [Pose.from_rigid_transform(latest_idx, latest_pose)], 
+            frame_id='camera', reset=False)
         
         # # Publish cloud in latest pose reference frame
         # pts3_c = self.pose(self.latest).inverse() * pts3_w
         # draw_utils.publish_cloud('current_cloud', [pts3_c], c='b', frame_id='current_pose', element_id=[latest_idx], reset=False)
         
-    def visualize_optimized_landmarks(self,
-                                      visualize_nodes=False, 
-                                      visualize_measurements=False,
-                                      visualize_factors=False,
-                                      visualize_marginals=False, name='SLAM_', frame_id='camera'):
+    def visualize_optimized_landmarks(
+            self,
+            visualize_nodes=False, 
+            visualize_measurements=False,
+            visualize_factors=False,
+            visualize_marginals=False, name='SLAM_', frame_id='camera'):
+        
         with self.state_lock_:
 
             # Draw targets (constantly updated, so draw with reset)
@@ -395,9 +427,10 @@ class VisualSLAM(BaseSLAM, _VisualSLAM):
                     factor_st = np.vstack([(updated_poses[xid].tvec).reshape(-1,3) for (xid, _) in landmark_edges])
                     factor_end = np.vstack([(updated_targets[lid]).reshape(-1,3) for (_, lid) in landmark_edges])
 
-                    draw_utils.publish_line_segments(name + 'optimized_factor_landmark', factor_st, factor_end, c='b', 
-                                                     frame_id=frame_id, reset=True) 
-        
+                    draw_utils.publish_line_segments(
+                        name + 'optimized_factor_landmark', factor_st, factor_end, c='b', 
+                        frame_id=frame_id, reset=True) 
+                    
     
 def with_visualization(
         cls,
@@ -428,8 +461,8 @@ def with_visualization(
         def save_dot_graph(self):
             self.save_graph('test.dot')
 
-        def update(self): 
-            super(_SLAM, self).update()
+        def update(self, iterations=1): 
+            super(_SLAM, self).update(iterations=iterations)
             self.publish_cb_.poll()
             self.write_cb_.poll()
 
@@ -467,11 +500,16 @@ def with_visualization(
 
     return _SLAM
 
-RobotSLAM = with_visualization(
-    BaseSLAM,
-    frame_id='camera',
-    visualize_measurements=True)
-
+def RobotSLAM(*args, **kwargs): 
+    """
+    name='SLAM_', frame_id='camera',
+    visualize_every=0.5,
+    visualize_nodes=True, 
+    visualize_measurements=False, 
+    visualize_factors=True, visualize_marginals=False
+    """
+    return with_visualization(BaseSLAM, *args, **kwargs)
+    
 RobotVisualSLAM = with_visualization(
     VisualSLAM,
     frame_id='camera',
@@ -492,23 +530,6 @@ RobotVisualSLAM = with_visualization(
     #         # Maintain updated ids
     #         return set(updated_poses.keys())
 
-
-        # def visualize_poses(self, p, relative=True):
-        #     if not self.visualize_measurements_:
-        #         return
-
-        #     # Draw odom pose
-        #     draw_utils.publish_pose_list(self.name_ + 'measured_odom', 
-        #                                  [Pose.from_rigid_transform(self.latest, self.latest_measurement_pose)], 
-        #                                  frame_id=self.frame_id_, reset=False)
-
-        #     # Draw odom factor
-        #     if self.visualize_factors_ and self.latest >= 1: 
-        #         factor_st = (self.measurement_pose(-2).tvec).reshape(-1,3)
-        #         factor_end = (self.measurement_pose(-1).tvec).reshape(-1,3)
-        #         draw_utils.publish_line_segments(self.name_ + 'measured_factor_odom', 
-        #                                          factor_st, factor_end, c='r', 
-        #                                          frame_id=self.frame_id_, reset=False)
 
         # def visualize_landmarks(self, ids, poses):
         #     if not self.visualize_measurements_:

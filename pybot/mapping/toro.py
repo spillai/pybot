@@ -22,9 +22,10 @@ from pytoro import TreeOptimizer3, Transformation3, tf3_from_vec, tf3_to_vec
 FLOAT = np.float64
 
 def rt_vec(rt=RigidTransform.identity()):
-    return tf3_from_vec(np.hstack([rt.tvec, rt.wxyz]).astype(FLOAT))
+    return tf3_from_vec(np.r_[rt.tvec, rt.wxyz].astype(FLOAT))
 
 def rt_from_vec(v):
+    # v: xyz, wxyz vector 
     return RigidTransform(tvec=v[:3], xyzw=Quaternion.from_wxyz(v[3:]))
 
 class BaseSLAM(object):
@@ -51,6 +52,9 @@ class BaseSLAM(object):
 
         # Toro interface
         self.pg_ = TreeOptimizer3()
+        self.pg_.verboseLevel = 0
+        self.pg_.restartOnDivergence = False
+        
         self.idx_ = -1
         self.verbose_ = verbose
 
@@ -103,6 +107,9 @@ class BaseSLAM(object):
         inf_m = 1. / noise.astype(FLOAT) if noise else \
                 1. / self.odo_noise_
         self.pg_.addEdge(xid1, xid2, rt_vec(delta), inf_m)
+
+        # Add to edges
+        self.xxs_.append((xid1, xid2))
 
         # # Check loop closure
         # if self.verbose_:
@@ -168,33 +175,32 @@ class BaseSLAM(object):
     # def pose_marginal(self, node_id): 
     #     return self.xcovs_[node_id]
 
-
     
-    # @property
-    # def target_poses(self): 
-    #     " Landmark Poses: Expects landmarks to be Pose3 "
-    #     return {k: v.matrix() for k,v in self.ls_.iteritems()}
+    @property
+    def target_poses(self): 
+        " Landmark Poses "
+        return {}
 
-    # @property
-    # def target_poses_count(self): 
-    #     " Landmark Poses: Expects landmarks to be Pose3 "
-    #     return len(self.ls_)
+    @property
+    def target_poses_count(self): 
+        " Landmark Poses "
+        return 0
 
-    # def target_pose(self, k): 
-    #     return self.ls_[k].matrix()
+    def target_pose(self, k): 
+        return NotImplementedError()
         
-    # @property
-    # def target_landmarks(self): 
-    #     " Landmark Points: Expects landmarks to be Point3 " 
-    #     return {k: v.vector().ravel() for k,v in self.ls_.iteritems()}
+    @property
+    def target_landmarks(self): 
+        " Landmark Points " 
+        return {}
 
-    # @property
-    # def target_landmarks_count(self): 
-    #     " Landmark Points: Expects landmarks to be Point3 " 
-    #     return len(self.ls_)
+    @property
+    def target_landmarks_count(self): 
+        " Landmark Points " 
+        return 0
 
-    # def target_landmark(self, k): 
-    #     return self.ls_[k].vector().ravel()
+    def target_landmark(self, k): 
+        return NotImplementedError()
         
     # @property
     # def target_poses_marginals(self): 
@@ -209,9 +215,9 @@ class BaseSLAM(object):
     # def landmark_marginal(self, node_id): 
     #     return self.lcovs_[node_id]
         
-    # @property
-    # def landmark_edges(self): 
-    #     return self.xls_
+    @property
+    def landmark_edges(self): 
+        return []
 
     @property
     def robot_edges(self): 
@@ -225,7 +231,8 @@ class BaseSLAM(object):
     # def marginals_available(self): 
     #     return len(self.xcovs_) > 0 or len(self.lcovs_) > 0
 
-    # def save_graph(self, filename):
-    #     # with self.slam_lock_: 
-    #     self.slam_.saveGraph(filename)
+    def save_graph(self, filename):
+        pass # raise NotImplementedError()
+        # with self.slam_lock_: 
+        # self.slam_.saveGraph(filename)
             

@@ -70,18 +70,18 @@ def test_solveFromFile():
     print('Complexity of an iteration={}'.format(l))
 
 
-    stripped_filename,_ = os.path.splitext(filename)
-    print('Saving starting graph... ')
-    output = stripped_filename + '-treeopt-initial.graph'
-    pg.save(output)
-    print('Done')
+    # stripped_filename,_ = os.path.splitext(filename)
+    # print('Saving starting graph... ')
+    # output = stripped_filename + '-treeopt-initial.graph'
+    # pg.save(output)
+    # print('Done')
 
-    output = stripped_filename + '-treeopt-initial.dat'
-    pg.saveGnuplot(output)
-    print('Done')
+    # output = stripped_filename + '-treeopt-initial.dat'
+    # pg.saveGnuplot(output)
+    # print('Done')
 
-    error_output = stripped_filename + '-treeopt-error.dat'
-    # ofstream errorStream;
+    # error_output = stripped_filename + '-treeopt-error.dat'
+    # # ofstream errorStream;
 
 
     # ignore preconditioner (-ip)
@@ -107,17 +107,23 @@ def test_solveFromFile():
     print('TOTAL TIME= {} s.'.format(time.time() - st))    
 
 
-    print('Saving files...(graph file)')
-    output = stripped_filename+ '-treeopt-final.graph'
-    pg.save(output)
-    print('...(gnuplot file)...')
-    output = stripped_filename + '-treeopt-final.dat'
-    pg.saveGnuplot(output)
-    # errorStream.close();
-    print('Done')
+    # print('Saving files...(graph file)')
+    # output = stripped_filename+ '-treeopt-final.graph'
+    # pg.save(output)
+    # print('...(gnuplot file)...')
+    # output = stripped_filename + '-treeopt-final.dat'
+    # pg.saveGnuplot(output)
+    # # errorStream.close();
+    # print('Done')
 
 
     
+fixed_yaw = lambda: RigidTransform.from_rpyxyz(0, 0, 0.2, 0, 0.2, 0)
+rand_yaw = lambda: RigidTransform.from_rpyxyz(0, 0,
+                                              0.2, # (np.random.random() - 0.5) * np.pi/6,
+                                              0, # (np.random.random() - 0.5) * 2.0,
+                                              0.2, # np.random.random() * 1,
+                                              0)
 
 def test_odometryExample(): 
     print("test_odmetryExample\n")
@@ -128,32 +134,59 @@ def test_odometryExample():
     # Init
     slam = BaseSLAM(verbose=True)
 
-    # slam.pg_.verboseLevel = 1
-    # slam.pg_.restartOnDivergence = False
+    slam.pg_.verboseLevel = 0
+    slam.pg_.restartOnDivergence = False
 
-    rand_yaw = lambda: RigidTransform.from_rpyxyz(0, 0,
-                                                  0.2, # (np.random.random() - 0.5) * np.pi/6,
-                                                  0, # (np.random.random() - 0.5) * 2.0,
-                                                  np.random.random() * 1,
-                                                  0)
 
+    from pybot.geometry.rigid_transform import Pose
+    from pybot.externals.lcm.draw_utils import publish_pose_list
+
+    
     for j in range(10): 
         slam.add_incremental_pose_constraint(rand_yaw()) 
     slam._update(iterations=1)
     slam._update_estimates()
-    
-    slam.add_relative_pose_constraint(0,9,RigidTransform.from_rpyxyz(0,0.8,0,-1.0,2.0,0))
+    poses = [Pose.from_rigid_transform(k,v) for k,v in slam.poses.iteritems()]
+    publish_pose_list('original_poses', poses, frame_id='origin')
+     
+    slam.add_relative_pose_constraint(0,9,RigidTransform.from_rpyxyz(0,0,np.pi/2,-1.0,2.0,0))
     slam._update(iterations=100)
     slam._update_estimates()
 
-    from pybot.geometry.rigid_transform import Pose
-    from pybot.externals.lcm.draw_utils import publish_pose_list
     poses = [Pose.from_rigid_transform(k,v) for k,v in slam.poses.iteritems()]
     publish_pose_list('optimized_poses', poses, frame_id='origin')
+
+
+def test_RobotSLAM(): 
+    print("test_RobotSLAM\n")
+    print("=================================")
+
+    from pybot.mapping import cfg
+    cfg.SLAM_BACKEND = 'toro'
+    from pybot.mapping.slam import RobotSLAM
+
+    slam_cls = RobotSLAM(frame_id='origin',
+                         visualize_nodes=True, visualize_measurements=True,
+                         visualize_factors=True, visualize_marginals=False)
+    slam = slam_cls(verbose=True)
+    
+    # slam.initialize(index=0)
+    for j in range(10):
+        rt = fixed_yaw()
+        slam.on_odom_relative(j, rt)
+    slam.update()
+
+    slam.on_loop_closure_relative(None, 0,9,RigidTransform.from_rpyxyz(0,0,np.pi/2,-1.0,2.0,0))
+    slam.update(iterations=10)
+
     
     
 if __name__ == "__main__": 
-    test_odometryExample()
+    # test_odometryExample()
+    # print('OK')
+
+    test_RobotSLAM()
     print('OK')
+
     # test_solveFromFile()
     # print('OK')
