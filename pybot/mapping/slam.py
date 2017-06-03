@@ -255,7 +255,9 @@ class BaseSLAM(_BaseSLAM):
                 draw_utils.publish_cloud(
                     name + 'optimized_node_poses', np.vstack(map(lambda p: p.tvec, updated_poses.values())), 
                     c='b', frame_id=frame_id, reset=True)
-                
+            else:
+                raise ValueError()
+            
             # Draw odometry edges (between robot poses)
             if visualize_factors: 
                 robot_edges = self.robot_edges
@@ -272,24 +274,34 @@ class BaseSLAM(_BaseSLAM):
             visualize_nodes=False, 
             visualize_measurements=False,
             visualize_factors=False,
-            visualize_marginals=False, name='SLAM_', frame_id='camera'):
+            visualize_marginals=False,
+            landmark_type=POSE, name='SLAM_', frame_id='camera'):
         
         with self.state_lock_:
 
             # Draw targets (constantly updated, so draw with reset)
-            updated_poses = self.updated_poses
             updated_targets = self.updated_targets
             if len(updated_targets):
                 poses = updated_targets.values()
                 texts, covars = map(str, updated_targets.keys()), []
-                draw_utils.publish_pose_list(
-                    name + 'optimized_node_landmark_poses', poses, texts=texts, 
-                    covars=covars, frame_id=frame_id, reset=True)
 
+                if landmark_type == POSE: 
+                    draw_utils.publish_pose_list(
+                        name + 'optimized_node_landmark_poses', poses, texts=texts, 
+                        covars=covars, frame_id=frame_id, reset=True)
+                elif landmark_type == POINT:
+                    draw_utils.publish_cloud(
+                        name + 'optimized_node_landmark_poses',
+                        np.vstack(map(lambda p: p.tvec, poses.values())), 
+                        c='b', frame_id=frame_id, reset=True)
+                else:
+                    raise ValueError()
+            
             # Draw edges (between landmarks and poses)
             if self.visualize_factors_: 
+                updated_poses = self.updated_poses
                 landmark_edges = self.landmark_edges
-                if len(landmark_edges): 
+                if len(landmark_edges) and len(updated_poses) and len(updated_targets): 
                     factor_st = np.vstack([(updated_poses[xid].tvec).reshape(-1,3) for (xid, _) in landmark_edges])
                     factor_end = np.vstack([(updated_targets[lid].tvec).reshape(-1,3) for (_, lid) in landmark_edges])
                     draw_utils.publish_line_segments(
@@ -401,7 +413,8 @@ class VisualSLAM(BaseSLAM, _VisualSLAM):
             visualize_nodes=False, 
             visualize_measurements=False,
             visualize_factors=False,
-            visualize_marginals=False, name='SLAM_', frame_id='camera'):
+            visualize_marginals=False,
+            landmark_type=POINT, name='SLAM_', frame_id='camera'):
         
         with self.state_lock_:
 
@@ -516,6 +529,7 @@ def with_visualization(
                 visualize_measurements=self.visualize_measurements_, 
                 visualize_factors=self.visualize_factors_, 
                 visualize_marginals=self.visualize_marginals_,
+                landmark_type=self.landmark_type_,
                 name=self.name_, frame_id=self.frame_id_)
 
     return _SLAM
@@ -528,12 +542,28 @@ def RobotSLAM(*args, **kwargs):
     visualize_measurements=False, 
     visualize_factors=True, visualize_marginals=False
     """
-    return with_visualization(BaseSLAM, *args, **kwargs)
+    kwargs.setdefault('landmark_type', 'pose')
     
-RobotVisualSLAM = with_visualization(
-    VisualSLAM,
-    frame_id='camera',
-    visualize_measurements=True)
+    return with_visualization(BaseSLAM, *args, **kwargs)
+
+
+def RobotVisualSLAM(*args, **kwargs): 
+    """
+    name='SLAM_', frame_id='camera',
+    visualize_every=0.5,
+    visualize_nodes=True, 
+    visualize_measurements=False, 
+    visualize_factors=True, visualize_marginals=False
+    """
+    kwargs.setdefault('landmark_type', 'point')
+    kwargs.setdefault('frame_id', 'camera')
+    
+    return with_visualization(VisualSLAM, *args, **kwargs)
+
+# RobotVisualSLAM = with_visualization(
+#     VisualSLAM,
+#     frame_id='camera',
+#     visualize_measurements=True)
 
 
 
