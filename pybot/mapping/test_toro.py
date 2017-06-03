@@ -128,17 +128,29 @@ def test_odometryExample():
     # Init
     slam = BaseSLAM(verbose=True)
 
-    rt = RigidTransform.random()
-    slam.add_incremental_pose_constraint(RigidTransform.random())
-    slam.add_incremental_pose_constraint(RigidTransform.random())
-    slam.add_incremental_pose_constraint(RigidTransform.random())
-    slam.add_incremental_pose_constraint(RigidTransform.random())
-    # slam.initialize(p=RandomTransform.identity(), index=0)
-    # slam.initialize(p=rt, index=1)
-    # slam.add_relative_pose_constraint(0, 1, rt)
-    # slam.add_relative_pose_constraint(1, 2, RigidTransform.random())
-    # slam.add_relative_pose_constraint(2, 3, RigidTransform.random())
-    # slam.add_relative_pose_constraint(3, 4, RigidTransform.random())
+    # slam.pg_.verboseLevel = 1
+    # slam.pg_.restartOnDivergence = False
+
+    rand_yaw = lambda: RigidTransform.from_rpyxyz(0, 0,
+                                                  0.2, # (np.random.random() - 0.5) * np.pi/6,
+                                                  0, # (np.random.random() - 0.5) * 2.0,
+                                                  np.random.random() * 1,
+                                                  0)
+
+    for j in range(10): 
+        slam.add_incremental_pose_constraint(rand_yaw()) 
+    slam._update(iterations=1)
+    slam._update_estimates()
+    
+    slam.add_relative_pose_constraint(0,9,RigidTransform.from_rpyxyz(0,0.8,0,-1.0,2.0,0))
+    slam._update(iterations=100)
+    slam._update_estimates()
+
+    from pybot.geometry.rigid_transform import Pose
+    from pybot.externals.lcm.draw_utils import publish_pose_list
+    poses = [Pose.from_rigid_transform(k,v) for k,v in slam.poses.iteritems()]
+    publish_pose_list('optimized_poses', poses, frame_id='origin')
+    
     
 if __name__ == "__main__": 
     test_odometryExample()
