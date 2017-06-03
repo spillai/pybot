@@ -167,7 +167,8 @@ def test_RobotSLAM():
 
     slam_cls = RobotSLAM(frame_id='origin',
                          visualize_nodes=True, visualize_measurements=True,
-                         visualize_factors=True, visualize_marginals=False)
+                         visualize_factors=True, visualize_marginals=False,
+                         pose_type='pose')
     slam = slam_cls(verbose=True)
     
     # slam.initialize(index=0)
@@ -202,8 +203,8 @@ if __name__ == "__main__":
     # test_odometryExample()
     # print('OK')
 
-    # test_RobotSLAM()
-    # print('OK')
+    test_RobotSLAM()
+    print('OK')
 
     test_toro_pose_graph_file()
     print('OK')

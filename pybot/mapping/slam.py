@@ -253,7 +253,7 @@ class BaseSLAM(_BaseSLAM):
                     covars=covars, frame_id=frame_id, draw_edges=False, reset=True)
             elif pose_type == POINT: 
                 draw_utils.publish_cloud(
-                    name + 'optimized_node_poses', np.vstack(map(lambda p: p.tvec, updated_poses.values())), 
+                    name + 'optimized_node_poses_pc', np.vstack(map(lambda p: p.tvec, updated_poses.values())), 
                     c='b', frame_id=frame_id, reset=True)
             else:
                 raise ValueError()
@@ -291,7 +291,7 @@ class BaseSLAM(_BaseSLAM):
                         covars=covars, frame_id=frame_id, reset=True)
                 elif landmark_type == POINT:
                     draw_utils.publish_cloud(
-                        name + 'optimized_node_landmark_poses',
+                        name + 'optimized_node_landmark_poses_pc',
                         np.vstack(map(lambda p: p.tvec, poses.values())), 
                         c='b', frame_id=frame_id, reset=True)
                 else:
