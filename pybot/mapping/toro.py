@@ -54,6 +54,7 @@ class BaseSLAM(object):
         self.pg_ = TreeOptimizer3()
         self.pg_.verboseLevel = 0
         self.pg_.restartOnDivergence = False
+        self.tree_initialized_ = False
         
         self.idx_ = -1
         self.verbose_ = verbose
@@ -111,21 +112,23 @@ class BaseSLAM(object):
         # Add to edges
         self.xxs_.append((xid1, xid2))
 
-        # # Check loop closure
-        # if self.verbose_:
-        #     if xid1 in self.xs_ and xid2 in self.xs_:
-        #         print_yellow('Loop closure inserted')
+        # Check loop closure
+        if self.verbose_:
+            if xid2-xid1 > 1 and xid1 in self.xs_ and xid2 in self.xs_:
+                print_yellow('Loop closure inserted')
 
     @timeitmethod
     def _update(self, iterations=1): 
         # print('.')
         # print('_update {}'.format(self.idx_))
-
-        # Iterate
-        self.pg_.buildSimpleTree()
-        self.pg_.initializeOnTree()
-        self.pg_.initializeTreeParameters()
-        self.pg_.initializeOptimization(compare_mode='level');
+        
+        # Initialize tree, and iterate
+        if not self.tree_initialized_: 
+            self.pg_.buildSimpleTree()
+            self.pg_.initializeOnTree()
+            self.pg_.initializeTreeParameters()
+            self.pg_.initializeOptimization(compare_mode='level');
+            self.tree_initialized_ = True
 
         for j in range(iterations): 
             self.pg_.iterate([], noPreconditioner=False)
@@ -141,7 +144,7 @@ class BaseSLAM(object):
         # Extract and update landmarks and poses
         for k,v in self.current_.iteritems():
             self.xs_[k] = rt_from_vec(v)
-
+            
     @property
     def latest(self): 
         return self.idx_

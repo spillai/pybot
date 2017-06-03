@@ -36,6 +36,7 @@ else:
 
 # ===============================================================================
 # BaseSLAM
+POSE, POINT = range(2)
 
 class BaseSLAM(_BaseSLAM):
     def __init__(self, update_every_k_odom=10,
@@ -202,7 +203,7 @@ class BaseSLAM(_BaseSLAM):
         # Visualize all poses
         self.visualize_poses()
         
-    def visualize_poses(self):
+    def visualize_poses(self, pose_type=POSE):
         if not self.visualize_measurements_:
             return
 
@@ -227,7 +228,8 @@ class BaseSLAM(_BaseSLAM):
             visualize_nodes=False, 
             visualize_measurements=False,
             visualize_factors=False,
-            visualize_marginals=False, name='SLAM_', frame_id='camera'):
+            visualize_marginals=False,
+            pose_type=POSE, name='SLAM_', frame_id='camera'):
         
         with self.state_lock_:
             # Poses 
@@ -245,10 +247,15 @@ class BaseSLAM(_BaseSLAM):
                         )
 
             # Draw cameras (with poses and marginals)
-            draw_utils.publish_cameras(
-                name + 'optimized_node_poses', updated_poses.values(), 
-                covars=covars, frame_id=frame_id, draw_edges=False, reset=True)
-            
+            if pose_type == POSE: 
+                draw_utils.publish_cameras(
+                    name + 'optimized_node_poses', updated_poses.values(), 
+                    covars=covars, frame_id=frame_id, draw_edges=False, reset=True)
+            elif pose_type == POINT: 
+                draw_utils.publish_cloud(
+                    name + 'optimized_node_poses', np.vstack(map(lambda p: p.tvec, updated_poses.values())), 
+                    c='b', frame_id=frame_id, reset=True)
+                
             # Draw odometry edges (between robot poses)
             if visualize_factors: 
                 robot_edges = self.robot_edges
@@ -441,7 +448,8 @@ def with_visualization(
         visualize_every=0.5,
         visualize_nodes=True, 
         visualize_measurements=False, 
-        visualize_factors=True, visualize_marginals=False): 
+        visualize_factors=True, visualize_marginals=False,
+        pose_type='pose', landmark_type='point'): 
 
     class _SLAM(cls):
         def __init__(self, *args, **kwargs): 
@@ -454,7 +462,15 @@ def with_visualization(
             self.visualize_factors_ = visualize_factors
             self.visualize_marginals_ = visualize_marginals
             self.visualize_measurements_ = visualize_measurements
-
+            try:
+                self.pose_type_ = {'pose': POSE, 'point': POINT}[pose_type]
+            except Exception, e:
+                raise ValueError('Unknown pose type {}'.format(pose_type))
+            try: 
+                self.landmark_type_ = {'pose': POSE, 'point': POINT}[landmark_type]
+            except Exception, e:
+                raise ValueError('Unknown landmark type {}'.format(landmark_type))
+            
             self.publish_cb_ = CounterWithPeriodicCallback(
                 every_k=visualize_every, process_cb=self.visualize_optimized)
 
@@ -491,6 +507,7 @@ def with_visualization(
                 visualize_measurements=self.visualize_measurements_, 
                 visualize_factors=self.visualize_factors_, 
                 visualize_marginals=self.visualize_marginals_,
+                pose_type=self.pose_type_, 
                 name=self.name_, frame_id=self.frame_id_)
 
         def visualize_optimized_landmarks(self):

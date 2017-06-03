@@ -189,12 +189,14 @@ def test_toro_pose_graph_file():
 
     slam_cls = RobotSLAM(frame_id='origin',
                          visualize_every=1, visualize_nodes=True, visualize_measurements=True,
-                         visualize_factors=True, visualize_marginals=False)
+                         visualize_factors=True, visualize_marginals=False,
+                         pose_type='point')
     slam = slam_cls(verbose=True)
 
     # load file
     slam.load('data/sphere_mednoise.graph')
-    slam.update(iterations=100)
+    for j in range(100): 
+        slam.update(iterations=1)
     
 if __name__ == "__main__": 
     # test_odometryExample()
