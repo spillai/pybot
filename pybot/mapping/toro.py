@@ -7,20 +7,16 @@ import sys
 import numpy as np
 np.set_printoptions(precision=2, suppress=True)
 
-# from collections import deque, defaultdict, Counter, namedtuple
-# from itertools import izip
-# from threading import Lock, RLock
-
 from pybot.geometry.rigid_transform import RigidTransform, Quaternion
 from pybot.utils.timer import SimpleTimer, timeitmethod
-from pybot.utils.db_utils import AttrDict
 from pybot.utils.misc import print_red, print_yellow, print_green
 from pybot.mapping import cfg
 
 from pytoro import TreeOptimizer3, Transformation3, tf3_from_vec, tf3_to_vec
 
 FLOAT = np.float64
-
+sxyz, srpy = 0.01, 0.001
+        
 def rt_vec(rt=RigidTransform.identity()):
     return tf3_from_vec(np.r_[rt.tvec, rt.wxyz].astype(FLOAT))
 
@@ -82,6 +78,8 @@ class BaseSLAM(object):
             self.pg_.initializeOptimization(compare_mode='level');
         else:
             self.pg_.initializeOnlineOptimization()
+            self.pg_.initializeOnlineIterations()
+
         print('Initializing in {} mode'.format('BATCH' if self.batch_mode_ else 'INCREMENTAL'))
         
     def initialize(self, p=RigidTransform.identity(), index=0, noise=None): 
@@ -118,8 +116,7 @@ class BaseSLAM(object):
             self.xs_[xid2] = pred_pose
 
         # Add odometry factor
-        sxyz, srpy = 0.01, 0.001
-        inf_m = 1. / noise.astype(FLOAT) if noise else \
+        inf_m = 1. / noise.astype(FLOAT) if noise is not None else \
                 1. / self.odo_noise_
         self.pg_.addIncrementalEdge(xid1, xid2, rt_vec(delta), inf_m)
         # self.pg_.addEdge(xid1, xid2, rt_vec(delta), inf_m)
@@ -140,8 +137,10 @@ class BaseSLAM(object):
         # print('.')
         # print('_update {}'.format(self.idx_))
 
-        if not self.batch_mode_: 
-            self.pg_.initializeOnlineIterations()
+        # Unclear if this needs to be called every time
+        # an update is called
+        # if not self.batch_mode_: 
+        #     self.pg_.initializeOnlineIterations()
 
         st_err = self.pg_.error()
         for j in range(iterations): 

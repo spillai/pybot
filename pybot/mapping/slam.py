@@ -16,7 +16,6 @@ from pybot.utils.timer import timeitmethod
 from pybot.utils.misc import Accumulator, SkippedCounter, CounterWithPeriodicCallback
 from pybot.externals.lcm import draw_utils
 
-
 # ===============================================================================
 # Import GTSAM / ISAM Backend
 from pybot.mapping import cfg
@@ -71,11 +70,13 @@ class BaseSLAM(_BaseSLAM):
 
     @property
     def updated_poses(self):
+        """ Upgrade to Pose from RigidTransform """
         return {pid : Pose.from_rigid_transform(pid, p)
                 for (pid,p) in self.poses.iteritems()}
 
     @property
     def updated_targets(self):
+        """ Upgrade to Pose from RigidTransform """
         return {pid : Pose.from_rigid_transform(pid, p)
                 for (pid, p) in self.target_poses.iteritems()}
 
@@ -286,7 +287,7 @@ class BaseSLAM(_BaseSLAM):
 
             # Draw targets (constantly updated, so draw with reset)
             updated_targets = self.updated_targets
-            if len(updated_targets):
+            if visualize_nodes and len(updated_targets):
                 poses = updated_targets.values()
                 texts, covars = map(str, updated_targets.keys()), []
 
@@ -303,7 +304,7 @@ class BaseSLAM(_BaseSLAM):
                     raise ValueError()
             
             # Draw edges (between landmarks and poses)
-            if self.visualize_factors_: 
+            if visualize_factors: 
                 updated_poses = self.updated_poses
                 landmark_edges = self.landmark_edges
                 if len(landmark_edges) and len(updated_poses) and len(updated_targets): 
@@ -399,7 +400,9 @@ class VisualSLAM(BaseSLAM, _VisualSLAM):
     def finish(self):
         super(BaseSLAM, self).finish()
         lids, pts3 = self.smart_update()
-        # print('{} :: Finished/Solved in {:4.2f} s'.format(self.__class__.__name__, time.time() - self.slam_mixin_timing_st_))
+        if self.verbose_:
+            print('{} :: Finished/Solved in {:4.2f} s'
+                  .format(self.pretty_name, time.time() - self.slam_mixin_timing_st_))
 
     def visualize_measurements(self):
         # Publish latest pose
