@@ -23,7 +23,7 @@ from pybot.mapping import cfg
 if cfg.SLAM_BACKEND == 'gtsam':
     sys.stderr.write('Using GTSAM backend.\n')
     from pybot.mapping.gtsam import BaseSLAM as _BaseSLAM
-    from pybot.mapping.gtsam import VisualSLAM as _VisualSLAM
+    from pybot.mapping.gtsam import VisualSLAM as _VisualSLAM    
 elif cfg.SLAM_BACKEND == 'isam':
     sys.stderr.write('Using iSAM backend.\n')
     raise NotImplementedError('ISAM not yet implemented')
@@ -36,6 +36,11 @@ else:
 
 # ===============================================================================
 # BaseSLAM
+_current_backend = cfg.SLAM_BACKEND
+
+def current_backend():
+    return _current_backend
+
 POSE, POINT = range(2)
 
 class BaseSLAM(_BaseSLAM):
@@ -464,7 +469,7 @@ def with_visualization(
         visualize_factors=True, visualize_marginals=False,
         pose_type='pose', landmark_type='point'): 
 
-    class _SLAM(cls):
+    class SLAM_vis(cls):
         def __init__(self, *args, **kwargs): 
             cls.__init__(self, *args, **kwargs)
 
@@ -494,17 +499,17 @@ def with_visualization(
             self.save_graph('test.dot')
 
         def update(self, iterations=1): 
-            super(_SLAM, self).update(iterations=iterations)
+            super(SLAM_vis, self).update(iterations=iterations)
             self.publish_cb_.poll()
             self.write_cb_.poll()
 
         def finish(self):
-            super(_SLAM, self).finish()
+            super(SLAM_vis, self).finish()
             self.visualize_optimized()
 
         def visualize_measurements(self):
             if self.visualize_measurements_:
-                super(_SLAM, self).visualize_measurements()
+                super(SLAM_vis, self).visualize_measurements()
 
         @timeitmethod
         def visualize_optimized(self):
@@ -515,7 +520,7 @@ def with_visualization(
             self.visualize_optimized_landmarks()
 
         def visualize_optimized_poses(self):
-            super(_SLAM, self).visualize_optimized_poses(
+            super(SLAM_vis, self).visualize_optimized_poses(
                 visualize_nodes=self.visualize_nodes_,
                 visualize_measurements=self.visualize_measurements_, 
                 visualize_factors=self.visualize_factors_, 
@@ -524,7 +529,7 @@ def with_visualization(
                 name=self.name_, frame_id=self.frame_id_)
 
         def visualize_optimized_landmarks(self):
-            super(_SLAM, self).visualize_optimized_landmarks(
+            super(SLAM_vis, self).visualize_optimized_landmarks(
                 visualize_nodes=self.visualize_nodes_,
                 visualize_measurements=self.visualize_measurements_, 
                 visualize_factors=self.visualize_factors_, 
@@ -532,7 +537,7 @@ def with_visualization(
                 landmark_type=self.landmark_type_,
                 name=self.name_, frame_id=self.frame_id_)
 
-    return _SLAM
+    return SLAM_vis
 
 def RobotSLAM(*args, **kwargs): 
     """

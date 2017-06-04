@@ -69,6 +69,10 @@ class BaseSLAM(object):
 
         self.xcovs_ = {}
         self.current_ = None
+
+    @property
+    def pretty_name(self):
+        return 'Toro_{}'.format(self.__class__.__name__)
         
     def _init_mode(self):
         if self.batch_mode_: 
@@ -83,7 +87,7 @@ class BaseSLAM(object):
     def initialize(self, p=RigidTransform.identity(), index=0, noise=None): 
         if self.verbose_:
             print_red('{}::initialize index: {}={}'
-                      .format(self.__class__.__name__, index, p))
+                      .format(self.pretty_name, index, p))
 
         self._init_mode()
         self.pg_.addVertex(index, rt_vec(p))
@@ -102,7 +106,7 @@ class BaseSLAM(object):
     def add_relative_pose_constraint(self, xid1, xid2, delta, noise=None): 
         if self.verbose_:
             print_red('{}::add_odom {}->{} = {}'
-                      .format(self.__class__.__name__, xid1, xid2, delta))
+                      .format(self.pretty_name, xid1, xid2, delta))
 
         # Predict pose and add as initial estimate
         assert(self.latest + 1 not in self.xs_)

@@ -115,12 +115,16 @@ class BaseSLAM(object):
         self.lcovs_ = {}
         self.current_ = None
 
+    @property
+    def pretty_name(self):
+        return 'GTSAM_{}'.format(self.__class__.__name__)
+        
     def initialize(self, p=RigidTransform.identity(), index=0, noise=None): 
         if self.verbose_:
             print_red('{}::initialize index: {}={}'
                       .format(self.__class__.__name__, index, p))
             print_red('{:}::add_pose_prior {}={}'
-                      .format(self.__class__.__name__, index, p))
+                      .format(self.pretty_name, index, p))
             
         x_id = symbol('x', index)
         pose0 = Pose3(p.matrix)
@@ -138,7 +142,7 @@ class BaseSLAM(object):
     def add_pose_prior(self, index, p, noise=None): 
         if self.verbose_:
             print_red('{:}::add_pose_prior {}={}'
-                      .format(self.__class__.__name__, index, p))
+                      .format(self.pretty_name, index, p))
         x_id = symbol('x', index)
         pose = Pose3(p.matrix)
         self.graph_.add(
@@ -163,7 +167,7 @@ class BaseSLAM(object):
     def add_relative_pose_constraint(self, xid1, xid2, delta, noise=None): 
         if self.verbose_:
             print_red('{}::add_odom {}->{} = {}'
-                      .format(self.__class__.__name__, xid1, xid2, delta))
+                      .format(self.pretty_name, xid1, xid2, delta))
 
         # Add odometry factor
         pdelta = Pose3(delta.matrix)
@@ -186,7 +190,7 @@ class BaseSLAM(object):
     def add_pose_landmarks(self, xid, lids, deltas, noise=None): 
         if self.verbose_: 
             print_red('{:}::add_landmark x{:} -> lcount: {:}'
-                      .format(self.__class__.__name__, xid, len(lids)))
+                      .format(self.pretty_name, xid, len(lids)))
 
         # Add Pose-Pose landmark factor
         x_id = symbol('x', xid)
@@ -574,7 +578,7 @@ class VisualSLAM(BaseSLAM):
     def add_landmark_prior(self, index, p, noise=None): 
         if self.verbose_:
             print_red('{:}::add_landmark_prior {}={}'
-                      .format(self.__class__.__name__, index, p))
+                      .format(self.pretty_name, index, p))
         l_id = symbol('l', index)
         point = Point3(p)
         self.graph_.add(
@@ -599,7 +603,7 @@ class VisualSLAM(BaseSLAM):
         """
         if self.verbose_: 
             print_red('{:}::add_landmark_points_smart {:}->{:}'
-                      .format(self.__class__.__name__, xid, lids))
+                      .format(self.pretty_name, xid, lids))
         
         # Mahalanobis check before adding points to the 
         # factor graph
@@ -808,7 +812,7 @@ class VisualSLAM(BaseSLAM):
 
     # def check_point_landmarks(self, xid, lids, pts): 
     #     print_red('{:}::check_point_landmarks {:}->{:}, ls:{:}'.format(
-    #         self.__class__.__name__, xid, len(lids), len(self.ls_)))
+    #         self.pretty_name, xid, len(lids), len(self.ls_)))
 
 
     #     print 'new landmark', xid, lids
