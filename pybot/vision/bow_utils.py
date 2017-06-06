@@ -54,7 +54,7 @@ def normalize_hist(hist, norm_method='global-l2'):
         raise NotImplementedError('Unknown normalization_method %s' % norm_method)            
 
 
-def bow(data, code, K): 
+def bow(code, K): 
     """
     BoW histogram with L2 normalization
     """
@@ -68,7 +68,7 @@ def bow(data, code, K):
 
 def bow_histogram(data, codebook, pts=None, shape=None): 
     code, dist = vq(data, codebook)
-    code_hist = bow(data, code, codebook.shape[0])
+    code_hist = bow(code, codebook.shape[0])
     return code_hist
 
 def bow_project(data, codebook, pts=None, shape=None, levels=(1,2,4)): 
@@ -326,7 +326,7 @@ class BoWVectorizer(object):
         """
         if self.method == 'vq' or self.method == 'bow': 
             code = self.get_code(data)
-            code_hist = self.bow(data, code, self.K)
+            code_hist = self.bow(code, self.K)
         elif self.method == 'vlad': 
             code = self.get_code(data)
             code_hist = self.vlad(data, code)
@@ -403,8 +403,8 @@ class BoWVectorizer(object):
         return normalize_hist(hist, norm_method=norm_method)
 
     @staticmethod
-    def bow(data, code, K): 
-        return bow(data, code, K)
+    def bow(code, K): 
+        return bow(code, K)
 
     def vlad(self, data, code): 
         """

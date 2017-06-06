@@ -28,6 +28,9 @@ from pybot.utils.io_utils import memory_usage_psutil, format_time
 from pybot.utils.db_utils import AttrDict, IterDB
 from pybot.utils.itertools_recipes import chunks
 
+from pybot.vision.feature_detection import get_dense_detector, get_detector
+
+
 # =====================================================================
 # Generic utility functions for object detection
 # ---------------------------------------------------------------------
