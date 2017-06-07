@@ -221,6 +221,10 @@ class VideoWriter:
             print('{} - {} :: creating {} ({},{})'
                         .format('cv2' if self.use_opencv else 'ffmpeg',
                                 self.__class__.__name__, self.filename, w, h))
+
+        # FFMPEG requires rgb encoding
+        if not self.use_opencv:
+            im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
             
         self.writer.write(im)
 
