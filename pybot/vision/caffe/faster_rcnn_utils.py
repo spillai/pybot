@@ -226,14 +226,14 @@ class FasterRCNNDescription(object):
     # def hypercolumn(self, im, boxes=None):
     #     return extract_hypercolumns(self, im, boxes=boxes)
 
-def nms_detections(boxes, labels, scores, K, nms_threshold=0.3):
+def nms_detections(boxes, labels, scores, nms_threshold=0.3):
     """
     NMS on detections for each class
     """
     CONF_THRESH = 0.8
 
     valid = np.zeros_like(labels, dtype=np.bool)
-    for cls_ind in range(K):  
+    for cls_ind in np.unique(labels): 
         inds, = np.where(labels == cls_ind)
         if not len(inds): continue
         dets = np.hstack([boxes[inds],
@@ -241,5 +241,6 @@ def nms_detections(boxes, labels, scores, K, nms_threshold=0.3):
         keep = nms(dets, nms_threshold)
         valid[inds[keep]] = True
 
-        print scores, labels, keep
+        # print scores, labels, keep
+        
     return valid
