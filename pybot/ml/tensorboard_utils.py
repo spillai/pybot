@@ -101,7 +101,7 @@ class TensorBoard(object):
     # port = datalab.utils.pick_unused_port()
     args = ['tensorboard', '--logdir=' + logdir, '--port=' + str(port)]
     FNULL = open(os.devnull, 'w')
-    p = subprocess.Popen(args, stdout=FNULL)
+    p = subprocess.Popen(args, stdout=FNULL, stderr=FNULL)
     retry = 5
     while (retry > 0):
       if is_http_running_on(port):
