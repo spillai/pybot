@@ -28,7 +28,7 @@ class OccasionalModelTesting(Callback):
         super(Callback, self).__init__()
 
     def on_epoch_end(self, epoch, logs={}):
-        if epoch % self.every_k_epochs == 0 and epoch > 0:
+        if epoch % self.every_k_epochs == 0: 
             current = logs.get(self.monitor)
 
             if self.monitor_op(current, self.best) or \
