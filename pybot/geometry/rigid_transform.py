@@ -207,6 +207,12 @@ class RigidTransform(object):
         result[:3, 3] = self.tvec
         return result
 
+    def to_vector(self):
+        """ Returns a 7-vector representation of 
+        rigid transform [tx, ty, tz, qx, qy, qz, qw] 
+        """
+        return np.hstack([self.tvec, self.xyzw])
+    
     def to_Rt(self):
         """ Returns rotation R, and translational vector t """
         T = self.to_matrix()
@@ -233,6 +239,10 @@ class RigidTransform(object):
     @classmethod
     def from_matrix(cls, T):
         return cls(Quaternion.from_matrix(T), T[:3,3])
+
+    @classmethod
+    def from_vector(cls, v):
+        return cls(xyzw=v[3:], tvec=v[:3])
 
     @classmethod
     def from_triad(cls, pos, v1, v2):
@@ -291,6 +301,10 @@ class RigidTransform(object):
     @property
     def matrix(self): 
         return self.to_matrix()
+
+    @property
+    def vector(self): 
+        return self.to_vector()
 
     def scaled(self, scale):
         " Returns Sim3 representation of rigid-body transformation with scale "
@@ -430,7 +444,7 @@ class DualQuaternion(object):
         result = self.rotation.to_matrix()
         result[:3, 3] = self.translation
         return result
-
+    
     def to_Rt(self):
         """ Returns rotation R, and translational vector t """
         T = self.to_matrix()
