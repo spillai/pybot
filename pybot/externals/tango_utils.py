@@ -78,6 +78,8 @@ def TangoOdomDecoder(channel, every_k_frames=1, noise=[0,0]):
     SS->CAM: 
     a) (-90, 0, 0)   => LEFT (X), DOWN (Y), FWD (Z) => CAM
 
+    Nominal noise levels: noise=[0.005, 0.009]
+    
     """
     p_ID = RigidTransform(tvec=[0,0,0], 
                           xyzw=[-0.079740, -0.079740, 0.702596, 0.702596])
@@ -104,6 +106,8 @@ def TangoOdomDecoder(channel, every_k_frames=1, noise=[0,0]):
         return p_CAM_S * p_SC
     decode_cb = lambda data: calibrated_odom_decode(data)
 
+    # Pose Noise injection
+    # See pybot.utils.pose_utils: inject_noise
     np.random.seed(1)
     noise = np.float32(noise)
     def get_noise(): 

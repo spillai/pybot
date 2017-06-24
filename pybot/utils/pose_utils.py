@@ -8,6 +8,7 @@ from abc import ABCMeta, abstractmethod
 from itertools import imap
 from pybot.utils.misc import print_green, print_red
 from pybot.utils.misc import Counter, Accumulator, CounterWithPeriodicCallback 
+from pybot.geometry.rigid_transform import RigidTransform
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
@@ -15,6 +16,39 @@ mpl.rcParams.update({'font.size':11,
                      # 'font.family':'sans-serif', 
                      # 'font.sans-serif': 'Helvetica', 
                      'image.cmap':'autumn', 'text.usetex':False})
+
+def inject_noise(poses_iterable, noise=[0,0]):
+
+    np.random.seed(1)
+    noise = np.float32(noise)
+    def get_noise():
+        if len(noise) == 6:
+            xyz = np.random.normal(0, noise[:3])
+            rpy = np.random.normal(0, noise[3:])
+        elif len(noise) == 2: 
+            xyz = np.random.normal(0, noise[0], size=3) \
+                  if noise[0] > 0 else np.zeros(3)
+            rpy = np.random.normal(0, noise[1], size=3) \
+                  if noise[1] > 0 else np.zeros(3)
+        else:
+            raise ValueError('Unknown noise length, either 2, or 6')
+        
+        return RigidTransform.from_rpyxyz(
+            rpy[0], rpy[1], rpy[2], xyz[0], xyz[1], xyz[2])
+    
+    p_accumulator = deque(maxlen=2)
+    p_accumulator_noisy = deque(maxlen=2)
+    
+    for p in poses_iterable:
+        p_accumulator.append(p)
+        if len(p_accumulator) == 1:
+            p_accumulator_noisy.append(p_accumulator[-1])
+        else: 
+            p21 = get_noise() * \
+                  (p_accumulator[-2].inverse() * p_accumulator[-1])
+            last = p_accumulator_noisy[-1]
+            p_accumulator_noisy.append(last.oplus(p21))
+        yield p_accumulator_noisy[-1]
 
 class Sampler(object): 
     __metaclass__ = ABCMeta
