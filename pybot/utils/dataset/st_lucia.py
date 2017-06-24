@@ -1,8 +1,11 @@
+import os.path
+import numpy as np
 from itertools import izip, islice
 from scipy.io import loadmat
 
 from pybot.geometry.rigid_transform import RigidTransform
 from pybot.utils.io_utils import VideoCapture
+from pybot.utils.db_utils import AttrDict
 from pybot.mapping.nav_utils import metric_from_gps, bearing_from_metric_gps
 
 class StLuciaReader(object):
