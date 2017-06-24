@@ -146,7 +146,8 @@ class BaseSLAM(_BaseSLAM):
             super(BaseSLAM, self).initialize(p_init)
         
         # 2. SLAM: Add relative pose measurements (odometry)
-        self.q_poses_.append(p * self.q_poses_.latest)
+        # self.q_poses_.append(p * self.q_poses_.latest)
+        self.q_poses_.append(self.q_poses_.latest.oplus(p))
         self.add_incremental_pose_constraint(p, noise=noise)
 
         # 3. Update
@@ -466,11 +467,11 @@ class VisualSLAM(BaseSLAM, _VisualSLAM):
 def with_visualization(
         cls,
         name='SLAM_', frame_id='camera',
-        visualize_every=0.5,
         visualize_nodes=True, 
         visualize_measurements=False, 
         visualize_factors=True, visualize_marginals=False,
-        pose_type='pose', landmark_type='point'): 
+        pose_type='pose', landmark_type='point',
+        visualize_every=1, write_every=0): 
 
     class SLAM_vis(cls):
         def __init__(self, *args, **kwargs): 
@@ -491,21 +492,27 @@ def with_visualization(
                 self.landmark_type_ = {'pose': POSE, 'point': POINT}[landmark_type]
             except Exception, e:
                 raise ValueError('Unknown landmark type {}'.format(landmark_type))
-            
-            self.publish_cb_ = CounterWithPeriodicCallback(
-                every_k=visualize_every, process_cb=self.visualize_optimized)
 
-            self.write_cb_ = CounterWithPeriodicCallback(
-                every_k=1, process_cb=self.save_dot_graph)
+            self.visualize_every_ = visualize_every
+            if visualize_every:
+                self.publish_cb_ = CounterWithPeriodicCallback(
+                    every_k=visualize_every, process_cb=self.visualize_optimized)
 
+            self.write_every_ = write_every
+            if write_every:
+                self.write_cb_ = CounterWithPeriodicCallback(
+                    every_k=write_every, process_cb=self.save_dot_graph)
+                
         def save_dot_graph(self):
             self.save_graph('test.dot')
 
         def update(self, iterations=1): 
             super(SLAM_vis, self).update(iterations=iterations)
-            self.publish_cb_.poll()
-            self.write_cb_.poll()
-
+            if self.visualize_every_: 
+                self.publish_cb_.poll()
+            if self.write_every_:
+                self.write_cb_.poll()
+            
         def finish(self):
             super(SLAM_vis, self).finish()
             self.visualize_optimized()
