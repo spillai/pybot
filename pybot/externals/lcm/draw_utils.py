@@ -36,6 +36,9 @@ class VisualizationMsgsPub:
         self.publish_sensor_frame('camera', pose=VisualizationMsgsPub.CAMERA_POSE)
         self.publish_sensor_frame('origin', pose=RigidTransform.identity())
         # self.publish_sensor_frame('origin_xz', pose=VisualizationMsgsPub.XZ_POSE)
+
+    def list_frames(self):
+        return self._sensor_pose
         
     def channel_uid(self, channel): 
         uid = self._channel_uid.setdefault(channel, len(self._channel_uid))
@@ -48,7 +51,7 @@ class VisualizationMsgsPub:
         return channel in self._sensor_pose
 
     def get_sensor_pose(self, channel): 
-        return self._sensor_pose[channel]
+        return self._sensor_pose[channel].copy()
 
     def set_sensor_pose(self, channel, pose): 
         self._sensor_pose[channel] = pose
