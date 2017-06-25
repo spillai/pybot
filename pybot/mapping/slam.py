@@ -469,7 +469,7 @@ class VisualSLAM(BaseSLAM, _VisualSLAM):
 def with_visualization(
         cls,
         name='SLAM_', frame_id='camera',
-        zoffset_optimized=0.,
+        offset_optimized=np.zeros(3),
         visualize_nodes=True, 
         visualize_measurements=False, 
         visualize_factors=True, visualize_marginals=False,
@@ -486,7 +486,7 @@ def with_visualization(
 
             # Create optimized frame (offset by z m)
             pose = draw_utils.get_sensor_pose(frame_id)
-            pose.tvec[2] += zoffset_optimized
+            pose.tvec += offset_optimized
             draw_utils.publish_sensor_frame(self.opt_frame_id_, pose)
 
             self.visualize_nodes_ = visualize_nodes
