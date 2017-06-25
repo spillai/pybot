@@ -22,7 +22,8 @@ from pybot.mapping import cfg
 if cfg.SLAM_BACKEND == 'gtsam':
     sys.stderr.write('Using GTSAM backend.\n')
     from pybot.mapping.gtsam import BaseSLAM as _BaseSLAM
-    from pybot.mapping.gtsam import VisualSLAM as _VisualSLAM    
+    from pybot.mapping.gtsam import VisualSLAM as _VisualSLAM
+    from pybot.mapping.gtsam import vec, vector, matrix
 elif cfg.SLAM_BACKEND == 'isam':
     sys.stderr.write('Using iSAM backend.\n')
     raise NotImplementedError('ISAM not yet implemented')
@@ -423,7 +424,8 @@ class VisualSLAM(BaseSLAM, _VisualSLAM):
             visualize_measurements=False,
             visualize_factors=False,
             visualize_marginals=False,
-            landmark_type=POINT, name='SLAM_', frame_id='camera'):
+            landmark_type=POINT, name='SLAM_',
+            frame_id='camera'):
         
         with self.state_lock_:
 
@@ -467,18 +469,25 @@ class VisualSLAM(BaseSLAM, _VisualSLAM):
 def with_visualization(
         cls,
         name='SLAM_', frame_id='camera',
+        zoffset_optimized=0.,
         visualize_nodes=True, 
         visualize_measurements=False, 
         visualize_factors=True, visualize_marginals=False,
         pose_type='pose', landmark_type='point',
-        visualize_every=1, write_every=0): 
+        visualize_every=1, write_every=0, ): 
 
     class SLAM_vis(cls):
         def __init__(self, *args, **kwargs): 
             cls.__init__(self, *args, **kwargs)
-
+            
             self.name_ = name
             self.frame_id_ = frame_id
+            self.opt_frame_id_ = frame_id + '_optimized'
+
+            # Create optimized frame (offset by z m)
+            pose = draw_utils.get_sensor_pose(frame_id)
+            pose.tvec[2] += zoffset_optimized
+            draw_utils.publish_sensor_frame(self.opt_frame_id_, pose)
 
             self.visualize_nodes_ = visualize_nodes
             self.visualize_factors_ = visualize_factors
@@ -536,7 +545,7 @@ def with_visualization(
                 visualize_factors=self.visualize_factors_, 
                 visualize_marginals=self.visualize_marginals_,
                 pose_type=self.pose_type_, 
-                name=self.name_, frame_id=self.frame_id_)
+                name=self.name_, frame_id=self.opt_frame_id_)
 
         def visualize_optimized_landmarks(self):
             super(SLAM_vis, self).visualize_optimized_landmarks(
@@ -545,7 +554,7 @@ def with_visualization(
                 visualize_factors=self.visualize_factors_, 
                 visualize_marginals=self.visualize_marginals_,
                 landmark_type=self.landmark_type_,
-                name=self.name_, frame_id=self.frame_id_)
+                name=self.name_, frame_id=self.opt_frame_id_)
 
     return SLAM_vis
 
