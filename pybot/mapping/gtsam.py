@@ -187,7 +187,6 @@ class BaseSLAM(object):
 
         # Robust (Switchable constraints / Max-mixtures)
         if self.robust_: 
-            print('adding switch constraints')
             # Create new switch variable
             self.switch_idx_ += 1
             self.initial_.insert(symbol('s', self.switch_idx_), SwitchVariableSigmoid(1.))
