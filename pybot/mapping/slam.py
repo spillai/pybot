@@ -48,9 +48,9 @@ class BaseSLAM(_BaseSLAM):
                  odom_noise=cfg.ODOM_NOISE, 
                  prior_pose_noise=cfg.PRIOR_POSE_NOISE, 
                  measurement_noise=cfg.MEASUREMENT_NOISE,
-                 verbose=False, export_graph=False):
+                 robust=True, verbose=False, export_graph=False):
         _BaseSLAM.__init__(self, odom_noise=odom_noise, prior_pose_noise=prior_pose_noise,
-                           verbose=verbose, export_graph=export_graph)
+                           robust=robust, verbose=verbose, export_graph=export_graph)
         self.update_every_k_odom_ = update_every_k_odom
         self.q_poses_ = Accumulator(maxlen=2)
 

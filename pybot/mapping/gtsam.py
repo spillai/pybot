@@ -35,6 +35,12 @@ from pygtsam import ISAM2Params
 from pygtsam import ISAM2, NonlinearOptimizer, \
     NonlinearFactorGraph, LevenbergMarquardtOptimizer, DoglegOptimizer
 
+# Externals
+from pybot_gtsam import BetweenFactorMaxMixPose3
+from pybot_gtsam import SwitchVariableSigmoid, PriorFactorSwitchVariableSigmoid, \
+    BetweenFactorSwitchableSigmoidPose3
+
+
 def symbol(ch, i): 
     return _symbol(ord(ch), i)
 
@@ -78,14 +84,18 @@ class BaseSLAM(object):
         xls: Edge list between x and l 
 
     Todo: 
-        Updated slam every landmark addition
+        - Updated slam every landmark addition
+        - Support for switching between Pose2/Pose3
+        - Max-Mixtures / Switchable constraints
+          See vertigo/examples/robustISAM2/robustISAM2.cpp
+          See self.robust_ = False
 
     """
     def __init__(self, 
                  odom_noise=cfg.ODOM_NOISE, 
                  prior_pose_noise=cfg.PRIOR_POSE_NOISE, 
                  measurement_noise=cfg.MEASUREMENT_NOISE,
-                 verbose=False, export_graph=False):
+                 robust=True, verbose=False, export_graph=False):
  
         # ISAM2 interface
         self.slam_ = ISAM2()
@@ -93,8 +103,10 @@ class BaseSLAM(object):
         self.batch_init_ = False
         
         self.idx_ = -1
+        self.switch_idx_ = -1
         self.verbose_ = verbose
-
+        self.robust_ = True # TODO/FIX handle properly
+        
         # Factor graph storage
         self.graph_ = NonlinearFactorGraph()
         self.initial_ = Values()
@@ -163,7 +175,7 @@ class BaseSLAM(object):
         # Add odometry factor
         self.add_relative_pose_constraint(self.latest, self.latest+1, delta, noise=noise)
         self.idx_ += 1
-
+        
     def add_relative_pose_constraint(self, xid1, xid2, delta, noise=None): 
         if self.verbose_:
             print_red('{}::add_odom {}->{} = {}'
@@ -172,12 +184,49 @@ class BaseSLAM(object):
         # Add odometry factor
         pdelta = Pose3(delta.matrix)
         x_id1, x_id2 = symbol('x', xid1), symbol('x', xid2)
-        self.graph_.add(BetweenFactorPose3(x_id1, x_id2, 
-                                           pdelta, Diagonal.Sigmas(noise)
-                                           if noise is not None
-                                           else self.odo_noise_))
+
+        # Robust (Switchable constraints / Max-mixtures)
+        if self.robust_: 
+            print('adding switch constraints')
+            # Create new switch variable
+            self.switch_idx_ += 1
+            self.initial_.insert(symbol('s', self.switch_idx_), SwitchVariableSigmoid(1.))
+
+            # Create switch prior factor
+            sw_prior_model = Diagonal.Sigmas(vec(2.))
+            sw_prior_factor = PriorFactorSwitchVariableSigmoid(symbol('s', self.switch_idx_),
+                                                 SwitchVariableSigmoid(1.), sw_prior_model)
+            self.graph_.add(sw_prior_factor)
+
+            # Create switchable odometry factor
+            odom_model = Diagonal.Sigmas(noise) \
+                         if noise is not None else self.odo_noise_
+            sw_factor = BetweenFactorSwitchableSigmoidPose3(x_id1, x_id2,
+                                                            symbol('s', self.switch_idx_),
+                                                            pdelta, odom_model)
+            self.graph_.add(sw_factor)
+
+        # If not robust (add as is)
+        else:
+            self.graph_.add(BetweenFactorPose3(x_id1, x_id2, 
+                                               pdelta, Diagonal.Sigmas(noise)
+                                               if noise is not None
+                                               else self.odo_noise_))
+
+        
+        # Max-Mixtures factor
+        # null_weight = 0.25
+        # odom_noise = Diagonal.Sigmas(noise)
+        # null_noise = Diagonal.Sigmas(noise / null_weight)
+        # self.graph_.add(BetweenFactorMaxMixPose3(
+        #     x_id1, x_id2, pdelta,
+        #     odom_noise, null_noise, null_weight))
+
         
         # Predict pose and add as initial estimate
+        # TODO: self.xs_[xid1] may not be most recent,
+        # use calculateEstimate(xid1) to get the most
+        # recent pose (optimized/updated potentially)
         with self.state_lock_: 
             if xid2 not in self.xs_: 
                 pred_pose = self.xs_[xid1].oplus(delta)
@@ -210,6 +259,11 @@ class BaseSLAM(object):
 
             # Initialize new landmark pose node from the latest robot
             # pose. This should be done just once
+
+            # TODO: self.xs_[xid1] may not be most recent,
+            # use calculateEstimate(xid1) to get the most
+            # recent pose (optimized/updated potentially)
+
             for (l_id, lid, delta) in izip(l_ids, lids, deltas): 
                 if lid not in self.ls_:
                     try: 

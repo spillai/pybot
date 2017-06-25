@@ -44,7 +44,8 @@ class BaseSLAM(object):
                  odom_noise=cfg.ODOM_NOISE, 
                  prior_pose_noise=cfg.PRIOR_POSE_NOISE, 
                  measurement_noise=cfg.MEASUREMENT_NOISE,
-                 verbose=False, export_graph=False, batch_mode=False):
+                 robust=True, verbose=False, 
+                 export_graph=False, batch_mode=False):
 
         # Toro interface
         self.pg_ = TreeOptimizer3()
