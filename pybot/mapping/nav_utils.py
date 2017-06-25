@@ -9,7 +9,7 @@ def metric_from_gps(gps_coords, scale=None):
     return np.vstack([scale * lon * np.pi * er / 180.,
                       scale * er * np.log(np.tan((90. + lat) * np.pi / 360.))]).T
 
-def bearing_from_metric_gps(mgps, look_forward=5):
+def bearing_from_metric_gps(mgps, look_forward=1.):
     """
     Look forward by X m to identify bearing
     """

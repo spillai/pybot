@@ -9,7 +9,7 @@ from pybot.utils.db_utils import AttrDict
 from pybot.mapping.nav_utils import metric_from_gps, bearing_from_metric_gps
 
 class StLuciaReader(object):
-    def __init__(self, directory): 
+    def __init__(self, directory, start_at_origin=True): 
 
         # Read dataset
         self.video_path_ = os.path.join(
@@ -18,7 +18,7 @@ class StLuciaReader(object):
         # Metric coords from GPS
         gps = loadmat(os.path.join(
             os.path.expanduser(directory), 'fGPS.mat'))['fGPS']
-        mgps = metric_from_gps(gps)
+        mgps = metric_from_gps(gps) * 0.1
         assert(np.isfinite(mgps).all())
         mgps -= mgps.mean(axis=0)
 
@@ -27,6 +27,9 @@ class StLuciaReader(object):
         assert(np.isfinite(theta).all())
         self.poses_ = [ RigidTransform.from_rpyxyz(0,0,th,gps[1],gps[0],0)
                         for gps,th in zip(mgps, theta) ]
+
+        if start_at_origin: 
+            self.poses_ = [ self.poses_[0].inverse() * p for p in self.poses_]
         
     def iterframes(self):
         cap = VideoCapture(self.video_path_)
