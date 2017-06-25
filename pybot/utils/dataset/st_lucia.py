@@ -18,7 +18,7 @@ class StLuciaReader(object):
         # Metric coords from GPS
         gps = loadmat(os.path.join(
             os.path.expanduser(directory), 'fGPS.mat'))['fGPS']
-        mgps = metric_from_gps(gps) * 0.1
+        mgps = metric_from_gps(gps)
         assert(np.isfinite(mgps).all())
         mgps -= mgps.mean(axis=0)
 

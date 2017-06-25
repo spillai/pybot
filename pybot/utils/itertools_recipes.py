@@ -191,3 +191,31 @@ def accumulate(iterable, func=operator.add):
     for element in it:
         total = func(total, element)
         yield total
+
+def pick(iterable, inds):
+    from collections import deque
+    inds = list(inds)
+    assert(len(inds))
+    assert(sorted(inds) == inds)
+    qinds = deque(inds)
+    first = qinds.popleft()
+    for idx, item in enumerate(iterable):
+        if first is None: break
+        if idx == first:
+            yield item
+            try:
+                first = qinds.popleft()
+            except IndexError:
+                first = None
+
+def test_pick(): 
+    import numpy as np
+    it = np.arange(200)
+    inds = np.arange(7,100)[::20]
+    result = list(pick(it, inds))
+    print result
+    assert(result == [7,27,47,67,87])
+    
+if __name__ == "__main__":
+    test_pick()
+            
