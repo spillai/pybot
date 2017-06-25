@@ -32,6 +32,9 @@ class Quaternion(object):
     def __getitem__ (self, i):
         return self.q[i]
 
+    def copy(self):
+        return Quaternion(self.q.copy())
+    
     # Basic operations
 
     def __mul__(self, other):

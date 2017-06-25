@@ -142,6 +142,9 @@ class RigidTransform(object):
     def __rmul__(self, other): 
         raise NotImplementedError('Right multiply not implemented yet!')                    
 
+    def copy(self):
+        return RigidTransform(self.quat.copy(), self.tvec.copy())
+    
     # Basic operations
 
     def inverse(self):
