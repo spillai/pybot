@@ -87,8 +87,6 @@ class BaseSLAM(_BaseSLAM):
         """
         if self.latest >= 2 and self.latest % self.update_every_k_odom_ == 0: 
             self.update()
-                
-        self.visualize_measurements()
     
     def initialize(self, p=None, index=0, noise=None):
         """
@@ -212,9 +210,6 @@ class BaseSLAM(_BaseSLAM):
         self.visualize_poses()
         
     def visualize_poses(self, pose_type=POSE):
-        if not self.visualize_measurements_:
-            return
-
         with self.state_lock_:
             # Draw odom pose
             draw_utils.publish_pose_list(
@@ -234,7 +229,6 @@ class BaseSLAM(_BaseSLAM):
     def visualize_optimized_poses(
             self, 
             visualize_nodes=False, 
-            visualize_measurements=False,
             visualize_factors=False,
             visualize_marginals=False,
             pose_type=POSE, name='SLAM_', frame_id='camera'):
@@ -280,7 +274,6 @@ class BaseSLAM(_BaseSLAM):
     def visualize_optimized_landmarks(
             self,
             visualize_nodes=False, 
-            visualize_measurements=False,
             visualize_factors=False,
             visualize_marginals=False,
             landmark_type=POSE, name='SLAM_', frame_id='camera'):
@@ -380,8 +373,8 @@ class VisualSLAM(BaseSLAM, _VisualSLAM):
             if not len(pts3_w):
                 return
                 
-        # Convert points in the latest reference frame
-        self.visualize_measurements()
+        # # Convert points in the latest reference frame
+        # self.visualize_measurements()
 
             
     def add_landmark_prior(self, index, p, noise=None):
@@ -421,7 +414,6 @@ class VisualSLAM(BaseSLAM, _VisualSLAM):
     def visualize_optimized_landmarks(
             self,
             visualize_nodes=False, 
-            visualize_measurements=False,
             visualize_factors=False,
             visualize_marginals=False,
             landmark_type=POINT, name='SLAM_',
@@ -511,6 +503,10 @@ def with_visualization(
             if write_every:
                 self.write_cb_ = CounterWithPeriodicCallback(
                     every_k=write_every, process_cb=self.save_dot_graph)
+
+        def _update_check(self): 
+            super(SLAM_vis, self)._update_check()                
+            self.visualize_measurements()
                 
         def save_dot_graph(self):
             self.save_graph('test.dot')
@@ -541,7 +537,6 @@ def with_visualization(
         def visualize_optimized_poses(self):
             super(SLAM_vis, self).visualize_optimized_poses(
                 visualize_nodes=self.visualize_nodes_,
-                visualize_measurements=self.visualize_measurements_, 
                 visualize_factors=self.visualize_factors_, 
                 visualize_marginals=self.visualize_marginals_,
                 pose_type=self.pose_type_, 
@@ -550,7 +545,6 @@ def with_visualization(
         def visualize_optimized_landmarks(self):
             super(SLAM_vis, self).visualize_optimized_landmarks(
                 visualize_nodes=self.visualize_nodes_,
-                visualize_measurements=self.visualize_measurements_, 
                 visualize_factors=self.visualize_factors_, 
                 visualize_marginals=self.visualize_marginals_,
                 landmark_type=self.landmark_type_,
