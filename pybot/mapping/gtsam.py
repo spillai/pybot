@@ -38,7 +38,7 @@ from pygtsam import ISAM2, NonlinearOptimizer, \
 # Externals
 from pybot_gtsam import BetweenFactorMaxMixPose3
 from pybot_gtsam import SwitchVariableSigmoid, PriorFactorSwitchVariableSigmoid, \
-    BetweenFactorSwitchableSigmoidPose3
+    BetweenFactorSwitchableSigmoidPose3, extractSwitchVariableSigmoid
 
 
 def symbol(ch, i): 
@@ -103,9 +103,7 @@ class BaseSLAM(object):
         self.batch_init_ = False
         
         self.idx_ = -1
-        self.switch_idx_ = -1
         self.verbose_ = verbose
-        self.robust_ = True # TODO/FIX handle properly
         
         # Factor graph storage
         self.graph_ = NonlinearFactorGraph()
@@ -126,6 +124,10 @@ class BaseSLAM(object):
         self.xcovs_ = {}
         self.lcovs_ = {}
         self.current_ = None
+
+        # Robust
+        self.robust_ = True # TODO/FIX handle properly
+        self.switch_ = []
 
     @property
     def pretty_name(self):
@@ -188,12 +190,13 @@ class BaseSLAM(object):
         # Robust (Switchable constraints / Max-mixtures)
         if self.robust_: 
             # Create new switch variable
-            self.switch_idx_ += 1
-            self.initial_.insert(symbol('s', self.switch_idx_), SwitchVariableSigmoid(1.))
+            switch_idx = len(self.switch_)
+            self.switch_.append(1.)
+            self.initial_.insert(symbol('s', switch_idx), SwitchVariableSigmoid(1.))
 
             # Create switch prior factor
             sw_prior_model = Diagonal.Sigmas(vec(2.))
-            sw_prior_factor = PriorFactorSwitchVariableSigmoid(symbol('s', self.switch_idx_),
+            sw_prior_factor = PriorFactorSwitchVariableSigmoid(symbol('s', switch_idx),
                                                  SwitchVariableSigmoid(1.), sw_prior_model)
             self.graph_.add(sw_prior_factor)
 
@@ -201,7 +204,7 @@ class BaseSLAM(object):
             odom_model = Diagonal.Sigmas(noise) \
                          if noise is not None else self.odo_noise_
             sw_factor = BetweenFactorSwitchableSigmoidPose3(x_id1, x_id2,
-                                                            symbol('s', self.switch_idx_),
+                                                            symbol('s', switch_idx),
                                                             pdelta, odom_model)
             self.graph_.add(sw_factor)
 
@@ -212,7 +215,6 @@ class BaseSLAM(object):
                                                if noise is not None
                                                else self.odo_noise_))
 
-        
         # Max-Mixtures factor
         # null_weight = 0.25
         # odom_noise = Diagonal.Sigmas(noise)
@@ -388,7 +390,8 @@ class BaseSLAM(object):
 
         poses = extractPose3(self.current_)
         landmarks = extractPoint3(self.current_)
-
+        switches = extractSwitchVariableSigmoid(self.current_)
+        
         with self.state_lock_: 
             # Extract and update landmarks and poses
             for k,v in poses.iteritems():
@@ -405,6 +408,10 @@ class BaseSLAM(object):
                     self.ls_[k.index()] = v.vector().ravel()
                 else: 
                     raise RuntimeError('Unknown key chr {} {}'.format(chr(k.chr()), k.index()))
+
+            # Extract/Update switches
+            for k,v in switches.iteritems():
+                self.switch_[k.index()] = v.value()
             
         # self.cleanup()
         
@@ -503,6 +510,11 @@ class BaseSLAM(object):
     @property
     def robot_edges(self): 
         return self.xxs_
+
+    @property
+    def robot_edges_confident(self): 
+        return np.float32(self.switch_) if self.robust_ \
+            else np.ones(len(self.xxs_))
 
     @property
     def estimate_available(self): 
