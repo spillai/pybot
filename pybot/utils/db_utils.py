@@ -243,7 +243,11 @@ class IterDB(object):
                 self.__class__.__name__))
             self.h5f_ = tb.open_file(fn, mode=mode, title='%s' % fn)
             self.data_ = {}
-        elif mode == 'r': 
+        elif mode == 'r':
+            if not os.path.exists(fn):
+                import sys;
+                raise IOError('Failed to open file, {}'.format(fn))
+            
             self.h5f_ = tb.open_file(fn, mode=mode, title='%s' % fn)
             print('{}::Loaded with fields: {}'.format(self.__class__.__name__, self.keys))
         else: 
