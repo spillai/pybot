@@ -70,6 +70,19 @@ class BaseSLAM(_BaseSLAM):
         return self.q_poses_.items[idx]
 
     @property
+    def measurement_poses(self):
+        """ 
+        Return all measurement poses (upto queue size)
+        
+        This function is useful in visualization context, when the
+        entire measurement graph needs to be queried.
+        """
+        N = self.q_poses_.length
+        Ni = len(self.q_poses_)
+        return {pid : Pose.from_rigid_transform(pid, p)
+                for (pid, p) in zip(range(N)[-Ni:], self.q_poses_)}
+
+    @property
     def updated_poses(self):
         """ Upgrade to Pose from RigidTransform """
         return {pid : Pose.from_rigid_transform(pid, p)
@@ -350,30 +363,36 @@ class BaseSLAM(_BaseSLAM):
     def savefig(self, filename, axis=np.int32([0,1])):
         from pybot.utils.plot_utils import plt, mpl
         from matplotlib import collections  as mc
-        
-        # Extract optimized poses
-        # Loop closure poses do not have subsequent indices
-        updated_poses = self.updated_poses
-        robot_edges = self.robot_edges
-        factor_st = np.vstack([(updated_poses[xid].tvec[axis]).reshape(-1,2) for (xid, _) in robot_edges])
-        factor_end = np.vstack([(updated_poses[xid].tvec[axis]).reshape(-1,2) for (_, xid) in robot_edges])
-        factor_loop = np.hstack([abs(xid1-xid2) > 1 for (xid1, xid2) in robot_edges])
-        
-        # Odometry and Loop closure edges (in blue and black respectively)
-        edges, colors = [], []
-        for ft,fs,fe in zip(factor_loop, factor_st, factor_end): 
-            edges.append(((fs[0], fs[1]), (fe[0], fe[1])))
-            colors.append(mpl.colors.to_rgba('k' if ft else 'b'))
 
-        # Add line segments
-        ax = plt.axes()
-        ax.add_collection(mc.LineCollection(
-            edges, linewidths=0.5, colors=colors))
-        plt.axis('equal')
-        plt.xlabel('X (m)')
-        plt.ylabel('Y (m)')
-        plt.savefig(filename)
-        print('Saving SLAM output figure to {}'.format(filename))
+        def _save_poses(_poses, _filename, c='b'): 
+            # Extract optimized poses
+            # Loop closure poses do not have subsequent indices
+            robot_edges = self.robot_edges
+            factor_st = np.vstack([(_poses[xid].tvec[axis]).reshape(-1,2) for (xid, _) in robot_edges])
+            factor_end = np.vstack([(_poses[xid].tvec[axis]).reshape(-1,2) for (_, xid) in robot_edges])
+            factor_loop = np.hstack([abs(xid1-xid2) > 1 for (xid1, xid2) in robot_edges])
+
+            # Odometry and Loop closure edges (in blue and black respectively)
+            edges, colors = [], []
+            for ft,fs,fe in zip(factor_loop, factor_st, factor_end): 
+                edges.append(((fs[0], fs[1]), (fe[0], fe[1])))
+                colors.append(mpl.colors.to_rgba('k' if ft else c))
+
+            # Add line segments
+            plt.figure()
+            plt.clf()
+            ax = plt.axes()
+            ax.add_collection(mc.LineCollection(
+                edges, linewidths=0.5, colors=colors))
+            plt.axis('equal')
+            plt.xlabel('X (m)')
+            plt.ylabel('Y (m)')
+            plt.savefig(_filename)
+            print('Saving output figure to {}'.format(_filename))
+
+        base,ext = os.path.splitext(filename)
+        _save_poses(self.measurement_poses, base + '_measured' + ext, c='r')
+        _save_poses(self.updated_poses, base + '_optimized' + ext, c='b')
         
             
 class VisualSLAM(BaseSLAM, _VisualSLAM):
@@ -506,11 +525,16 @@ def with_visualization(
     class SLAM_vis(cls):
         def __init__(self, *args, **kwargs): 
             cls.__init__(self, *args, **kwargs)
-            
+
+            # Visualization class redefines q_poses_ with
+            # unlimited pose accumulator size, for persistence
+            # and self.savefig
+            self.q_poses_ = Accumulator(maxlen=None)
+
             self.name_ = name
             self.frame_id_ = frame_id
             self.opt_frame_id_ = frame_id + '_optimized'
-
+            
             # Create optimized frame (offset by z m)
             pose = draw_utils.get_sensor_pose(frame_id)
             pose.tvec += offset_optimized
