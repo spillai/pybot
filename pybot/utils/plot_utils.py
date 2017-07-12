@@ -2,8 +2,15 @@
 # License: MIT
 
 import numpy as np
-import matplotlib as mpl
-import matplotlib.pyplot as plt
+import matplotlib as mpl; mpl.use('Agg')
+import matplotlib.pyplot as plt; plt.ioff()
+from matplotlib import rcParams as rc
+
+rc['font.size'] = 7
+rc['font.family'] = 'sans-serif'
+rc['font.sans-serif'] = 'Arial'
+rc['savefig.bbox'] = 'tight' # 'standard', 'tight'
+rc['savefig.pad_inches'] = 0.01
 
 def colormap(v, scale=255): 
     return plt.cm.hsv(v.ravel())[:,:3] * scale

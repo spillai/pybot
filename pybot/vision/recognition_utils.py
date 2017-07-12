@@ -20,7 +20,7 @@ from sklearn.linear_model import SGDClassifier
 from sklearn.grid_search import GridSearchCV
 from sklearn.cross_validation import train_test_split, ShuffleSplit
 
-import matplotlib.pyplot as plt
+from pybot.utils.plot_utils import plt
 from pybot.utils.misc import print_yellow
 from pybot.vision.geom_utils import brute_force_match, intersection_over_union
 from pybot.vision.image_utils import im_resize, gaussian_blur, median_blur, box_blur
@@ -146,7 +146,6 @@ def plot_precision_recall(y_score, y_test, clf_target_ids, clf_target_names, tit
     plt.show(block=False)
 
 def plot_roc(y_score, y_test, target_map, title='ROC curve'): 
-    import matplotlib.pyplot as plt
     from sklearn.metrics import roc_curve, auc, precision_recall_curve
     from sklearn.preprocessing import label_binarize
 

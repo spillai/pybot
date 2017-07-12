@@ -4,8 +4,7 @@
 import cv2
 import numpy as np
 
-import matplotlib
-import matplotlib.pyplot as plt
+from pybot.utils.plot_utils import plt
 from matplotlib.colors import colorConverter, ListedColormap
 from pybot.vision.image_utils import im_normalize
 

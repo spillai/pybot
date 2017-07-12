@@ -3,7 +3,7 @@
 
 import numpy as np
 
-import matplotlib.pyplot as plt
+from pybot.utils.plot_utils import plt
 import sklearn.metrics as metrics
 
 def plot_confusion_matrix(cm, target_names, title='Confusion matrix', cmap=plt.cm.Greys):

@@ -346,6 +346,14 @@ class BaseSLAM(_BaseSLAM):
 
             #         draw_utils.publish_line_segments(name + 'optimized_factor_landmark', factor_st, factor_end, c='b', 
             #                                          frame_id=frame_id, reset=True) 
+
+    def savefig(self, filename, axis=np.int32([0,1])):
+        from pybot.utils.plot_utils import plt
+        xys = np.vstack([p.tvec[axis] for p in self.updated_poses.values()])
+        plt.plot(xys[:,0], xys[:,1], 'b')
+        plt.savefig(filename)
+        print('Saving SLAM output figure to {}'.format(filename))
+        
             
 class VisualSLAM(BaseSLAM, _VisualSLAM):
     def __init__(self, calib, min_landmark_obs=cfg.VSLAM_MIN_LANDMARK_OBS,

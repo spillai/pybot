@@ -6,7 +6,7 @@ import sys
 import time
 import numpy as np
 
-import matplotlib.pyplot as plt
+from pybot.utils.plot_utils import plt
 from collections import OrderedDict
 
 global figures, trackbars

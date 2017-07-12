@@ -3,7 +3,7 @@
 
 # Helper functions for plotting
 import numpy as np
-import matplotlib.pyplot as plt
+from pybot.utils.plot_utils import plt
 from matplotlib.colors import colorConverter
 from copy import deepcopy
 
