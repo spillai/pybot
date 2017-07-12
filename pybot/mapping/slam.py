@@ -274,7 +274,7 @@ class BaseSLAM(_BaseSLAM):
                     # print len(factor_st), len(robot_edges), len(confident_colors)
 
                     draw_utils.publish_line_segments(
-                        name + 'optimized_factor_odom', factor_st, factor_end, c=confident_colors,
+                        name + 'optimized_factor_odom', factor_st, factor_end, c='b', # confident_colors,
                         frame_id=frame_id, reset=True) 
             
     def visualize_optimized_landmarks(
@@ -398,8 +398,8 @@ class VisualSLAM(BaseSLAM, _VisualSLAM):
         
         return self.latest
 
-    def finish(self):
-        super(BaseSLAM, self).finish()
+    def finish(self, *args, **kwargs):
+        super(BaseSLAM, self).finish(*args, **kwargs)
         lids, pts3 = self.smart_update()
         if self.verbose_:
             print('{} :: Finished/Solved in {:4.2f} s'
@@ -524,8 +524,8 @@ def with_visualization(
             if self.write_every_:
                 self.write_cb_.poll()
             
-        def finish(self):
-            super(SLAM_vis, self).finish()
+        def finish(self, *args, **kwargs):
+            super(SLAM_vis, self).finish(*args, **kwargs)
             self.visualize_optimized()
 
         def visualize_measurements(self):
