@@ -348,9 +348,30 @@ class BaseSLAM(_BaseSLAM):
             #                                          frame_id=frame_id, reset=True) 
 
     def savefig(self, filename, axis=np.int32([0,1])):
-        from pybot.utils.plot_utils import plt
-        xys = np.vstack([p.tvec[axis] for p in self.updated_poses.values()])
-        plt.plot(xys[:,0], xys[:,1], 'b')
+        from pybot.utils.plot_utils import plt, mpl
+        from matplotlib import collections  as mc
+        
+        # Extract optimized poses
+        # Loop closure poses do not have subsequent indices
+        updated_poses = self.updated_poses
+        robot_edges = self.robot_edges
+        factor_st = np.vstack([(updated_poses[xid].tvec[axis]).reshape(-1,2) for (xid, _) in robot_edges])
+        factor_end = np.vstack([(updated_poses[xid].tvec[axis]).reshape(-1,2) for (_, xid) in robot_edges])
+        factor_loop = np.hstack([abs(xid1-xid2) > 1 for (xid1, xid2) in robot_edges])
+        
+        # Odometry and Loop closure edges (in blue and black respectively)
+        edges, colors = [], []
+        for ft,fs,fe in zip(factor_loop, factor_st, factor_end): 
+            edges.append(((fs[0], fs[1]), (fe[0], fe[1])))
+            colors.append(mpl.colors.to_rgba('k' if ft else 'b'))
+
+        # Add line segments
+        ax = plt.axes()
+        ax.add_collection(mc.LineCollection(
+            edges, linewidths=0.5, colors=colors))
+        plt.axis('equal')
+        plt.xlabel('X (m)')
+        plt.ylabel('Y (m)')
         plt.savefig(filename)
         print('Saving SLAM output figure to {}'.format(filename))
         
