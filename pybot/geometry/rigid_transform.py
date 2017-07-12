@@ -114,7 +114,7 @@ class RigidTransform(object):
     def __init__(self, xyzw=[0.,0.,0.,1.], tvec=[0.,0.,0.]):
         """ Initialize a RigidTransform with Quaternion and 3D Position """
         self.quat = Quaternion(xyzw)
-        self.tvec = np.array(tvec)
+        self.tvec = np.float32(tvec)
 
     def __repr__(self):
         return 'rpy (rxyz): %s tvec: %s' % \

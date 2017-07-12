@@ -271,7 +271,7 @@ class BaseSLAM(_BaseSLAM):
                     # confident_colors = ['b' if v else 'r' for v in robot_edges_confident]
                     factor_st = np.vstack([(updated_poses[xid].tvec).reshape(-1,3) for (xid, _) in robot_edges])
                     factor_end = np.vstack([(updated_poses[xid].tvec).reshape(-1,3) for (_, xid) in robot_edges])
-                    print len(factor_st), len(robot_edges), len(confident_colors)
+                    # print len(factor_st), len(robot_edges), len(confident_colors)
 
                     draw_utils.publish_line_segments(
                         name + 'optimized_factor_odom', factor_st, factor_end, c=confident_colors,
