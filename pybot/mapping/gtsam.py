@@ -100,7 +100,6 @@ class BaseSLAM(object):
         # ISAM2 interface
         self.slam_ = ISAM2()
         self.slam_lock_ = Lock()
-        self.batch_init_ = False
         
         self.idx_ = -1
         self.verbose_ = verbose
@@ -345,23 +344,8 @@ class BaseSLAM(object):
         
         # Update ISAM with new nodes/factors and initial estimates
         try: 
-
-            # Do a full optimization on the first two poses,
-            # before performing updates for subsequent calls
-            if not self.batch_init_:
-                self.batch_init_ = True
-                opt = LevenbergMarquardtOptimizer(self.graph_, self.initial_)
-                current = opt.optimize()
-                self.slam_.update(self.graph_, current)
-
-                # print 'Current:'
-                # current.printf()
-                
-            # Update with estimates
-            # TODO: (iterate ?)
-            else: 
-                self.slam_.update(self.graph_, self.initial_)
-                self.slam_.update()
+            self.slam_.update(self.graph_, self.initial_)
+            self.slam_.update()
                 
         except Exception, e:
             s = get_exception_variable(e.message); print(s)
@@ -381,7 +365,7 @@ class BaseSLAM(object):
         
         # with self.slam_lock_:
         opt = LevenbergMarquardtOptimizer(self.graph_, self.initial_)
-        self.current_ = opt.optimize();
+        self.current_ = opt.optimize()
         
     @timeitmethod
     def _update_estimates(self): 
@@ -602,6 +586,7 @@ class VisualSLAM(BaseSLAM):
                  prior_point3d_noise=cfg.PRIOR_POINT3D_NOISE, 
                  px_error_threshold=4, px_noise=cfg.PX_MEASUREMENT_NOISE, verbose=False):
         BaseSLAM.__init__(self, odom_noise=odom_noise, prior_pose_noise=prior_pose_noise, verbose=verbose)
+        self.batch_init_ = False
 
         # Set relinearizationskip, and factorization method
         # params = ISAM2Params()
@@ -874,6 +859,44 @@ class VisualSLAM(BaseSLAM):
         except Exception, e:
             # print('Could not return pts3, {:}'.format(e))
             return np.int64([]), np.array([])        
+
+    @timeitmethod
+    def _update(self, iterations=1): 
+        # print('.')
+        # print('_update {}'.format(self.idx_))
+        
+        # Update ISAM with new nodes/factors and initial estimates
+        try: 
+
+            # Do a full optimization on the first two poses,
+            # before performing updates for subsequent calls
+            if not self.batch_init_:
+                self.batch_init_ = True
+                opt = LevenbergMarquardtOptimizer(self.graph_, self.initial_)
+                current = opt.optimize()
+                self.slam_.update(self.graph_, current)
+
+                # print 'Current:'
+                # current.printf()
+                
+            # Update with estimates
+            # TODO: (iterate ?)
+            else: 
+                self.slam_.update(self.graph_, self.initial_)
+                self.slam_.update()
+                
+        except Exception, e:
+            s = get_exception_variable(e.message); print(s)
+            import IPython; IPython.embed()
+            raise RuntimeError()
+
+        # Graph and initial values cleanup
+        # print self.graph_.printf()
+        self.graph_.resize(0)
+        self.initial_.clear()
+        
+        # Get current estimate
+        self.current_ = self.slam_.calculateEstimate()
 
     # def check_point_landmarks(self, xid, lids, pts): 
     #     print_red('{:}::check_point_landmarks {:}->{:}, ls:{:}'.format(
