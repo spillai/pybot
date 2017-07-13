@@ -224,6 +224,13 @@ class AttrDict(dict):
         create_path_if_not_exists(fn)
         return save_pytable(fn, self)
 
+    def pprint(self):
+        import json
+        print(json.dumps(self.to_dict(),
+                         indent=4,
+                         sort_keys=True))
+        
+    
 class IterDB(object): 
     def __init__(self, filename, mode): 
         """

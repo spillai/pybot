@@ -12,6 +12,14 @@ rc['font.sans-serif'] = 'Arial'
 rc['savefig.bbox'] = 'tight' # 'standard', 'tight'
 rc['savefig.pad_inches'] = 0.01
 
+# 'axes.titlesize' : 24
+# 'axes.labelsize' : 20
+# 'lines.linewidth' : 3
+# 'lines.markersize' : 10
+# 'xtick.labelsize' : 16
+# 'ytick.labelsize' : 16
+
+
 def colormap(v, scale=255): 
     return plt.cm.hsv(v.ravel())[:,:3] * scale
 
