@@ -245,9 +245,9 @@ class IterDB(object):
         """
         fn = os.path.expanduser(filename)
         if mode == 'w' or mode == 'a': 
-            print('{}::{}'.format(
+            print('{}::{} at {}'.format(
                 'Writing' if mode == 'w' else 'Appending', 
-                self.__class__.__name__))
+                self.__class__.__name__, fn))
             self.h5f_ = tb.open_file(fn, mode=mode, title='%s' % fn)
             self.data_ = {}
         elif mode == 'r':
