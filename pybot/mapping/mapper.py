@@ -227,7 +227,7 @@ class Mapper(object):
             kf_pts = self.dirty_points
             kf_cols = self.dirty_colors
             # print 'kf_poses, kf_ids', len(kf_poses), len(kf_ids)
-
+            
             # Draw all the dirty keyframes
             draw_utils.publish_cameras(self.name_ + '_keyframes_cams', kf_poses, draw_faces=False, 
                                        frame_id='camera', reset=False)
@@ -368,6 +368,14 @@ class MultiViewMapper(Mapper):
         self.kf_theta = kf_theta
         self.kf_displacement = kf_displacement
 
+        # Initialize vars before update
+        self.init()
+
+    def init(self):
+        self.keyframes_ = {}
+        self.keyframes_dirty_ = {}
+        self.mosaics_ = {}        
+        
     def update_keyframes(self):
         """ Process/Update Keyframe data """
 
@@ -387,7 +395,7 @@ class MultiViewMapper(Mapper):
             # self.epi_viz_.add(kf.img, camera, kf.points2d)
             
         if len(self.mosaics_): 
-            imshow_cv('kfs', im_mosaic_list(self.mosaics_.values(), scale=0.75, width=3))        
+            imshow_cv('kfs', self.get_visualization_mosaic())
 
         # self.epi_viz_.visualize()
         # print 'Updated IDS: ', [kf.getId() for kf in kf_data]
@@ -443,6 +451,11 @@ class MultiViewMapper(Mapper):
         self.keyframes[0].points = self.depth_filter.getPoints()
         self.keyframes[0].colors = (self.depth_filter.getColors() * 1.0 / 255).astype(np.float32)
 
+    def get_visualization_mosaic(self):
+        if not len(self.mosaics_):
+            return None
+        return im_mosaic_list(self.mosaics_.values(), scale=0.75, width=3)
+        
     def load(self, path):
         db = AttrDict.load(path)
         keyframes = OrderedDict({kf.id:kf for kf in db.keyframes})

@@ -95,6 +95,10 @@ def reset():
     global g_viz_pub
     g_viz_pub = VisualizationMsgsPub()
 
+def reset_visualization():
+    global g_viz_pub
+    g_viz_pub.reset_visualization()
+
 def get_sensor_pose(frame_id='camera'): 
     global g_viz_pub
     return g_viz_pub.get_sensor_pose(frame_id)
