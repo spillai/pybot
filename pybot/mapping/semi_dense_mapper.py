@@ -66,16 +66,18 @@ class LSDMapper(Mapper):
 
 class ORBMapper(Mapper): 
     """ ORB-SLAM interface """
-    def __init__(self, settings='Settings_udub.yaml'): 
+    default_params = AttrDict(
+        settings='Settings_udub.yaml', vocab='ORBvoc.txt'
+    )
+    def __init__(self, params=default_params): 
         Mapper.__init__(self, poses=[], keyframes=OrderedDict())
         from pybot_externals import ORBSLAM2
 
+        # Only monocular supported for now
         mode = ORBSLAM2.eSensor.MONOCULAR
-        path = os.path.join(user_data(), 'orb-slam2')
-        self.slam = ORBSLAM2(settings=os.path.join(path, settings), vocab=os.path.join(path, 'ORBvoc.txt'), mode=mode)
-        self.slam.process = self.slam.process_monocular
-        
-        print('ORBSLAM: Settings File %s' % (path + settings))
+        self.slam = ORBSLAM2(settings=params.settings, vocab=params.vocab, mode=mode)
+        self.slam.process = self.slam.process_monocular        
+        print('ORBSLAM: Settings {}'.format(params))
 
     def update_keyframes(self): 
         # Keyframe graph for updates
