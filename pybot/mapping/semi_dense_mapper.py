@@ -136,6 +136,9 @@ class ORBMapper(Mapper):
 
 
 class SemiDenseMapper(object): 
+    """
+    SLAM wrapper + SVO-depth filter + Persistence
+    """
     default_params = AttrDict(
         slam_method='orb',
         slam_params=ORBMapper.default_params, 
@@ -193,9 +196,5 @@ class SemiDenseMapper(object):
                                     use_photometric_disparity_error=True, 
                                     kf_displacement=0.4, kf_theta=np.deg2rad(20), detector='edge')
         mv_mapper.load(map_file)
-        import IPython; IPython.embed()
-
-        
         mv_mapper.run()
-        
         mv_mapper.save(os.path.join(self.params.cache.map_dir, '%s_dense.h5' % key))

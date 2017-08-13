@@ -246,7 +246,7 @@ class Mapper(object):
             draw_utils.publish_cameras(self.name_ + '_keyframes_cams', kf_poses, draw_faces=False, 
                                        frame_id='camera', reset=False)
             draw_utils.publish_pose_list(self.name_ + '_keyframes', kf_poses, 
-                                         frame_id='camera', reset=True)
+                                         frame_id='camera', reset=False)
             draw_utils.publish_cloud(self.name_ + '_keyframes_cloud', kf_pts, c=kf_cols, 
                                      frame_id=self.name_ + '_keyframes', element_id=kf_ids, reset=False)
 
