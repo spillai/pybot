@@ -7,7 +7,7 @@ from collections import OrderedDict
 
 from pybot import user_data
 from pybot.utils.db_utils import AttrDict
-from pybot.geometry import RigidTransform, Pose
+from pybot.geometry import RigidTransform, Pose, Sim3
 from pybot.mapping import Keyframe, Mapper, MultiViewMapper 
 
 class LSDMapper(Mapper): 
@@ -88,27 +88,28 @@ class ORBMapper(Mapper):
         kf_data = self.slam.getKeyframeGraph()
 
         # Only plot until penultimate
-        for kf in kf_data: 
-            k_id = kf.getId()
-            f_id = kf.getFrameId()
-            pose_wc = RigidTransform.from_matrix(kf.getPose())
+        for kfj in kf_data: 
+            k_id = kfj.getId()
+            f_id = kfj.getFrameId()
+            pose_wc = RigidTransform.from_matrix(kfj.getPose())
             pose_cw = pose_wc.inverse()
-            cloud_w = kf.getPoints()
+            cloud_w = kfj.getPoints()
             cloud_c = pose_cw * cloud_w
             colors = (np.tile([0,0,1.0], [len(cloud_w),1])).astype(np.float32)
-
-            # print k_id, len(cloud_w), len(cloud_c)
-
+            
             # For now, add Pose with ID to pose, not necessary later on
             kf = Keyframe(id=k_id, frame_id=f_id,
-                                            pose=Pose.from_rigid_transform(k_id, pose_wc), 
-                                            points=cloud_c, colors=colors,
-                                            img=kf.getImage())
-            self.keyframes_[k_id] = kf
-            self.keyframes_dirty_[k_id] = True
+                          pose=Pose.from_rigid_transform(k_id, pose_wc), 
+                          points=cloud_c, colors=colors,
+                          img=kfj.getImage())
+
+            # kf = Keyframe.from_KeyframeData(kfj)
+                        
+            self.keyframes_[kf.id] = kf
+            self.keyframes_dirty_[kf.id] = True
             # self.mosaics_[kf.id] = kf.visualize(self.calib_)
             
-        print 'Keyframes: ', len(self.keyframes), 'Poses: ', len(self.poses)
+        print 'Keyframes: ', len(self.keyframes_), 'Poses: ', len(self.poses)
 
     def initialize_baseline(self, Tcw): 
         self.slam.initialize_baseline(Tcw)
@@ -178,14 +179,23 @@ class SemiDenseMapper(object):
             # Doesn't support skipping frames (frame_id inconsistent)
             for fidx, f in enumerate(scene.iteritems(every_k_frames=1)): 
                 slam.process(f.img)
-                # print 'Processing ', fidx
                 
             # Save slam map temporarily
             slam.save(map_file)
-        
+
+        # Load calib from settings
+        from pybot_externals import yaml_calib_settings
+        calib = AttrDict(yaml_calib_settings(self.params.slam_params.settings))
+        calib.shape = (480,640)
+            
         # Finalize (semi-dense depth filter)
-        mv_mapper = MultiViewMapper()
+        mv_mapper = MultiViewMapper(calib.K, calib.shape[1], calib.shape[0], gridSize=4, nPyrLevels=1, max_n_kfs=10,
+                                    use_photometric_disparity_error=True, 
+                                    kf_displacement=0.4, kf_theta=np.deg2rad(20), detector='edge')
         mv_mapper.load(map_file)
+        import IPython; IPython.embed()
+
+        
         mv_mapper.run()
         
         mv_mapper.save(os.path.join(self.params.cache.map_dir, '%s_dense.h5' % key))

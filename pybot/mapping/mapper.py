@@ -34,7 +34,7 @@ from pybot.vision.camera_utils import Camera, \
     CameraIntrinsic, CameraExtrinsic
 from pybot.externals.lcm import draw_utils
 
-class Keyframe(object): 
+class Keyframe(dict): 
     """
     Basic interface for keyframes
 
@@ -45,18 +45,33 @@ class Keyframe(object):
         id, frame_id, pose, points, colors, img
 
     """
-    def __init__(self, **kwargs):
-        self.data_ = AttrDict(**kwargs)
+    def __init__(self, *args, **kwargs): 
+        super(Keyframe, self).__init__(*args, **kwargs)
+        
+    # def __getitem__(self, attr): 
+    #     return super(Keyframe, self).__getitem__(attr)
 
-    def __getattr__(self, key):
-        return self.data_[key]
+    # def __setitem__(self, attr, value): 
+    #     super(Keyframe, self).__setitem__(attr, value)
+
+    def __getattr__(self, attr): 
+        return super(Keyframe, self).__getitem__(attr)
+
+    def __setattr__(self, attr, value): 
+        super(Keyframe, self).__setitem__(attr, value)
+
+    def __getstate__(self): 
+        pass
+
+    def __setstate__(self): 
+        pass
 
     @classmethod
     def from_dict(self, d): 
         return cls(**d)
 
-    def to_dict(self, d): 
-        return self.data_
+    def to_dict(self): 
+        return dict(self)
 
     @classmethod
     def from_KeyframeData(cls, kf, is_sim3=False):
@@ -67,9 +82,8 @@ class Keyframe(object):
         kf_pose.id = kf_id
 
         points = kf.getPoints()
-        try: 
-            colors = kf.getColors()
-        except: 
+        colors = kf.getColors()
+        if colors is None: 
             colors = (np.tile([0,0,1.0], [len(points),1])).astype(np.float32)
 
         assert(len(points) == len(colors))
@@ -232,7 +246,7 @@ class Mapper(object):
             draw_utils.publish_cameras(self.name_ + '_keyframes_cams', kf_poses, draw_faces=False, 
                                        frame_id='camera', reset=False)
             draw_utils.publish_pose_list(self.name_ + '_keyframes', kf_poses, 
-                                         frame_id='camera', reset=False)
+                                         frame_id='camera', reset=True)
             draw_utils.publish_cloud(self.name_ + '_keyframes_cloud', kf_pts, c=kf_cols, 
                                      frame_id=self.name_ + '_keyframes', element_id=kf_ids, reset=False)
 
@@ -372,7 +386,8 @@ class MultiViewMapper(Mapper):
         self.init()
 
     def init(self):
-        self.keyframes_ = {}
+        self.poses_ = []
+        self.keyframes_ = {} # OrderedDict()
         self.keyframes_dirty_ = {}
         self.mosaics_ = {}        
         
@@ -386,9 +401,6 @@ class MultiViewMapper(Mapper):
             self.keyframes_[kf.id] = kf
             self.keyframes_dirty_[kf.id] = True
             self.mosaics_[kf.id] = kf.visualize(self.calib_)
-
-            # print len(kf.kf_points2d), len(kf.kf_ids), len(kf.points), [item.shape for item in kf.kf_points2d]
-            # print len(kf.kf_points2d), [(type(ids), type(item)) for (ids, item) in izip(kf.kf_ids, kf.kf_points2d)]
             
             # # Visualize
             # camera = Camera.from_intrinsics_extrinsics(self.cam_intrinsic_, kf.pose)
@@ -447,9 +459,12 @@ class MultiViewMapper(Mapper):
             self.process(self.keyframes[kf_id].img, self.keyframes[kf_id].pose)
             draw_utils.publish_cameras('current_keyframe', [self.keyframes[kf_id].pose], frame_id='camera', size=1)
 
+            
         # HACK: save to first keyframe
-        self.keyframes[0].points = self.depth_filter.getPoints()
-        self.keyframes[0].colors = (self.depth_filter.getColors() * 1.0 / 255).astype(np.float32)
+        self.update_keyframes()
+        
+        # self.keyframes[0].points = self.depth_filter.getPoints()
+        # self.keyframes[0].colors = (self.depth_filter.getColors() * 1.0 / 255).astype(np.float32)
 
     def get_visualization_mosaic(self):
         if not len(self.mosaics_):
@@ -458,8 +473,12 @@ class MultiViewMapper(Mapper):
         
     def load(self, path):
         db = AttrDict.load(path)
-        keyframes = OrderedDict({kf.id:kf for kf in db.keyframes})
-        Mapper.__init__(self, db.poses, keyframes)
+        self.keyframes_ = OrderedDict({kf.id:kf for kf in db.keyframes})
+        self.keyframes_dirty_ = { kf.id: True 
+                                  for kf in self.keyframes_.itervalues() }
+        self.keyframes_lut_ = { kf.frame_id: kf.id 
+                                for kf in self.keyframes_.itervalues() }
+        self.poses_ = db.poses
 
     def save(self, path): 
         print 'Saving keyframe ids: ', self.keyframes.keys()
