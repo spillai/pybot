@@ -6,7 +6,7 @@ import numpy as np
 import pickle
 import time, logging, cPickle, shelve
 from collections import defaultdict
-from itertools import izip, imap, ifilter
+from itertools import izip, imap, ifilter, islice
 
 import os.path
 from pybot.utils.misc import progressbar
@@ -313,10 +313,11 @@ class IterDB(object):
     def length(self, key): 
         return self.get_node(key).nrows
 
-    def itervalues_for_key(self, key, inds=None, verbose=False): 
+    def itervalues_for_key(self, key, inds=None, every_k=None, verbose=False): 
         if key not in self.keys: 
             raise RuntimeError('Key %s not found in dataset. keys: %s' % (key, self.keys))
-        return imap(self.unpack, self.get_node(key).iterrows())
+        return imap(self.unpack,
+                    islice(self.get_node(key).iterrows(), None, None, every_k))
             
     def itervalues_for_keys(self, keys, inds=None, verbose=False): 
         for key in keys: 
