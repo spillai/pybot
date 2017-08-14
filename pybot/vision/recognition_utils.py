@@ -30,7 +30,6 @@ from pybot.utils.itertools_recipes import chunks
 
 from pybot.vision.feature_detection import get_dense_detector, get_detector
 
-
 # =====================================================================
 # Generic utility functions for object detection
 # ---------------------------------------------------------------------
@@ -346,7 +345,9 @@ def im_describe(*args, **kwargs):
 # ---------------------------------------------------------------------
 
 class HistogramClassifier(object): 
-    def __init__(self, filename, target_map, classifier='svm'): 
+    def __init__(self, filename, target_map,
+                 classifier='svm',
+                 classifier_params=dict()): 
         
         self.seed_ = 0
         self.filename_ = filename
@@ -365,6 +366,26 @@ class HistogramClassifier(object):
             self.clf_hyparams_ = {'alpha':[0.0001, 0.001, 0.01, 0.1, 1.0, 10.0], 'class_weight':['auto']} # 'loss':['hinge'], 
             self.clf_ = SGDClassifier(loss='log', penalty='l2', shuffle=False, random_state=self.seed_, 
                                       warm_start=True, n_jobs=-1, n_iter=1, verbose=0)
+        elif classifier == 'keras':
+            # self.clf_hyparams_ = {'alpha':[0.0001, 0.001, 0.01, 0.1, 1.0, 10.0], 'class_weight':['auto']}
+
+            from pybot.ml.keras_utils import create_classifier_model
+            from keras.wrappers.scikit_learn import KerasClassifier
+
+            # optimizers = ['rmsprop', 'adam']
+            optimizers = ['rmsprop']
+            init = ['normal']
+            # init = ['glorot_uniform', 'normal', 'uniform']
+            epochs = [50] # , 100, 150]
+            # batches = [5, 10, 20]
+            batches = [20]
+            self.clf_hyparams_ = dict(optimizer=optimizers, epochs=epochs,
+                                      batch_size=batches, init=init)
+            self.clf_base_ = KerasClassifier(
+                build_fn=create_classifier_model,
+                input_dim=classifier_params['input_dim'], output_dim=len(self.target_ids_), verbose=1)
+            # , epochs=150, batch_size=10, verbose=0)
+
         else: 
             raise Exception('Unknown classifier type %s. Choose from [sgd, svm, gradient-boosting, extra-trees]' 
                             % classifier)

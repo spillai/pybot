@@ -2,6 +2,9 @@ import numpy as np
 from keras.callbacks import Callback
 from keras.callbacks import ModelCheckpoint
 
+from keras.models import Sequential
+from keras.layers import Dense
+
 class OccasionalModelCheckpoint(ModelCheckpoint):
     def __init__(self, *args, **kwargs):
         self.model_name_ = kwargs.pop('name', 'unknown')
@@ -42,3 +45,10 @@ class OccasionalModelTesting(Callback):
                               (epoch, self.monitor))
 
 
+def create_classifier_model(input_dim=4096, output_dim=2):
+    model = Sequential()
+    model.add(Dense(256, input_dim=input_dim, activation='relu'))
+    model.add(Dense(256, activation='relu'))
+    model.add(Dense(output_dim, activation='softmax'))
+    model.compile(loss='categorical_crossentropy', optimizer='rmsprop', metrics=['accuracy'])
+    return model
