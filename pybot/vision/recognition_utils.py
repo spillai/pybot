@@ -430,6 +430,9 @@ class HistogramClassifier(object):
     def decision_function(self, X): 
         return self.clf_.decision_function(X)
 
+    def predict_log_proba(self, X): 
+        return self.clf_.predict_log_proba(X)
+
     def report(self, y, y_pred, background=None): 
         print_yellow('-------------------------------')
         print_yellow(' Accuracy score (Training): {:4.3f}'.format((metrics.accuracy_score(y, y_pred))))
