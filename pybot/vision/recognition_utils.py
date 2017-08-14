@@ -430,6 +430,9 @@ class HistogramClassifier(object):
     def decision_function(self, X): 
         return self.clf_.decision_function(X)
 
+    def predict_proba(self, X): 
+        return self.clf_.predict_proba(X)
+
     def predict_log_proba(self, X): 
         return self.clf_.predict_log_proba(X)
 
