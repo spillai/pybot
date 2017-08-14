@@ -282,8 +282,14 @@ class Mapper(object):
     def keyframes(self): 
         return self.keyframes_
 
+    # TODO
+    # @property
+    # def all_points_transformed(self):
+    #     return [kf.pose * kf.points for kf in self.keyframes_.itervalues() if kf.points is not None]
+    
     @property
-    def all_points(self): 
+    def all_points(self):
+        "All the points are defined in their own keyframe pose ref. frame"
         return [kf.points for kf in self.keyframes_.itervalues() if kf.points is not None]
 
     @property
