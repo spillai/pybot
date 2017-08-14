@@ -262,14 +262,11 @@ class Mapper(object):
             kf_poses = self.all_keyframe_poses
             kf_pts = self.all_points
             kf_cols = self.all_colors
-
-
+            
             draw_utils.publish_cameras(self.name_ + '_keyframes', kf_poses, draw_faces=False, 
-                                       frame_id='camera', reset=self.reset)
-            draw_utils.publish_cloud(self.name_ + '_keyframes_cloud', kf_pts, c=kf_cols, 
-                                     frame_id='camera', reset=self.reset)
-            # draw_utils.publish_cloud('slam_keyframes_cloud', kf_pts, c=kf_cols, element_id=kf_ids, 
-            # frame_id='slam_keyframes')
+                                       frame_id='camera', reset=False)
+            draw_utils.publish_cloud(self.name_ + '_keyframes_cloud', kf_pts, c=kf_cols,
+                                     frame_id=self.name_ + '_keyframes', element_id=kf_ids, reset=False)
 
         self.reset_ = False
 
@@ -282,10 +279,9 @@ class Mapper(object):
     def keyframes(self): 
         return self.keyframes_
 
-    # TODO
-    # @property
-    # def all_points_transformed(self):
-    #     return [kf.pose * kf.points for kf in self.keyframes_.itervalues() if kf.points is not None]
+    @property
+    def all_points_transformed(self):
+        return [kf.pose * kf.points for kf in self.keyframes_.itervalues() if kf.points is not None]
     
     @property
     def all_points(self):

@@ -647,8 +647,12 @@ class Camera(CameraIntrinsic, CameraExtrinsic):
         """
         R, t = self.to_Rt()
 	rvec,_ = cv2.Rodrigues(R)
-	proj,_ = cv2.projectPoints(X, rvec, t, self.K, self.D)
-        x = proj.reshape(-1,2)
+        try: 
+            proj,_ = cv2.projectPoints(X, rvec, t, self.K, self.D)
+            x = proj.reshape(-1,2)
+        except Exception, e:
+            print('Failed to project, possibly no 2D projections {}'.format(e))
+            x = np.empty([])
 
         output = []
         
