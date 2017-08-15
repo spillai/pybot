@@ -310,6 +310,9 @@ class IterDB(object):
         # _f_get_child(key)
         return self.h5f_.get_node(self.node_str(key))
 
+    def get_node_value(self, key):
+        return list(self.get_node(key))
+    
     def length(self, key): 
         return self.get_node(key).nrows
 

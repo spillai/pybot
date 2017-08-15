@@ -48,3 +48,8 @@ def chunked_data(iterable, batch_size=10):
                             '''Type is {}'''.format(type(args[0][0])))
             
         yield tuple(items)
+
+def get_dataset_generator(datagen, batch_size=1):
+    if batch_size > 1:
+        datagen = chunked_data(datagen, batch_size=batch_size)
+    return datagen
