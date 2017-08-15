@@ -133,6 +133,7 @@ def dmap(X, d, targets, shape, size=10,
     Create depth map: z-buffer, z-buffered object index, and the
     corresponding bbox coordinates
     """
+    visible_bboxes = {}
     
     assert(len(X) == len(d) == len(targets))
     H, W = shape[:2]
@@ -147,7 +148,8 @@ def dmap(X, d, targets, shape, size=10,
         return im_resize(zbuffer.reshape(BH, BW), shape=(W,H),
                          interpolation=interpolation), \
             im_resize(zbufferl.reshape(BH, BW), shape=(W,H),
-                      interpolation=interpolation)
+                      interpolation=interpolation), \
+            visible_bboxes
     X, d, targets = X[mask], d[mask], targets[mask]
 
     # Z-buffer for each of the targets
@@ -176,7 +178,6 @@ def dmap(X, d, targets, shape, size=10,
     zbufferl = zbufferl.reshape(BH, BW)
     
     # Check visible bboxes
-    visible_bboxes = {}
     for lind in np.unique(zbufferl):
         if lind < 0: continue
         xs, = np.where((zbufferl == lind).any(axis=0))
@@ -243,11 +244,11 @@ class UWRGBDDataset(object):
     # train_names = ["bowl", "cap", "cereal_box", "background"]
     # train_names = ["cap", "cereal_box", "coffee_mug", "soda_can", "background"]
     # train_names = ["bowl", "cap", "cereal_box", "soda_can", "background"]
-    # train_names = ["bowl", "cap", "cereal_box", "coffee_mug", "soda_can", "background"]
+    train_names = ["bowl", "cap", "cereal_box", "coffee_mug", "soda_can", "background"]
     # train_names = ["bowl", "cap", "cereal_box", "coffee_mug", "soda_can"]
-    train_names = ["bowl", "cap", "cereal_box", "coffee_mug", "flashlight", 
-                   "keyboard", "kleenex", "scissors",  "soda_can", 
-                   "stapler", "sofa", "table", "background"]
+    # train_names = ["bowl", "cap", "cereal_box", "coffee_mug", "flashlight", 
+    #                "keyboard", "kleenex", "scissors",  "soda_can", 
+    #                "stapler", "sofa", "table", "background"]
     # train_names = class_names
 
     train_ids = [target_hash[name] for name in train_names]
