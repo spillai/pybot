@@ -6,6 +6,7 @@ import sys
 import time
 import numpy as np
 
+from pybot import IMSHOW_FLAG
 from pybot.utils.plot_utils import plt
 from collections import OrderedDict
 
@@ -70,27 +71,32 @@ def draw_border(vis, value=128):
     vis[:,0], vis[0,:], vis[:,-1], vis[-1,:] = value, value, value, value
     return vis
 
-def imshow_cv(label, im, block=False, text=None, wait=2): 
-    vis = im.copy()
-    print_status(vis, text=text)
-    window_manager.imshow(label, vis)
-    ch = cv2.waitKey(0 if block else wait) & 0xFF
-    if ch == ord(' '):
-        cv2.waitKey(0)
-    if ch == ord('v'):
-        print('Entering debug mode, image callbacks active')
-        while True: 
-            ch = cv2.waitKey(10) & 0xFF
-            if ch == ord('q'): 
-                print('Exiting debug mode!')
-                break
-    if ch == ord('s'):
-        fn = 'img-%s.png' % time.strftime("%Y-%m-%d-%H-%M-%S")
-        print 'Saving %s' % fn
-        cv2.imwrite(fn, vis)
-    elif ch == 27 or ch == ord('q'):
-        sys.exit(1)
-
+if IMSHOW_FLAG: 
+    def imshow_cv(label, im, block=False, text=None, wait=2): 
+        vis = im.copy()
+        print_status(vis, text=text)
+        window_manager.imshow(label, vis)
+        ch = cv2.waitKey(0 if block else wait) & 0xFF
+        if ch == ord(' '):
+            cv2.waitKey(0)
+        if ch == ord('v'):
+            print('Entering debug mode, image callbacks active')
+            while True: 
+                ch = cv2.waitKey(10) & 0xFF
+                if ch == ord('q'): 
+                    print('Exiting debug mode!')
+                    break
+        if ch == ord('s'):
+            fn = 'img-%s.png' % time.strftime("%Y-%m-%d-%H-%M-%S")
+            print 'Saving %s' % fn
+            cv2.imwrite(fn, vis)
+        elif ch == 27 or ch == ord('q'):
+            sys.exit(1)
+else:
+    def imshow_cv(*args, **kwargs):
+        pass
+            
+            
 def trackbar_update(_=None): 
     global trackbars
     for k,v in trackbars.iteritems(): 

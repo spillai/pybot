@@ -15,5 +15,9 @@ _PYBOT_USER_DATA = get_environment('PYBOT_USER_DATA',
                                    default=os.path.join(os.getenv('HOME'),
                                                         'perceptual-learning/data'))
 
+_PYBOT_IMSHOW = bool(int(get_environment('PYBOT_IMSHOW', default=1)))
+
 def user_data():
     return _PYBOT_USER_DATA
+
+IMSHOW_FLAG = _PYBOT_IMSHOW
