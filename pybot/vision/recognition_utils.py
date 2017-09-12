@@ -18,6 +18,7 @@ import sklearn.metrics as metrics
 from sklearn.svm import LinearSVC, SVC
 from sklearn.linear_model import SGDClassifier
 from sklearn.grid_search import GridSearchCV
+from sklearn.calibration import CalibratedClassifierCV
 from sklearn.cross_validation import train_test_split, ShuffleSplit
 
 from pybot.utils.plot_utils import plt
@@ -347,7 +348,7 @@ def im_describe(*args, **kwargs):
 class HistogramClassifier(object): 
     def __init__(self, filename, target_map,
                  classifier='svm',
-                 classifier_params=dict()): 
+                 classifier_params=dict(), verbose=0): 
         
         self.seed_ = 0
         self.filename_ = filename
@@ -362,10 +363,14 @@ class HistogramClassifier(object):
         if classifier == 'svm': 
             self.clf_hyparams_ = {'C':[0.01, 0.1, 1.0, 10.0, 100.0], 'class_weight': ['balanced']}
             self.clf_base_ = LinearSVC(random_state=self.seed_)
+            
         elif classifier == 'sgd': 
             self.clf_hyparams_ = {'alpha':[0.0001, 0.001, 0.01, 0.1, 1.0, 10.0], 'class_weight':['auto']} # 'loss':['hinge'], 
-            self.clf_ = SGDClassifier(loss='log', penalty='l2', shuffle=False, random_state=self.seed_, 
-                                      warm_start=True, n_jobs=-1, n_iter=1, verbose=0)
+            self.clf_ = SGDClassifier(
+                loss='log', penalty='l2', alpha=0.01, 
+                shuffle=True, random_state=self.seed_, 
+                warm_start=True, n_jobs=-1, n_iter=1, verbose=verbose)
+            
         elif classifier == 'keras':
             # self.clf_hyparams_ = {'alpha':[0.0001, 0.001, 0.01, 0.1, 1.0, 10.0], 'class_weight':['auto']}
 
@@ -393,20 +398,20 @@ class HistogramClassifier(object):
     def fit(self, X, y, test_size=0.3):
         # Grid search cross-val (best C param)
         cv = ShuffleSplit(len(X), n_iter=1, test_size=0.3, random_state=self.seed_)
-        clf_cv = GridSearchCV(self.clf_base_, self.clf_hyparams_, cv=cv, n_jobs=-1, verbose=0)
-
+        
         print_yellow('====> Training Classifier (with grid search hyperparam tuning) .. ')
         print_yellow('====> BATCH Training (in-memory): {:4.3f} MB'.format(X.nbytes / 1024.0 / 1024.0) )
+        clf_cv = GridSearchCV(self.clf_base_, self.clf_hyparams_, cv=cv, n_jobs=-1, verbose=0)
         clf_cv.fit(X, y)
         print_yellow('BEST: {}, {}'.format(clf_cv.best_score_, clf_cv.best_params_))
 
         # Setting clf to best estimator
         self.clf_ = clf_cv.best_estimator_
         
-        # # Calibrating classifier
-        # print('Calibrating Classifier ... ')
-        # self.clf_prob_ = CalibratedClassifierCV(self.clf_, cv=cv, method='sigmoid')
-        # self.clf_prob_.fit(X, y)        
+        # Calibrating classifier
+        print('Calibrating Classifier ... ')
+        self.clf_ = CalibratedClassifierCV(self.clf_, cv=cv, method='sigmoid')
+        self.clf_.fit(X, y)        
         
         # # Setting clf to best estimator
         # self.clf_ = clf_cv.best_estimator_
@@ -420,7 +425,7 @@ class HistogramClassifier(object):
     def partial_fit(self, X, y): 
         self.clf_.partial_fit(X, y, classes=self.target_ids_, sample_weight=None)
 
-        if self.epoch_no_ % 10 == 0: 
+        if self.epoch_no_ % 50 == 0: 
             self._save(self.filename_.replace('.h5', '_iter_{}.h5'.format(self.epoch_no_)))
         self.epoch_no_ += 1
 
@@ -578,7 +583,7 @@ class NegativeMiningGenerator(object):
 # from sklearn.preprocessing import normalize
 # from sklearn.decomposition import PCA, RandomizedPCA
 # from sklearn.svm import LinearSVC, SVC
-# from sklearn.calibration import CalibratedClassifierCV
+
 # from sklearn.ensemble import GradientBoostingClassifier, ExtraTreesClassifier
 # from sklearn.linear_model import SGDClassifier
 # from sklearn.grid_search import GridSearchCV
