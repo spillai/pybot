@@ -573,7 +573,7 @@ class UWRGBDSceneDataset(UWRGBDDataset):
             return UWRGBDDataset.calib
             
         @staticmethod
-        def cluster_ply_labels(ply_xyz, ply_rgb, ply_label): 
+        def cluster_ply_labels(ply_xyz, ply_rgb, ply_label, std=None): 
             """
             Separate multiple object instances cleanly, otherwise, 
             candidate projection becomes inconsistent
@@ -592,7 +592,8 @@ class UWRGBDSceneDataset(UWRGBDDataset):
 
                 l_xyz = ply_xyz[ply_label == l]
                 l_rgb = ply_rgb[ply_label == l]
-                std = np.std(l_xyz, axis=0).min() * 1.0
+                if std is None: 
+                    std = np.std(l_xyz, axis=0).min() * 1.0
                 # print 'Clustering: ', l_xyz.shape, l_rgb.shape, std, UWRGBDDataset.target_unhash[l], len(l_xyz)
 
                 linds = euclidean_clustering(l_xyz.astype(np.float32), tolerance=std,
