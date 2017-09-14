@@ -1,4 +1,32 @@
+import sys
 from collections import defaultdict
+from pybot import get_environment
+
+_PYBOT_VIS_BACKEND = get_environment('PYBOT_VIS_BACKEND',
+                                      default='lcm',
+                                      choices=['lcm', 'protobuf'])
+
+def vis_backend():
+    return _PYBOT_VIS_BACKEND
+
+def set_vis_backend(value):
+    _PYBOT_VIS_BACKEND = value
+
+# ===============================================================================
+
+if _PYBOT_VIS_BACKEND == 'lcm':
+    sys.stderr.write('Using lcm-vis backend.\n')
+    from pybot.externals.lcm import vs, serialize
+    
+elif _PYBOT_VIS_BACKEND == 'protobuf':
+    sys.stderr.write('Using protobuf-vis backend.\n')
+    from pybot.externals.pb import vs, serialize
+
+else:
+    raise Exception('Unknown backend: {}'.format(cfg.SLAM_BACKEND))
+    
+
+# ===============================================================================
 
 class MayBeCalled(object):
     def __call__(self, *args, **kwargs):
@@ -24,3 +52,4 @@ class nop(object):
         if len(self.name_): print('{}::{}'.format(self.name_, attr))
         return MayBeCalled()
 
+    
