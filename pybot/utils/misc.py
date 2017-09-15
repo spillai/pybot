@@ -7,14 +7,14 @@ from collections import deque, OrderedDict
 import functools
 import multiprocessing
 
-def color_red(prt): return "\033[91m {}\033[00m" .format(prt)
-def color_green(prt): return "\033[92m {}\033[00m" .format(prt)
-def color_yellow(prt): return "\033[93m {}\033[00m" .format(prt)
-def color_lightpurple(prt): return "\033[94m {}\033[00m" .format(prt)
-def color_purple(prt): return "\033[95m {}\033[00m" .format(prt)
-def color_cyan(prt): return "\033[96m {}\033[00m" .format(prt)
-def color_lightgray(prt): return "\033[97m {}\033[00m" .format(prt)
-def color_black(prt): return "\033[98m {}\033[00m" .format(prt)
+def color_red(prt): return "\033[91m{}\033[00m" .format(prt)
+def color_green(prt): return "\033[92m{}\033[00m" .format(prt)
+def color_yellow(prt): return "\033[93m{}\033[00m" .format(prt)
+def color_lightpurple(prt): return "\033[94m{}\033[00m" .format(prt)
+def color_purple(prt): return "\033[95m{}\033[00m" .format(prt)
+def color_cyan(prt): return "\033[96m{}\033[00m" .format(prt)
+def color_lightgray(prt): return "\033[97m{}\033[00m" .format(prt)
+def color_black(prt): return "\033[98m{}\033[00m" .format(prt)
 
 def print_red(prt): print(color_red(prt))
 def print_green(prt): print(color_green(prt))
