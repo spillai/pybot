@@ -240,7 +240,7 @@ class WebSocketHandler(StreamRequestHandler):
         opcode_handler(self, decoded)
 
     def send_message(self, message):
-        self.send_text(message)
+        self.send_blob(message)
 
     def send_pong(self, message):
         self.send_text(message, OPCODE_PONG)
@@ -290,6 +290,52 @@ class WebSocketHandler(StreamRequestHandler):
 
         self.request.send(header + payload)
 
+    def send_blob(self, message, opcode=OPCODE_TEXT):
+        """
+        Important: Fragmented(=continuation) messages are not supported since
+        their usage cases are limited - when we don't know the payload length.
+        """
+
+        # # Validate message
+        # if isinstance(message, bytes):
+        #     message = try_decode_UTF8(message)  # this is slower but ensures we have UTF-8
+        #     if not message:
+        #         logger.warning("Can\'t send message, message is not valid UTF-8")
+        #         return False
+        # elif isinstance(message, str) or isinstance(message, unicode):
+        #     pass
+        # else:
+        #     logger.warning('Can\'t send message, message has to be a string or bytes. Given type is %s' % type(message))
+        #     return False
+
+        header  = bytearray()
+        # payload = encode_to_UTF8(message)
+        payload = message
+        payload_length = len(payload)
+
+        # Normal payload
+        if payload_length <= 125:
+            header.append(FIN | opcode)
+            header.append(payload_length)
+
+        # Extended payload
+        elif payload_length >= 126 and payload_length <= 65535:
+            header.append(FIN | opcode)
+            header.append(PAYLOAD_LEN_EXT16)
+            header.extend(struct.pack(">H", payload_length))
+
+        # Huge extended payload
+        elif payload_length < 18446744073709551616:
+            header.append(FIN | opcode)
+            header.append(PAYLOAD_LEN_EXT64)
+            header.extend(struct.pack(">Q", payload_length))
+
+        else:
+            raise Exception("Message is too big. Consider breaking it into chunks.")
+            return
+
+        self.request.send(header + payload)
+        
     def handshake(self):
         message = self.request.recv(1024).decode().strip()
         upgrade = re.search('\nupgrade[\s]*:[\s]*websocket', message.lower())

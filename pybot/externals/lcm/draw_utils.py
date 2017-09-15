@@ -12,10 +12,9 @@ from collections import deque
 import numpy as np
 
 import cv2
-import lcm
 
 from pybot.externals import vs, serialize, publish
-from bot_core import image_t, pose_t
+# from bot_core import image_t, pose_t
 
 from pybot.externals.draw_helpers import reshape_arr, get_color_arr, height_map, \
     color_by_height_axis, copy_pointcloud_data, Frustum

@@ -8,17 +8,24 @@ from pybot.externals import marshalling_backend
 class LCMThreadHandler(object):
     def __init__(self):
         self.lock_ = Lock()
-
+        self.ev_th_ = None
+        
     def setup(self, server):
         self.ev_th_ = mp.Process(target=self.run, args=(server,))
         self.ev_th_.start()
         with self.lock_:
             self.server_ = server
             
+    def stop(self):
+        try: 
+            self.ev_th_.join()
+        except Exception, e:
+            print('Exiting')
+            
     def on_event(self, server, ch, data):
         try:
             print('on_event: {}, {}, {}'.format(ch, len(data), server))
-            server.send_message_to_all(ch)
+            server.send_message_to_all(data)
         except Exception, e:
             print('Failed to send, client unavailable {}'.format(e))            
         
@@ -27,14 +34,12 @@ class LCMThreadHandler(object):
         self.setup(server)
         with self.lock_:
             print("New client connected and was given id %d" % client['id'])
-            self.server_.send_message_to_all("Hey all, a new client has joined us")
-            print('server', self.server_)
+            # self.server_.send_message_to_all("Hey all, a new client has joined us")
 
     # Called for every client disconnecting
     def client_left(self, client, server):
         self.setup(server)
         with self.lock_:
-            print server
             print("Client(%d) disconnected" % client['id'])
 
     # Called when a client sends a message
@@ -93,8 +98,6 @@ class LCMThreadHandler(object):
         # Handle
         handle()
         
-    def stop(self):
-        self.ev_th_.join()
 
         
 PORT=9001
