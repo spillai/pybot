@@ -14,7 +14,7 @@ import numpy as np
 import cv2
 import lcm
 
-from pybot.externals import vs, serialize
+from pybot.externals import vs, serialize, publish
 from bot_core import image_t, pose_t
 
 from pybot.externals.draw_helpers import reshape_arr, get_color_arr, height_map, \
@@ -32,12 +32,14 @@ class VisualizationMsgsPub:
         self._channel_uid = dict()
         self._sensor_pose = dict()
 
-        self.lc = lcm.LCM()
         self.reset_visualization()
         self.publish_sensor_frame('camera', pose=VisualizationMsgsPub.CAMERA_POSE)
         self.publish_sensor_frame('origin', pose=RigidTransform.identity())
         # self.publish_sensor_frame('origin_xz', pose=VisualizationMsgsPub.XZ_POSE)
 
+    def publish(self, channel, data):
+        publish(channel, data)
+        
     def list_frames(self):
         return self._sensor_pose
         
@@ -60,7 +62,7 @@ class VisualizationMsgsPub:
     def reset_visualization(self): 
         print('{} :: Reseting Visualizations'.format(self.__class__.__name__))
         msg = vs.reset_collections_t()
-        self.lc.publish("RESET_COLLECTIONS", serialize(msg))
+        self.publish("RESET_COLLECTIONS", serialize(msg))
 
     def publish_sensor_frame(self, channel, pose=None): 
         """ 
@@ -88,7 +90,7 @@ class VisualizationMsgsPub:
         # msg.objs = [pose_msg]
         msg.objs.extend([pose_msg])
         msg.nobjs = len(msg.objs)
-        self.lc.publish("OBJ_COLLECTION", serialize(msg))
+        self.publish("OBJ_COLLECTION", serialize(msg))
 
 global g_viz_pub
 g_viz_pub = VisualizationMsgsPub()
@@ -121,7 +123,7 @@ def publish_pose_t(channel, pose, frame_id='camera'):
     p = pose_t()
     p.orientation = list(out_pose.quat.to_wxyz())
     p.pos = out_pose.tvec.tolist()
-    g_viz_pub.lc.publish(channel, serialize(p))
+    g_viz_pub.publish(channel, serialize(p))
 
 def publish_image_t(pub_channel, im, jpeg=False, flip_rb=True): 
     global g_viz_pub
@@ -146,7 +148,7 @@ def publish_image_t(pub_channel, im, jpeg=False, flip_rb=True):
     out.nmetadata = 0
 
     # Pub
-    g_viz_pub.lc.publish(pub_channel, serialize(out))
+    g_viz_pub.publish(pub_channel, serialize(out))
 
 def publish_botviewer_image_t(im, jpeg=False, flip_rb=True): 
     if not isinstance(im, np.ndarray): 
@@ -242,7 +244,7 @@ def publish_point_type(pub_channel, _arr, c='r', point_type='POINT',
     # add to point cloud list                
     # print('published %i lists %s' % (len(_arr), reset))
     pc_list_msg.nlists = len(pc_list_msg.point_lists)
-    g_viz_pub.lc.publish("POINTS_COLLECTION", serialize(pc_list_msg))
+    g_viz_pub.publish("POINTS_COLLECTION", serialize(pc_list_msg))
 
 # @run_async
 def publish_cloud(pub_channel, arr, c='r', flip_rb=False, frame_id='camera', element_id=0, reset=True):
@@ -296,7 +298,7 @@ def publish_pose_list(pub_channel, poses, texts=[], covars=[], frame_id='camera'
         pose_list_msg.objs[j].pitch = pitch
         pose_list_msg.objs[j].yaw = yaw
         
-    g_viz_pub.lc.publish("OBJ_COLLECTION", serialize(pose_list_msg))
+    g_viz_pub.publish("OBJ_COLLECTION", serialize(pose_list_msg))
 
     # Publish corresponding text
     if len(texts): 
@@ -325,7 +327,7 @@ def publish_text_list(pub_channel, poses, texts=[], frame_id='camera', reset=Tru
         text_list_msg.texts[j].object_id = getattr(pose, 'id', j) 
         text_list_msg.texts[j].text = texts[j]
        
-    g_viz_pub.lc.publish("TEXT_COLLECTION", serialize(text_list_msg))
+    g_viz_pub.publish("TEXT_COLLECTION", serialize(text_list_msg))
 
 def publish_covar_list(pub_channel, poses, covars=[], frame_id='camera', reset=True):
     covar_list_msg = vs.cov_collection_t()
@@ -350,7 +352,7 @@ def publish_covar_list(pub_channel, poses, covars=[], frame_id='camera', reset=T
         # print 'covar_list', nposes, covar_list_msg.covs[j].collection, covar_list_msg.covs[j].id, \
         #     covar_list_msg.covs[j].element_id, covars[j]
 
-    g_viz_pub.lc.publish("COV_COLLECTION", serialize(covar_list_msg))
+    g_viz_pub.publish("COV_COLLECTION", serialize(covar_list_msg))
 
 def publish_line_segments(pub_channel, _arr1, _arr2, c='r', flip_rb=False, frame_id='camera', element_id=0, reset=True):
     publish_point_type(pub_channel, np.hstack([_arr1, _arr2]), c=c, point_type='LINES', 
