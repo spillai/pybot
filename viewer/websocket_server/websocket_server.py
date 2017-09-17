@@ -239,8 +239,8 @@ class WebSocketHandler(StreamRequestHandler):
             decoded += chr(char)
         opcode_handler(self, decoded)
 
-    def send_message(self, message):
-        self.send_blob(message)
+    def send_message(self, message, opcode=OPCODE_BINARY):
+        self.send_blob(message, opcode=opcode)
 
     def send_pong(self, message):
         self.send_text(message, OPCODE_PONG)
