@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <title>Reconstruction Viewer</title>
+        <meta charset="utf-8">
+        <style>
+            body {
+                margin: 0px;
+            }
+            #loading {
+               position: absolute;
+               top: 50%;
+               left: 50%;
+               width: 508px;
+               height: 381px;
+               margin-top: -190px; /* Half the height */
+               margin-left: -254px; /* Half the width */
+            }
+
+            #info {
+                position: absolute;
+                top: 0px;
+                left: 10px;
+                background-color: #000;
+                visibility: hidden;
+            }
+            #image {
+                width: 160px;
+                height: 120px;
+            }
+            #text {
+                text-align: center;
+                font-family: sans-serif;
+                font-size: 10px;
+                color: #FFF;
+            }
+            #navigation {
+                position: absolute;
+                top: 0px;
+                left: 10px;
+                display: none;
+                font-family: sans-serif;
+                font-size: 30px;
+            }
+            #journeyButton {
+                display: none;
+            }
+        </style>
+    </head>
+    <body>
+        <div id="ThreeJS" target="_blank"></div>
+        <div id="loading">
+            <img src="images/preloader.gif">
+        </div>
+        <div id="info">
+            <img id="image">
+            <div id="text"></div>
+        </div>
+        <div id="navigation">
+            <table>
+                <tr>
+                    <td id="nav-turn-left">
+                        <button onclick="walkOneStep('TURN_LEFT')">
+                            &#8624;
+                        </button>
+                    </td>
+                    <td id="nav-forward">
+                        <button onclick="walkOneStep('STEP_FORWARD')">
+                            &#8593;
+                        </button>
+                    </td>
+                    <td id="nav-turn-right">
+                        <button onclick="walkOneStep('TURN_RIGHT')">
+                            &#8625;
+                        </button>
+                    </td>
+                </tr>
+                <tr>
+                    <td id="nav-left">
+                        <button onclick="walkOneStep('STEP_LEFT')">
+                            &#8592;
+                        </button>
+                    </td>
+                    <td id="nav-u-turn">
+                        <button onclick="walkOneStep('TURN_U')">
+                            &#8630;
+                        </button>
+                    </td>
+                    <td id="nav-right">
+                        <button onclick="walkOneStep('STEP_RIGHT')">
+                            &#8594;
+                        </button>
+                    </td>
+                </tr>
+                <tr>
+                    <td>
+                        <button id="journeyButton" onclick="invokeJourneyWrapper(function () { journeyWrapper.toggle(); });">
+                            Go
+                        </button>
+                    </td>
+                    <td id="nav-backward">
+                        <button onclick="walkOneStep('STEP_BACKWARD')">
+                            &#8595;
+                        </button>
+                    </td>
+                    <td>
+                        <button onclick="setMovingMode('orbit')">
+                            fly
+                        </button>
+                    </td>
+                </tr>
+            </table>
+        </div>
+
+        <script src="js/jquery.js"></script>
+        <script src="js/three.js"></script>
+        <script src="js/OrbitControls.js"></script>
+        <script src="js/TrackballControls.js"></script>
+        <script src="js/dat.gui.js"></script>
+        <script src="js/journey.js"></script>
+        
+        <script src="js/protobuf.js"></script>
+
+        <!-- Shaders -->
+        <script type="x-shader/x-vertex" id="vertexshader">
+
+            // switch on high precision floats
+            #ifdef GL_ES
+            precision highp float;
+            #endif
+
+            varying vec4 vRstq;
+            uniform mat4 projectorMat;
+
+            void main()
+            {
+                vRstq = projectorMat * vec4(position, 1.0);
+                gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0);
+            }
+
+        </script>
+
+        <script type="x-shader/x-fragment" id="fragmentshader">
+
+            #ifdef GL_ES
+            precision highp float;
+            #endif
+
+            varying vec4 vRstq;
+            uniform sampler2D projectorTex;
+            uniform float opacity;
+            uniform float focal;
+            uniform float k1;
+            uniform float k2;
+            uniform float scale_x;
+            uniform float scale_y;
+
+            void main()
+            {
+                float x = vRstq.x / vRstq.z;
+                float y = vRstq.y / vRstq.z;
+                float r2 = x * x + y * y;
+                float d = 1.0 + k1 * r2 + k2 * r2 * r2;
+                float u = scale_x * focal * d * x + 0.5;
+                float v = - scale_y * focal * d * y + 0.5;
+
+                vec4 baseColor = texture2D(projectorTex, vec2(u, v));
+                baseColor.a = opacity;
+                gl_FragColor = baseColor;
+            }
+
+        </script>
+
+        <script type="x-shader/x-fragment" id="fragmentshader_fisheye">
+
+            #ifdef GL_ES
+            precision highp float;
+            #endif
+
+            varying vec4 vRstq;
+            uniform sampler2D projectorTex;
+            uniform float opacity;
+            uniform float focal;
+            uniform float k1;
+            uniform float k2;
+            uniform float scale_x;
+            uniform float scale_y;
+
+            void main()
+            {
+                float x = vRstq.x;
+                float y = vRstq.y;
+                float z = vRstq.z;
+
+                float l = sqrt(x * x + y * y);
+                float theta = atan(l, z);
+                float theta2 = theta * theta;
+                float theta_d = theta * (1.0 + theta2 * (k1 + theta2 * k2));
+                float s = focal * theta_d / l;
+
+                float u = scale_x * s * x + 0.5;
+                float v = -scale_y * s * y + 0.5;
+
+                vec4 baseColor = texture2D(projectorTex, vec2(u, v));
+                baseColor.a = opacity;
+                gl_FragColor = baseColor;
+            }
+
+        </script>
+
+        <script type="x-shader/x-fragment" id="fragmentshader_equirectangular">
+
+            #ifdef GL_ES
+            precision highp float;
+            #endif
+
+            #define tau 6.28318530718
+
+            varying vec4 vRstq;
+            uniform sampler2D projectorTex;
+            uniform float opacity;
+
+            void main()
+            {
+                vec3 b = normalize(vRstq.xyz);
+                float lat = -asin(b.y);
+                float lon = atan(b.x, b.z);
+                float x = lon / tau + 0.5;
+                float y = lat / tau * 2.0 + 0.5;
+                vec4 baseColor = texture2D(projectorTex, vec2(x, y));
+                baseColor.a = opacity;
+                gl_FragColor = baseColor;
+            }
+
+        </script>
+
+        <script src="js/renderer.js"></script>
+
+    </body>
+</html>
