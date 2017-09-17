@@ -9,10 +9,14 @@ var selectedCamera;
 var imagePlane, imagePlaneCamera;
 var imagePlaneOld, imagePlaneCameraOld;
 var scene_group, grid_group;
-var pointCloudMaterial;
+var pointCloudMaterial, lineMaterial;
 var reconstructions;
 var reconstruction_visibles = [];
 var reconstruction_groups = [];
+
+var obj_collections = {};
+var obj_collections_lut = {};
+
 var point_clouds = [];
 var camera_lines = [];
 var gps_lines = [];
@@ -554,27 +558,67 @@ function add_points_to_scene_group(msg) {
           size: options.pointSize,
           vertexColors: true,
     });
+    lineMaterial = new THREE.LineBasicMaterial({
+        color: 0xffffff,
+        vertexColors: THREE.VertexColors,
+        linewidth: 5
+    });
 
+    // Render 
     for (var r = 0; r < msg.pointLists.length; ++r) {
         var pc = msg.pointLists[r];
         reconstruction_groups[r] = new THREE.Object3D();
         var group = reconstruction_groups[r];
 
-        // Points.
-        var points = new THREE.Geometry();
+        var geom = new THREE.Geometry();
         for (var j = 0, pc_sz = pc.points.length; j < pc_sz; ++j) {
             var pt = pc.points[j];
             var col = pc.colors[j];
-            points.vertices.push(new THREE.Vector3(pt.x, pt.y, pt.z));
-            points.colors.push(new THREE.Color(col.r, col.g, col.b));
+            geom.vertices.push(new THREE.Vector3(pt.x, pt.y, pt.z));
+            geom.colors.push(new THREE.Color(col.r, col.g, col.b));
         }
-        var point_cloud = new THREE.PointCloud(points, pointCloudMaterial);
-        point_clouds.push(point_cloud);
-        group.add(point_cloud);
+        
+        // Render points
+        switch (msg.type) {
+        case point3d_list_collection_t.getEnum('point_type').POINT:
+            var point_cloud = new THREE.PointCloud(
+                geom, pointCloudMaterial);
+            point_clouds.push(point_cloud);
+            group.add(point_cloud);
+            break;
+            
+        // Render lines
+        case point3d_list_collection_t.getEnum('point_type').LINES:
+            var lines = new THREE.Line(
+                geom, lineMaterial, THREE.LinePieces);
+            // line.reconstruction = reconstruction;
+            // line.shot_id = shot_id;
+            // lines.push(line);
+            group.add(lines)
+            break;
+            
+        // Render triangles
+        case point3d_list_collection_t.getEnum('point_type').TRIANGLES:
+            // Create triangles and compute normals
+            for (var j = 0, pc_sz = pc.points.length / 3;
+                 j < pc_sz; ++j) {
+                geom.faces.push( new THREE.Face3( j, j+1, j+2 ));
+            }
+            geom.computeFaceNormals();
+            var mesh= new THREE.Mesh(
+                geom, new THREE.MeshNormalMaterial() );
+            group.add(mesh);
+            break;
+
+        default:
+            console.log('Unknown type ' + msg.type);
+        }
+
+        // Add group to scene
         scene_group.add(group);
-
+        
     }
-
+    
     // Re-render scene
     render();
     
@@ -633,10 +677,65 @@ function add_points_to_scene_group(msg) {
 
 }
 
-function add_obj_to_scene_group(msg) {
+function add_objects_to_scene_group(msg) {
+
+    // Render
+    obj_collections[msg.id] = new THREE.Object3D();
+    obj_collections_lut[msg.id] = {}
+    //obj_collections[msg.id].applyMatrix();
+    
+    for (var i = 0; i < msg.objs.length; ++i) {
+        var obj = msg.objs[i];
+        var mat = new THREE.Matrix4().makeRotationFromEuler(
+            new THREE.Euler(obj.roll, obj.pitch, obj.yaw, 'XYZ'));
+        mat.setPosition(new THREE.Vector3(obj.x, obj.y, obj.z));
+
+        // Create object group for obj_id
+        obj_collections_lut[msg.id][obj.id] = new THREE.Object3D();
+        var group = obj_collections_lut[msg.id][obj.id];
+
+        // Add axes to obj_id
+        var axes = getAxes();
+        group.add(axes);
+
+        // Transform obj_id
+        group.applyMatrix(mat);
+
+        // Add obj_id to scene
+        scene_group.add(group);
+    }
+    
+    // Re-render scene
+    render();
     
 }
 
+function getAxes() {
+    var linegeo = new THREE.Geometry();
+    linegeo.vertices = [
+        new THREE.Vector3(0, 0, 0),
+        new THREE.Vector3(1, 0, 0),
+        new THREE.Vector3(0, 0, 0),
+        new THREE.Vector3(0, 1, 0),
+        new THREE.Vector3(0, 0, 0),
+        new THREE.Vector3(0, 0, 1)
+    ];
+    linegeo.colors = [
+        new THREE.Color( 0xff0000 ),
+        new THREE.Color( 0xff0000 ),
+        new THREE.Color( 0x00ff00 ),
+        new THREE.Color( 0x00ff00 ),
+        new THREE.Color( 0x0000ff ),
+        new THREE.Color( 0x0000ff )
+    ];
+    var lineMaterial = new THREE.LineBasicMaterial({
+        color: 0xffffff,
+        vertexColors: THREE.VertexColors,
+        linewidth: 5
+    });
+    var line = new THREE.Line(linegeo, lineMaterial, THREE.LinePieces);
+    return line;
+}
 
 function init() {
 
@@ -674,7 +773,7 @@ function init() {
                 break;
             case 'OBJ_COLLECTION':
                 msg = obj_collection_t.decode(msg_buf.data);
-                // add_objects_to_scene_group(msg);
+                add_objects_to_scene_group(msg);
                 break;
             default:
                 console.log('Unknown channel / decoder ' + ch_str);
@@ -742,30 +841,7 @@ function init() {
 
     // Axis
     grid_group = new THREE.Object3D();
-    var linegeo = new THREE.Geometry();
-    linegeo.vertices = [
-        new THREE.Vector3(0, 0, 0),
-        new THREE.Vector3(1, 0, 0),
-        new THREE.Vector3(0, 0, 0),
-        new THREE.Vector3(0, 1, 0),
-        new THREE.Vector3(0, 0, 0),
-        new THREE.Vector3(0, 0, 1)
-    ];
-    linegeo.colors = [
-        new THREE.Color( 0xff0000 ),
-        new THREE.Color( 0xff0000 ),
-        new THREE.Color( 0x00ff00 ),
-        new THREE.Color( 0x00ff00 ),
-        new THREE.Color( 0x0000ff ),
-        new THREE.Color( 0x0000ff )
-    ];
-    var lineMaterial = new THREE.LineBasicMaterial({
-        color: 0xffffff,
-        vertexColors: THREE.VertexColors,
-        linewidth: 5
-    });
-    var line = new THREE.Line(linegeo, lineMaterial, THREE.LinePieces);
-    grid_group.add(line);
+    grid_group.add(getAxes());
 
     // Ground grid
     {
