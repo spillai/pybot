@@ -641,6 +641,8 @@ function add_points_to_scene_group(msg) {
 
         // Add group to scene
         scene_group.add(element_group);
+        scene_group.frustumCulled = true;
+
         
     }
     
@@ -742,6 +744,8 @@ function add_objects_to_scene_group(msg) {
             scene_group.add(obj_group);
         }
     }
+    scene_group.frustumCulled = true;
+
         
 }
 

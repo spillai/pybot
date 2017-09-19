@@ -13,11 +13,11 @@ import numpy as np
 
 import cv2
 
-from pybot.externals import vs, serialize, publish, pose_t
-
-from pybot.externals.draw_helpers import reshape_arr, get_color_arr, height_map, \
-    color_by_height_axis, copy_pointcloud_data, Frustum
+from pybot.utils.timer import timeitmethod
 from pybot.geometry.rigid_transform import RigidTransform
+from pybot.externals import vs, serialize, publish, pose_t
+from pybot.externals.draw_helpers import reshape_arr, get_color_arr, \
+    height_map, color_by_height_axis, copy_pointcloud_data, Frustum
 
 class VisualizationMsgsPub: 
     """
@@ -192,7 +192,7 @@ def arr_msg(arr, carr, frame_uid, element_id):
 
     return msg
 
-
+@timeitmethod
 def publish_point_type(pub_channel, _arr, c='r', point_type='POINT', 
                        flip_rb=False, frame_id='camera', element_id=0, reset=True):
     """
@@ -244,6 +244,7 @@ def publish_point_type(pub_channel, _arr, c='r', point_type='POINT',
     g_viz_pub.publish("POINTS_COLLECTION", serialize(pc_list_msg))
 
 # @run_async
+@timeitmethod
 def publish_cloud(pub_channel, arr, c='r', flip_rb=False, frame_id='camera', element_id=0, reset=True):
     publish_point_type(pub_channel, arr, c=c, point_type='POINT', 
                        flip_rb=flip_rb, frame_id=frame_id, element_id=element_id, reset=reset)
