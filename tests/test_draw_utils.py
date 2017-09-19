@@ -43,7 +43,8 @@ if __name__ == "__main__":
     for j in range(3):
         time.sleep(1)
         p = Pose.from_rigid_transform(0, RigidTransform(tvec=[1,j,0]))
-        draw_utils.publish_pose_list('poses', [p], frame_id='origin', reset=False)
+        draw_utils.publish_pose_list('poses', [p],
+                                     frame_id='origin', reset=False)
 
     # draw_utils.publish_cloud('cloud', Xs, c='b', frame_id='poses', element_id=ids)
 

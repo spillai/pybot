@@ -24,7 +24,7 @@ class LCMThreadHandler(object):
             
     def on_event(self, server, ch, data):
         try:
-            print('on_event: {}, {}, {}'.format(ch, len(data), server))
+            print('on_event: ch={}, len={}'.format(ch, len(data)))
             server.send_message_to_all(ch + b' ' + data)
         except Exception, e:
             print('Failed to send, client unavailable {}'.format(e))            

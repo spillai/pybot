@@ -570,7 +570,7 @@ function update_camera_pose(msg) {
                                     za.y * 1 + msg.pos[1],
                           za.z * 1 + msg.pos[2])
     );
-    render();
+    
 }
 
 function add_points_to_scene_group(msg) {
@@ -618,18 +618,22 @@ function add_points_to_scene_group(msg) {
             element_group.add(lines)
             break;
             
-        // // Render triangles
-        // case point3d_list_collection_t.getEnum('point_type').TRIANGLES:
-        //     // Create triangles and compute normals
-        //     for (var j = 0, pc_sz = pc.points.length / 3;
-        //          j < pc_sz; ++j) {
-        //         geom.faces.push( new THREE.Face3( j, j+1, j+2 ));
-        //     }
-        //     geom.computeFaceNormals();
-        //     var mesh= new THREE.Mesh(
-        //         geom, new THREE.MeshNormalMaterial() );
-        //     element_group.add(mesh);
-        //     break;
+        // Render triangles
+        case point3d_list_collection_t.getEnum('point_type').TRIANGLES:
+            // Create triangles and compute normals
+            for (var j = 0, pc_sz = pc.points.length / 3;
+                 j < pc_sz; ++j) {
+                geom.faces.push( new THREE.Face3( 3*j, 3*j+1, 3*j+2 ));
+            }
+            
+            mesh_material = new THREE.MeshBasicMaterial({
+                color: 0xFFFF00,
+                // transparent: true,
+                // opacity: .6
+            });
+            var mesh = new THREE.Mesh(geom, mesh_material);
+            element_group.add(mesh);
+            break;
 
         default:
             console.log('Unknown type ' + msg.type);
@@ -639,9 +643,6 @@ function add_points_to_scene_group(msg) {
         scene_group.add(element_group);
         
     }
-    
-    // Re-render scene
-    render();
     
     // for (var r = 0; r < reconstructions.length; ++r) {
     //     var reconstruction = reconstructions[r];
@@ -702,13 +703,14 @@ function add_objects_to_scene_group(msg) {
 
 
     // Retreive object collection
-    if (msg.reset || Object.keys(obj_collections_lut).length == 0) {
+    // Object.keys(obj_collections_lut).length == 0
+    if (msg.reset || !(msg.id in obj_collections_lut)) {
         obj_collections[msg.id] = {};
         obj_collections_lut[msg.id] = {};
     }
     collection = obj_collections[msg.id];
     collection_lut = obj_collections_lut[msg.id];
-
+    
     // Render poses
     for (var i = 0; i < msg.objs.length; ++i) {
         var obj = msg.objs[i];
@@ -740,10 +742,7 @@ function add_objects_to_scene_group(msg) {
             scene_group.add(obj_group);
         }
     }
-    
-    // Re-render scene
-    render();
-    
+        
 }
 
 function getAxes(sz) {
@@ -796,7 +795,7 @@ function init() {
             // Split channel, and data
             msg_buf = split_channel_data(buf);
             ch_str = String.fromCharCode.apply(null, msg_buf.channel);
-            console.log('<' + ch_str + '>');
+            // console.log('<' + ch_str + '>');
 
             // Decode based on channel 
             switch(ch_str) {
@@ -817,19 +816,20 @@ function init() {
                 break;
                 
             case 'RESET_COLLECTIONS':
-                var obj = scene.getObjectByName('collections_scene');
-                
                 obj_collections = {};
                 obj_collections_lut = {};
                 
-                scene.remove(obj);
+                scene.remove(scene_group);
                 addEmptyScene();
-                render();
+                
                 break;
                 
             default:
                 console.log('Unknown channel / decoder ' + ch_str);
             }
+            
+            // Re-render scene
+            render();
             
         }
     };
@@ -938,11 +938,9 @@ function initRenderer() {
     }
     grid_group.name = 'grid';
     grid_group.frustumCulled = true;
-    // scene_group.add(grid_group);
 
     scene = new THREE.Scene();
     scene.add(grid_group);
-    //scene.add(scene_group);
 
     // Create empty scene
     addEmptyScene();

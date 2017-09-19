@@ -368,12 +368,12 @@ def draw_camera(pose, zmin=0.0, zmax=0.1, fov=np.deg2rad(60)):
     faces = []
 
     # Triangles: Front Face
-    faces.extend([ful, fur, flr])
-    faces.extend([flr, ful, fll])
+    # faces.extend([ful, fur, flr])
+    # faces.extend([flr, ful, fll])
 
     # Triangles: Back Face
-    faces.extend([nul, nur, nlr])
-    faces.extend([nlr, nul, nll])
+    # faces.extend([nul, nur, nlr])
+    # faces.extend([nlr, nul, nll])
 
     # Triangles: Four walls (2-triangles per face)
     left, top, right, bottom = [fll, nll, ful, ful, nll, nul], \
@@ -390,6 +390,8 @@ def draw_camera(pose, zmin=0.0, zmax=0.1, fov=np.deg2rad(60)):
     pts.extend([ful, nul, nur, fur, ful])
     pts.extend([fur, nur, nlr, flr, fur])
     pts.extend([flr, nlr, nll, fll, flr])
+    pts.extend([flr, ful])
+    pts.extend([fur, fll])    
     pts = np.vstack(pts)
     
     return (faces, np.hstack([pts[:-1], pts[1:]]).reshape((-1,3)))
