@@ -553,15 +553,31 @@ function split_channel_data(ch_data) {
     return {channel: -1, data: -1};
 }
 
+function update_camera_pose(msg) {
+    // Place camera
+    var mat = new THREE.Matrix4().makeRotationFromQuaternion(
+        new THREE.Quaternion(msg.orientation[1],
+                             msg.orientation[2],
+                             msg.orientation[3],
+                             msg.orientation[0])).transpose();
+
+    var d = mat.elements;
+    var ya = new THREE.Vector3(d[1], d[5], d[9]);
+    var za = new THREE.Vector3(d[2], d[6], d[10]);
+    controls.goto(
+        new THREE.Vector3(msg.pos[0], msg.pos[1], msg.pos[2]),
+        new THREE.Vector3(za.x * 1 + msg.pos[0],
+                                    za.y * 1 + msg.pos[1],
+                          za.z * 1 + msg.pos[2])
+    );
+    render();
+}
+
 function add_points_to_scene_group(msg) {
     
     // Render points
     for (var i = 0; i < msg.pointLists.length; ++i) {
         var pc = msg.pointLists[i];
-        // reconstruction_groups[r] = new THREE.Object3D();
-        // var group = reconstruction_groups[r];
-        // var group = new THREE.Object3D();
-
 
         // Find collection_id, and element_id pose
         try {
@@ -574,7 +590,7 @@ function add_points_to_scene_group(msg) {
             return;
         }
 
-        
+        // Add points into 
         var geom = new THREE.Geometry();
         for (var j = 0, pc_sz = pc.points.length; j < pc_sz; ++j) {
             var pt = pc.points[j];
@@ -684,21 +700,16 @@ function add_points_to_scene_group(msg) {
 
 function add_objects_to_scene_group(msg) {
 
-    // Render
-    // obj_collections[msg.id] = new THREE.Object3D();
-
-    // TODO: reset
 
     // Retreive object collection
-    if (msg.reset || obj_collections_lut.keys().length == 0) {
+    if (msg.reset || Object.keys(obj_collections_lut).length == 0) {
         obj_collections[msg.id] = {};
         obj_collections_lut[msg.id] = {};
     }
     collection = obj_collections[msg.id];
     collection_lut = obj_collections_lut[msg.id];
-    
-    //obj_collections[msg.id].applyMatrix();
-    
+
+    // Render poses
     for (var i = 0; i < msg.objs.length; ++i) {
         var obj = msg.objs[i];
         var mat = new THREE.Matrix4().makeRotationFromEuler(
@@ -706,21 +717,28 @@ function add_objects_to_scene_group(msg) {
         mat.setPosition(new THREE.Vector3(obj.x, obj.y, obj.z));
 
         // Create object group for obj_id
-        collection[obj.id] = new THREE.Object3D();
-        collection_lut[obj.id] = msg;
+        var update = false;
+        if (msg.reset || !(obj.id in collection)) { 
+            collection[obj.id] = new THREE.Object3D();
+            collection_lut[obj.id] = msg;
+            // console.log('adding element ' + msg.id + ':' + obj.id);
+        } else {
+            update = true;
+            console.log('updating element ' + msg.id + ':' + obj.id);
+        }
         
-        var obj_group = collection[obj.id];
-        console.log('adding element ' + msg.id + ':' + obj.id);
-        
-        // Add axes to obj_id
-        var axes = getAxes(0.2);
-        obj_group.add(axes);
-
         // Transform obj_id
+        var obj_group = collection[obj.id];
         obj_group.applyMatrix(mat);
 
-        // Add obj_id to scene
-        scene_group.add(obj_group);
+        // First time add
+        if (!update) {
+            // Add axes to obj_id
+            obj_group.add(getAxes(0.2));
+
+            // Add obj_id to scene
+            scene_group.add(obj_group);
+        }
     }
     
     // Re-render scene
@@ -759,8 +777,10 @@ function init() {
             throw err;
         
         // Obtain a message type
+        pose_t = root.lookupType("vs.pose_t");
         obj_collection_t = root.lookupType("vs.obj_collection_t");
         point3d_list_collection_t = root.lookupType("vs.point3d_list_collection_t");
+        
     });
 
     // -------------------------------------------
@@ -780,22 +800,33 @@ function init() {
 
             // Decode based on channel 
             switch(ch_str) {
+                
+            case 'CAMERA_POSE':
+                msg = pose_t.decode(msg_buf.data);
+                update_camera_pose(msg);
+                break;
+                
             case 'POINTS_COLLECTION':
                 msg = point3d_list_collection_t.decode(msg_buf.data);
                 add_points_to_scene_group(msg);
                 break;
+                
             case 'OBJ_COLLECTION':
                 msg = obj_collection_t.decode(msg_buf.data);
                 add_objects_to_scene_group(msg);
                 break;
+                
             case 'RESET_COLLECTIONS':
                 var obj = scene.getObjectByName('collections_scene');
+                
+                obj_collections = {};
+                obj_collections_lut = {};
+                
                 scene.remove(obj);
-                
                 addEmptyScene();
-                
                 render();
                 break;
+                
             default:
                 console.log('Unknown channel / decoder ' + ch_str);
             }
@@ -839,6 +870,7 @@ function initRenderer() {
     camera.position.x = 50;
     camera.position.y = 50;
     camera.position.z = 50;
+    camera.far = 100; // Setting far frustum (for culling)
     camera.up = new THREE.Vector3(0,0,1);
 
     controls = new THREE.OrbitControls(camera, renderer.domElement);
@@ -905,6 +937,7 @@ function initRenderer() {
         grid_group.add(line);
     }
     grid_group.name = 'grid';
+    grid_group.frustumCulled = true;
     // scene_group.add(grid_group);
 
     scene = new THREE.Scene();

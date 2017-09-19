@@ -30,10 +30,10 @@ def set_marshalling_backend(value):
 # ===============================================================================
 
 if _PYBOT_VIS_BACKEND == 'lcm':
-    from pybot.externals.lcm import vs, serialize
+    from pybot.externals.lcm import vs, serialize, image_t, pose_t
     
 elif _PYBOT_VIS_BACKEND == 'protobuf':
-    from pybot.externals.pb import vs, serialize
+    from pybot.externals.pb import vs, serialize, pose_t
 
 else:
     raise Exception('''Unknown backend: {}, '''

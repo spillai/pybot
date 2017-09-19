@@ -13,8 +13,7 @@ import numpy as np
 
 import cv2
 
-from pybot.externals import vs, serialize, publish
-# from bot_core import image_t, pose_t
+from pybot.externals import vs, serialize, publish, pose_t
 
 from pybot.externals.draw_helpers import reshape_arr, get_color_arr, height_map, \
     color_by_height_axis, copy_pointcloud_data, Frustum
@@ -119,9 +118,8 @@ def publish_pose_t(channel, pose, frame_id='camera'):
     frame_pose = g_viz_pub.get_sensor_pose(frame_id)
     out_pose = frame_pose.oplus(pose)
 
-    p = pose_t()
-    p.orientation = list(out_pose.quat.to_wxyz())
-    p.pos = out_pose.tvec.tolist()
+    p = pose_t(list(out_pose.quat.to_wxyz()),
+               out_pose.tvec.tolist())
     g_viz_pub.publish(channel, serialize(p))
 
 def publish_image_t(pub_channel, im, jpeg=False, flip_rb=True): 

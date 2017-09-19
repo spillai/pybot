@@ -11,35 +11,15 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(
         description='KITTI test dataset')
-    # parser.add_argument(
-    #     '-f', '--filename', type=str, required=True, 
-    #     help="Filename: rosbag (.bag)")
-    # parser.add_argument(
-    #     '-c', '--camera-channel', type=str, required=False, 
-    #     default='/left_camera/image_color', 
-    #     help='/left_camera/image_color')
-    # parser.add_argument(
-    #     '-p', '--point-cloud', type=str, required=False, 
-    #     default='/vehicle/sonar_cloud', 
-    #     help='/vehicle/sonar_cloud')
-    # parser.add_argument(
-    #     '-o', '--odom-channel', type=str, required=False, 
-    #     default='/odom', 
-    #     help='/odom')
     parser.add_argument(
         '--velodyne', dest='velodyne', action='store_true',
         help="Process Velodyne data")
     args = parser.parse_args()
 
-    # try: 
     import pybot.externals.draw_utils as draw_utils
-    #     draw_utils.init()
-    # except: 
-    #     import pybot.vision.draw_utils as draw_utils
-        
 
     # KITTI params
-    dataset = test_dataset(scale=1.0)
+    dataset = test_dataset(sequence='00', scale=1.0)
 
     try: 
         # Publish ground truth poses
@@ -59,20 +39,23 @@ if __name__ == "__main__":
     except Exception, e:
         print('Failed to publish poses, {}'.format(e))
         
-    # Iterate through the dataset
-    p_bc = KITTIDatasetReader.camera2body
-    p_bv = KITTIDatasetReader.velodyne2body
-    for idx, f in enumerate(dataset.iterframes()):
-        imshow_cv('frame', np.vstack([f.left,f.right]))
+    # # Iterate through the dataset
+    # p_bc = KITTIDatasetReader.camera2body
+    # p_bv = KITTIDatasetReader.velodyne2body
+    # for idx, f in enumerate(dataset.iterframes()):
+    #     # imshow_cv('frame', np.vstack([f.left,f.right]))
 
-        if idx % 20 == 0: 
-            draw_utils.publish_cameras('poses', [Pose.from_rigid_transform(idx, f.pose)], frame_id='camera', zmax=20, reset=False, draw_faces=True)
-        # draw_utils.publish_pose_list('poses', [Pose.from_rigid_transform(idx, f.pose)], frame_id='camera', reset=False)
-        # draw_utils.publish_pose_t('CAMERA_POSE', f.pose, frame_id='camera')
-        print f.pose
+    #     # if idx % 20 == 0: 
+    #     #     draw_utils.publish_cameras(
+    #     #         'poses', [Pose.from_rigid_transform(idx, f.pose)],
+    #     #         frame_id='camera', zmax=5,
+    #     #         reset=False, draw_faces=True)
+    #     draw_utils.publish_pose_list('poses', [Pose.from_rigid_transform(idx, f.pose)], frame_id='camera', reset=False)
+    #     # draw_utils.publish_pose_t('CAMERA_POSE', f.pose, frame_id='camera')
+    #     print f.pose
 
         
-        if args.velodyne:
-            X = f.velodyne[::10,:3]
-            # draw_utils.publish_cloud('cloud', X, c='b', frame_id='camera')
-            draw_utils.publish_cloud('cloud', p_bv * X, c='b', frame_id='poses', element_id=idx)
+    #     if args.velodyne:
+    #         X = f.velodyne[::10,:3]
+    #         # draw_utils.publish_cloud('cloud', X, c='b', frame_id='camera')
+    #         draw_utils.publish_cloud('cloud', p_bv * X, c='b', frame_id='poses', element_id=idx)

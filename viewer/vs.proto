@@ -2,6 +2,16 @@ syntax = "proto3";
 
 package vs;
 
+// Pose
+message pose_t {
+  int64 utime = 1;
+  repeated double pos = 2;
+  repeated double vel = 3;
+  repeated double orientation = 4;
+  repeated double rotation_rate = 5;
+  repeated double accel = 6;
+}
+
 // Objects
 message obj_t {
   int64 id = 1;
