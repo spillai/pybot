@@ -632,6 +632,7 @@ function add_points_to_scene_group(msg) {
                 // opacity: .6
             });
             var mesh = new THREE.Mesh(geom, mesh_material);
+            mesh.renderOrder = 0;
             element_group.add(mesh);
             break;
 

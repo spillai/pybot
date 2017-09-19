@@ -463,7 +463,7 @@ def publish_cameras(pub_channel, poses, c='y', texts=[], covars=[], frame_id='ca
 
     # Darker yellow edge
     if draw_edges: 
-        carr = ['r'] * len(cam_edges)
+        carr = ['y'] * len(cam_edges)
         publish_point_type(pub_channel+'-edges', cam_edges, point_type='LINES', c=carr, 
                            frame_id=frame_id, reset=reset)
 

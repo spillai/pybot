@@ -52,8 +52,8 @@ if __name__ == "__main__":
         if idx % 5 == 0: 
             draw_utils.publish_cameras(
                 'cam_poses', [Pose.from_rigid_transform(idx, f.pose)],
-                frame_id='camera', zmax=0.5,
-                reset=False, draw_faces=True)
+                frame_id='camera', zmax=2,
+                reset=False, draw_faces=False, draw_edges=True)
         
         draw_utils.publish_pose_list(
             'poses', [Pose.from_rigid_transform(idx, f.pose)],
