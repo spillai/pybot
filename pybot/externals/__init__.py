@@ -5,12 +5,12 @@ from pybot.utils.misc import color_green
 
 _PYBOT_VIS_CHOICES = ['lcm', 'protobuf']
 _PYBOT_VIS_BACKEND = get_environment('PYBOT_VIS_BACKEND',
-                                      default='lcm',
+                                      default='protobuf',
                                       choices=_PYBOT_VIS_CHOICES)
 
 _PYBOT_MARSHALLING_CHOICES = ['lcm', 'zmq']
 _PYBOT_MARSHALLING_BACKEND = get_environment('PYBOT_MARSHALLING_BACKEND',
-                                      default='lcm',
+                                      default='zmq',
                                       choices=_PYBOT_MARSHALLING_CHOICES)
 
 def vis_backend():
