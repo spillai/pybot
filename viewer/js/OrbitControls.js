@@ -38,7 +38,7 @@ THREE.OrbitControls = function ( object, domElement ) {
 	this.animationTarget = new THREE.Vector3();
 	this.animationPosition = new THREE.Vector3();
 	this.animationPosition.copy(object.position);
-	this.animationSpeed = 0.1;
+	this.animationSpeed = 0.2;
 
 	// This option actually enables dollying in and out; left as "zoom" for
 	// backwards compatibility

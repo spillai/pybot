@@ -76,9 +76,11 @@ class LCMThreadHandler(object):
             zmq_port = 4999
             self.m_ = zmq.Context()
             self.sub_ = self.m_.socket(zmq.SUB)
-            self.sub_.connect('tcp://{}:{}'.format(zmq_server, zmq_port))
+            self.sub_.connect('tcp://{}:{}'
+                              .format(zmq_server, zmq_port))
             self.sub_.setsockopt(zmq.SUBSCRIBE, '')
-            print('Starting zmq listener on port {}:{}'.format(zmq_server, zmq_port))
+            print('Starting zmq listener on port {}:{}'
+                  .format(zmq_server, zmq_port))
             
             def handle():
                 # Handler

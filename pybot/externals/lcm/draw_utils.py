@@ -81,7 +81,7 @@ class VisualizationMsgsPub:
         roll, pitch, yaw, x, y, z = pose.to_rpyxyz(axes='sxyz')
         pose_msg.id = 0
         pose_msg.x, pose_msg.y, pose_msg.z, \
-            pose_msg.roll, pose_msg.pitch, pose_msg.yaw  = x, y, z, roll, pitch, yaw
+            pose_msg.roll, pose_msg.pitch, pose_msg.yaw = x, y, z, roll, pitch, yaw
         
         # Save pose
         self.set_sensor_pose(channel, pose)

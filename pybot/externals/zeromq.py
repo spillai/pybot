@@ -1,4 +1,5 @@
 import zmq
+import time
 
 global g_context
 global g_socket
@@ -11,8 +12,12 @@ def connect(server='127.0.0.1', port=4999):
     try: 
         g_context = zmq.Context()
         g_socket = g_context.socket(zmq.PUB)
+        g_socket.setsockopt(zmq.LINGER, 0)
         g_socket.bind("tcp://{}:{}".format(server, port))
         print('Connected successfully to {}:{}'.format(server, port))
+
+        # Sleep a little bit so that packets are not dropped
+        time.sleep(0.2)
     except Exception, e:
         g_context, g_socket = None, None
         print('Exception {}'.format(e))
@@ -31,4 +36,3 @@ def publish(channel, data):
     if g_context is None:
         connect()
     g_socket.send(pack(channel, data))
-            

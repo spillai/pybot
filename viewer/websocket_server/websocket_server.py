@@ -290,7 +290,7 @@ class WebSocketHandler(StreamRequestHandler):
 
         self.request.send(header + payload)
 
-    def send_blob(self, message, opcode=OPCODE_TEXT):
+    def send_blob(self, message, opcode=OPCODE_BINARY):
         """
         Important: Fragmented(=continuation) messages are not supported since
         their usage cases are limited - when we don't know the payload length.
@@ -312,7 +312,7 @@ class WebSocketHandler(StreamRequestHandler):
         # payload = encode_to_UTF8(message)
         payload = message
         payload_length = len(payload)
-
+        
         # Normal payload
         if payload_length <= 125:
             header.append(FIN | opcode)
