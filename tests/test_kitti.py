@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+import time
 import argparse
 import numpy as np
 
@@ -6,6 +7,7 @@ from pybot.utils.test_utils import test_dataset
 from pybot.utils.dataset.kitti import KITTIDatasetReader
 from pybot.vision.imshow_utils import imshow_cv
 from pybot.geometry.rigid_transform import RigidTransform, Pose
+from pybot.utils.timer import SimpleTimer
 
 if __name__ == "__main__": 
 
@@ -45,6 +47,8 @@ if __name__ == "__main__":
 
     p_bc, p_bv = dataset.p_bc, dataset.p_bv
     p_cv = (p_bc.inverse() * p_bv).inverse()
+
+    timer = SimpleTimer('publish_velodyne')
     
     for idx, f in enumerate(dataset.iterframes()):
         # imshow_cv('frame', np.vstack([f.left,f.right]))
@@ -62,8 +66,8 @@ if __name__ == "__main__":
                                   frame_id='camera')
         print idx, f.pose
 
-        
         if args.velodyne and idx % 5 == 0:
+
             # Collect velodyne point clouds (+ve x axis)
             X_v = f.velodyne[::10,:3]
             carr = f.velodyne[::10,3]
@@ -76,5 +80,6 @@ if __name__ == "__main__":
             # Convert velo pt. cloud to cam coords, and project
             X_c = p_cv * X_v
             draw_utils.publish_cloud(
-                'cloud', X_c, c=carr, frame_id='poses', element_id=idx)
-
+                'cloud', X_c, c=carr, frame_id='poses',
+                element_id=idx)
+            

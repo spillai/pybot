@@ -35,6 +35,7 @@ THREE.OrbitControls = function ( object, domElement ) {
 	// and where it pans with respect to.
 	this.target = new THREE.Vector3();
 
+    this.animationUp = new THREE.Vector3(0,0,1);
 	this.animationTarget = new THREE.Vector3();
 	this.animationPosition = new THREE.Vector3();
 	this.animationPosition.copy(object.position);
@@ -236,12 +237,15 @@ THREE.OrbitControls = function ( object, domElement ) {
 	};
 
 	this.update = function () {
-		this.updateAnimationTargetsMouse();
+	    this.updateAnimationTargetsMouse();
 
-		this.target.lerp(this.animationTarget, this.animationSpeed);
-		this.object.position.lerp(this.animationPosition, this.animationSpeed);
-		this.object.lookAt(this.target);
-
+	    this.target.lerp(this.animationTarget, this.animationSpeed);
+	    this.object.position.lerp(this.animationPosition, this.animationSpeed);
+	    this.object.lookAt(this.target);
+            this.object.up = this.animationUp;
+            
+            // this.object.up = new THREE.Vector3(0,0,1);
+            
 		// update condition is:
 		// min(camera displacement, camera rotation in radians)^2 > EPS
 		// using small-angle approximation cos(x/2) = 1 - x^2 / 8
@@ -266,6 +270,12 @@ THREE.OrbitControls = function ( object, domElement ) {
 		this.animationTarget.copy(target);
 	};
 
+    this.goto_up = function(position, target, up) {
+	this.animationPosition.copy(position);
+	this.animationTarget.copy(target);
+        this.animationUp.copy(up);
+	};
+    
 	this.reset = function () {
 		state = STATE.NONE;
 		this.target.copy( this.target0 );

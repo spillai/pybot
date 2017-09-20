@@ -562,13 +562,14 @@ function update_camera_pose(msg) {
                              msg.orientation[0])).transpose();
 
     var d = mat.elements;
-    var ya = new THREE.Vector3(d[1], d[5], d[9]);
+    var ya = new THREE.Vector3(d[1], d[5], d[9]).negate();
     var za = new THREE.Vector3(d[2], d[6], d[10]);
-    controls.goto(
+    controls.goto_up(
         new THREE.Vector3(msg.pos[0], msg.pos[1], msg.pos[2]),
         new THREE.Vector3(za.x * 1 + msg.pos[0],
                                     za.y * 1 + msg.pos[1],
-                          za.z * 1 + msg.pos[2])
+                          za.z * 1 + msg.pos[2]),
+        new THREE.Vector3(ya.x, ya.y, ya.z)
     );
     
 }
