@@ -4,6 +4,7 @@
 # Helper functions for plotting
 import numpy as np
 from pybot.utils.plot_utils import plt
+from pybot.utils.timer import timeitmethod
 from matplotlib.colors import colorConverter
 from copy import deepcopy
 
@@ -46,14 +47,11 @@ def get_color_arr(c, n, flip_rb=False):
     # return floating point with values in [0,1]
     return carr.astype(np.float32) / 255.0 if carr.dtype == np.uint8 else carr.astype(np.float32)
 
-
 def copy_pointcloud_data(_arr, _carr, flip_rb=False): 
-    arr, carr = deepcopy(_arr), deepcopy(_carr)
-    arr = arr.reshape(-1,3)
+    arr = _arr.reshape(-1,3)
     N, D = arr.shape[:2]
-    carr = get_color_arr(carr, N, flip_rb=flip_rb);
+    carr = get_color_arr(_carr, N, flip_rb=flip_rb);
     return arr, carr
-
 
 class Frustum(object): 
     """

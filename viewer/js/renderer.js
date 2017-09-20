@@ -592,11 +592,12 @@ function add_points_to_scene_group(msg) {
 
         // Add points into 
         var geom = new THREE.Geometry();
-        for (var j = 0, pc_sz = pc.points.length; j < pc_sz; ++j) {
-            var pt = pc.points[j];
-            var col = pc.colors[j];
-            geom.vertices.push(new THREE.Vector3(pt.x, pt.y, pt.z));
-            geom.colors.push(new THREE.Color(col.r, col.g, col.b));
+        // console.log('points: ' + pc.points.length / 3);
+        for (var j = 0, j3 = 0, pc_sz = pc.points.length / 3; j < pc_sz; ++j, j3 += 3) {
+            var pt_x = pc.points[j3], pt_y = pc.points[j3+1], pt_z = pc.points[j3+2];
+            var col_r = pc.colors[j3], col_g = pc.colors[j3+1], col_b = pc.colors[j3+2];
+            geom.vertices.push(new THREE.Vector3(pt_x, pt_y, pt_z));
+            geom.colors.push(new THREE.Color(col_r, col_g, col_b));
         }
         
         // Render points

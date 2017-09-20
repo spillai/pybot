@@ -15,7 +15,7 @@ import cv2
 
 from pybot.utils.timer import timeitmethod
 from pybot.geometry.rigid_transform import RigidTransform
-from pybot.externals import vs, serialize, publish, pose_t
+from pybot.externals import vs, serialize, publish, pose_t, arr_msg
 from pybot.externals.draw_helpers import reshape_arr, get_color_arr, \
     height_map, color_by_height_axis, copy_pointcloud_data, Frustum
 
@@ -159,38 +159,6 @@ def corners_to_edges(corners):
 def polygons_to_edges(polygons):
     """ Edges are represented in N x 6 form """
     return np.vstack([ corners_to_edges(corners) for corners in polygons])
-
-def arr_msg(arr, carr, frame_uid, element_id): 
-    # point3d collection msg
-    msg = vs.point3d_list_t()
-    msg.nnormals = 0
-    # msg.normals = []
-    msg.npointids = 0
-    # msg.pointids = []
-    msg.id = int(time.time() * 1e6)
-    
-    # comes from the sensor_frames_msg published earlier
-    msg.collection = frame_uid 
-    msg.element_id = element_id
-
-    npoints = len(arr)
-    msg.points.extend([vs.point3d_t() for _ in xrange(0,npoints)])
-    msg.npoints = len(msg.points)             
-    inds = np.arange(0,npoints)
-
-    for j in xrange(npoints):
-        msg.points[j].x = arr[j,0]
-        msg.points[j].y = arr[j,1]
-        msg.points[j].z = arr[j,2]
-
-    msg.colors.extend([vs.color_t() for _ in xrange(0,npoints)])
-    msg.ncolors = len(msg.colors)
-    for j in xrange(npoints):
-        msg.colors[j].r = carr[j,0]
-        msg.colors[j].g = carr[j,1]
-        msg.colors[j].b = carr[j,2]    
-
-    return msg
 
 @timeitmethod
 def publish_point_type(pub_channel, _arr, c='r', point_type='POINT', 
