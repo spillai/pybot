@@ -70,12 +70,14 @@ if __name__ == "__main__":
 
             # Collect velodyne point clouds (+ve x axis)
             X_v = f.velodyne[::10,:3]
-            carr = f.velodyne[::10,3]
+            # carr = f.velodyne[::10,3]
+            # carr = np.tile(carr.reshape(-1,1), [1,3])
+
+            carr = draw_utils.height_map(X_v[:,2], hmin=-2, hmax=4)
             
-            valid = X_v[:,0] >= 0
-            X_v = X_v[valid, :3]
-            carr = carr[valid]
-            carr = np.tile(carr.reshape(-1,1), [1,3])
+            inds, = np.where(X_v[:,0] >= 0)
+            X_v = X_v[inds, :3]
+            carr = carr[inds]
 
             # Convert velo pt. cloud to cam coords, and project
             X_c = p_cv * X_v

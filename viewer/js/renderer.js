@@ -1,5 +1,5 @@
 var urlParams;
-var f1;
+var f1, f2;
 var container, camera, controls, scene, renderer;
 var ws;
 
@@ -11,6 +11,7 @@ var imagePlaneOld, imagePlaneCameraOld;
 var scene_group, grid_group;
 var pointCloudMaterial, lineMaterial;
 var reconstructions;
+var collections_visibles = [];
 var reconstruction_visibles = [];
 var reconstruction_groups = [];
 
@@ -35,6 +36,7 @@ var savedOptions = {
     showThumbnail: false,
     showImagePlane: true,
     drawGrid: false,
+    followCamera: false, 
     drawGPS: false
 };
 
@@ -45,6 +47,7 @@ var options = {
     showThumbnail: true,
     showImagePlane: false,
     drawGrid: true,
+    followCamera: true,
     drawGPS: false,
     animationSpeed: 0.2,
     imagePlaneOpacity: 1,
@@ -52,6 +55,7 @@ var options = {
     hoverCameraColor: new THREE.Color(0xFF8888),
     selectedCameraColor: new THREE.Color(0xFFFF88),
     reconstruction_visibles: {},
+    collections_visibles: {},
     resolution: 'original',
     allNone: function () {
         var someone = false;
@@ -107,6 +111,9 @@ function addDatGui(){
     f1.add(options, 'drawGrid')
         .listen()
         .onChange(setDrawGrid);
+    f1.add(options, 'followCamera')
+        .listen()
+        .onChange(setFollowCamera);
     f1.add(options, 'showImagePlane')
         .listen()
         .onChange(setShowImagePlane);
@@ -115,6 +122,7 @@ function addDatGui(){
         .onChange(setDrawGPS);
     f1.open();
 
+    f2 = gui.addFolder('Collections');
 
     // var f3 = gui.addFolder('Reconstructions')
     // f3.add(options, 'allNone');
@@ -176,6 +184,10 @@ function setDrawGrid(value) {
     render();
 }
 
+function setFollowCamera(value) {
+    options.followCamera = value;
+}
+
 function setDrawGPS(value) {
     options.drawGPS = value;
     for (var i = 0; i < gps_lines.length; ++i) {
@@ -227,6 +239,7 @@ function swapOptions() {
         showThumbnail: savedOptions.showThumbnail,
         showImagePlane: savedOptions.showImagePlane,
         drawGrid: savedOptions.drawGrid,
+        followCamera: savedOptions.followCamera,
         drawGPS: savedOptions.drawGPS
     };
 
@@ -235,6 +248,7 @@ function swapOptions() {
     savedOptions.showThumbnail = options.showThumbnail;
     savedOptions.showImagePlane = options.showImagePlane;
     savedOptions.drawGrid = options.drawGrid;
+    savedOptions.followCamera = options.followCamera;
     savedOptions.drawGPS = options.drawGPS;
 
     setPointSize(tmpOptions.pointSize);
@@ -242,6 +256,7 @@ function swapOptions() {
     setShowThumbnail(tmpOptions.showThumbnail);
     setShowImagePlane(tmpOptions.showImagePlane);
     setDrawGrid(tmpOptions.drawGrid);
+    setFollowCamera(tmpOptions.followCamera);
     setDrawGPS(tmpOptions.drawGPS);
 }
 
@@ -346,7 +361,7 @@ function initCameraLines(reconstruction) {
             var lmaterial = new THREE.LineBasicMaterial({size: 0.1 })
             lmaterial.color = options.cameraColor;
             var linegeo = cameraLineGeo(reconstruction, shot_id);
-            var line = new THREE.Line(linegeo, lmaterial, THREE.LinePieces);
+            var line = new THREE.LineSegments(linegeo, lmaterial, THREE.LinePieces);
             line.reconstruction = reconstruction;
             line.shot_id = shot_id;
             lines.push(line);
@@ -554,6 +569,9 @@ function split_channel_data(ch_data) {
 }
 
 function update_camera_pose(msg) {
+    if (!options.followCamera)
+        return;
+    
     // Place camera
     var mat = new THREE.Matrix4().makeRotationFromQuaternion(
         new THREE.Quaternion(msg.orientation[1],
@@ -579,7 +597,7 @@ function add_points_to_scene_group(msg) {
     // Render points
     for (var i = 0; i < msg.pointLists.length; ++i) {
         var pc = msg.pointLists[i];
-
+        
         // Find collection_id, and element_id pose
         try {
             cid = pc.collection, eid = pc.elementId;
@@ -604,7 +622,7 @@ function add_points_to_scene_group(msg) {
         // Render points
         switch (msg.type) {
         case point3d_list_collection_t.getEnum('point_type').POINT:
-            var point_cloud = new THREE.PointCloud(
+            var point_cloud = new THREE.Points(
                 geom, pointCloudMaterial);
             point_clouds.push(point_cloud);
             element_group.add(point_cloud);
@@ -612,8 +630,9 @@ function add_points_to_scene_group(msg) {
             
         // Render lines
         case point3d_list_collection_t.getEnum('point_type').LINES:
-            var lines = new THREE.Line(
+            var lines = new THREE.LineSegments(
                 geom, lineMaterial, THREE.LinePieces);
+            // lines.visible = true;
             // line.reconstruction = reconstruction;
             // line.shot_id = shot_id;
             // lines.push(line);
@@ -642,6 +661,9 @@ function add_points_to_scene_group(msg) {
             console.log('Unknown type ' + msg.type);
         }
 
+        // Element group culling
+        element_group.frustumCulled = true;
+        
         // Add group to scene
         scene_group.add(element_group);
         scene_group.frustumCulled = true;
@@ -748,8 +770,57 @@ function add_objects_to_scene_group(msg) {
         }
     }
     scene_group.frustumCulled = true;
+}
 
-        
+function addGridAxes() {
+    // add the three markers to the axes
+    addAxis(new THREE.Vector3(1, 0, 0));
+    addAxis(new THREE.Vector3(0, 1, 0));
+    addAxis(new THREE.Vector3(0, 0, 1));
+}
+
+function addAxis(axis) {
+    // create the cylinders for the objects
+    var shaftRadius = 0.008;
+    var headRadius = 0.023;
+    var headLength = 0.1;
+
+    var lineGeom = new THREE.CylinderGeometry(
+        shaftRadius, shaftRadius, 0.5);
+    var headGeom = new THREE.CylinderGeometry(
+        0, headRadius, headLength);
+
+    // set the color of the axis
+    var color = new THREE.Color();
+    color.setRGB(axis.x, axis.y, axis.z);
+    var material = new THREE.MeshBasicMaterial({
+      color : color.getHex()
+    });
+
+    var axis_group = new THREE.Object3D();
+    
+    // setup the rotation information
+    var rotAxis = new THREE.Vector3();
+    rotAxis.crossVectors(axis, new THREE.Vector3(0, -1, 0));
+    var rot = new THREE.Quaternion();
+    rot.setFromAxisAngle(rotAxis, 0.5 * Math.PI);
+
+    // create the arrow
+    var arrow = new THREE.Mesh(headGeom, material);
+    arrow.matrix.makeRotationFromQuaternion(rot);
+    arrow.matrix.setPosition(axis.multiplyScalar(0.5).clone());
+    arrow.matrixAutoUpdate = false;
+    axis_group.add(arrow);
+
+    // create the line
+    var line = new THREE.Mesh(lineGeom, material);
+    line.matrix.makeRotationFromQuaternion(rot);
+    line.matrix.setPosition(axis.multiplyScalar(0.5).clone());
+    line.matrixAutoUpdate = false;
+    axis_group.add(line);
+
+    // add axis to group
+    grid_group.add(axis_group);
 }
 
 function getAxes(sz) {
@@ -770,7 +841,7 @@ function getAxes(sz) {
         new THREE.Color( 0x0000ff ),
         new THREE.Color( 0x0000ff )
     ];
-    var line = new THREE.Line(linegeo, lineMaterial, THREE.LinePieces);
+    var line = new THREE.LineSegments(linegeo, lineMaterial, THREE.LinePieces);
     return line;
 }
 
@@ -877,7 +948,7 @@ function initRenderer() {
     camera.position.x = 50;
     camera.position.y = 50;
     camera.position.z = 50;
-    camera.far = 100; // Setting far frustum (for culling)
+    camera.far = 20; // Setting far frustum (for culling)
     camera.up = new THREE.Vector3(0,0,1);
 
     controls = new THREE.OrbitControls(camera, renderer.domElement);
@@ -889,14 +960,16 @@ function initRenderer() {
     window.addEventListener( 'keydown', onKeyDown, false );
     
     // Set materials
-    pointCloudMaterial = new THREE.PointCloudMaterial({
+    pointCloudMaterial = new THREE.PointsMaterial({
         size: options.pointSize,
         vertexColors: true,
     });
     lineMaterial = new THREE.LineBasicMaterial({
         color: 0xffffff,
+        opacity: 1,
+        linewidth: 3,
         vertexColors: THREE.VertexColors,
-        linewidth: 5
+        depthTest: false
     });
 
 
@@ -921,12 +994,12 @@ function initRenderer() {
 
     // Axis
     grid_group = new THREE.Object3D();
-    grid_group.add(getAxes(1));
+    addGridAxes(); // grid_group.add(getAxes(1));
 
     // Ground grid
     {
         var linegeo = new THREE.Geometry();
-        var N = 20;
+        var N = 50;
         var scale = 5;
         for (var i = 0; i <= 2 * N; ++i) {
             linegeo.vertices.push(
@@ -938,9 +1011,10 @@ function initRenderer() {
         }
         var lmaterial = new THREE.LineBasicMaterial({color:
                                                         0x555555});
-        var line = new THREE.Line(
+        var line = new THREE.LineSegments(
             linegeo, lmaterial,
             THREE.LinePieces);
+        // line.receiveShadow = true;
         grid_group.add(line);
     }
     grid_group.name = 'grid';
