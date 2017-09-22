@@ -5,6 +5,8 @@ var ws;
 
 var mouse = new THREE.Vector2();
 var hoverCamera, raycaster, parentTransform;
+var capturer = null;
+var rec_button; 
 var selectedCamera;
 var imagePlane, imagePlaneCamera;
 var imagePlaneOld, imagePlaneCameraOld;
@@ -41,6 +43,28 @@ var savedOptions = {
 };
 
 var options = {
+    record: function() {
+        if (capturer == null) { 
+            // Create a capturer that exports a WebM video
+            capturer = new CCapture(
+                { framerate: 30,
+                  format: 'webm',
+                  // quality: 90,
+                  display: true, 
+                  // workersPath: 'js/',
+                  verbose: false }
+            );
+            capturer.start();
+            console.log('Start recording ...');
+            rec_button.name('Recording ...');
+        } else {
+            capturer.stop();
+            capturer.save();
+            capturer = null;
+            console.log('Stop recording ...');
+            rec_button.name('Record');
+        }    
+    }, 
     cameraSize: 0.9,
     pointSize: 0.1,
     imagePlaneSize: 50,
@@ -123,7 +147,9 @@ function addDatGui(){
     f1.open();
 
     f2 = gui.addFolder('Collections');
-
+    rec_button = f2.add(options, 'record');
+    rec_button.name('Record');
+    f2.open();
     // var f3 = gui.addFolder('Reconstructions')
     // f3.add(options, 'allNone');
     // options.reconstruction_visibles = [];
@@ -597,7 +623,8 @@ function add_points_to_scene_group(msg) {
     // Render points
     for (var i = 0; i < msg.pointLists.length; ++i) {
         var pc = msg.pointLists[i];
-        
+        // var colors = pc.colors[0];
+
         // Find collection_id, and element_id pose
         try {
             cid = pc.collection, eid = pc.elementId;
@@ -609,15 +636,14 @@ function add_points_to_scene_group(msg) {
             return;
         }
 
-        // Add points into 
-        var geom = new THREE.Geometry();
-        // console.log('points: ' + pc.points.length / 3);
-        for (var j = 0, j3 = 0, pc_sz = pc.points.length / 3; j < pc_sz; ++j, j3 += 3) {
-            var pt_x = pc.points[j3], pt_y = pc.points[j3+1], pt_z = pc.points[j3+2];
-            var col_r = pc.colors[j3], col_g = pc.colors[j3+1], col_b = pc.colors[j3+2];
-            geom.vertices.push(new THREE.Vector3(pt_x, pt_y, pt_z));
-            geom.colors.push(new THREE.Color(col_r, col_g, col_b));
-        }
+        // Add points into buffer geometry
+        var geom = new THREE.BufferGeometry();
+        geom.addAttribute(
+            'position', new THREE.BufferAttribute(
+                new Float32Array(pc.points), 3 ));
+        geom.addAttribute(
+            'color', new THREE.BufferAttribute(
+                new Float32Array(pc.colors), 3 ));
         
         // Render points
         switch (msg.type) {
@@ -632,7 +658,7 @@ function add_points_to_scene_group(msg) {
         case point3d_list_collection_t.getEnum('point_type').LINES:
             var lines = new THREE.LineSegments(
                 geom, lineMaterial, THREE.LinePieces);
-            // lines.visible = true;
+            lines.visible = true;
             // line.reconstruction = reconstruction;
             // line.shot_id = shot_id;
             // lines.push(line);
@@ -644,16 +670,14 @@ function add_points_to_scene_group(msg) {
             // Create triangles and compute normals
             for (var j = 0, pc_sz = pc.points.length / 3;
                  j < pc_sz; ++j) {
-                geom.faces.push( new THREE.Face3( 3*j, 3*j+1, 3*j+2 ));
+                geom.faces.push(
+                    new THREE.Face3( 3*j, 3*j+1, 3*j+2 ));
             }
-            
             mesh_material = new THREE.MeshBasicMaterial({
                 color: 0xFFFF00,
-                // transparent: true,
-                // opacity: .6
             });
             var mesh = new THREE.Mesh(geom, mesh_material);
-            mesh.renderOrder = 0;
+            
             element_group.add(mesh);
             break;
 
@@ -781,12 +805,12 @@ function addGridAxes() {
 
 function addAxis(axis) {
     // create the cylinders for the objects
-    var shaftRadius = 0.008;
-    var headRadius = 0.023;
+    var shaftRadius = 0.02;
+    var headRadius = 0.04;
     var headLength = 0.1;
 
     var lineGeom = new THREE.CylinderGeometry(
-        shaftRadius, shaftRadius, 0.5);
+        shaftRadius, shaftRadius, 1);
     var headGeom = new THREE.CylinderGeometry(
         0, headRadius, headLength);
 
@@ -808,7 +832,7 @@ function addAxis(axis) {
     // create the arrow
     var arrow = new THREE.Mesh(headGeom, material);
     arrow.matrix.makeRotationFromQuaternion(rot);
-    arrow.matrix.setPosition(axis.multiplyScalar(0.5).clone());
+    arrow.matrix.setPosition(axis.multiplyScalar(1).clone());
     arrow.matrixAutoUpdate = false;
     axis_group.add(arrow);
 
@@ -877,7 +901,6 @@ function init() {
 
             // Decode based on channel 
             switch(ch_str) {
-                
             case 'CAMERA_POSE':
                 msg = pose_t.decode(msg_buf.data);
                 update_camera_pose(msg);
@@ -900,6 +923,23 @@ function init() {
                 scene.remove(scene_group);
                 addEmptyScene();
                 
+                break;
+                
+            case 'RECORD_START':
+                // location = msg_buf.data;
+                
+                // Create a capturer that exports a WebM video
+                capturer = new CCapture(
+                    { framerate: 30, format: 'webm', verbose: true }
+                );
+                capturer.start();
+                break;
+
+            case 'RECORD_STOP':
+                // location = msg_buf.data;
+                capturer.stop();
+                capturer.save();
+                capturer = null;
                 break;
                 
             default:
@@ -936,28 +976,36 @@ function initRenderer() {
     raycaster = new THREE.Raycaster();
     raycaster.precision = 0.01;
 
-    renderer = new THREE.WebGLRenderer();
+    renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setClearColor( 0x202020, 0.0);
-    renderer.sortObjects = false;
+    // renderer.sortObjects = false;
 
     container = document.getElementById( 'ThreeJS' );
     container.appendChild(renderer.domElement);
 
-    camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.03, 10000);
+    camera = new THREE.PerspectiveCamera(
+        70, window.innerWidth / window.innerHeight, 0.03, 10000);
     camera.position.x = 50;
     camera.position.y = 50;
     camera.position.z = 50;
-    camera.far = 20; // Setting far frustum (for culling)
+    camera.far = 200; // Setting far frustum (for culling)
     camera.up = new THREE.Vector3(0,0,1);
 
     controls = new THREE.OrbitControls(camera, renderer.domElement);
     controls.addEventListener('change', render);
 
-    window.addEventListener('resize', onWindowResize, false);
-    renderer.domElement.addEventListener('mousemove', onDocumentMouseMove, false);
-    renderer.domElement.addEventListener('mousedown', onDocumentMouseDown, false);
-    window.addEventListener( 'keydown', onKeyDown, false );
+    window
+        .addEventListener(
+            'resize', onWindowResize, false);
+    renderer.domElement
+        .addEventListener(
+            'mousemove', onDocumentMouseMove, false);
+    renderer.domElement
+        .addEventListener(
+            'mousedown', onDocumentMouseDown, false);
+    window
+        .addEventListener( 'keydown', onKeyDown, false );
     
     // Set materials
     pointCloudMaterial = new THREE.PointsMaterial({
@@ -968,10 +1016,9 @@ function initRenderer() {
         color: 0xffffff,
         opacity: 1,
         linewidth: 3,
-        vertexColors: THREE.VertexColors,
-        depthTest: false
+        vertexColors: THREE.VertexColors
     });
-
+    
 
     // // Image plane
     // imagePlaneCamera = camera_lines[0];
@@ -1410,4 +1457,7 @@ function render() {
 
     // Render.
     renderer.render(scene, camera);
+    if( capturer )
+        capturer.capture( renderer.domElement );
+
 }

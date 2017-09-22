@@ -27,9 +27,10 @@ def arr_msg(arr, carr, frame_uid, element_id):
     msg.collection = frame_uid 
     msg.element_id = element_id
     npoints = len(arr)
-
-    msg.points._values = np.float64(arr).flat
-    msg.colors._values = np.float32(carr[:,:3]).flat
+    
+    msg.points._values = np.asarray(arr, dtype=np.float64).flat
+    msg.colors._values = np.asarray(carr[:,:3], dtype=np.float32).flat
+    print msg.colors._values[:3]
     
     msg.npoints = npoints
     msg.ncolors = npoints
