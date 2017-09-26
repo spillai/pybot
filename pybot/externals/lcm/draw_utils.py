@@ -1,9 +1,7 @@
-""" LCM viewer drawing utils """
+""" Drawing utils """
 
 # Author: Sudeep Pillai <spillai@csail.mit.edu>
 # License: MIT
-# Dependencies: LCM, OpenCV, vs (Visualization renderer)
-# botcore (libbot), and pybot.geometry (pybot_geometry)
 
 import time
 from itertools import izip
