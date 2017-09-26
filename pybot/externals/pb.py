@@ -4,6 +4,7 @@ from pybot.externals.proto import vs_pb2 as vs
 
 def pose_t(orientation, pos):
     p = vs.pose_t()
+    p.utime = 0
     p.orientation.extend(orientation)
     p.pos.extend(pos)
     return p
@@ -28,10 +29,9 @@ def arr_msg(arr, carr, frame_uid, element_id):
     msg.element_id = element_id
     npoints = len(arr)
     
-    msg.points._values = np.asarray(arr, dtype=np.float64).flat
-    msg.colors._values = np.asarray(carr[:,:3], dtype=np.float32).flat
-    print msg.colors._values[:3]
-    
+    msg.points = np.float32(arr).tostring()
+    msg.colors = np.float32(carr[:,:3]).tostring()
+    print 'arr: ', len(arr), arr[:3], carr[:3,:3], '\n' + '-' * 40
     msg.npoints = npoints
     msg.ncolors = npoints
 

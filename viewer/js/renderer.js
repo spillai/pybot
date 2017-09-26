@@ -583,6 +583,12 @@ function projectorCameraMatrix(cam, shot) {
     return projection.multiply(rotation);
 }
 
+function convertTypedArray(src, type) {
+    var buffer = new ArrayBuffer(src.byteLength);
+    var baseView = new src.constructor(buffer).set(src);
+    return new type(buffer);
+}
+
 function split_channel_data(ch_data) {
     val = ' '.charCodeAt(0);
     for (var i=0, L=ch_data.length; i < L; i++) {
@@ -636,14 +642,18 @@ function add_points_to_scene_group(msg) {
             return;
         }
 
+        // Convert bytes to float32array
+        var pointsf = convertTypedArray(pc.points, Float32Array);
+        var colorsf = convertTypedArray(pc.colors, Float32Array);
+        
         // Add points into buffer geometry
         var geom = new THREE.BufferGeometry();
         geom.addAttribute(
-            'position', new THREE.BufferAttribute(
-                new Float32Array(pc.points), 3 ));
+            'position',
+            new THREE.BufferAttribute(pointsf, 3));
         geom.addAttribute(
-            'color', new THREE.BufferAttribute(
-                new Float32Array(pc.colors), 3 ));
+            'color',
+            new THREE.BufferAttribute(colorsf, 3));
         
         // Render points
         switch (msg.type) {

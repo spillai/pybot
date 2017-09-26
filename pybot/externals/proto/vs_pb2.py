@@ -18,8 +18,8 @@ _sym_db = _symbol_database.Default()
 DESCRIPTOR = _descriptor.FileDescriptor(
   name='vs.proto',
   package='vs',
-  syntax='proto3',
-  serialized_pb=_b('\n\x08vs.proto\x12\x02vs\"l\n\x06pose_t\x12\r\n\x05utime\x18\x01 \x01(\x03\x12\x0b\n\x03pos\x18\x02 \x03(\x01\x12\x0b\n\x03vel\x18\x03 \x03(\x01\x12\x13\n\x0borientation\x18\x04 \x03(\x01\x12\x15\n\rrotation_rate\x18\x05 \x03(\x01\x12\r\n\x05\x61\x63\x63\x65l\x18\x06 \x03(\x01\"^\n\x05obj_t\x12\n\n\x02id\x18\x01 \x01(\x03\x12\t\n\x01x\x18\x02 \x01(\x01\x12\t\n\x01y\x18\x03 \x01(\x01\x12\t\n\x01z\x18\x04 \x01(\x01\x12\x0b\n\x03yaw\x18\x05 \x01(\x01\x12\r\n\x05pitch\x18\x06 \x01(\x01\x12\x0c\n\x04roll\x18\x07 \x01(\x01\"\x94\x02\n\x10obj_collection_t\x12\n\n\x02id\x18\x01 \x01(\x05\x12\x0c\n\x04name\x18\x02 \x01(\t\x12\r\n\x05reset\x18\x03 \x01(\x08\x12+\n\x04type\x18\x04 \x01(\x0e\x32\x1d.vs.obj_collection_t.obj_type\x12\x17\n\x04objs\x18\x05 \x03(\x0b\x32\t.vs.obj_t\x12\r\n\x05nobjs\x18\x06 \x01(\x05\"\x81\x01\n\x08obj_type\x12\x08\n\x04POSE\x10\x00\x12\x08\n\x04TREE\x10\x01\x12\n\n\x06SQUARE\x10\x02\x12\n\n\x06POSE3D\x10\x03\x12\n\n\x06\x41XIS3D\x10\x04\x12\x07\n\x03TAG\x10\x05\x12\n\n\x06\x43\x41MERA\x10\x06\x12\x0c\n\x08TRIANGLE\x10\x07\x12\x0b\n\x07HEXAGON\x10\x08\x12\r\n\tSONARCONE\x10\t\"\x15\n\x13reset_collections_t\",\n\tpoint3d_t\x12\t\n\x01x\x18\x01 \x01(\x01\x12\t\n\x01y\x18\x02 \x01(\x01\x12\t\n\x01z\x18\x03 \x01(\x01\"*\n\x07\x63olor_t\x12\t\n\x01r\x18\x01 \x01(\x02\x12\t\n\x01g\x18\x02 \x01(\x02\x12\t\n\x01\x62\x18\x03 \x01(\x02\"\xde\x01\n\x0epoint3d_list_t\x12\n\n\x02id\x18\x01 \x01(\x03\x12\x12\n\ncollection\x18\x02 \x01(\x05\x12\x12\n\nelement_id\x18\x03 \x01(\x03\x12\x12\n\x06points\x18\x04 \x03(\x01\x42\x02\x10\x01\x12\x12\n\x06\x63olors\x18\x05 \x03(\x02\x42\x02\x10\x01\x12\x13\n\x07normals\x18\x06 \x03(\x01\x42\x02\x10\x01\x12\x14\n\x08pointids\x18\x07 \x03(\x03\x42\x02\x10\x01\x12\x0f\n\x07npoints\x18\x08 \x01(\x05\x12\x0f\n\x07ncolors\x18\t \x01(\x05\x12\x10\n\x08nnormals\x18\n \x01(\x05\x12\x11\n\tnpointids\x18\x0b \x01(\x05\"\xd6\x02\n\x19point3d_list_collection_t\x12\n\n\x02id\x18\x01 \x01(\x05\x12\x0c\n\x04name\x18\x02 \x01(\t\x12\x36\n\x04type\x18\x03 \x01(\x0e\x32(.vs.point3d_list_collection_t.point_type\x12\r\n\x05reset\x18\x04 \x01(\x08\x12\'\n\x0bpoint_lists\x18\x05 \x03(\x0b\x32\x12.vs.point3d_list_t\x12\x0e\n\x06nlists\x18\x06 \x01(\x05\"\x9e\x01\n\npoint_type\x12\t\n\x05POINT\x10\x00\x12\x0e\n\nLINE_STRIP\x10\x01\x12\r\n\tLINE_LOOP\x10\x02\x12\t\n\x05LINES\x10\x03\x12\x12\n\x0eTRIANGLE_STRIP\x10\x04\x12\x10\n\x0cTRIANGLE_FAN\x10\x05\x12\r\n\tTRIANGLES\x10\x06\x12\x0e\n\nQUAD_STRIP\x10\x07\x12\t\n\x05QUADS\x10\x08\x12\x0b\n\x07POLYGON\x10\t\"L\n\x05\x63ov_t\x12\n\n\x02id\x18\x01 \x01(\x03\x12\x12\n\ncollection\x18\x02 \x01(\x05\x12\x12\n\nelement_id\x18\x03 \x01(\x03\x12\x0f\n\x07\x65ntries\x18\x04 \x03(\x01\"T\n\x10\x63ov_collection_t\x12\n\n\x02id\x18\x01 \x01(\x05\x12\x0c\n\x04name\x18\x02 \x01(\t\x12\r\n\x05reset\x18\x03 \x01(\x08\x12\x17\n\x04\x63ovs\x18\x04 \x03(\x0b\x32\t.vs.cov_t\"L\n\x06text_t\x12\n\n\x02id\x18\x01 \x01(\x03\x12\x15\n\rcollection_id\x18\x02 \x01(\x05\x12\x11\n\tobject_id\x18\x03 \x01(\x03\x12\x0c\n\x04text\x18\x04 \x01(\t\"W\n\x11text_collection_t\x12\n\n\x02id\x18\x01 \x01(\x05\x12\x0c\n\x04name\x18\x02 \x01(\t\x12\r\n\x05reset\x18\x04 \x01(\x08\x12\x19\n\x05texts\x18\x05 \x03(\x0b\x32\n.vs.text_tb\x06proto3')
+  syntax='proto2',
+  serialized_pb=_b('\n\x08vs.proto\x12\x02vs\"l\n\x06pose_t\x12\r\n\x05utime\x18\x01 \x02(\x03\x12\x0b\n\x03pos\x18\x02 \x03(\x01\x12\x0b\n\x03vel\x18\x03 \x03(\x01\x12\x13\n\x0borientation\x18\x04 \x03(\x01\x12\x15\n\rrotation_rate\x18\x05 \x03(\x01\x12\r\n\x05\x61\x63\x63\x65l\x18\x06 \x03(\x01\"^\n\x05obj_t\x12\n\n\x02id\x18\x01 \x02(\x03\x12\t\n\x01x\x18\x02 \x02(\x01\x12\t\n\x01y\x18\x03 \x02(\x01\x12\t\n\x01z\x18\x04 \x02(\x01\x12\x0b\n\x03yaw\x18\x05 \x02(\x01\x12\r\n\x05pitch\x18\x06 \x02(\x01\x12\x0c\n\x04roll\x18\x07 \x02(\x01\"\x94\x02\n\x10obj_collection_t\x12\n\n\x02id\x18\x01 \x02(\x05\x12\x0c\n\x04name\x18\x02 \x02(\t\x12\r\n\x05reset\x18\x03 \x02(\x08\x12+\n\x04type\x18\x04 \x02(\x0e\x32\x1d.vs.obj_collection_t.obj_type\x12\x17\n\x04objs\x18\x05 \x03(\x0b\x32\t.vs.obj_t\x12\r\n\x05nobjs\x18\x06 \x01(\x05\"\x81\x01\n\x08obj_type\x12\x08\n\x04POSE\x10\x00\x12\x08\n\x04TREE\x10\x01\x12\n\n\x06SQUARE\x10\x02\x12\n\n\x06POSE3D\x10\x03\x12\n\n\x06\x41XIS3D\x10\x04\x12\x07\n\x03TAG\x10\x05\x12\n\n\x06\x43\x41MERA\x10\x06\x12\x0c\n\x08TRIANGLE\x10\x07\x12\x0b\n\x07HEXAGON\x10\x08\x12\r\n\tSONARCONE\x10\t\"\x15\n\x13reset_collections_t\",\n\tpoint3d_t\x12\t\n\x01x\x18\x01 \x02(\x01\x12\t\n\x01y\x18\x02 \x02(\x01\x12\t\n\x01z\x18\x03 \x02(\x01\"*\n\x07\x63olor_t\x12\t\n\x01r\x18\x01 \x02(\x02\x12\t\n\x01g\x18\x02 \x02(\x02\x12\t\n\x01\x62\x18\x03 \x02(\x02\"\xd2\x01\n\x0epoint3d_list_t\x12\n\n\x02id\x18\x01 \x02(\x03\x12\x12\n\ncollection\x18\x02 \x02(\x05\x12\x12\n\nelement_id\x18\x03 \x02(\x03\x12\x0e\n\x06points\x18\x04 \x02(\x0c\x12\x0e\n\x06\x63olors\x18\x05 \x02(\x0c\x12\x0f\n\x07normals\x18\x06 \x01(\x0c\x12\x14\n\x08pointids\x18\x07 \x03(\x03\x42\x02\x10\x01\x12\x0f\n\x07npoints\x18\x08 \x01(\x05\x12\x0f\n\x07ncolors\x18\t \x01(\x05\x12\x10\n\x08nnormals\x18\n \x01(\x05\x12\x11\n\tnpointids\x18\x0b \x01(\x05\"\xd6\x02\n\x19point3d_list_collection_t\x12\n\n\x02id\x18\x01 \x02(\x05\x12\x0c\n\x04name\x18\x02 \x02(\t\x12\x36\n\x04type\x18\x03 \x02(\x0e\x32(.vs.point3d_list_collection_t.point_type\x12\r\n\x05reset\x18\x04 \x02(\x08\x12\'\n\x0bpoint_lists\x18\x05 \x03(\x0b\x32\x12.vs.point3d_list_t\x12\x0e\n\x06nlists\x18\x06 \x02(\x05\"\x9e\x01\n\npoint_type\x12\t\n\x05POINT\x10\x00\x12\x0e\n\nLINE_STRIP\x10\x01\x12\r\n\tLINE_LOOP\x10\x02\x12\t\n\x05LINES\x10\x03\x12\x12\n\x0eTRIANGLE_STRIP\x10\x04\x12\x10\n\x0cTRIANGLE_FAN\x10\x05\x12\r\n\tTRIANGLES\x10\x06\x12\x0e\n\nQUAD_STRIP\x10\x07\x12\t\n\x05QUADS\x10\x08\x12\x0b\n\x07POLYGON\x10\t\"L\n\x05\x63ov_t\x12\n\n\x02id\x18\x01 \x02(\x03\x12\x12\n\ncollection\x18\x02 \x02(\x05\x12\x12\n\nelement_id\x18\x03 \x02(\x03\x12\x0f\n\x07\x65ntries\x18\x04 \x03(\x01\"T\n\x10\x63ov_collection_t\x12\n\n\x02id\x18\x01 \x02(\x05\x12\x0c\n\x04name\x18\x02 \x02(\t\x12\r\n\x05reset\x18\x03 \x02(\x08\x12\x17\n\x04\x63ovs\x18\x04 \x03(\x0b\x32\t.vs.cov_t\"L\n\x06text_t\x12\n\n\x02id\x18\x01 \x02(\x03\x12\x15\n\rcollection_id\x18\x02 \x02(\x05\x12\x11\n\tobject_id\x18\x03 \x02(\x03\x12\x0c\n\x04text\x18\x04 \x02(\t\"W\n\x11text_collection_t\x12\n\n\x02id\x18\x01 \x02(\x05\x12\x0c\n\x04name\x18\x02 \x02(\t\x12\r\n\x05reset\x18\x04 \x02(\x08\x12\x19\n\x05texts\x18\x05 \x03(\x0b\x32\n.vs.text_t')
 )
 _sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
@@ -128,8 +128,8 @@ _POINT3D_LIST_COLLECTION_T_POINT_TYPE = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   options=None,
-  serialized_start=1024,
-  serialized_end=1182,
+  serialized_start=1012,
+  serialized_end=1170,
 )
 _sym_db.RegisterEnumDescriptor(_POINT3D_LIST_COLLECTION_T_POINT_TYPE)
 
@@ -143,7 +143,7 @@ _POSE_T = _descriptor.Descriptor(
   fields=[
     _descriptor.FieldDescriptor(
       name='utime', full_name='vs.pose_t.utime', index=0,
-      number=1, type=3, cpp_type=2, label=1,
+      number=1, type=3, cpp_type=2, label=2,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
@@ -191,7 +191,7 @@ _POSE_T = _descriptor.Descriptor(
   ],
   options=None,
   is_extendable=False,
-  syntax='proto3',
+  syntax='proto2',
   extension_ranges=[],
   oneofs=[
   ],
@@ -209,49 +209,49 @@ _OBJ_T = _descriptor.Descriptor(
   fields=[
     _descriptor.FieldDescriptor(
       name='id', full_name='vs.obj_t.id', index=0,
-      number=1, type=3, cpp_type=2, label=1,
+      number=1, type=3, cpp_type=2, label=2,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
       name='x', full_name='vs.obj_t.x', index=1,
-      number=2, type=1, cpp_type=5, label=1,
+      number=2, type=1, cpp_type=5, label=2,
       has_default_value=False, default_value=float(0),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
       name='y', full_name='vs.obj_t.y', index=2,
-      number=3, type=1, cpp_type=5, label=1,
+      number=3, type=1, cpp_type=5, label=2,
       has_default_value=False, default_value=float(0),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
       name='z', full_name='vs.obj_t.z', index=3,
-      number=4, type=1, cpp_type=5, label=1,
+      number=4, type=1, cpp_type=5, label=2,
       has_default_value=False, default_value=float(0),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
       name='yaw', full_name='vs.obj_t.yaw', index=4,
-      number=5, type=1, cpp_type=5, label=1,
+      number=5, type=1, cpp_type=5, label=2,
       has_default_value=False, default_value=float(0),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
       name='pitch', full_name='vs.obj_t.pitch', index=5,
-      number=6, type=1, cpp_type=5, label=1,
+      number=6, type=1, cpp_type=5, label=2,
       has_default_value=False, default_value=float(0),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
       name='roll', full_name='vs.obj_t.roll', index=6,
-      number=7, type=1, cpp_type=5, label=1,
+      number=7, type=1, cpp_type=5, label=2,
       has_default_value=False, default_value=float(0),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
@@ -264,7 +264,7 @@ _OBJ_T = _descriptor.Descriptor(
   ],
   options=None,
   is_extendable=False,
-  syntax='proto3',
+  syntax='proto2',
   extension_ranges=[],
   oneofs=[
   ],
@@ -282,28 +282,28 @@ _OBJ_COLLECTION_T = _descriptor.Descriptor(
   fields=[
     _descriptor.FieldDescriptor(
       name='id', full_name='vs.obj_collection_t.id', index=0,
-      number=1, type=5, cpp_type=1, label=1,
+      number=1, type=5, cpp_type=1, label=2,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
       name='name', full_name='vs.obj_collection_t.name', index=1,
-      number=2, type=9, cpp_type=9, label=1,
+      number=2, type=9, cpp_type=9, label=2,
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
       name='reset', full_name='vs.obj_collection_t.reset', index=2,
-      number=3, type=8, cpp_type=7, label=1,
+      number=3, type=8, cpp_type=7, label=2,
       has_default_value=False, default_value=False,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
       name='type', full_name='vs.obj_collection_t.type', index=3,
-      number=4, type=14, cpp_type=8, label=1,
+      number=4, type=14, cpp_type=8, label=2,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
@@ -331,7 +331,7 @@ _OBJ_COLLECTION_T = _descriptor.Descriptor(
   ],
   options=None,
   is_extendable=False,
-  syntax='proto3',
+  syntax='proto2',
   extension_ranges=[],
   oneofs=[
   ],
@@ -355,7 +355,7 @@ _RESET_COLLECTIONS_T = _descriptor.Descriptor(
   ],
   options=None,
   is_extendable=False,
-  syntax='proto3',
+  syntax='proto2',
   extension_ranges=[],
   oneofs=[
   ],
@@ -373,21 +373,21 @@ _POINT3D_T = _descriptor.Descriptor(
   fields=[
     _descriptor.FieldDescriptor(
       name='x', full_name='vs.point3d_t.x', index=0,
-      number=1, type=1, cpp_type=5, label=1,
+      number=1, type=1, cpp_type=5, label=2,
       has_default_value=False, default_value=float(0),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
       name='y', full_name='vs.point3d_t.y', index=1,
-      number=2, type=1, cpp_type=5, label=1,
+      number=2, type=1, cpp_type=5, label=2,
       has_default_value=False, default_value=float(0),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
       name='z', full_name='vs.point3d_t.z', index=2,
-      number=3, type=1, cpp_type=5, label=1,
+      number=3, type=1, cpp_type=5, label=2,
       has_default_value=False, default_value=float(0),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
@@ -400,7 +400,7 @@ _POINT3D_T = _descriptor.Descriptor(
   ],
   options=None,
   is_extendable=False,
-  syntax='proto3',
+  syntax='proto2',
   extension_ranges=[],
   oneofs=[
   ],
@@ -418,21 +418,21 @@ _COLOR_T = _descriptor.Descriptor(
   fields=[
     _descriptor.FieldDescriptor(
       name='r', full_name='vs.color_t.r', index=0,
-      number=1, type=2, cpp_type=6, label=1,
+      number=1, type=2, cpp_type=6, label=2,
       has_default_value=False, default_value=float(0),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
       name='g', full_name='vs.color_t.g', index=1,
-      number=2, type=2, cpp_type=6, label=1,
+      number=2, type=2, cpp_type=6, label=2,
       has_default_value=False, default_value=float(0),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
       name='b', full_name='vs.color_t.b', index=2,
-      number=3, type=2, cpp_type=6, label=1,
+      number=3, type=2, cpp_type=6, label=2,
       has_default_value=False, default_value=float(0),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
@@ -445,7 +445,7 @@ _COLOR_T = _descriptor.Descriptor(
   ],
   options=None,
   is_extendable=False,
-  syntax='proto3',
+  syntax='proto2',
   extension_ranges=[],
   oneofs=[
   ],
@@ -463,46 +463,46 @@ _POINT3D_LIST_T = _descriptor.Descriptor(
   fields=[
     _descriptor.FieldDescriptor(
       name='id', full_name='vs.point3d_list_t.id', index=0,
-      number=1, type=3, cpp_type=2, label=1,
+      number=1, type=3, cpp_type=2, label=2,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
       name='collection', full_name='vs.point3d_list_t.collection', index=1,
-      number=2, type=5, cpp_type=1, label=1,
+      number=2, type=5, cpp_type=1, label=2,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
       name='element_id', full_name='vs.point3d_list_t.element_id', index=2,
-      number=3, type=3, cpp_type=2, label=1,
+      number=3, type=3, cpp_type=2, label=2,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
       name='points', full_name='vs.point3d_list_t.points', index=3,
-      number=4, type=1, cpp_type=5, label=3,
-      has_default_value=False, default_value=[],
+      number=4, type=12, cpp_type=9, label=2,
+      has_default_value=False, default_value=_b(""),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=_descriptor._ParseOptions(descriptor_pb2.FieldOptions(), _b('\020\001'))),
+      options=None),
     _descriptor.FieldDescriptor(
       name='colors', full_name='vs.point3d_list_t.colors', index=4,
-      number=5, type=2, cpp_type=6, label=3,
-      has_default_value=False, default_value=[],
+      number=5, type=12, cpp_type=9, label=2,
+      has_default_value=False, default_value=_b(""),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=_descriptor._ParseOptions(descriptor_pb2.FieldOptions(), _b('\020\001'))),
+      options=None),
     _descriptor.FieldDescriptor(
       name='normals', full_name='vs.point3d_list_t.normals', index=5,
-      number=6, type=1, cpp_type=5, label=3,
-      has_default_value=False, default_value=[],
+      number=6, type=12, cpp_type=9, label=1,
+      has_default_value=False, default_value=_b(""),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=_descriptor._ParseOptions(descriptor_pb2.FieldOptions(), _b('\020\001'))),
+      options=None),
     _descriptor.FieldDescriptor(
       name='pointids', full_name='vs.point3d_list_t.pointids', index=6,
       number=7, type=3, cpp_type=2, label=3,
@@ -546,12 +546,12 @@ _POINT3D_LIST_T = _descriptor.Descriptor(
   ],
   options=None,
   is_extendable=False,
-  syntax='proto3',
+  syntax='proto2',
   extension_ranges=[],
   oneofs=[
   ],
   serialized_start=615,
-  serialized_end=837,
+  serialized_end=825,
 )
 
 
@@ -564,28 +564,28 @@ _POINT3D_LIST_COLLECTION_T = _descriptor.Descriptor(
   fields=[
     _descriptor.FieldDescriptor(
       name='id', full_name='vs.point3d_list_collection_t.id', index=0,
-      number=1, type=5, cpp_type=1, label=1,
+      number=1, type=5, cpp_type=1, label=2,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
       name='name', full_name='vs.point3d_list_collection_t.name', index=1,
-      number=2, type=9, cpp_type=9, label=1,
+      number=2, type=9, cpp_type=9, label=2,
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
       name='type', full_name='vs.point3d_list_collection_t.type', index=2,
-      number=3, type=14, cpp_type=8, label=1,
+      number=3, type=14, cpp_type=8, label=2,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
       name='reset', full_name='vs.point3d_list_collection_t.reset', index=3,
-      number=4, type=8, cpp_type=7, label=1,
+      number=4, type=8, cpp_type=7, label=2,
       has_default_value=False, default_value=False,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
@@ -599,7 +599,7 @@ _POINT3D_LIST_COLLECTION_T = _descriptor.Descriptor(
       options=None),
     _descriptor.FieldDescriptor(
       name='nlists', full_name='vs.point3d_list_collection_t.nlists', index=5,
-      number=6, type=5, cpp_type=1, label=1,
+      number=6, type=5, cpp_type=1, label=2,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
@@ -613,12 +613,12 @@ _POINT3D_LIST_COLLECTION_T = _descriptor.Descriptor(
   ],
   options=None,
   is_extendable=False,
-  syntax='proto3',
+  syntax='proto2',
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=840,
-  serialized_end=1182,
+  serialized_start=828,
+  serialized_end=1170,
 )
 
 
@@ -631,21 +631,21 @@ _COV_T = _descriptor.Descriptor(
   fields=[
     _descriptor.FieldDescriptor(
       name='id', full_name='vs.cov_t.id', index=0,
-      number=1, type=3, cpp_type=2, label=1,
+      number=1, type=3, cpp_type=2, label=2,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
       name='collection', full_name='vs.cov_t.collection', index=1,
-      number=2, type=5, cpp_type=1, label=1,
+      number=2, type=5, cpp_type=1, label=2,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
       name='element_id', full_name='vs.cov_t.element_id', index=2,
-      number=3, type=3, cpp_type=2, label=1,
+      number=3, type=3, cpp_type=2, label=2,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
@@ -665,12 +665,12 @@ _COV_T = _descriptor.Descriptor(
   ],
   options=None,
   is_extendable=False,
-  syntax='proto3',
+  syntax='proto2',
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1184,
-  serialized_end=1260,
+  serialized_start=1172,
+  serialized_end=1248,
 )
 
 
@@ -683,21 +683,21 @@ _COV_COLLECTION_T = _descriptor.Descriptor(
   fields=[
     _descriptor.FieldDescriptor(
       name='id', full_name='vs.cov_collection_t.id', index=0,
-      number=1, type=5, cpp_type=1, label=1,
+      number=1, type=5, cpp_type=1, label=2,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
       name='name', full_name='vs.cov_collection_t.name', index=1,
-      number=2, type=9, cpp_type=9, label=1,
+      number=2, type=9, cpp_type=9, label=2,
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
       name='reset', full_name='vs.cov_collection_t.reset', index=2,
-      number=3, type=8, cpp_type=7, label=1,
+      number=3, type=8, cpp_type=7, label=2,
       has_default_value=False, default_value=False,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
@@ -717,12 +717,12 @@ _COV_COLLECTION_T = _descriptor.Descriptor(
   ],
   options=None,
   is_extendable=False,
-  syntax='proto3',
+  syntax='proto2',
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1262,
-  serialized_end=1346,
+  serialized_start=1250,
+  serialized_end=1334,
 )
 
 
@@ -735,28 +735,28 @@ _TEXT_T = _descriptor.Descriptor(
   fields=[
     _descriptor.FieldDescriptor(
       name='id', full_name='vs.text_t.id', index=0,
-      number=1, type=3, cpp_type=2, label=1,
+      number=1, type=3, cpp_type=2, label=2,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
       name='collection_id', full_name='vs.text_t.collection_id', index=1,
-      number=2, type=5, cpp_type=1, label=1,
+      number=2, type=5, cpp_type=1, label=2,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
       name='object_id', full_name='vs.text_t.object_id', index=2,
-      number=3, type=3, cpp_type=2, label=1,
+      number=3, type=3, cpp_type=2, label=2,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
       name='text', full_name='vs.text_t.text', index=3,
-      number=4, type=9, cpp_type=9, label=1,
+      number=4, type=9, cpp_type=9, label=2,
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
@@ -769,12 +769,12 @@ _TEXT_T = _descriptor.Descriptor(
   ],
   options=None,
   is_extendable=False,
-  syntax='proto3',
+  syntax='proto2',
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1348,
-  serialized_end=1424,
+  serialized_start=1336,
+  serialized_end=1412,
 )
 
 
@@ -787,21 +787,21 @@ _TEXT_COLLECTION_T = _descriptor.Descriptor(
   fields=[
     _descriptor.FieldDescriptor(
       name='id', full_name='vs.text_collection_t.id', index=0,
-      number=1, type=5, cpp_type=1, label=1,
+      number=1, type=5, cpp_type=1, label=2,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
       name='name', full_name='vs.text_collection_t.name', index=1,
-      number=2, type=9, cpp_type=9, label=1,
+      number=2, type=9, cpp_type=9, label=2,
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
       name='reset', full_name='vs.text_collection_t.reset', index=2,
-      number=4, type=8, cpp_type=7, label=1,
+      number=4, type=8, cpp_type=7, label=2,
       has_default_value=False, default_value=False,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
@@ -821,12 +821,12 @@ _TEXT_COLLECTION_T = _descriptor.Descriptor(
   ],
   options=None,
   is_extendable=False,
-  syntax='proto3',
+  syntax='proto2',
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1426,
-  serialized_end=1513,
+  serialized_start=1414,
+  serialized_end=1501,
 )
 
 _OBJ_COLLECTION_T.fields_by_name['type'].enum_type = _OBJ_COLLECTION_T_OBJ_TYPE
@@ -935,12 +935,6 @@ text_collection_t = _reflection.GeneratedProtocolMessageType('text_collection_t'
 _sym_db.RegisterMessage(text_collection_t)
 
 
-_POINT3D_LIST_T.fields_by_name['points'].has_options = True
-_POINT3D_LIST_T.fields_by_name['points']._options = _descriptor._ParseOptions(descriptor_pb2.FieldOptions(), _b('\020\001'))
-_POINT3D_LIST_T.fields_by_name['colors'].has_options = True
-_POINT3D_LIST_T.fields_by_name['colors']._options = _descriptor._ParseOptions(descriptor_pb2.FieldOptions(), _b('\020\001'))
-_POINT3D_LIST_T.fields_by_name['normals'].has_options = True
-_POINT3D_LIST_T.fields_by_name['normals']._options = _descriptor._ParseOptions(descriptor_pb2.FieldOptions(), _b('\020\001'))
 _POINT3D_LIST_T.fields_by_name['pointids'].has_options = True
 _POINT3D_LIST_T.fields_by_name['pointids']._options = _descriptor._ParseOptions(descriptor_pb2.FieldOptions(), _b('\020\001'))
 # @@protoc_insertion_point(module_scope)

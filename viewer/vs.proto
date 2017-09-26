@@ -68,9 +68,9 @@ message point3d_list_t {
   required int64 id = 1;
   required int32 collection = 2;
   required int64 element_id = 3;
-  repeated double points = 4 [packed = true];
-  repeated float colors = 5 [packed = true];
-  repeated double normals = 6 [packed = true];
+  required bytes points = 4;
+  required bytes colors = 5;
+  optional bytes normals = 6;
   repeated int64 pointids = 7 [packed = true];
   optional int32 npoints = 8;
   optional int32 ncolors = 9;
