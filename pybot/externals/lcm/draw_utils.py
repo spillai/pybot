@@ -160,7 +160,6 @@ def polygons_to_edges(polygons):
     """ Edges are represented in N x 6 form """
     return np.vstack([ corners_to_edges(corners) for corners in polygons])
 
-@timeitmethod
 def publish_point_type(pub_channel, _arr, c='r', point_type='POINT', 
                        flip_rb=False, frame_id='camera', element_id=0, reset=True):
     """
@@ -212,7 +211,6 @@ def publish_point_type(pub_channel, _arr, c='r', point_type='POINT',
     g_viz_pub.publish("POINTS_COLLECTION", serialize(pc_list_msg))
 
 # @run_async
-@timeitmethod
 def publish_cloud(pub_channel, arr, c='r', flip_rb=False, frame_id='camera', element_id=0, reset=True):
     publish_point_type(pub_channel, arr, c=c, point_type='POINT', 
                        flip_rb=flip_rb, frame_id=frame_id, element_id=element_id, reset=reset)

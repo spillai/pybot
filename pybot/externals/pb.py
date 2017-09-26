@@ -31,7 +31,7 @@ def arr_msg(arr, carr, frame_uid, element_id):
     
     msg.points = np.float32(arr).tostring()
     msg.colors = np.float32(carr[:,:3]).tostring()
-    print 'arr: ', len(arr), arr[:3], carr[:3,:3], '\n' + '-' * 40
+
     msg.npoints = npoints
     msg.ncolors = npoints
 
