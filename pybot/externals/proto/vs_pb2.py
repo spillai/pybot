@@ -19,7 +19,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   name='vs.proto',
   package='vs',
   syntax='proto2',
-  serialized_pb=_b('\n\x08vs.proto\x12\x02vs\"l\n\x06pose_t\x12\r\n\x05utime\x18\x01 \x02(\x03\x12\x0b\n\x03pos\x18\x02 \x03(\x01\x12\x0b\n\x03vel\x18\x03 \x03(\x01\x12\x13\n\x0borientation\x18\x04 \x03(\x01\x12\x15\n\rrotation_rate\x18\x05 \x03(\x01\x12\r\n\x05\x61\x63\x63\x65l\x18\x06 \x03(\x01\"^\n\x05obj_t\x12\n\n\x02id\x18\x01 \x02(\x03\x12\t\n\x01x\x18\x02 \x02(\x01\x12\t\n\x01y\x18\x03 \x02(\x01\x12\t\n\x01z\x18\x04 \x02(\x01\x12\x0b\n\x03yaw\x18\x05 \x02(\x01\x12\r\n\x05pitch\x18\x06 \x02(\x01\x12\x0c\n\x04roll\x18\x07 \x02(\x01\"\x94\x02\n\x10obj_collection_t\x12\n\n\x02id\x18\x01 \x02(\x05\x12\x0c\n\x04name\x18\x02 \x02(\t\x12\r\n\x05reset\x18\x03 \x02(\x08\x12+\n\x04type\x18\x04 \x02(\x0e\x32\x1d.vs.obj_collection_t.obj_type\x12\x17\n\x04objs\x18\x05 \x03(\x0b\x32\t.vs.obj_t\x12\r\n\x05nobjs\x18\x06 \x01(\x05\"\x81\x01\n\x08obj_type\x12\x08\n\x04POSE\x10\x00\x12\x08\n\x04TREE\x10\x01\x12\n\n\x06SQUARE\x10\x02\x12\n\n\x06POSE3D\x10\x03\x12\n\n\x06\x41XIS3D\x10\x04\x12\x07\n\x03TAG\x10\x05\x12\n\n\x06\x43\x41MERA\x10\x06\x12\x0c\n\x08TRIANGLE\x10\x07\x12\x0b\n\x07HEXAGON\x10\x08\x12\r\n\tSONARCONE\x10\t\"\x15\n\x13reset_collections_t\",\n\tpoint3d_t\x12\t\n\x01x\x18\x01 \x02(\x01\x12\t\n\x01y\x18\x02 \x02(\x01\x12\t\n\x01z\x18\x03 \x02(\x01\"*\n\x07\x63olor_t\x12\t\n\x01r\x18\x01 \x02(\x02\x12\t\n\x01g\x18\x02 \x02(\x02\x12\t\n\x01\x62\x18\x03 \x02(\x02\"\xd2\x01\n\x0epoint3d_list_t\x12\n\n\x02id\x18\x01 \x02(\x03\x12\x12\n\ncollection\x18\x02 \x02(\x05\x12\x12\n\nelement_id\x18\x03 \x02(\x03\x12\x0e\n\x06points\x18\x04 \x02(\x0c\x12\x0e\n\x06\x63olors\x18\x05 \x02(\x0c\x12\x0f\n\x07normals\x18\x06 \x01(\x0c\x12\x14\n\x08pointids\x18\x07 \x03(\x03\x42\x02\x10\x01\x12\x0f\n\x07npoints\x18\x08 \x01(\x05\x12\x0f\n\x07ncolors\x18\t \x01(\x05\x12\x10\n\x08nnormals\x18\n \x01(\x05\x12\x11\n\tnpointids\x18\x0b \x01(\x05\"\xd6\x02\n\x19point3d_list_collection_t\x12\n\n\x02id\x18\x01 \x02(\x05\x12\x0c\n\x04name\x18\x02 \x02(\t\x12\x36\n\x04type\x18\x03 \x02(\x0e\x32(.vs.point3d_list_collection_t.point_type\x12\r\n\x05reset\x18\x04 \x02(\x08\x12\'\n\x0bpoint_lists\x18\x05 \x03(\x0b\x32\x12.vs.point3d_list_t\x12\x0e\n\x06nlists\x18\x06 \x02(\x05\"\x9e\x01\n\npoint_type\x12\t\n\x05POINT\x10\x00\x12\x0e\n\nLINE_STRIP\x10\x01\x12\r\n\tLINE_LOOP\x10\x02\x12\t\n\x05LINES\x10\x03\x12\x12\n\x0eTRIANGLE_STRIP\x10\x04\x12\x10\n\x0cTRIANGLE_FAN\x10\x05\x12\r\n\tTRIANGLES\x10\x06\x12\x0e\n\nQUAD_STRIP\x10\x07\x12\t\n\x05QUADS\x10\x08\x12\x0b\n\x07POLYGON\x10\t\"L\n\x05\x63ov_t\x12\n\n\x02id\x18\x01 \x02(\x03\x12\x12\n\ncollection\x18\x02 \x02(\x05\x12\x12\n\nelement_id\x18\x03 \x02(\x03\x12\x0f\n\x07\x65ntries\x18\x04 \x03(\x01\"T\n\x10\x63ov_collection_t\x12\n\n\x02id\x18\x01 \x02(\x05\x12\x0c\n\x04name\x18\x02 \x02(\t\x12\r\n\x05reset\x18\x03 \x02(\x08\x12\x17\n\x04\x63ovs\x18\x04 \x03(\x0b\x32\t.vs.cov_t\"L\n\x06text_t\x12\n\n\x02id\x18\x01 \x02(\x03\x12\x15\n\rcollection_id\x18\x02 \x02(\x05\x12\x11\n\tobject_id\x18\x03 \x02(\x03\x12\x0c\n\x04text\x18\x04 \x02(\t\"W\n\x11text_collection_t\x12\n\n\x02id\x18\x01 \x02(\x05\x12\x0c\n\x04name\x18\x02 \x02(\t\x12\r\n\x05reset\x18\x04 \x02(\x08\x12\x19\n\x05texts\x18\x05 \x03(\x0b\x32\n.vs.text_t')
+  serialized_pb=_b('\n\x08vs.proto\x12\x02vs\"*\n\tmessage_t\x12\x0f\n\x07\x63hannel\x18\x01 \x02(\t\x12\x0c\n\x04\x64\x61ta\x18\x02 \x02(\x0c\"l\n\x06pose_t\x12\r\n\x05utime\x18\x01 \x02(\x03\x12\x0b\n\x03pos\x18\x02 \x03(\x01\x12\x0b\n\x03vel\x18\x03 \x03(\x01\x12\x13\n\x0borientation\x18\x04 \x03(\x01\x12\x15\n\rrotation_rate\x18\x05 \x03(\x01\x12\r\n\x05\x61\x63\x63\x65l\x18\x06 \x03(\x01\"^\n\x05obj_t\x12\n\n\x02id\x18\x01 \x02(\x03\x12\t\n\x01x\x18\x02 \x02(\x01\x12\t\n\x01y\x18\x03 \x02(\x01\x12\t\n\x01z\x18\x04 \x02(\x01\x12\x0b\n\x03yaw\x18\x05 \x02(\x01\x12\r\n\x05pitch\x18\x06 \x02(\x01\x12\x0c\n\x04roll\x18\x07 \x02(\x01\"\x94\x02\n\x10obj_collection_t\x12\n\n\x02id\x18\x01 \x02(\x05\x12\x0c\n\x04name\x18\x02 \x02(\t\x12\r\n\x05reset\x18\x03 \x02(\x08\x12+\n\x04type\x18\x04 \x02(\x0e\x32\x1d.vs.obj_collection_t.obj_type\x12\x17\n\x04objs\x18\x05 \x03(\x0b\x32\t.vs.obj_t\x12\r\n\x05nobjs\x18\x06 \x01(\x05\"\x81\x01\n\x08obj_type\x12\x08\n\x04POSE\x10\x00\x12\x08\n\x04TREE\x10\x01\x12\n\n\x06SQUARE\x10\x02\x12\n\n\x06POSE3D\x10\x03\x12\n\n\x06\x41XIS3D\x10\x04\x12\x07\n\x03TAG\x10\x05\x12\n\n\x06\x43\x41MERA\x10\x06\x12\x0c\n\x08TRIANGLE\x10\x07\x12\x0b\n\x07HEXAGON\x10\x08\x12\r\n\tSONARCONE\x10\t\"\x15\n\x13reset_collections_t\",\n\tpoint3d_t\x12\t\n\x01x\x18\x01 \x02(\x01\x12\t\n\x01y\x18\x02 \x02(\x01\x12\t\n\x01z\x18\x03 \x02(\x01\"*\n\x07\x63olor_t\x12\t\n\x01r\x18\x01 \x02(\x02\x12\t\n\x01g\x18\x02 \x02(\x02\x12\t\n\x01\x62\x18\x03 \x02(\x02\"\xd2\x01\n\x0epoint3d_list_t\x12\n\n\x02id\x18\x01 \x02(\x03\x12\x12\n\ncollection\x18\x02 \x02(\x05\x12\x12\n\nelement_id\x18\x03 \x02(\x03\x12\x0e\n\x06points\x18\x04 \x02(\x0c\x12\x0e\n\x06\x63olors\x18\x05 \x02(\x0c\x12\x0f\n\x07normals\x18\x06 \x01(\x0c\x12\x14\n\x08pointids\x18\x07 \x03(\x03\x42\x02\x10\x01\x12\x0f\n\x07npoints\x18\x08 \x01(\x05\x12\x0f\n\x07ncolors\x18\t \x01(\x05\x12\x10\n\x08nnormals\x18\n \x01(\x05\x12\x11\n\tnpointids\x18\x0b \x01(\x05\"\xd6\x02\n\x19point3d_list_collection_t\x12\n\n\x02id\x18\x01 \x02(\x05\x12\x0c\n\x04name\x18\x02 \x02(\t\x12\x36\n\x04type\x18\x03 \x02(\x0e\x32(.vs.point3d_list_collection_t.point_type\x12\r\n\x05reset\x18\x04 \x02(\x08\x12\'\n\x0bpoint_lists\x18\x05 \x03(\x0b\x32\x12.vs.point3d_list_t\x12\x0e\n\x06nlists\x18\x06 \x02(\x05\"\x9e\x01\n\npoint_type\x12\t\n\x05POINT\x10\x00\x12\x0e\n\nLINE_STRIP\x10\x01\x12\r\n\tLINE_LOOP\x10\x02\x12\t\n\x05LINES\x10\x03\x12\x12\n\x0eTRIANGLE_STRIP\x10\x04\x12\x10\n\x0cTRIANGLE_FAN\x10\x05\x12\r\n\tTRIANGLES\x10\x06\x12\x0e\n\nQUAD_STRIP\x10\x07\x12\t\n\x05QUADS\x10\x08\x12\x0b\n\x07POLYGON\x10\t\"L\n\x05\x63ov_t\x12\n\n\x02id\x18\x01 \x02(\x03\x12\x12\n\ncollection\x18\x02 \x02(\x05\x12\x12\n\nelement_id\x18\x03 \x02(\x03\x12\x0f\n\x07\x65ntries\x18\x04 \x03(\x01\"T\n\x10\x63ov_collection_t\x12\n\n\x02id\x18\x01 \x02(\x05\x12\x0c\n\x04name\x18\x02 \x02(\t\x12\r\n\x05reset\x18\x03 \x02(\x08\x12\x17\n\x04\x63ovs\x18\x04 \x03(\x0b\x32\t.vs.cov_t\"L\n\x06text_t\x12\n\n\x02id\x18\x01 \x02(\x03\x12\x15\n\rcollection_id\x18\x02 \x02(\x05\x12\x11\n\tobject_id\x18\x03 \x02(\x03\x12\x0c\n\x04text\x18\x04 \x02(\t\"W\n\x11text_collection_t\x12\n\n\x02id\x18\x01 \x02(\x05\x12\x0c\n\x04name\x18\x02 \x02(\t\x12\r\n\x05reset\x18\x04 \x02(\x08\x12\x19\n\x05texts\x18\x05 \x03(\x0b\x32\n.vs.text_t')
 )
 _sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
@@ -74,8 +74,8 @@ _OBJ_COLLECTION_T_OBJ_TYPE = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   options=None,
-  serialized_start=370,
-  serialized_end=499,
+  serialized_start=414,
+  serialized_end=543,
 )
 _sym_db.RegisterEnumDescriptor(_OBJ_COLLECTION_T_OBJ_TYPE)
 
@@ -128,10 +128,48 @@ _POINT3D_LIST_COLLECTION_T_POINT_TYPE = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   options=None,
-  serialized_start=1012,
-  serialized_end=1170,
+  serialized_start=1056,
+  serialized_end=1214,
 )
 _sym_db.RegisterEnumDescriptor(_POINT3D_LIST_COLLECTION_T_POINT_TYPE)
+
+
+_MESSAGE_T = _descriptor.Descriptor(
+  name='message_t',
+  full_name='vs.message_t',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='channel', full_name='vs.message_t.channel', index=0,
+      number=1, type=9, cpp_type=9, label=2,
+      has_default_value=False, default_value=_b("").decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='data', full_name='vs.message_t.data', index=1,
+      number=2, type=12, cpp_type=9, label=2,
+      has_default_value=False, default_value=_b(""),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  options=None,
+  is_extendable=False,
+  syntax='proto2',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=16,
+  serialized_end=58,
+)
 
 
 _POSE_T = _descriptor.Descriptor(
@@ -195,8 +233,8 @@ _POSE_T = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=16,
-  serialized_end=124,
+  serialized_start=60,
+  serialized_end=168,
 )
 
 
@@ -268,8 +306,8 @@ _OBJ_T = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=126,
-  serialized_end=220,
+  serialized_start=170,
+  serialized_end=264,
 )
 
 
@@ -335,8 +373,8 @@ _OBJ_COLLECTION_T = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=223,
-  serialized_end=499,
+  serialized_start=267,
+  serialized_end=543,
 )
 
 
@@ -359,8 +397,8 @@ _RESET_COLLECTIONS_T = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=501,
-  serialized_end=522,
+  serialized_start=545,
+  serialized_end=566,
 )
 
 
@@ -404,8 +442,8 @@ _POINT3D_T = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=524,
-  serialized_end=568,
+  serialized_start=568,
+  serialized_end=612,
 )
 
 
@@ -449,8 +487,8 @@ _COLOR_T = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=570,
-  serialized_end=612,
+  serialized_start=614,
+  serialized_end=656,
 )
 
 
@@ -550,8 +588,8 @@ _POINT3D_LIST_T = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=615,
-  serialized_end=825,
+  serialized_start=659,
+  serialized_end=869,
 )
 
 
@@ -617,8 +655,8 @@ _POINT3D_LIST_COLLECTION_T = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=828,
-  serialized_end=1170,
+  serialized_start=872,
+  serialized_end=1214,
 )
 
 
@@ -669,8 +707,8 @@ _COV_T = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1172,
-  serialized_end=1248,
+  serialized_start=1216,
+  serialized_end=1292,
 )
 
 
@@ -721,8 +759,8 @@ _COV_COLLECTION_T = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1250,
-  serialized_end=1334,
+  serialized_start=1294,
+  serialized_end=1378,
 )
 
 
@@ -773,8 +811,8 @@ _TEXT_T = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1336,
-  serialized_end=1412,
+  serialized_start=1380,
+  serialized_end=1456,
 )
 
 
@@ -825,8 +863,8 @@ _TEXT_COLLECTION_T = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1414,
-  serialized_end=1501,
+  serialized_start=1458,
+  serialized_end=1545,
 )
 
 _OBJ_COLLECTION_T.fields_by_name['type'].enum_type = _OBJ_COLLECTION_T_OBJ_TYPE
@@ -837,6 +875,7 @@ _POINT3D_LIST_COLLECTION_T.fields_by_name['point_lists'].message_type = _POINT3D
 _POINT3D_LIST_COLLECTION_T_POINT_TYPE.containing_type = _POINT3D_LIST_COLLECTION_T
 _COV_COLLECTION_T.fields_by_name['covs'].message_type = _COV_T
 _TEXT_COLLECTION_T.fields_by_name['texts'].message_type = _TEXT_T
+DESCRIPTOR.message_types_by_name['message_t'] = _MESSAGE_T
 DESCRIPTOR.message_types_by_name['pose_t'] = _POSE_T
 DESCRIPTOR.message_types_by_name['obj_t'] = _OBJ_T
 DESCRIPTOR.message_types_by_name['obj_collection_t'] = _OBJ_COLLECTION_T
@@ -849,6 +888,13 @@ DESCRIPTOR.message_types_by_name['cov_t'] = _COV_T
 DESCRIPTOR.message_types_by_name['cov_collection_t'] = _COV_COLLECTION_T
 DESCRIPTOR.message_types_by_name['text_t'] = _TEXT_T
 DESCRIPTOR.message_types_by_name['text_collection_t'] = _TEXT_COLLECTION_T
+
+message_t = _reflection.GeneratedProtocolMessageType('message_t', (_message.Message,), dict(
+  DESCRIPTOR = _MESSAGE_T,
+  __module__ = 'vs_pb2'
+  # @@protoc_insertion_point(class_scope:vs.message_t)
+  ))
+_sym_db.RegisterMessage(message_t)
 
 pose_t = _reflection.GeneratedProtocolMessageType('pose_t', (_message.Message,), dict(
   DESCRIPTOR = _POSE_T,

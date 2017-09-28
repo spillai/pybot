@@ -2,6 +2,12 @@ syntax = "proto2";
 
 package vs;
 
+// msg
+message message_t {
+  required string channel = 1;
+  required bytes data = 2; 
+}
+
 // Pose
 message pose_t {
   required int64 utime = 1;

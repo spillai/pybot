@@ -5,7 +5,7 @@ from websocket_server import WebsocketServer
 
 from pybot.externals import marshalling_backend
 
-class LCMThreadHandler(object):
+class _ThreadHandler(object):
     def __init__(self):
         self.lock_ = Lock()
         self.ev_th_ = None
@@ -103,14 +103,13 @@ class LCMThreadHandler(object):
 
         
 PORT=9001
-
-lcm_th = LCMThreadHandler()
+th = _ThreadHandler()
 
 print('Starting server on port {}'.format(PORT))
 server = WebsocketServer(PORT)
-server.set_fn_new_client(lcm_th.new_client)
-server.set_fn_client_left(lcm_th.client_left)
-server.set_fn_message_received(lcm_th.message_received)
+server.set_fn_new_client(th.new_client)
+server.set_fn_client_left(th.client_left)
+server.set_fn_message_received(th.message_received)
 
 server.run_forever()
-lcm_th.stop()
+th.stop()

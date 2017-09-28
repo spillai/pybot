@@ -17,6 +17,7 @@ var collections_visibles = [];
 var reconstruction_visibles = [];
 var reconstruction_groups = [];
 
+var obj_axes_geom = null;
 var obj_collections = {};
 var obj_collections_lut = {};
 
@@ -858,25 +859,50 @@ function addAxis(axis) {
 }
 
 function getAxes(sz) {
-    var linegeo = new THREE.Geometry();
-    linegeo.vertices = [
-        new THREE.Vector3(0, 0, 0),
-        new THREE.Vector3(sz, 0, 0),
-        new THREE.Vector3(0, 0, 0),
-        new THREE.Vector3(0, sz, 0),
-        new THREE.Vector3(0, 0, 0),
-        new THREE.Vector3(0, 0, sz)
-    ];
-    linegeo.colors = [
-        new THREE.Color( 0xff0000 ),
-        new THREE.Color( 0xff0000 ),
-        new THREE.Color( 0x00ff00 ),
-        new THREE.Color( 0x00ff00 ),
-        new THREE.Color( 0x0000ff ),
-        new THREE.Color( 0x0000ff )
-    ];
-    var line = new THREE.LineSegments(linegeo, lineMaterial, THREE.LinePieces);
-    return line;
+    // var pointsf = new Float32Array([0, 0, 0,
+    //                             sz, 0, 0,
+    //                             0, 0, 0,
+    //                             0, sz, 0,
+    //                             0, 0, 0,
+    //                             0, 0, sz]);
+    // var colorsf = new Float32Array([1.0, 0, 0,
+    //                             1.0, 0, 0,
+    //                             0, 1.0, 0, 
+    //                             0, 1.0, 0,
+    //                             0, 0, 1.0,
+    //                             0, 0, 1.0]);
+    
+    // var geom = new THREE.BufferGeometry();
+    // geom.addAttribute(
+    //     'position',
+    //     new THREE.BufferAttribute(pointsf, 3));
+    // geom.addAttribute(
+    //     'color',
+    //     new THREE.BufferAttribute(colorsf, 3));
+    if (!obj_axes_geom) { 
+        obj_axes_geom = new THREE.Geometry();
+        obj_axes_geom.vertices = [
+            new THREE.Vector3(0, 0, 0),
+            new THREE.Vector3(sz, 0, 0),
+            new THREE.Vector3(0, 0, 0),
+            new THREE.Vector3(0, sz, 0),
+            new THREE.Vector3(0, 0, 0),
+            new THREE.Vector3(0, 0, sz)
+        ];
+        obj_axes_geom.colors = [
+            new THREE.Color( 0xff0000 ),
+            new THREE.Color( 0xff0000 ),
+            new THREE.Color( 0x00ff00 ),
+            new THREE.Color( 0x00ff00 ),
+            new THREE.Color( 0x0000ff ),
+            new THREE.Color( 0x0000ff )
+        ];
+    }
+
+    // Return new axis with cached geometry
+    var axis = new THREE.LineSegments(
+        obj_axes_geom, lineMaterial, THREE.LinePieces);
+    return axis;
 }
 
 function init() {
@@ -888,6 +914,7 @@ function init() {
             throw err;
         
         // Obtain a message type
+        message_t = root.lookupType("vs.message_t");
         pose_t = root.lookupType("vs.pose_t");
         obj_collection_t = root.lookupType("vs.obj_collection_t");
         point3d_list_collection_t = root.lookupType("vs.point3d_list_collection_t");
@@ -1082,7 +1109,8 @@ function initRenderer() {
 
     // Create empty scene
     addEmptyScene();
-    
+
+    // Add controls
     addDatGui();
 
     // setShowThumbnail(true);
@@ -1252,82 +1280,82 @@ function angleBetweenVector2(x1, y1, x2, y2) {
     else return a;
 }
 
-function computeValidMoves() {
-    var currentPosition = controls.animationPosition;
-    var currentTarget = controls.animationTarget;
-    var currentDir = currentTarget.clone().sub(currentPosition);
-    var turnAngle = undefined;
+// function computeValidMoves() {
+//     var currentPosition = controls.animationPosition;
+//     var currentTarget = controls.animationTarget;
+//     var currentDir = currentTarget.clone().sub(currentPosition);
+//     var turnAngle = undefined;
 
-    var wantedMotionDirs = {
-        STEP_LEFT: new THREE.Vector3(-currentDir.y, currentDir.x, 0),
-        STEP_RIGHT: new THREE.Vector3(currentDir.y, -currentDir.x, 0),
-        STEP_FORWARD: new THREE.Vector3(currentDir.x, currentDir.y, 0),
-        STEP_BACKWARD: new THREE.Vector3(-currentDir.x, -currentDir.y, 0),
-        TURN_LEFT: new THREE.Vector3(0, 0, 0),
-        TURN_RIGHT: new THREE.Vector3(0, 0, 0),
-        TURN_U: new THREE.Vector3(0, 0, 0)
-    }
+//     var wantedMotionDirs = {
+//         STEP_LEFT: new THREE.Vector3(-currentDir.y, currentDir.x, 0),
+//         STEP_RIGHT: new THREE.Vector3(currentDir.y, -currentDir.x, 0),
+//         STEP_FORWARD: new THREE.Vector3(currentDir.x, currentDir.y, 0),
+//         STEP_BACKWARD: new THREE.Vector3(-currentDir.x, -currentDir.y, 0),
+//         TURN_LEFT: new THREE.Vector3(0, 0, 0),
+//         TURN_RIGHT: new THREE.Vector3(0, 0, 0),
+//         TURN_U: new THREE.Vector3(0, 0, 0)
+//     }
 
-    var wantedDirs = {
-        STEP_LEFT: new THREE.Vector3(currentDir.x, currentDir.y, 0),
-        STEP_RIGHT: new THREE.Vector3(currentDir.x, currentDir.y, 0),
-        STEP_FORWARD: new THREE.Vector3(currentDir.x, currentDir.y, 0),
-        STEP_BACKWARD: new THREE.Vector3(currentDir.x, currentDir.y, 0),
-        TURN_LEFT: new THREE.Vector3(-currentDir.y, currentDir.x, 0),
-        TURN_RIGHT: new THREE.Vector3(currentDir.y, -currentDir.x, 0),
-        TURN_U: new THREE.Vector3(-currentDir.x, -currentDir.y, 0)
-    }
+//     var wantedDirs = {
+//         STEP_LEFT: new THREE.Vector3(currentDir.x, currentDir.y, 0),
+//         STEP_RIGHT: new THREE.Vector3(currentDir.x, currentDir.y, 0),
+//         STEP_FORWARD: new THREE.Vector3(currentDir.x, currentDir.y, 0),
+//         STEP_BACKWARD: new THREE.Vector3(currentDir.x, currentDir.y, 0),
+//         TURN_LEFT: new THREE.Vector3(-currentDir.y, currentDir.x, 0),
+//         TURN_RIGHT: new THREE.Vector3(currentDir.y, -currentDir.x, 0),
+//         TURN_U: new THREE.Vector3(-currentDir.x, -currentDir.y, 0)
+//     }
 
-    var min_d = {};
-    var closest_line = {};
-    var turn_threshold;
-    for (var k in wantedMotionDirs) {
-        if (wantedMotionDirs.hasOwnProperty(k)) {
-            min_d[k] = 999999999999;
-            closest_line[k] = undefined;
-        }
-    }
+//     var min_d = {};
+//     var closest_line = {};
+//     var turn_threshold;
+//     for (var k in wantedMotionDirs) {
+//         if (wantedMotionDirs.hasOwnProperty(k)) {
+//             min_d[k] = 999999999999;
+//             closest_line[k] = undefined;
+//         }
+//     }
 
-    for (var i = 0; i < camera_lines.length; ++i) {
-        var line = camera_lines[i];
-        var r = line.reconstruction;
-        var shot_id = line.shot_id;
-        var shot = r['shots'][shot_id];
-        var oc = opticalCenter(shot);
-        var dir = viewingDirection(shot);
-        var motion = oc.clone().sub(currentPosition);
-        var d = currentPosition.distanceTo(oc);
-        var rid = reconstruction_id_of_shot(reconstructions, shot_id);
-        var visible = options.reconstruction_visibles[rid];
-        if (!visible) continue;
+//     for (var i = 0; i < camera_lines.length; ++i) {
+//         var line = camera_lines[i];
+//         var r = line.reconstruction;
+//         var shot_id = line.shot_id;
+//         var shot = r['shots'][shot_id];
+//         var oc = opticalCenter(shot);
+//         var dir = viewingDirection(shot);
+//         var motion = oc.clone().sub(currentPosition);
+//         var d = currentPosition.distanceTo(oc);
+//         var rid = reconstruction_id_of_shot(reconstructions, shot_id);
+//         var visible = options.reconstruction_visibles[rid];
+//         if (!visible) continue;
 
-        for (var k in wantedMotionDirs) {
-            if (wantedMotionDirs.hasOwnProperty(k)) {
-                var turn = angleBetweenVector2(wantedDirs[k].x, wantedDirs[k].y, dir.x, dir.y);
-                var driftAB = angleBetweenVector2(wantedMotionDirs[k].x, wantedMotionDirs[k].y, motion.x, motion.y);
-                var driftBA = driftAB - turn;
-                var drift = Math.max(driftAB, driftBA);
-                if (k.lastIndexOf('STEP', 0) === 0) {
-                    turn_threshold = 0.5
-                    if (Math.abs(turn) < turn_threshold && Math.abs(drift) < 0.5 && d > 0.01 && d < 20) {
-                        if (d < min_d[k]) {
-                            min_d[k] = d;
-                            closest_line[k] = line;
-                        }
-                    }
-                } else if (k.lastIndexOf('TURN', 0) === 0) {
-                    if (Math.abs(turn) < 0.7 && d < 15) {
-                        if (d < min_d[k]) {
-                            min_d[k] = d;
-                            closest_line[k] = line;
-                        }
-                    }
-                }
-            }
-        }
-    }
-    return closest_line;
-}
+//         for (var k in wantedMotionDirs) {
+//             if (wantedMotionDirs.hasOwnProperty(k)) {
+//                 var turn = angleBetweenVector2(wantedDirs[k].x, wantedDirs[k].y, dir.x, dir.y);
+//                 var driftAB = angleBetweenVector2(wantedMotionDirs[k].x, wantedMotionDirs[k].y, motion.x, motion.y);
+//                 var driftBA = driftAB - turn;
+//                 var drift = Math.max(driftAB, driftBA);
+//                 if (k.lastIndexOf('STEP', 0) === 0) {
+//                     turn_threshold = 0.5
+//                     if (Math.abs(turn) < turn_threshold && Math.abs(drift) < 0.5 && d > 0.01 && d < 20) {
+//                         if (d < min_d[k]) {
+//                             min_d[k] = d;
+//                             closest_line[k] = line;
+//                         }
+//                     }
+//                 } else if (k.lastIndexOf('TURN', 0) === 0) {
+//                     if (Math.abs(turn) < 0.7 && d < 15) {
+//                         if (d < min_d[k]) {
+//                             min_d[k] = d;
+//                             closest_line[k] = line;
+//                         }
+//                     }
+//                 }
+//             }
+//         }
+//     }
+//     return closest_line;
+// }
 
 function walkOneStep(motion_type) {
     var line = validMoves[motion_type];
@@ -1393,36 +1421,36 @@ function preloadAllImages() {
     }
 }
 
-function preloadValidMoves() {
-    for (var k in validMoves) {
-        if (validMoves.hasOwnProperty(k)) {
-            var line = validMoves[k];
-            if (line !== undefined) {
-                var shot_id = line.shot_id;
-                var image_url = imageURL(shot_id);
-                var temp_img = new Image();
-                temp_img.src = image_url;
-            }
-        }
-    }
-}
+// function preloadValidMoves() {
+//     for (var k in validMoves) {
+//         if (validMoves.hasOwnProperty(k)) {
+//             var line = validMoves[k];
+//             if (line !== undefined) {
+//                 var shot_id = line.shot_id;
+//                 var image_url = imageURL(shot_id);
+//                 var temp_img = new Image();
+//                 temp_img.src = image_url;
+//             }
+//         }
+//     }
+// }
 
-function updateValidMovesWidget() {
-    $('#nav-left').css('visibility',
-                       (validMoves.STEP_LEFT === undefined) ? 'hidden':'visible');
-    $('#nav-right').css('visibility',
-                        (validMoves.STEP_RIGHT === undefined) ? 'hidden':'visible');
-    $('#nav-forward').css('visibility',
-                          (validMoves.STEP_FORWARD === undefined) ? 'hidden':'visible');
-    $('#nav-backward').css('visibility',
-                           (validMoves.STEP_BACKWARD === undefined) ? 'hidden':'visible');
-    $('#nav-turn-left').css('visibility',
-                            (validMoves.TURN_LEFT === undefined) ? 'hidden':'visible');
-    $('#nav-turn-right').css('visibility',
-                             (validMoves.TURN_RIGHT === undefined) ? 'hidden':'visible');
-    $('#nav-u-turn').css('visibility',
-                         (validMoves.TURN_U === undefined) ? 'hidden':'visible');
-}
+// function updateValidMovesWidget() {
+//     $('#nav-left').css('visibility',
+//                        (validMoves.STEP_LEFT === undefined) ? 'hidden':'visible');
+//     $('#nav-right').css('visibility',
+//                         (validMoves.STEP_RIGHT === undefined) ? 'hidden':'visible');
+//     $('#nav-forward').css('visibility',
+//                           (validMoves.STEP_FORWARD === undefined) ? 'hidden':'visible');
+//     $('#nav-backward').css('visibility',
+//                            (validMoves.STEP_BACKWARD === undefined) ? 'hidden':'visible');
+//     $('#nav-turn-left').css('visibility',
+//                             (validMoves.TURN_LEFT === undefined) ? 'hidden':'visible');
+//     $('#nav-turn-right').css('visibility',
+//                              (validMoves.TURN_RIGHT === undefined) ? 'hidden':'visible');
+//     $('#nav-u-turn').css('visibility',
+//                          (validMoves.TURN_U === undefined) ? 'hidden':'visible');
+// }
 
 function animate() {
     requestAnimationFrame(animate);
@@ -1438,36 +1466,38 @@ function animate() {
 }
 
 function render() {
-    validMoves = computeValidMoves();
-    updateValidMovesWidget();
-    if (invokeJourneyWrapper(function () { return journeyWrapper.isStarted(); }) !== true) {
-        preloadValidMoves();
-    }
+    // validMoves = computeValidMoves();
+    // updateValidMovesWidget();
+    // if (invokeJourneyWrapper(function () { return journeyWrapper.isStarted(); }) !== true) {
+    //     preloadValidMoves();
+    // }
 
-    // Handle camera selection.
-    if (hoverCamera !== undefined && hoverCamera !== selectedCamera) {
-        hoverCamera.material.linewidth = 1;
-        hoverCamera.material.color = options.cameraColor;
-    }
-    var vector = new THREE.Vector3(mouse.x, mouse.y, 1).unproject(camera);
-    raycaster.set(camera.position, vector.sub(camera.position).normalize());
-    var intersects = raycaster.intersectObjects(camera_lines, true);
-    hoverCamera = undefined;
-    for (var i = 0; i < intersects.length; ++i) {
-        if (intersects[i].distance > 1.5 * options.cameraSize
-            && intersects[i].object.visible) {
-            hoverCamera = intersects[i].object;
-            if (hoverCamera !== selectedCamera) {
-                hoverCamera.material.linewidth = 2;
-                hoverCamera.material.color = options.hoverCameraColor;
-            }
-            break;
-        }
-    }
+    // // Handle camera selection.
+    // if (hoverCamera !== undefined && hoverCamera !== selectedCamera) {
+    //     hoverCamera.material.linewidth = 1;
+    //     hoverCamera.material.color = options.cameraColor;
+    // }
+    // var vector = new THREE.Vector3(mouse.x, mouse.y, 1).unproject(camera);
+    // raycaster.set(camera.position, vector.sub(camera.position).normalize());
+    // var intersects = raycaster.intersectObjects(camera_lines, true);
+    // hoverCamera = undefined;
+    // for (var i = 0; i < intersects.length; ++i) {
+    //     if (intersects[i].distance > 1.5 * options.cameraSize
+    //         && intersects[i].object.visible) {
+    //         hoverCamera = intersects[i].object;
+    //         if (hoverCamera !== selectedCamera) {
+    //             hoverCamera.material.linewidth = 2;
+    //             hoverCamera.material.color = options.hoverCameraColor;
+    //         }
+    //         break;
+    //     }
+    // }
 
     // Render.
     renderer.render(scene, camera);
-    if( capturer )
-        capturer.capture( renderer.domElement );
+
+    // Capture canvas
+    // if( capturer )
+    //     capturer.capture( renderer.domElement );
 
 }
