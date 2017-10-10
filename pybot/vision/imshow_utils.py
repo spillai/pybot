@@ -27,7 +27,7 @@ class WindowManager(object):
     def imshow(self, label, im): 
         cv2.imshow(label, im)
         if label not in self.has_moved_:
-            cv2.moveWindow(label, 1920, 0)
+            cv2.moveWindow(label, 0, 0)
             self.has_moved_.add(label)
 
 global window_manager
