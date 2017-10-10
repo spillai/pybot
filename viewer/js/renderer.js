@@ -74,7 +74,7 @@ var options = {
     drawGrid: true,
     followCamera: true,
     drawGPS: false,
-    animationSpeed: 0.2,
+    animationSpeed: 0.5,
     imagePlaneOpacity: 1,
     cameraColor: new THREE.Color(0xFFFFFF),
     hoverCameraColor: new THREE.Color(0xFF8888),
@@ -124,7 +124,7 @@ function addDatGui(){
             imagePlane.geometry = imagePlaneGeo(imagePlaneCamera.reconstruction, imagePlaneCamera.shot_id);
             render();
         });
-    f1.add(options, 'animationSpeed', 0, 0.25)
+    f1.add(options, 'animationSpeed', 0, 0.5)
         .onChange(function(value) {
             controls.animationSpeed = value;
             invokeJourneyWrapper(function () { journeyWrapper.updateInterval(); });
@@ -1000,6 +1000,9 @@ function init() {
 
     // initialize renderer
     initRenderer();
+
+    // TODO: Image viewer (see onionmaps reference)
+    
 }
 
 function addEmptyScene() {
@@ -1013,6 +1016,7 @@ function initRenderer() {
     raycaster = new THREE.Raycaster();
     raycaster.precision = 0.01;
 
+    // TODO: optional preserveDrawingBuffer: true
     renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setClearColor( 0x202020, 0.0);
