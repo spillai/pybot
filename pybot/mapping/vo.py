@@ -13,7 +13,7 @@ from collections import deque
 from pybot.utils.misc import Accumulator
 from pybot.utils.db_utils import AttrDict
 from pybot.vision.camera_utils import Camera, CameraExtrinsic, CameraIntrinsic
-from pybot.geometry.rigid_transform import Pose, RigidTransform
+from pybot.geometry.rigid_transform import Pose, RigidTransform, rpyxyz
 from pybot.vision.camera_utils import compute_essential, decompose_E
 from pybot.vision.feature_detection import FeatureDetector
 from pybot.vision.trackers.base_klt import OpenCVKLT
@@ -24,10 +24,10 @@ from pybot.utils.timer import timeitmethod
 
 from pybot.externals.lcm import draw_utils
 
-try: 
-    from pybot_vision import recoverPose
-except Exception,e:
-    raise RuntimeWarning('Failed to import pybot_vision.recoverPose {}'.format(e.message))
+# try: 
+#     from pybot_vision import recoverPose
+# except Exception,e:
+#     raise RuntimeWarning('Failed to import pybot_vision.recoverPose {}'.format(e.message))
 
 class VO(object):
     def __init__(self, calib, 
@@ -217,18 +217,20 @@ class NisterVO(VO):
         
         # Restrict 2D
         if self.restrict_2d_:
-            rpyxyz = rt.to_rpyxyz(axes='sxyz')
-            rpyxyz[0], rpyxyz[2], rpyxyz[4] = 0, 0, 0
-            rt = RigidTransform.from_rpyxyz(*rpyxyz, axes='sxyz').scaled(rt.scale)
+            rtvec = rt.to_rpyxyz(axes='sxyz')
+            rtvec[0], rtvec[2], rtvec[4] = 0, 0, 0
+            rt = rpyxyz(*rtvec, axes='sxyz').scaled(rt.scale)
         
         # Sim3 scaled transformation
         crt = self.poses_q_.latest
         newp = crt.scaled(scale) * rt
-        draw_utils.publish_pose_t('CAMERA_POSE', newp, frame_id='camera_upright')
+        # draw_utils.publish_pose_t('CAMERA_POSE', newp, frame_id='camera_upright')
         
         self.poses_q_.append(newp)
-        draw_utils.publish_cameras('camera', [Pose.from_rigid_transform(self.poses_q_.index, newp)],
-                                   reset=False, frame_id='camera_upright')
+        draw_utils.publish_cameras(
+            'camera',
+            [Pose.from_rigid_transform(self.poses_q_.index, newp)],
+            reset=False, frame_id='camera')
         # draw_utils.publish_botviewer_image_t(im, jpeg=True)
 
         
@@ -266,54 +268,4 @@ class SlidingWindowVO(VO):
     
         
 
-def test_vo():
-    from pybot.vision.imshow_utils import imshow_cv
-    from pybot.utils.test_utils import test_dataset
     
-    dataset = test_dataset(sequence='00', scale=0.5)
-    lcam = dataset.calib.left
-    poses = dataset.poses
-    
-    vo = NisterVO(lcam, restrict_2d=True,
-                         num_tracks=500, min_tracks=300, grid_size=30,
-                         lk_window_size=25, lk_levels=3, visualize=True)
-    draw_utils.publish_sensor_frame('camera_upright',
-                                    pose=RigidTransform.from_rpyxyz(np.pi/2,np.pi/2,0,0,0,1))
-
-    parr = np.vstack([p.tvec for p in poses[::10]])
-    draw_utils.publish_line_segments('trajectory', parr[:-1,:], parr[1:,:], c='b')
-    draw_utils.publish_pose_list('poses', poses[::10], frame_id='camera')
-    
-    
-    ppose = None
-    for f in dataset.iterframes():
-        scale = np.linalg.norm(ppose.tvec - f.pose.tvec) \
-                if ppose is not None else 1.0
-
-        ppose = f.pose
-        vo.process(f.left, scale=scale)
-
-def test_slidingwindowvo():
-    from pybot.vision.imshow_utils import imshow_cv
-    from pybot.utils.test_utils import test_dataset
-    
-    dataset = test_dataset(sequence='00', scale=0.5)
-    lcam = dataset.calib.left
-    poses = dataset.poses
-
-    vo = SlidingWindowVO(lcam, restrict_2d=True,
-                         num_tracks=500, min_tracks=300, grid_size=30,
-                         lk_window_size=25, lk_levels=3, visualize=True)
-
-    ppose = None
-    for f in dataset.iterframes():
-        scale = np.linalg.norm(ppose.tvec - f.pose.tvec) \
-                if ppose is not None else 1.0
-        
-        ppose = f.pose
-        vo.process(f.left, scale=scale)
-
-    
-if __name__ == "__main__":
-    test_vo()        
-    # test_slidingwindowvo()
