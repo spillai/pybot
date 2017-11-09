@@ -6,7 +6,7 @@ General-purpose class for rigid-body transformations.
 
 import random as rnd
 import numpy as np
-import transformations as tf
+from . import transformations as tf
 from pybot.geometry.quaternion import Quaternion
 
 ###############################################################################
@@ -158,7 +158,7 @@ class RigidTransform(object):
             r = self.quat * other.quat
             return RigidTransform(r, t)
         elif isinstance(other, list): 
-            return map(lambda o: self.oplus(o), other)
+            return [self.oplus(o) for o in other]
         else: 
             raise TypeError("Type inconsistent", type(other), other.__class__)
 
@@ -171,7 +171,7 @@ class RigidTransform(object):
 
     def rotate_vec(self, v): 
         if v.ndim == 2: 
-            return np.vstack(map(lambda v_: self.quat.rotate(v_), v))
+            return np.vstack([self.quat.rotate(v_) for v_ in v])
         else: 
             assert(v.ndim == 1 or (v.ndim == 2 and v.shape[0] == 1))
             return self.quat.rotate(v)
@@ -357,7 +357,7 @@ class Sim3(RigidTransform):
             r = self.quat * other.quat
             return RigidTransform(r, t)
         elif isinstance(other, list) and isinstance(other[0], ): 
-            return map(lambda o: self.oplus(o), other)
+            return [self.oplus(o) for o in other]
         else: 
             raise TypeError("Type inconsistent", type(other), other.__class__)
 
@@ -507,30 +507,30 @@ if __name__ == "__main__":
     q = Quaternion.identity()
     t = [ 1, 2, 3 ]
     m = RigidTransform(q, t)
-    print "m"
-    print m.to_matrix()
-    print "--------------------------"
+    print("m")
+    print(m.to_matrix())
+    print("--------------------------")
 
     q2 = Quaternion.from_rpy(np.pi / 4, 0, 0)
     t2 = [ 0, 0, 0 ]
     m2 = RigidTransform(q2, t2)
-    print "m2"
-    print m2.to_matrix()
+    print("m2")
+    print(m2.to_matrix())
 
-    print "--------------------------"
+    print("--------------------------")
     m3 = m * m2
-    print "m * m2"
-    print m3.to_matrix()
-    print np.dot(m.to_matrix(), m2.to_matrix())
-    print "--------------------------"
+    print("m * m2")
+    print(m3.to_matrix())
+    print(np.dot(m.to_matrix(), m2.to_matrix()))
+    print("--------------------------")
 
     m4 = m2 * m
-    print "m * m2"
-    print m4.to_matrix()
-    print np.dot(m2.to_matrix(), m.to_matrix())
-    print "--------------------------"
+    print("m * m2")
+    print(m4.to_matrix())
+    print(np.dot(m2.to_matrix(), m.to_matrix()))
+    print("--------------------------")
 
-    print "Testing inverse"
+    print("Testing inverse")
     identity = np.identity(4)
     for unused in range(100):
         # generate a bunch of random rigid body transforms, then compose them and apply their inverses
@@ -545,19 +545,19 @@ if __name__ == "__main__":
         errs = (identity - r.to_matrix()).flatten().tolist()[0]
         sse = np.dot(errs, errs)
         assert sse < 1e-10
-    print "OK"
+    print("OK")
     
 
-    print 'check inverse'
+    print('check inverse')
     for _ in range(10): 
         m = make_random_transform()
         t = m.to_matrix()
         tinv = np.linalg.inv(t) # tf_compose(t[:3,:3].T, np.dot(t[:3,:3],-t[:3,3]))
-        print tinv, '\n', tf_compose(t[:3,:3].T, np.dot(t[:3,:3],-t[:3,3]))
+        print(tinv, '\n', tf_compose(t[:3,:3].T, np.dot(t[:3,:3],-t[:3,3])))
         assert(tf.is_same_transform(tinv, m.inverse().to_matrix()))
 
 
-    print "Testing composition"
+    print("Testing composition")
     t = RigidTransform.identity()
     m = np.identity(4)
     for unused in range(1000):
@@ -600,9 +600,9 @@ if __name__ == "__main__":
     ba = b * a
 
     # huh?
-    print np.dot(b, a), b * a
+    print(np.dot(b, a), b * a)
 
     # retrieve relative pose 
     assert(tf.is_same_transform((ba * a.inverse()).to_matrix(), b.to_matrix()))
 
-    print "OK"
+    print("OK")
