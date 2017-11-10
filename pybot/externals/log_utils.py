@@ -4,12 +4,14 @@
 # License: MIT
 
 import os.path
-import numpy as np
-from itertools import islice, izip
 from abc import ABCMeta, abstractmethod
 from collections import Counter
 from heapq import heappush, heappop
+
+import numpy as np
 from scipy.spatial import cKDTree
+
+from pybot.utils.itertools_recipes import izip, islice
 
 def take(iterable, max_length=None): 
     return iterable if max_length is None else islice(iterable, max_length)
