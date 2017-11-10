@@ -6,7 +6,6 @@ import numpy as np
 import fnmatch
 import cv2
 
-from itertools import izip, imap, islice
 from collections import defaultdict
 from datetime import datetime
 
@@ -15,6 +14,7 @@ from pybot.utils.misc import OneHotLabeler
 from pybot.utils.timer import timeitmethod
 from pybot.utils.io_utils import find_files
 from pybot.utils.db_utils import load_json_dict, save_json_dict
+from pybot.utils.itertools_recipes import izip, imap, islice
 
 def frame_to_json(bboxes, targets): 
     """

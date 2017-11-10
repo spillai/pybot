@@ -1,6 +1,6 @@
 # Author: Sudeep Pillai <spillai@csail.mit.edu>
 # License: MIT
-
+from __future__ import print_function
 from pybot.vision.image_utils import to_color, to_gray
 from pybot.utils.dataset.kitti import KITTIDatasetReader, KITTIStereoGroundTruthDatasetReader
 
@@ -62,7 +62,7 @@ if __name__ == "__main__":
 
     # Test video
     for im in test_video(color=True): 
-        print im.shape, im.dtype
+        print(im.shape, im.dtype)
         imshow_cv('video', im)
 
     cv2.waitKey(0)
