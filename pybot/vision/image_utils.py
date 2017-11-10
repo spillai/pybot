@@ -42,7 +42,7 @@ def im_mosaic_list(items, scale=1.0, shape=None, pad=0, width=None):
         else: 
             items.append(np.zeros_like(items[-1]))
 
-    chunks = lambda l, n: [l[x: x+n] for x in xrange(0, len(l), n)]
+    chunks = lambda l, n: [l[x: x+n] for x in range(0, len(l), n)]
     hstack = [np.hstack(chunk) for chunk in chunks(items, W)]
     mosaic = im_pad(np.vstack(hstack), pad=3) if len(hstack) > 1 \
              else im_pad(hstack[0], pad=3)

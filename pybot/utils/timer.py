@@ -1,5 +1,6 @@
 # Author: Sudeep Pillai <spillai@csail.mit.edu>
 # License: MIT
+from __future__ import print_function
 
 import time
 from collections import OrderedDict
@@ -17,7 +18,7 @@ def named_timer(name):
         g_timers[name] = SimpleTimer(name, header=header)
     try: 
         return g_timers[name] 
-    except KeyError, e: 
+    except KeyError as e: 
         raise RuntimeError('Failed to retrieve timer {:}'.format(e))
 
 def timeitmethod(func):

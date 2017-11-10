@@ -24,7 +24,7 @@ import argparse
 import psutil
 import subprocess
 import time
-import httplib
+from six.moves.http_client import HTTPConnection
 
 # import google.datalab as datalab
 
@@ -36,7 +36,7 @@ def is_http_running_on(port):
     True if it is used by an http server. False otherwise.
   """
     try:
-      conn = httplib.HTTPConnection('127.0.0.1:' + str(port))
+      conn = HTTPConnection('127.0.0.1:' + str(port))
       conn.connect()
       conn.close()
       return True

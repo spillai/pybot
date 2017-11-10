@@ -630,7 +630,6 @@ function add_points_to_scene_group(msg) {
     // Render points
     for (var i = 0; i < msg.pointLists.length; ++i) {
         var pc = msg.pointLists[i];
-        // var colors = pc.colors[0];
 
         // Find collection_id, and element_id pose
         try {

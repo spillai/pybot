@@ -1,8 +1,8 @@
 import os.path
 import numpy as np
-from itertools import izip, islice
 from scipy.io import loadmat
 
+from pybot.utils.itertools_recipes import izip, islice
 from pybot.geometry.rigid_transform import RigidTransform
 from pybot.utils.io_utils import VideoCapture
 from pybot.utils.db_utils import AttrDict
@@ -43,13 +43,4 @@ class StLuciaReader(object):
     @property
     def length(self):
         return self.len(self.poses_)
-
-        
-# from pybot.externals.ros.bag_utils import ROSBagReader, ImageDecoder, NavMsgDecoder
-# channel = '/stlucia/camera/image/compressed'
-# dataset = ROSBagReader(
-#     filename=os.path.expanduser(args.filename), 
-#     decoder=[ImageDecoder(channel=channel, scale=args.scale, compressed=compressed)],
-#     every_k_frames=1, start_idx=0, index=False)
-# dataset_iterframes = imap(lambda (t, ch, im): (f.img, f.pose), dataset.iterframes())
         

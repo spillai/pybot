@@ -2,7 +2,7 @@
 # License: MIT
 
 import numpy as np
-from itertools import izip
+from pybot.utils.itertools_recipes import izip
 from pybot.utils.db_utils import AttrDict
 
 class skdataHelper(object): 

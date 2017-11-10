@@ -4,8 +4,8 @@
 import os 
 import cv2
 import numpy as np
-from itertools import izip, repeat
 
+from pybot.utils.itertools_recipes import izip, repeat
 from pybot.utils.dataset_readers import FileReader, DatasetReader, ImageDatasetReader, StereoDatasetReader
 from pybot.utils.db_utils import AttrDict
 

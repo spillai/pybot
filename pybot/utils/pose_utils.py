@@ -1,21 +1,13 @@
 # Author: Sudeep Pillai <spillai@csail.mit.edu>
 # License: MIT
-
-import numpy as np
 from collections import deque, namedtuple
 from abc import ABCMeta, abstractmethod
 
-from itertools import imap
+import numpy as np
+
 from pybot.utils.misc import print_green, print_red
 from pybot.utils.misc import Counter, Accumulator, CounterWithPeriodicCallback 
 from pybot.geometry.rigid_transform import RigidTransform
-
-import matplotlib as mpl
-import matplotlib.pyplot as plt
-mpl.rcParams.update({'font.size':11, 
-                     # 'font.family':'sans-serif', 
-                     # 'font.sans-serif': 'Helvetica', 
-                     'image.cmap':'autumn', 'text.usetex':False})
 
 def inject_noise(poses_iterable, noise=[0,0]):
 

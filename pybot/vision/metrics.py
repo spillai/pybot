@@ -77,9 +77,9 @@ if __name__ == "__main__":
 
     cm = metrics.confusion_matrix(cinfo.test_target, cinfo.pred_target)
     # print ' Confusion matrix (Test): %s' % (cm)
-    print ' Accuracy score (Test): %4.3f' % (metrics.accuracy_score(cinfo.test_target, cinfo.pred_target))
-    print ' Report (Test):\n %s' % (metrics.classification_report(cinfo.test_target, cinfo.pred_target, 
-                                                                  target_names=cinfo.target_names))
+    print(' Accuracy score (Test): %4.3f' % (metrics.accuracy_score(cinfo.test_target, cinfo.pred_target)))
+    print(' Report (Test):\n %s' % (metrics.classification_report(cinfo.test_target, cinfo.pred_target, 
+                                                                  target_names=cinfo.target_names)))
 
     # plot_roc_curve(cinfo.test_target, cinfo.pred_score)
 

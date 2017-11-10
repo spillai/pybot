@@ -1,12 +1,15 @@
+"""
+Helper functions for plotting
+"""
+
 # Author: Sudeep Pillai <spillai@csail.mit.edu>
 # License: MIT
 
-# Helper functions for plotting
+from copy import deepcopy
 import numpy as np
+from matplotlib.colors import colorConverter
 from pybot.utils.plot_utils import plt
 from pybot.utils.timer import timeitmethod
-from matplotlib.colors import colorConverter
-from copy import deepcopy
 
 def height_map(hX, hmin=-0.20, hmax=5.0): 
     return np.array(plt.cm.hsv((hX-hmin)/(hmax-hmin)))[:,:3]

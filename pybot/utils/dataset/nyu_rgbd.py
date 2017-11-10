@@ -9,7 +9,6 @@ import os, time
 import numpy as np
 import cv2
 
-from itertools import izip, imap, islice
 from collections import defaultdict
 
 import h5py
@@ -23,6 +22,7 @@ from pybot.vision.camera_utils import Camera, CameraIntrinsic, CameraExtrinsic, 
 
 from pybot.geometry.rigid_transform import Quaternion, RigidTransform
 from pybot.externals.plyfile import PlyData
+from pybot.utils.itertools_recipes import izip, imap, islice
 
 # =====================================================================
 # Generic NYU-RGBD Dataset class

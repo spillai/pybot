@@ -47,7 +47,7 @@ if _PYBOT_MARSHALLING_BACKEND == 'lcm':
     from pybot.externals.lcm import publish
     
 elif _PYBOT_MARSHALLING_BACKEND == 'zmq':
-    from pybot.externals.zeromq import publish
+    from pybot.externals.zeromq import publish, pack, unpack
 
 else:
     raise Exception('''Unknown backend: {}, '''

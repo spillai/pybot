@@ -18,13 +18,13 @@ def connect(server='127.0.0.1', port=4999):
 
         # Sleep a little bit so that packets are not dropped
         time.sleep(0.2)
-    except Exception, e:
+    except Exception as e:
         g_context, g_socket = None, None
         print('Exception {}'.format(e))
     
     
 def pack(channel, data):
-    return channel + b' ' + data
+    return bytearray(channel, 'utf-8') + b' ' + data
 
 def unpack(msg):
     channel, data = msg.split(b' ', 1)

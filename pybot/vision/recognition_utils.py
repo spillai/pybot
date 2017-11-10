@@ -12,7 +12,7 @@ import datetime
 import pandas as pd
 
 import numpy as np
-from itertools import izip, chain
+from itertools import chain
 
 import sklearn.metrics as metrics
 from sklearn.svm import LinearSVC, SVC
@@ -96,7 +96,7 @@ def multilabel_precision_recall(y_score, y_test, clf_target_ids, clf_target_name
 
 
 def plot_confusion_matrix(cm, clf_target_names, title='Confusion matrix', cmap=plt.cm.jet):
-    target_names = map(lambda key: key.replace('_','-'), clf_target_names)
+    target_names = [key.replace('_','-') for key in clf_target_names]
 
     for idx in range(len(cm)): 
         cm[idx,:] = (cm[idx,:] * 100.0 / np.sum(cm[idx,:])).astype(np.int)
@@ -154,9 +154,9 @@ def plot_roc(y_score, y_test, target_map, title='ROC curve'):
     tpr = dict()
     roc_auc = dict()
     
-    target_ids = target_map.keys()
-    target_names = target_map.values()
-    print target_names
+    target_ids = list(target_map.keys())
+    target_names = list(target_map.values())
+    print(target_names)
 
     y_test_multi = label_binarize(y_test, classes=target_ids)
     N, n_classes = y_score.shape[:2]
@@ -322,7 +322,7 @@ def im_detect_and_describe(img, mask=None, detector='dense', descriptor='SIFT', 
         return pts, desc
 
     except Exception as e: 
-        print 'im_detect_and_describe', e
+        print('im_detect_and_describe', e)
         return None, None
 
 def im_describe(*args, **kwargs): 
@@ -353,7 +353,7 @@ class HistogramClassifier(object):
         self.seed_ = 0
         self.filename_ = filename
         self.target_map_ = target_map
-        self.target_ids_ = (np.unique(target_map.keys())).astype(np.int32)
+        self.target_ids_ = (np.unique(list(target_map.keys()))).astype(np.int32)
         self.epoch_no_ = 0
         self.st_time_ = time.time()
 
@@ -446,12 +446,12 @@ class HistogramClassifier(object):
         print_yellow(' Accuracy score (Training): {:4.3f}'.format((metrics.accuracy_score(y, y_pred))))
         print_yellow(' Report (Training):\n {}'.format(
             classification_report(y, y_pred, 
-                                  labels=self.target_map_.keys(), 
-                                  target_names=self.target_map_.values())))
-        cmatrix = metrics.confusion_matrix(y, y_pred, labels=self.target_map_.keys())
+                                  labels=list(self.target_map_.keys()), 
+                                  target_names=list(self.target_map_.values()))))
+        cmatrix = metrics.confusion_matrix(y, y_pred, labels=list(self.target_map_.keys()))
 
         N = len(cmatrix)
-        xs, ys = np.meshgrid(range(N), range(N))
+        xs, ys = np.meshgrid(list(range(N)), list(range(N)))
         xyc = np.dstack([xs, ys, cmatrix]).reshape(-1,3)
 
         inds = np.argsort(xyc[:,2])[-20:]
@@ -462,8 +462,8 @@ class HistogramClassifier(object):
         for xyct in xyc_top: 
             if xyct[0] != xyct[1]: 
                 print_yellow('confusion: {}\t{}\t{}'.format(xyct[2], 
-                                                     self.target_map_.values()[xyct[0]], 
-                                                     self.target_map_.values()[xyct[1]]))        
+                                                     list(self.target_map_.values())[xyct[0]], 
+                                                     list(self.target_map_.values())[xyct[1]]))        
         print_yellow('\n')
 
         # import ipdb; ipdb.set_trace()
@@ -483,9 +483,9 @@ class HistogramClassifier(object):
                 del target_map[background]
             print_yellow(' Report (Training without background):\n {}'.format(
                 classification_report(y[inds], y_pred[inds], 
-                                      labels=target_map.keys(),
-                                      target_names=target_map.values())))
-            cmatrix = metrics.confusion_matrix(y[inds], y_pred[inds], labels=target_map.keys())
+                                      labels=list(target_map.keys()),
+                                      target_names=list(target_map.values()))))
+            cmatrix = metrics.confusion_matrix(y[inds], y_pred[inds], labels=list(target_map.keys()))
             # print ' Confusion matrix (Test): \n%s' % (pd.DataFrame(cmatrix, 
             #                                                        columns=target_map.values(), 
             #                                                        index=target_map.values()))
@@ -514,7 +514,7 @@ class HistogramClassifier(object):
     def load(cls, path): 
         print_yellow('====> Loading classifier {}'.format(path))
         db = AttrDict.load(path)
-        c = cls(path, target_map=dict((int(key), item) for key,item in db.target_map.iteritems()))
+        c = cls(path, target_map=dict((int(key), item) for key,item in db.target_map.items()))
         c.clf_ = db.clf
         print_yellow('-------------------------------')
         return c

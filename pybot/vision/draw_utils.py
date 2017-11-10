@@ -4,13 +4,13 @@
 import cv2
 import numpy as np
 
-from itertools import imap, izip
+
 from pybot.utils.plot_utils import colormap
 from pybot.vision.color_utils import color_from_string
 from pybot.vision.image_utils import to_color
 
 def draw_texts(vis, pts, texts, size=2):
-    for pt,txt in izip(pts.astype(np.int32), texts): 
+    for pt,txt in zip(pts.astype(np.int32), texts): 
         cv2.putText(vis, txt, (pt[0], pt[1]), 
                     cv2.FONT_HERSHEY_SIMPLEX, 0.2 * size,
                     (255, 255, 255), thickness=1, lineType=cv2.CV_AA)
@@ -83,7 +83,7 @@ def annotate_bbox(vis, coords, color=(0,200,0), title=''):
 
 def annotate_bboxes(vis, bboxes, texts, colors=None):
     # target_name.title().replace('_', ' '))
-    for bbox,text in izip(bboxes, texts): 
+    for bbox,text in zip(bboxes, texts): 
         box_color = (0, 200, 0) # if UWRGBDDataset.get_category_name(target) != 'background' else (100, 100, 100)
         annotate_bbox(vis, bbox, color=box_color, title=text)
     return vis
@@ -95,6 +95,6 @@ def draw_ellipses(im, ellipses):
 
 def draw_hulls(im, hulls): 
     assert(isinstance(hulls, list))
-    cv2.polylines(im, map(lambda hull: hull.astype(np.int32), hulls), 1, (0, 255, 0) if im.ndim == 3 else 255, thickness=1)       
+    cv2.polylines(im, [hull.astype(np.int32) for hull in hulls], 1, (0, 255, 0) if im.ndim == 3 else 255, thickness=1)       
     return im
 

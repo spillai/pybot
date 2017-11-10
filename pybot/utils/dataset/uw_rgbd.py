@@ -14,10 +14,10 @@ import numpy as np
 import cv2
 import fnmatch
 
-from itertools import izip
 from collections import defaultdict
 from scipy.io import loadmat
 
+from pybot.utils.itertools_recipes import izip
 from pybot.utils.timer import SimpleTimer
 from pybot.utils.misc import progressbar
 from pybot.utils.db_utils import AttrDict

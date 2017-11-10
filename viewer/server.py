@@ -4,6 +4,7 @@ from threading import Lock, RLock
 from websocket_server import WebsocketServer
 
 from pybot.externals import marshalling_backend
+from pybot.externals import unpack, pack
 
 class _ThreadHandler(object):
     def __init__(self):
@@ -19,14 +20,15 @@ class _ThreadHandler(object):
     def stop(self):
         try: 
             self.ev_th_.join()
-        except Exception, e:
+        except Exception as e:
             print('Exiting')
             
-    def on_event(self, server, ch, data):
+    def on_event(self, server, msg):
         try:
+            ch, data = unpack(msg)
             print('on_event: ch={}, len={}'.format(ch, len(data)))
-            server.send_message_to_all(ch + b' ' + data)
-        except Exception, e:
+            server.send_message_to_all(msg)
+        except Exception as e:
             print('Failed to send, client unavailable {}'.format(e))            
         
     # Called for every client connecting (after handshake)
@@ -70,7 +72,6 @@ class _ThreadHandler(object):
             
         elif marshalling_backend() == 'zmq':
             import zmq
-            from pybot.externals.zeromq import unpack
 
             zmq_server = '127.0.0.1'
             zmq_port = 4999
@@ -78,7 +79,7 @@ class _ThreadHandler(object):
             self.sub_ = self.m_.socket(zmq.SUB)
             self.sub_.connect('tcp://{}:{}'
                               .format(zmq_server, zmq_port))
-            self.sub_.setsockopt(zmq.SUBSCRIBE, '')
+            self.sub_.setsockopt(zmq.SUBSCRIBE, b'')
             print('Starting zmq listener on port {}:{}'
                   .format(zmq_server, zmq_port))
             
@@ -87,8 +88,7 @@ class _ThreadHandler(object):
                 try:
                     while True:
                         msg = self.sub_.recv()
-                        ch, data = unpack(msg)
-                        self.on_event(server, ch, data)                        
+                        self.on_event(server, msg)
                 except KeyboardInterrupt:
                     pass
             
