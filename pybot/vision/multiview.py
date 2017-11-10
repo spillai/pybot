@@ -84,7 +84,7 @@ class EpipolarViz(object):
         if not len(pts):
             return
 
-        print pts.shape, pts.dtype
+        print(pts.shape, pts.dtype)
         
         
         # Draw epipoles across all other images/poses
@@ -95,4 +95,4 @@ class EpipolarViz(object):
             # print 'F b/w ref and idx={:}, \ncurr={:}\n\nF={:}\n'.format(idx, f.camera, F_10)
 
         if len(vis): 
-            imshow_cv('epi_out', im_resize(np.vstack(vis.values()), scale=0.5))
+            imshow_cv('epi_out', im_resize(np.vstack(list(vis.values())), scale=0.5))

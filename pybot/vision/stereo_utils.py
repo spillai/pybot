@@ -2,6 +2,7 @@
 # License: MIT
 
 import time
+import six
 import cv2
 import numpy as np
 from collections import deque
@@ -186,7 +187,7 @@ def setup_zed(scale=1.0):
     # @ 720p
     # image_width = 720
     # fx, fy, cx, cy = 677.57005977463643, 677.57005977463643, 658.49378727401586, 358.58253283725276
-    print 'fx, fy, cx, cy', fx, fy, cx, cy, scale
+    print('fx, fy, cx, cy', fx, fy, cx, cy, scale)
 
     calib_params = StereoCamera.from_calib_params(fx*scale, fy*scale, cx*scale, cy*scale, baseline=0.12)
     # calib_params = get_calib_params() # baseline_px=baseline_px * scale)
@@ -212,7 +213,7 @@ def setup_ps3eye(scale=1.0):
     calibration = StereoCalibration(input_folder=calib_path)
     calib_params = AttrDict(get_stereo_calibration_params(input_folder=calib_path))
 
-    print calib_params
+    print(calib_params)
     return StereoCamera.from_calib_params(calib_params.fx, calib_params.fy, 
                                           calib_params.cx, calib_params.cy, baseline=0.1) # calib_params.baseline)
     # return calib_params

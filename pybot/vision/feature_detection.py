@@ -4,6 +4,7 @@
 import cv2
 import numpy as np
 from pybot.utils.db_utils import AttrDict
+from functools import reduce
 
 def finite_and_within_bounds(xys, shape): 
     H, W = shape[:2]
@@ -120,8 +121,8 @@ class FeatureDetector(object):
         # Determine detector type that implements detect
         try: 
             self.detector_ = FeatureDetector.detectors[method](**params)
-        except Exception,e:
-            raise RuntimeError('Unknown detector type: %s! Use from {:}, {:}'.format(FeatureDetector.detectors.keys(), e))
+        except Exception as e:
+            raise RuntimeError('Unknown detector type: %s! Use from {:}, {:}'.format(list(FeatureDetector.detectors.keys()), e))
 
         # Only support grid and pyramid with gftt and fast
         if (method == 'gftt' or method == 'fast'): 

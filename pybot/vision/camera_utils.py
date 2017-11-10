@@ -1,3 +1,4 @@
+
 # Author: Sudeep Pillai <spillai@csail.mit.edu>
 # License: MIT
 
@@ -343,8 +344,8 @@ def plot_epipolar_line(im_1, F_10, x_0, im_0=None):
     # col = (0,255,0)
     for col, l1 in zip(cols, lines_1):
         try: 
-            x0, y0 = map(int, [0, -l1[2] / l1[1] ])
-            x1, y1 = map(int, [W, -(l1[2] + l1[0] * W) / l1[1] ])
+            x0, y0 = list(map(int, [0, -l1[2] / l1[1] ]))
+            x1, y1 = list(map(int, [W, -(l1[2] + l1[0] * W) / l1[1] ]))
             cv2.line(vis_1, (x0,y0), (x1,y1), col, 1)
         except: 
             pass
@@ -650,7 +651,7 @@ class Camera(CameraIntrinsic, CameraExtrinsic):
         try: 
             proj,_ = cv2.projectPoints(X, rvec, t, self.K, self.D)
             x = proj.reshape(-1,2)
-        except Exception, e:
+        except Exception as e:
             print('Failed to project, possibly no 2D projections {}'.format(e))
             x = np.empty([])
 
@@ -1159,5 +1160,5 @@ def test_Frustum():
 if __name__ == "__main__": 
     cam = Camera.from_intrinsics_extrinsics(CameraIntrinsic.simulate(), 
                                             CameraExtrinsic.simulate())
-    print cam.shape
+    print(cam.shape)
     cam.save('cam_test.yaml')

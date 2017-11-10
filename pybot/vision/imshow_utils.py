@@ -88,7 +88,7 @@ if IMSHOW_FLAG:
                     break
         if ch == ord('s'):
             fn = 'img-%s.png' % time.strftime("%Y-%m-%d-%H-%M-%S")
-            print 'Saving %s' % fn
+            print('Saving %s' % fn)
             cv2.imwrite(fn, vis)
         elif ch == 27 or ch == ord('q'):
             sys.exit(1)
@@ -99,7 +99,7 @@ else:
             
 def trackbar_update(_=None): 
     global trackbars
-    for k,v in trackbars.iteritems(): 
+    for k,v in trackbars.items(): 
         trackbars[k]['value'] = cv2.getTrackbarPos(v['label'], v['win_name'])    
 
 def trackbar_create(label, win_name, v, maxv, scale=1.0): 
