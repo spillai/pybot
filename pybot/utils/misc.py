@@ -1,6 +1,6 @@
 # Author: Sudeep Pillai <spillai@csail.mit.edu>
 # License: MIT
-
+from __future__ import print_function
 import sys
 from collections import deque, OrderedDict
 
@@ -266,7 +266,7 @@ class CounterWithPeriodicCallback(Counter):
         try:
             orig_func = getattr(cls_instance, function_name)
             function_cb = setattr(cls_instance, function_name, polled_function_cb(orig_func))
-        except Exception, e:
+        except Exception as e:
             raise AttributeError('function %s has not been defined in instance {:}'.format(function_name, e))
         
         print('Setting new polled callback for %s.%s' % (type(cls_instance).__name__, function_name))

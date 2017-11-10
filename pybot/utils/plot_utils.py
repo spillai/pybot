@@ -1,8 +1,7 @@
 # Author: Sudeep Pillai <spillai@csail.mit.edu>
 # License: MIT
-
 import numpy as np
-import matplotlib as mpl; mpl.use('Agg')
+import matplotlib as mpl; # mpl.use('Agg')
 import matplotlib.pyplot as plt; plt.ioff()
 from matplotlib import rcParams as rc
 
