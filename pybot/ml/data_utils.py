@@ -1,5 +1,7 @@
-import numpy as np
+import six
 from collections import deque, defaultdict
+
+import numpy as np
 from pybot.utils.itertools_recipes import chunks
 
 def concat_chunked_dicts(dlist):
@@ -11,9 +13,9 @@ def concat_chunked_dicts(dlist):
     """
     batch = defaultdict(list)
     for item in dlist:
-        for k,v in item.iteritems():
+        for k,v in six.iteritems(item):
             batch[k].append(v)
-    for k,v in batch.iteritems():
+    for k,v in six.iteritems(batch):
         batch[k] = np.concatenate(v)
     return dict(batch)
 
@@ -27,7 +29,7 @@ def chunked_data(iterable, batch_size=10):
        arg = ({'input': np.array, 'input2': np.array}, {'output': np.array})
     """
     for batch in chunks(iterable, batch_size):
-        args = zip(*batch)
+        args = list(zip(*batch))
 
         # (arg), (arg), ...
         # arg = ([x1,x2], y) 
