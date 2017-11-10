@@ -28,10 +28,10 @@ def arr_msg(arr, carr, frame_uid, element_id):
     msg.collection = frame_uid 
     msg.element_id = element_id
     npoints = len(arr)
-
-    msg.points.extend(np.float64(arr).flat)
-    msg.colors.extend(np.float32(carr[:,:3]).flat)
     
+    msg.points = np.float32(arr).tostring()
+    msg.colors = np.float32(carr[:,:3]).tostring()
+
     msg.npoints = npoints
     msg.ncolors = npoints
 

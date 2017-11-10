@@ -50,21 +50,25 @@ if __name__ == "__main__":
 
     timer = SimpleTimer('publish_velodyne')
     
+    # Iterate through frames
     for idx, f in enumerate(dataset.iterframes()):
         # imshow_cv('frame', np.vstack([f.left,f.right]))
 
+        # Publish keyframes every 5 frames
         if idx % 5 == 0: 
             draw_utils.publish_cameras(
                 'cam_poses', [Pose.from_rigid_transform(idx, f.pose)],
                 frame_id='camera', zmax=2,
                 reset=False, draw_faces=False, draw_edges=True)
-        
+
+        # Publish pose 
         draw_utils.publish_pose_list(
             'poses', [Pose.from_rigid_transform(idx, f.pose)],
             frame_id='camera', reset=False)
+
+        # Move camera viewpoint 
         draw_utils.publish_pose_t('CAMERA_POSE', f.pose,
                                   frame_id='camera')
-        print idx, f.pose
 
         if args.velodyne and idx % 5 == 0:
 

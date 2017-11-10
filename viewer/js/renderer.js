@@ -5,6 +5,8 @@ var ws;
 
 var mouse = new THREE.Vector2();
 var hoverCamera, raycaster, parentTransform;
+var capturer = null;
+var rec_button; 
 var selectedCamera;
 var imagePlane, imagePlaneCamera;
 var imagePlaneOld, imagePlaneCameraOld;
@@ -15,6 +17,7 @@ var collections_visibles = [];
 var reconstruction_visibles = [];
 var reconstruction_groups = [];
 
+var obj_axes_geom = null;
 var obj_collections = {};
 var obj_collections_lut = {};
 
@@ -41,6 +44,28 @@ var savedOptions = {
 };
 
 var options = {
+    record: function() {
+        if (capturer == null) { 
+            // Create a capturer that exports a WebM video
+            capturer = new CCapture(
+                { framerate: 30,
+                  format: 'webm',
+                  // quality: 90,
+                  display: true, 
+                  // workersPath: 'js/',
+                  verbose: false }
+            );
+            capturer.start();
+            console.log('Start recording ...');
+            rec_button.name('Recording ...');
+        } else {
+            capturer.stop();
+            capturer.save();
+            capturer = null;
+            console.log('Stop recording ...');
+            rec_button.name('Record');
+        }    
+    }, 
     cameraSize: 0.9,
     pointSize: 0.1,
     imagePlaneSize: 50,
@@ -49,7 +74,7 @@ var options = {
     drawGrid: true,
     followCamera: true,
     drawGPS: false,
-    animationSpeed: 0.2,
+    animationSpeed: 0.5,
     imagePlaneOpacity: 1,
     cameraColor: new THREE.Color(0xFFFFFF),
     hoverCameraColor: new THREE.Color(0xFF8888),
@@ -99,7 +124,7 @@ function addDatGui(){
             imagePlane.geometry = imagePlaneGeo(imagePlaneCamera.reconstruction, imagePlaneCamera.shot_id);
             render();
         });
-    f1.add(options, 'animationSpeed', 0, 0.25)
+    f1.add(options, 'animationSpeed', 0, 0.5)
         .onChange(function(value) {
             controls.animationSpeed = value;
             invokeJourneyWrapper(function () { journeyWrapper.updateInterval(); });
@@ -123,7 +148,9 @@ function addDatGui(){
     f1.open();
 
     f2 = gui.addFolder('Collections');
-
+    rec_button = f2.add(options, 'record');
+    rec_button.name('Record');
+    f2.open();
     // var f3 = gui.addFolder('Reconstructions')
     // f3.add(options, 'allNone');
     // options.reconstruction_visibles = [];
@@ -557,6 +584,12 @@ function projectorCameraMatrix(cam, shot) {
     return projection.multiply(rotation);
 }
 
+function convertTypedArray(src, type) {
+    var buffer = new ArrayBuffer(src.byteLength);
+    var baseView = new src.constructor(buffer).set(src);
+    return new type(buffer);
+}
+
 function split_channel_data(ch_data) {
     val = ' '.charCodeAt(0);
     for (var i=0, L=ch_data.length; i < L; i++) {
@@ -597,7 +630,8 @@ function add_points_to_scene_group(msg) {
     // Render points
     for (var i = 0; i < msg.pointLists.length; ++i) {
         var pc = msg.pointLists[i];
-        
+        // var colors = pc.colors[0];
+
         // Find collection_id, and element_id pose
         try {
             cid = pc.collection, eid = pc.elementId;
@@ -609,15 +643,18 @@ function add_points_to_scene_group(msg) {
             return;
         }
 
-        // Add points into 
-        var geom = new THREE.Geometry();
-        // console.log('points: ' + pc.points.length / 3);
-        for (var j = 0, j3 = 0, pc_sz = pc.points.length / 3; j < pc_sz; ++j, j3 += 3) {
-            var pt_x = pc.points[j3], pt_y = pc.points[j3+1], pt_z = pc.points[j3+2];
-            var col_r = pc.colors[j3], col_g = pc.colors[j3+1], col_b = pc.colors[j3+2];
-            geom.vertices.push(new THREE.Vector3(pt_x, pt_y, pt_z));
-            geom.colors.push(new THREE.Color(col_r, col_g, col_b));
-        }
+        // Convert bytes to float32array
+        var pointsf = convertTypedArray(pc.points, Float32Array);
+        var colorsf = convertTypedArray(pc.colors, Float32Array);
+        
+        // Add points into buffer geometry
+        var geom = new THREE.BufferGeometry();
+        geom.addAttribute(
+            'position',
+            new THREE.BufferAttribute(pointsf, 3));
+        geom.addAttribute(
+            'color',
+            new THREE.BufferAttribute(colorsf, 3));
         
         // Render points
         switch (msg.type) {
@@ -632,7 +669,7 @@ function add_points_to_scene_group(msg) {
         case point3d_list_collection_t.getEnum('point_type').LINES:
             var lines = new THREE.LineSegments(
                 geom, lineMaterial, THREE.LinePieces);
-            // lines.visible = true;
+            lines.visible = true;
             // line.reconstruction = reconstruction;
             // line.shot_id = shot_id;
             // lines.push(line);
@@ -644,16 +681,14 @@ function add_points_to_scene_group(msg) {
             // Create triangles and compute normals
             for (var j = 0, pc_sz = pc.points.length / 3;
                  j < pc_sz; ++j) {
-                geom.faces.push( new THREE.Face3( 3*j, 3*j+1, 3*j+2 ));
+                geom.faces.push(
+                    new THREE.Face3( 3*j, 3*j+1, 3*j+2 ));
             }
-            
             mesh_material = new THREE.MeshBasicMaterial({
                 color: 0xFFFF00,
-                // transparent: true,
-                // opacity: .6
             });
             var mesh = new THREE.Mesh(geom, mesh_material);
-            mesh.renderOrder = 0;
+            
             element_group.add(mesh);
             break;
 
@@ -781,12 +816,12 @@ function addGridAxes() {
 
 function addAxis(axis) {
     // create the cylinders for the objects
-    var shaftRadius = 0.008;
-    var headRadius = 0.023;
+    var shaftRadius = 0.02;
+    var headRadius = 0.04;
     var headLength = 0.1;
 
     var lineGeom = new THREE.CylinderGeometry(
-        shaftRadius, shaftRadius, 0.5);
+        shaftRadius, shaftRadius, 1);
     var headGeom = new THREE.CylinderGeometry(
         0, headRadius, headLength);
 
@@ -808,7 +843,7 @@ function addAxis(axis) {
     // create the arrow
     var arrow = new THREE.Mesh(headGeom, material);
     arrow.matrix.makeRotationFromQuaternion(rot);
-    arrow.matrix.setPosition(axis.multiplyScalar(0.5).clone());
+    arrow.matrix.setPosition(axis.multiplyScalar(1).clone());
     arrow.matrixAutoUpdate = false;
     axis_group.add(arrow);
 
@@ -824,25 +859,50 @@ function addAxis(axis) {
 }
 
 function getAxes(sz) {
-    var linegeo = new THREE.Geometry();
-    linegeo.vertices = [
-        new THREE.Vector3(0, 0, 0),
-        new THREE.Vector3(sz, 0, 0),
-        new THREE.Vector3(0, 0, 0),
-        new THREE.Vector3(0, sz, 0),
-        new THREE.Vector3(0, 0, 0),
-        new THREE.Vector3(0, 0, sz)
-    ];
-    linegeo.colors = [
-        new THREE.Color( 0xff0000 ),
-        new THREE.Color( 0xff0000 ),
-        new THREE.Color( 0x00ff00 ),
-        new THREE.Color( 0x00ff00 ),
-        new THREE.Color( 0x0000ff ),
-        new THREE.Color( 0x0000ff )
-    ];
-    var line = new THREE.LineSegments(linegeo, lineMaterial, THREE.LinePieces);
-    return line;
+    // var pointsf = new Float32Array([0, 0, 0,
+    //                             sz, 0, 0,
+    //                             0, 0, 0,
+    //                             0, sz, 0,
+    //                             0, 0, 0,
+    //                             0, 0, sz]);
+    // var colorsf = new Float32Array([1.0, 0, 0,
+    //                             1.0, 0, 0,
+    //                             0, 1.0, 0, 
+    //                             0, 1.0, 0,
+    //                             0, 0, 1.0,
+    //                             0, 0, 1.0]);
+    
+    // var geom = new THREE.BufferGeometry();
+    // geom.addAttribute(
+    //     'position',
+    //     new THREE.BufferAttribute(pointsf, 3));
+    // geom.addAttribute(
+    //     'color',
+    //     new THREE.BufferAttribute(colorsf, 3));
+    if (!obj_axes_geom) { 
+        obj_axes_geom = new THREE.Geometry();
+        obj_axes_geom.vertices = [
+            new THREE.Vector3(0, 0, 0),
+            new THREE.Vector3(sz, 0, 0),
+            new THREE.Vector3(0, 0, 0),
+            new THREE.Vector3(0, sz, 0),
+            new THREE.Vector3(0, 0, 0),
+            new THREE.Vector3(0, 0, sz)
+        ];
+        obj_axes_geom.colors = [
+            new THREE.Color( 0xff0000 ),
+            new THREE.Color( 0xff0000 ),
+            new THREE.Color( 0x00ff00 ),
+            new THREE.Color( 0x00ff00 ),
+            new THREE.Color( 0x0000ff ),
+            new THREE.Color( 0x0000ff )
+        ];
+    }
+
+    // Return new axis with cached geometry
+    var axis = new THREE.LineSegments(
+        obj_axes_geom, lineMaterial, THREE.LinePieces);
+    return axis;
 }
 
 function init() {
@@ -854,6 +914,7 @@ function init() {
             throw err;
         
         // Obtain a message type
+        message_t = root.lookupType("vs.message_t");
         pose_t = root.lookupType("vs.pose_t");
         obj_collection_t = root.lookupType("vs.obj_collection_t");
         point3d_list_collection_t = root.lookupType("vs.point3d_list_collection_t");
@@ -877,7 +938,6 @@ function init() {
 
             // Decode based on channel 
             switch(ch_str) {
-                
             case 'CAMERA_POSE':
                 msg = pose_t.decode(msg_buf.data);
                 update_camera_pose(msg);
@@ -902,6 +962,23 @@ function init() {
                 
                 break;
                 
+            case 'RECORD_START':
+                // location = msg_buf.data;
+                
+                // Create a capturer that exports a WebM video
+                capturer = new CCapture(
+                    { framerate: 30, format: 'webm', verbose: true }
+                );
+                capturer.start();
+                break;
+
+            case 'RECORD_STOP':
+                // location = msg_buf.data;
+                capturer.stop();
+                capturer.save();
+                capturer = null;
+                break;
+                
             default:
                 console.log('Unknown channel / decoder ' + ch_str);
             }
@@ -923,6 +1000,9 @@ function init() {
 
     // initialize renderer
     initRenderer();
+
+    // TODO: Image viewer (see onionmaps reference)
+    
 }
 
 function addEmptyScene() {
@@ -936,28 +1016,37 @@ function initRenderer() {
     raycaster = new THREE.Raycaster();
     raycaster.precision = 0.01;
 
-    renderer = new THREE.WebGLRenderer();
+    // TODO: optional preserveDrawingBuffer: true
+    renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setClearColor( 0x202020, 0.0);
-    renderer.sortObjects = false;
+    // renderer.sortObjects = false;
 
     container = document.getElementById( 'ThreeJS' );
     container.appendChild(renderer.domElement);
 
-    camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.03, 10000);
+    camera = new THREE.PerspectiveCamera(
+        70, window.innerWidth / window.innerHeight, 0.03, 10000);
     camera.position.x = 50;
     camera.position.y = 50;
     camera.position.z = 50;
-    camera.far = 20; // Setting far frustum (for culling)
+    camera.far = 200; // Setting far frustum (for culling)
     camera.up = new THREE.Vector3(0,0,1);
 
     controls = new THREE.OrbitControls(camera, renderer.domElement);
     controls.addEventListener('change', render);
 
-    window.addEventListener('resize', onWindowResize, false);
-    renderer.domElement.addEventListener('mousemove', onDocumentMouseMove, false);
-    renderer.domElement.addEventListener('mousedown', onDocumentMouseDown, false);
-    window.addEventListener( 'keydown', onKeyDown, false );
+    window
+        .addEventListener(
+            'resize', onWindowResize, false);
+    renderer.domElement
+        .addEventListener(
+            'mousemove', onDocumentMouseMove, false);
+    renderer.domElement
+        .addEventListener(
+            'mousedown', onDocumentMouseDown, false);
+    window
+        .addEventListener( 'keydown', onKeyDown, false );
     
     // Set materials
     pointCloudMaterial = new THREE.PointsMaterial({
@@ -968,10 +1057,9 @@ function initRenderer() {
         color: 0xffffff,
         opacity: 1,
         linewidth: 3,
-        vertexColors: THREE.VertexColors,
-        depthTest: false
+        vertexColors: THREE.VertexColors
     });
-
+    
 
     // // Image plane
     // imagePlaneCamera = camera_lines[0];
@@ -1025,7 +1113,8 @@ function initRenderer() {
 
     // Create empty scene
     addEmptyScene();
-    
+
+    // Add controls
     addDatGui();
 
     // setShowThumbnail(true);
@@ -1195,82 +1284,82 @@ function angleBetweenVector2(x1, y1, x2, y2) {
     else return a;
 }
 
-function computeValidMoves() {
-    var currentPosition = controls.animationPosition;
-    var currentTarget = controls.animationTarget;
-    var currentDir = currentTarget.clone().sub(currentPosition);
-    var turnAngle = undefined;
+// function computeValidMoves() {
+//     var currentPosition = controls.animationPosition;
+//     var currentTarget = controls.animationTarget;
+//     var currentDir = currentTarget.clone().sub(currentPosition);
+//     var turnAngle = undefined;
 
-    var wantedMotionDirs = {
-        STEP_LEFT: new THREE.Vector3(-currentDir.y, currentDir.x, 0),
-        STEP_RIGHT: new THREE.Vector3(currentDir.y, -currentDir.x, 0),
-        STEP_FORWARD: new THREE.Vector3(currentDir.x, currentDir.y, 0),
-        STEP_BACKWARD: new THREE.Vector3(-currentDir.x, -currentDir.y, 0),
-        TURN_LEFT: new THREE.Vector3(0, 0, 0),
-        TURN_RIGHT: new THREE.Vector3(0, 0, 0),
-        TURN_U: new THREE.Vector3(0, 0, 0)
-    }
+//     var wantedMotionDirs = {
+//         STEP_LEFT: new THREE.Vector3(-currentDir.y, currentDir.x, 0),
+//         STEP_RIGHT: new THREE.Vector3(currentDir.y, -currentDir.x, 0),
+//         STEP_FORWARD: new THREE.Vector3(currentDir.x, currentDir.y, 0),
+//         STEP_BACKWARD: new THREE.Vector3(-currentDir.x, -currentDir.y, 0),
+//         TURN_LEFT: new THREE.Vector3(0, 0, 0),
+//         TURN_RIGHT: new THREE.Vector3(0, 0, 0),
+//         TURN_U: new THREE.Vector3(0, 0, 0)
+//     }
 
-    var wantedDirs = {
-        STEP_LEFT: new THREE.Vector3(currentDir.x, currentDir.y, 0),
-        STEP_RIGHT: new THREE.Vector3(currentDir.x, currentDir.y, 0),
-        STEP_FORWARD: new THREE.Vector3(currentDir.x, currentDir.y, 0),
-        STEP_BACKWARD: new THREE.Vector3(currentDir.x, currentDir.y, 0),
-        TURN_LEFT: new THREE.Vector3(-currentDir.y, currentDir.x, 0),
-        TURN_RIGHT: new THREE.Vector3(currentDir.y, -currentDir.x, 0),
-        TURN_U: new THREE.Vector3(-currentDir.x, -currentDir.y, 0)
-    }
+//     var wantedDirs = {
+//         STEP_LEFT: new THREE.Vector3(currentDir.x, currentDir.y, 0),
+//         STEP_RIGHT: new THREE.Vector3(currentDir.x, currentDir.y, 0),
+//         STEP_FORWARD: new THREE.Vector3(currentDir.x, currentDir.y, 0),
+//         STEP_BACKWARD: new THREE.Vector3(currentDir.x, currentDir.y, 0),
+//         TURN_LEFT: new THREE.Vector3(-currentDir.y, currentDir.x, 0),
+//         TURN_RIGHT: new THREE.Vector3(currentDir.y, -currentDir.x, 0),
+//         TURN_U: new THREE.Vector3(-currentDir.x, -currentDir.y, 0)
+//     }
 
-    var min_d = {};
-    var closest_line = {};
-    var turn_threshold;
-    for (var k in wantedMotionDirs) {
-        if (wantedMotionDirs.hasOwnProperty(k)) {
-            min_d[k] = 999999999999;
-            closest_line[k] = undefined;
-        }
-    }
+//     var min_d = {};
+//     var closest_line = {};
+//     var turn_threshold;
+//     for (var k in wantedMotionDirs) {
+//         if (wantedMotionDirs.hasOwnProperty(k)) {
+//             min_d[k] = 999999999999;
+//             closest_line[k] = undefined;
+//         }
+//     }
 
-    for (var i = 0; i < camera_lines.length; ++i) {
-        var line = camera_lines[i];
-        var r = line.reconstruction;
-        var shot_id = line.shot_id;
-        var shot = r['shots'][shot_id];
-        var oc = opticalCenter(shot);
-        var dir = viewingDirection(shot);
-        var motion = oc.clone().sub(currentPosition);
-        var d = currentPosition.distanceTo(oc);
-        var rid = reconstruction_id_of_shot(reconstructions, shot_id);
-        var visible = options.reconstruction_visibles[rid];
-        if (!visible) continue;
+//     for (var i = 0; i < camera_lines.length; ++i) {
+//         var line = camera_lines[i];
+//         var r = line.reconstruction;
+//         var shot_id = line.shot_id;
+//         var shot = r['shots'][shot_id];
+//         var oc = opticalCenter(shot);
+//         var dir = viewingDirection(shot);
+//         var motion = oc.clone().sub(currentPosition);
+//         var d = currentPosition.distanceTo(oc);
+//         var rid = reconstruction_id_of_shot(reconstructions, shot_id);
+//         var visible = options.reconstruction_visibles[rid];
+//         if (!visible) continue;
 
-        for (var k in wantedMotionDirs) {
-            if (wantedMotionDirs.hasOwnProperty(k)) {
-                var turn = angleBetweenVector2(wantedDirs[k].x, wantedDirs[k].y, dir.x, dir.y);
-                var driftAB = angleBetweenVector2(wantedMotionDirs[k].x, wantedMotionDirs[k].y, motion.x, motion.y);
-                var driftBA = driftAB - turn;
-                var drift = Math.max(driftAB, driftBA);
-                if (k.lastIndexOf('STEP', 0) === 0) {
-                    turn_threshold = 0.5
-                    if (Math.abs(turn) < turn_threshold && Math.abs(drift) < 0.5 && d > 0.01 && d < 20) {
-                        if (d < min_d[k]) {
-                            min_d[k] = d;
-                            closest_line[k] = line;
-                        }
-                    }
-                } else if (k.lastIndexOf('TURN', 0) === 0) {
-                    if (Math.abs(turn) < 0.7 && d < 15) {
-                        if (d < min_d[k]) {
-                            min_d[k] = d;
-                            closest_line[k] = line;
-                        }
-                    }
-                }
-            }
-        }
-    }
-    return closest_line;
-}
+//         for (var k in wantedMotionDirs) {
+//             if (wantedMotionDirs.hasOwnProperty(k)) {
+//                 var turn = angleBetweenVector2(wantedDirs[k].x, wantedDirs[k].y, dir.x, dir.y);
+//                 var driftAB = angleBetweenVector2(wantedMotionDirs[k].x, wantedMotionDirs[k].y, motion.x, motion.y);
+//                 var driftBA = driftAB - turn;
+//                 var drift = Math.max(driftAB, driftBA);
+//                 if (k.lastIndexOf('STEP', 0) === 0) {
+//                     turn_threshold = 0.5
+//                     if (Math.abs(turn) < turn_threshold && Math.abs(drift) < 0.5 && d > 0.01 && d < 20) {
+//                         if (d < min_d[k]) {
+//                             min_d[k] = d;
+//                             closest_line[k] = line;
+//                         }
+//                     }
+//                 } else if (k.lastIndexOf('TURN', 0) === 0) {
+//                     if (Math.abs(turn) < 0.7 && d < 15) {
+//                         if (d < min_d[k]) {
+//                             min_d[k] = d;
+//                             closest_line[k] = line;
+//                         }
+//                     }
+//                 }
+//             }
+//         }
+//     }
+//     return closest_line;
+// }
 
 function walkOneStep(motion_type) {
     var line = validMoves[motion_type];
@@ -1336,36 +1425,36 @@ function preloadAllImages() {
     }
 }
 
-function preloadValidMoves() {
-    for (var k in validMoves) {
-        if (validMoves.hasOwnProperty(k)) {
-            var line = validMoves[k];
-            if (line !== undefined) {
-                var shot_id = line.shot_id;
-                var image_url = imageURL(shot_id);
-                var temp_img = new Image();
-                temp_img.src = image_url;
-            }
-        }
-    }
-}
+// function preloadValidMoves() {
+//     for (var k in validMoves) {
+//         if (validMoves.hasOwnProperty(k)) {
+//             var line = validMoves[k];
+//             if (line !== undefined) {
+//                 var shot_id = line.shot_id;
+//                 var image_url = imageURL(shot_id);
+//                 var temp_img = new Image();
+//                 temp_img.src = image_url;
+//             }
+//         }
+//     }
+// }
 
-function updateValidMovesWidget() {
-    $('#nav-left').css('visibility',
-                       (validMoves.STEP_LEFT === undefined) ? 'hidden':'visible');
-    $('#nav-right').css('visibility',
-                        (validMoves.STEP_RIGHT === undefined) ? 'hidden':'visible');
-    $('#nav-forward').css('visibility',
-                          (validMoves.STEP_FORWARD === undefined) ? 'hidden':'visible');
-    $('#nav-backward').css('visibility',
-                           (validMoves.STEP_BACKWARD === undefined) ? 'hidden':'visible');
-    $('#nav-turn-left').css('visibility',
-                            (validMoves.TURN_LEFT === undefined) ? 'hidden':'visible');
-    $('#nav-turn-right').css('visibility',
-                             (validMoves.TURN_RIGHT === undefined) ? 'hidden':'visible');
-    $('#nav-u-turn').css('visibility',
-                         (validMoves.TURN_U === undefined) ? 'hidden':'visible');
-}
+// function updateValidMovesWidget() {
+//     $('#nav-left').css('visibility',
+//                        (validMoves.STEP_LEFT === undefined) ? 'hidden':'visible');
+//     $('#nav-right').css('visibility',
+//                         (validMoves.STEP_RIGHT === undefined) ? 'hidden':'visible');
+//     $('#nav-forward').css('visibility',
+//                           (validMoves.STEP_FORWARD === undefined) ? 'hidden':'visible');
+//     $('#nav-backward').css('visibility',
+//                            (validMoves.STEP_BACKWARD === undefined) ? 'hidden':'visible');
+//     $('#nav-turn-left').css('visibility',
+//                             (validMoves.TURN_LEFT === undefined) ? 'hidden':'visible');
+//     $('#nav-turn-right').css('visibility',
+//                              (validMoves.TURN_RIGHT === undefined) ? 'hidden':'visible');
+//     $('#nav-u-turn').css('visibility',
+//                          (validMoves.TURN_U === undefined) ? 'hidden':'visible');
+// }
 
 function animate() {
     requestAnimationFrame(animate);
@@ -1381,33 +1470,38 @@ function animate() {
 }
 
 function render() {
-    validMoves = computeValidMoves();
-    updateValidMovesWidget();
-    if (invokeJourneyWrapper(function () { return journeyWrapper.isStarted(); }) !== true) {
-        preloadValidMoves();
-    }
+    // validMoves = computeValidMoves();
+    // updateValidMovesWidget();
+    // if (invokeJourneyWrapper(function () { return journeyWrapper.isStarted(); }) !== true) {
+    //     preloadValidMoves();
+    // }
 
-    // Handle camera selection.
-    if (hoverCamera !== undefined && hoverCamera !== selectedCamera) {
-        hoverCamera.material.linewidth = 1;
-        hoverCamera.material.color = options.cameraColor;
-    }
-    var vector = new THREE.Vector3(mouse.x, mouse.y, 1).unproject(camera);
-    raycaster.set(camera.position, vector.sub(camera.position).normalize());
-    var intersects = raycaster.intersectObjects(camera_lines, true);
-    hoverCamera = undefined;
-    for (var i = 0; i < intersects.length; ++i) {
-        if (intersects[i].distance > 1.5 * options.cameraSize
-            && intersects[i].object.visible) {
-            hoverCamera = intersects[i].object;
-            if (hoverCamera !== selectedCamera) {
-                hoverCamera.material.linewidth = 2;
-                hoverCamera.material.color = options.hoverCameraColor;
-            }
-            break;
-        }
-    }
+    // // Handle camera selection.
+    // if (hoverCamera !== undefined && hoverCamera !== selectedCamera) {
+    //     hoverCamera.material.linewidth = 1;
+    //     hoverCamera.material.color = options.cameraColor;
+    // }
+    // var vector = new THREE.Vector3(mouse.x, mouse.y, 1).unproject(camera);
+    // raycaster.set(camera.position, vector.sub(camera.position).normalize());
+    // var intersects = raycaster.intersectObjects(camera_lines, true);
+    // hoverCamera = undefined;
+    // for (var i = 0; i < intersects.length; ++i) {
+    //     if (intersects[i].distance > 1.5 * options.cameraSize
+    //         && intersects[i].object.visible) {
+    //         hoverCamera = intersects[i].object;
+    //         if (hoverCamera !== selectedCamera) {
+    //             hoverCamera.material.linewidth = 2;
+    //             hoverCamera.material.color = options.hoverCameraColor;
+    //         }
+    //         break;
+    //     }
+    // }
 
     // Render.
     renderer.render(scene, camera);
+
+    // Capture canvas
+    // if( capturer )
+    //     capturer.capture( renderer.domElement );
+
 }
