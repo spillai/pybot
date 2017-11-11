@@ -1,0 +1,18 @@
+# Ignore everything
+*
+
+# Pick what to include
+!bin
+!doc
+!pybot
+!requirements.txt
+!setup.py
+!viewer
+
+# Picking exceptions
+doc/build
+*/*.so
+*/*.pyc
+*/*/*.pyc
+*/__pycache__
+*/*/__pycache__

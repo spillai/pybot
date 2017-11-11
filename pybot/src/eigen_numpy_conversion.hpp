@@ -1,8 +1,7 @@
 // Author(s): Sudeep Pillai (spillai@csail.mit.edu)
 // License: MIT
 
-#ifndef _EIGEN_NUMPY_H_
-#define _EIGEN_NUMPY_H
+#pragma once
 
 #include <Python.h>
 #include <numpy/ndarrayobject.h>
@@ -10,10 +9,10 @@
 #include <Eigen/Eigen>
 #include <glog/logging.h>
 
-namespace bot { namespace eigen {
+namespace pybot { namespace eigen_numpy {
 void export_converters();
-} // namespace eigen
-} // namespace bot
-#endif
+} // namespace eigen_numpy
+} // namespace pybot
+
 
 

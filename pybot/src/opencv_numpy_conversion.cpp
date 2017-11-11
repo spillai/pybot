@@ -1,15 +1,15 @@
 // Author(s): Sudeep Pillai (spillai@csail.mit.edu)
 // License: MIT
 
-#include <pybot/utils/template.h>
-#include <pybot/utils/container.h>
-#include <pybot/opencv_numpy_conversion.hpp>
+#include "utils/template.h"
+#include "utils/container.h"
+#include "opencv_numpy_conversion.hpp"
 
 /*
  * The following conversion functions are taken/adapted from OpenCV's cv2.cpp file
  * inside modules/python/src2 folder.
  */
-namespace bot { namespace opencv {
+namespace pybot { namespace opencv_numpy {
 
 static void init()
 {

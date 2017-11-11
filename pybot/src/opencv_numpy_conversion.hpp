@@ -11,7 +11,7 @@
 #include <opencv2/core/core.hpp>
 
 
-namespace bot { namespace opencv {
+namespace pybot { namespace opencv_numpy {
 
 static PyObject* opencv_error = 0;
 

@@ -31,7 +31,9 @@ bool init_and_export_cv_converters() {
 BOOST_PYTHON_MODULE(pybot_cv_types)
 {
   // Main types export
-  bot::python::init_and_export_cv_converters();
+  py_init();
+  pybot::opencv_numpy::export_converters();
+  
   py::scope scope = py::scope();
 
   expose_template_type< std::pair<cv::Mat, cv::Mat> >();

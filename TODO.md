@@ -1,3 +1,8 @@
+Nov 10
+
+- Dockerfile update spillai/pybot-docker-base
+- Add .travis.yaml (python 2/3)
+- Remove explicit dependency on boost
 
 Decorators for piped data manipulation
 https://github.com/kieferk/dfply#decorators

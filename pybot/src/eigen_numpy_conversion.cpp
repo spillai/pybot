@@ -1,15 +1,15 @@
 // Author(s): Sudeep Pillai (spillai@csail.mit.edu)
 // License: MIT
 
-#include <pybot/utils/template.h>
-#include <pybot/utils/container.h>
-#include <pybot/eigen_numpy_conversion.hpp>
+#include "utils/template.h"
+#include "utils/container.h"
+#include "eigen_numpy_conversion.hpp"
 
 namespace bp = boost::python;
 
 using namespace Eigen;
 
-namespace bot { namespace eigen {
+namespace pybot { namespace eigen_numpy {
 
 template <typename SCALAR>
 struct NumpyEquivalentType {};
@@ -289,7 +289,7 @@ void export_converters(void) {
 }
 
 } // namespace eigen
-} // namespace bot
+} // namespace pybot
 
 
 
