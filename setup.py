@@ -40,7 +40,7 @@ setup(
     packages=['pybot'],
     scripts=[],
     package_data={
-        'pybot': ['eigen_types.so']                  
+        'pybot': ['pybot_types.so']
     },
     # packages=find_packages())
 )

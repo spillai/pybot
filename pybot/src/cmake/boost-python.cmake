@@ -1,6 +1,10 @@
 function(boost_python_module NAME)
   find_package(Boost COMPONENTS python REQUIRED)
-  find_package(PythonLibs 2.7 REQUIRED)
+
+  # Support for py 2/3 compat
+  # Alternatively, use find_package(PythonLibs 2.7 REQUIRED)
+  # for Python 2.7 support
+  find_package(PythonLibs REQUIRED)
   # find_package(Numpy)
 
   set(DEP_LIBS

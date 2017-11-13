@@ -9,9 +9,10 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 
 set(CMAKE_MODULE_PATH ${PYBOT_SOURCE_DIR}/cmake)
+set(CMAKE_MACOSX_RPATH 1)
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC -std=c++11")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC -std=c++11 -fpermissive")
 
 # Check the architecture and set CMAKE_LIBRARY_ARCHITECTURE accordingly
 if(UNIX)
@@ -23,51 +24,52 @@ endif()
 # cmake Dependencies
 include(cmake/FindNumPy.cmake)
 include(cmake/FindEigen3.cmake)
-include(cmake/FindCholmod.cmake)
-# include(cmake/FindGlog.cmake)
+include(cmake/FindGlog.cmake)
 include(cmake/boost-python.cmake)
 
-# find_package(Ceres REQUIRED)
-# include_directories(${CERES_INCLUDE_DIR})
+find_package(Ceres REQUIRED)
+include_directories(${CERES_INCLUDE_DIR})
 
 find_package(Gflags REQUIRED)
 include_directories(${GFLAGS_INCLUDE_DIR})
 
-find_package(Glog REQUIRED)
-include_directories(${GLOG_INCLUDE_DIR})
+find_package(OpenCV REQUIRED)
+include_directories(${OpenCV_INCLUDE_DIRS})
 
-# find_package(OpenCV REQUIRED)
-# include_directories(${OpenCV_INCLUDE_DIRS})
-
-find_package(Boost COMPONENTS python REQUIRED)
-include_directories(${Boost_INCLUDE_DIRS})
-
+# Includes
+include_directories(${CMAKE_CURRENT_SOURCE_DIR})
+include_directories(${NUMPY_INCLUDE_DIRS})
+include_directories(${EIGEN3_INCLUDE_DIR})
 
 set(BOOST_NUMPY_LIBS
    ${GFLAGS_LIBRARY} ${GLOG_LIBRARY}
    ${Boost_LIBRARIES}
-   # boost_system boost_python glog
-   ${CHOLMOD_LIBRARIES}
    ${PYTHON_LIBRARIES})
 
+# STL-NumPy converter
+boost_python_module(stl_numpy
+                    stl_numpy_converter/stl_numpy_converter.cc)
+target_link_libraries(stl_numpy ${BOOST_NUMPY_LIBS})
+
 # Eigen-NumPy converter
-add_library(eigen_numpy SHARED eigen_numpy_conversion.cpp)
-target_link_libraries(eigen_numpy ${BOOST_NUMPY_LIBS})
-set_target_properties(eigen_types PROPERTIES
-    PREFIX ""
-    SUFFIX ".so"
-    LIBRARY_OUTPUT_DIRECTORY "${PYBOT_SOURCE_DIR}/.."
-)
+boost_python_module(eigen_numpy
+                    eigen_numpy_converter/eigen_numpy_converter.cc)
+target_link_libraries(eigen_numpy ${BOOST_NUMPY_LIBS} stl_numpy)
 
 # Opencv-NumPy converter
-add_library(opencv_numpy SHARED opencv_numpy_conversion.cpp)
-target_link_libraries(opencv_numpy ${BOOST_NUMPY_LIBS})
-set_target_properties(opencv_types PROPERTIES
-    PREFIX ""
-    SUFFIX ".so"
-    LIBRARY_OUTPUT_DIRECTORY "${PYBOT_SOURCE_DIR}/.."
-)
+boost_python_module(opencv_numpy
+                    opencv_numpy_converter/conversion.cc
+                    opencv_numpy_converter/opencv_numpy_converter.cc)
+target_link_libraries(opencv_numpy ${BOOST_NUMPY_LIBS} ${OpenCV_LIBS} stl_numpy)
 
+# pybot-types
+boost_python_module(pybot_types pybot_types.cpp)
+target_link_libraries(pybot_types ${BOOST_NUMPY_LIBS} ${OpenCV_LIBS}
+                      stl_numpy eigen_numpy opencv_numpy)
+set_target_properties(pybot_types PROPERTIES
+                      PREFIX ""
+                      SUFFIX ".so"
+                      LIBRARY_OUTPUT_DIRECTORY "${PYBOT_SOURCE_DIR}/..")
 
 # # Python wrapper
 # add_library(eigen_types SHARED eigen_types.cpp)

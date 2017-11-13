@@ -1,22 +1,20 @@
 // Author(s): Sudeep Pillai (spillai@csail.mit.edu)
 // License: MIT
-
-#include "utils/template.h"
-#include "utils/container.h"
-#include "eigen_numpy_conversion.hpp"
+#include <iostream>
+#include "stl_numpy_converter/utils/template.h"
+#include "stl_numpy_converter/utils/container.h"
+#include "eigen_numpy_converter/eigen_numpy_converter.h"
 
 namespace bp = boost::python;
 
-using namespace Eigen;
-
-namespace pybot { namespace eigen_numpy {
+namespace eigen_numpy {
 
 template <typename SCALAR>
 struct NumpyEquivalentType {};
 
 template <> struct NumpyEquivalentType<double> {enum { type_code = NPY_DOUBLE };};
 template <> struct NumpyEquivalentType<int> {enum { type_code = NPY_INT };};
-template <> struct NumpyEquivalentType<short> {enum { type_code = NPY_SHORT };};
+template <> struct NumpyEquivalentType<int16_t> {enum { type_code = NPY_SHORT };};
 template <> struct NumpyEquivalentType<float> {enum { type_code = NPY_FLOAT };};
 template <> struct NumpyEquivalentType<std::complex<double> > {enum { type_code = NPY_CDOUBLE };};
 
@@ -25,8 +23,7 @@ static void copy_array(const SourceType* source, DestType* dest,
                        const npy_int &nb_rows, const npy_int &nb_cols,
     const bool &isSourceTypeNumpy = false, const bool &isDestRowMajor = true,
     const bool& isSourceRowMajor = true,
-    const npy_int &numpy_row_stride = 1, const npy_int &numpy_col_stride = 1)
-{
+    const npy_int &numpy_row_stride = 1, const npy_int &numpy_col_stride = 1) {
   // determine source strides
   int row_stride = 1, col_stride = 1;
   if (isSourceTypeNumpy) {
@@ -41,15 +38,15 @@ static void copy_array(const SourceType* source, DestType* dest,
   }
 
   if (isDestRowMajor) {
-    for (int r=0; r<nb_rows; r++) {
-      for (int c=0; c<nb_cols; c++) {
+    for (int r=0; r < nb_rows; r++) {
+      for (int c=0; c < nb_cols; c++) {
         *dest = source[r*row_stride + c*col_stride];
         dest++;
       }
     }
   } else {
-    for (int c=0; c<nb_cols; c++) {
-      for (int r=0; r<nb_rows; r++) {
+    for (int c=0; c < nb_cols; c++) {
+      for (int r=0; r < nb_rows; r++) {
         *dest = source[r*row_stride + c*col_stride];
         dest++;
       }
@@ -58,7 +55,7 @@ static void copy_array(const SourceType* source, DestType* dest,
 }
 
 
-template<class MatType> // MatrixXf or MatrixXd
+template<class MatType>  // MatrixXf or MatrixXd
 struct EigenMatrixToPython {
   static PyObject* convert(const MatType& mat) {
     npy_intp shape[2] = { mat.rows(), mat.cols() };
@@ -177,19 +174,45 @@ struct EigenMatrixFromPython {
     }
 
     T* raw_data = reinterpret_cast<T*>(PyArray_DATA(array));
+    typedef Eigen::Map<Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>,
+                       Eigen::Aligned, Eigen::Stride<Eigen::Dynamic, Eigen::Dynamic> > MapType;
 
-    typedef Map<Matrix<T, Dynamic, Dynamic, RowMajor>, Aligned, Stride<Dynamic, Dynamic> > MapType;
-
-    void* storage=((bp::converter::rvalue_from_python_storage<MatType>*)
-                   (data))->storage.bytes;
+    void* storage = ((bp::converter::rvalue_from_python_storage<MatType>*)
+                     (data))->storage.bytes;
 
     new (storage) MatType;
     MatType* emat = (MatType*)storage;
     // TODO: This is a (potentially) expensive copy operation. There should
     // be a better way
     *emat = MapType(raw_data, nrows, ncols,
-                Stride<Dynamic, Dynamic>(s1/dtype_size, s2/dtype_size));
+                Eigen::Stride<Eigen::Dynamic, Eigen::Dynamic>(s1/dtype_size, s2/dtype_size));
     data->convertible = storage;
+  }
+};
+
+
+template<class TransformType>  // MatrixXf or MatrixXd
+struct EigenTransformToPython {
+  static PyObject* convert(const TransformType& transform) {
+    return EigenMatrixToPython<typename TransformType::MatrixType>::convert(transform.matrix());
+  }
+};
+
+template<typename TransformType>
+struct EigenTransformFromPython {
+  EigenTransformFromPython() {
+    bp::converter::registry::push_back(&convertible,
+                                       &construct,
+                                       bp::type_id<TransformType>());
+  }
+
+  static void* convertible(PyObject* obj_ptr) {
+    return EigenMatrixFromPython<typename TransformType::MatrixType>::convertible(obj_ptr);
+  }
+
+  static void construct(PyObject* obj_ptr,
+                        bp::converter::rvalue_from_python_stage1_data* data) {
+    return EigenMatrixFromPython<typename TransformType::MatrixType>::construct(obj_ptr, data);
   }
 };
 
@@ -197,65 +220,78 @@ struct EigenMatrixFromPython {
   EigenMatrixFromPython<Type>();  \
   bp::to_python_converter<Type, EigenMatrixToPython<Type> >();
 
+#define EIGEN_TRANSFORM_CONVERTER(Type) \
+  EigenTransformFromPython<Type>();  \
+  bp::to_python_converter<Type, EigenTransformToPython<Type> >();
+
 #define MAT_CONV(R, C, T) \
-  typedef Matrix<T, R, C> Matrix ## R ## C ## T; \
+  typedef Eigen::Matrix<T, R, C> Matrix ## R ## C ## T; \
   EIGEN_MATRIX_CONVERTER(Matrix ## R ## C ## T);
 
 // This require a MAT_CONV for that Matrix type to be registered first
 #define MAP_CONV(R, C, T) \
-  typedef Map<Matrix ## R ## C ## T> Map ## R ## C ## T; \
+  typedef Eigen::Map<Eigen::Matrix ## R ## C ## T> Map ## R ## C ## T; \
   EIGEN_MATRIX_CONVERTER(Map ## R ## C ## T);
 
 #define T_CONV(R, C, T) \
-  typedef Transpose<Matrix ## R ## C ## T> Transpose ## R ## C ## T; \
+  typedef Eigen::Transpose<Eigen::Matrix ## R ## C ## T> Transpose ## R ## C ## T; \
   EIGEN_MATRIX_CONVERTER(Transpose ## R ## C ## T);
 
 
 #define BLOCK_CONV(R, C, BR, BC, T) \
-  typedef Block<Matrix ## R ## C ## T, BR, BC> Block ## R ## C ## BR ## BC ## T; \
+  typedef Eigen::Block<Eigen::Matrix ## R ## C ## T, BR, BC> Block ## R ## C ## BR ## BC ## T; \
   EIGEN_MATRIX_CONVERTER(Block ## R ## C ## BR ## BC ## T);
 
 static const int X = Eigen::Dynamic;
 
-typedef Matrix<short,Dynamic,1> VectorXs;
+typedef Eigen::Matrix<int16_t, Eigen::Dynamic, 1> VectorXs;
 
-void export_converters(void) {
+// void initialize() {
+//   Py_Initialize();
+//   import_array();
+// }
+static bool converter_exported = false;
+void export_converters() {
+  std::cout << "eigen_numpy :: Registering converters (eigen version="
+            << EIGEN_WORLD_VERSION << "."
+            << EIGEN_MAJOR_VERSION << "."
+            << EIGEN_MINOR_VERSION << ")" << std::endl;
+  if (converter_exported) {
+    std::cout << "eigen_numpy :: Already registered" << std::endl;
+    return;
+  }
 
-  import_array();
+  Py_Initialize();
+  // import_array();
 
-  EIGEN_MATRIX_CONVERTER(Matrix2f);
-  EIGEN_MATRIX_CONVERTER(Matrix2d);
+  EIGEN_MATRIX_CONVERTER(Eigen::Matrix2f);
+  EIGEN_MATRIX_CONVERTER(Eigen::Matrix2d);
 
-  EIGEN_MATRIX_CONVERTER(Matrix3f);
-  EIGEN_MATRIX_CONVERTER(Matrix3d);
+  EIGEN_MATRIX_CONVERTER(Eigen::Matrix3f);
+  EIGEN_MATRIX_CONVERTER(Eigen::Matrix3d);
 
-  EIGEN_MATRIX_CONVERTER(Matrix4f);
-  EIGEN_MATRIX_CONVERTER(Matrix4d);
+  EIGEN_MATRIX_CONVERTER(Eigen::Matrix4f);
+  EIGEN_MATRIX_CONVERTER(Eigen::Matrix4d);
 
-  EIGEN_MATRIX_CONVERTER(MatrixXf);
-  EIGEN_MATRIX_CONVERTER(MatrixXd);
+  EIGEN_MATRIX_CONVERTER(Eigen::Vector2f);
+  EIGEN_MATRIX_CONVERTER(Eigen::Vector2d);
 
-  EIGEN_MATRIX_CONVERTER(Vector2f);
-  EIGEN_MATRIX_CONVERTER(Vector2d);
+  EIGEN_MATRIX_CONVERTER(Eigen::Vector3f);
+  EIGEN_MATRIX_CONVERTER(Eigen::Vector3d);
 
-  EIGEN_MATRIX_CONVERTER(Vector3f);
-  EIGEN_MATRIX_CONVERTER(Vector3d);
-
-  EIGEN_MATRIX_CONVERTER(Vector4f);
-  EIGEN_MATRIX_CONVERTER(Vector4d);
+  EIGEN_MATRIX_CONVERTER(Eigen::Vector4f);
+  EIGEN_MATRIX_CONVERTER(Eigen::Vector4d);
 
   EIGEN_MATRIX_CONVERTER(VectorXs);
-  EIGEN_MATRIX_CONVERTER(VectorXf);
-  EIGEN_MATRIX_CONVERTER(VectorXd);
+  EIGEN_MATRIX_CONVERTER(Eigen::VectorXf);
+  EIGEN_MATRIX_CONVERTER(Eigen::VectorXd);
 
   MAT_CONV(6, 1, double);
   MAT_CONV(6, 6, double);
-  
+
   MAT_CONV(X, 2, double);
   MAT_CONV(X, 3, double);
-  // MAT_CONV(X, 1, double);
-  // MAT_CONV(X, X, double);
-  // MAT_CONV(4, 4, double);
+  MAT_CONV(X, X, double);
 
   MAT_CONV(1, 4, double);
   MAT_CONV(2, 3, double);
@@ -265,9 +301,7 @@ void export_converters(void) {
 
   MAT_CONV(X, 2, float);
   MAT_CONV(X, 3, float);
-  // MAT_CONV(X, 1, float);
-  // MAT_CONV(X, X, float);
-  // MAT_CONV(4, 4, float);
+  MAT_CONV(X, X, float);
 
   MAT_CONV(1, 4, float);
   MAT_CONV(2, 3, float);
@@ -275,22 +309,36 @@ void export_converters(void) {
   MAT_CONV(3, 4, float);
   MAT_CONV(2, X, float);
 
+  // Expose Eigen Transforms
+  EIGEN_TRANSFORM_CONVERTER(Eigen::Affine2f);
+  EIGEN_TRANSFORM_CONVERTER(Eigen::Affine3f);
+  EIGEN_TRANSFORM_CONVERTER(Eigen::Affine2d);
+  EIGEN_TRANSFORM_CONVERTER(Eigen::Affine3d);
+
+  EIGEN_TRANSFORM_CONVERTER(Eigen::Isometry2f);
+  EIGEN_TRANSFORM_CONVERTER(Eigen::Isometry3f);
+  EIGEN_TRANSFORM_CONVERTER(Eigen::Isometry2d);
+  EIGEN_TRANSFORM_CONVERTER(Eigen::Isometry3d);
+
+  EIGEN_TRANSFORM_CONVERTER(Eigen::Projective2f);
+  EIGEN_TRANSFORM_CONVERTER(Eigen::Projective3f);
+  EIGEN_TRANSFORM_CONVERTER(Eigen::Projective2d);
+  EIGEN_TRANSFORM_CONVERTER(Eigen::Projective3d);
+
+  // Vector of Eigen matrices
   expose_template_type< std::vector<Eigen::Vector3f> >();
   expose_template_type< std::vector<Eigen::Vector3d> >();
 
-  expose_template_type< std::vector<Eigen::Matrix<float,3,4> > >();
-  expose_template_type< std::vector<Eigen::Matrix<double,3,4> > >();
-  
+  expose_template_type< std::vector<Eigen::Matrix<float, 3, 4> > >();
+  expose_template_type< std::vector<Eigen::Matrix<double, 3, 4> > >();
+
   expose_template_type< std::vector<Eigen::Matrix3f> >();
   expose_template_type< std::vector<Eigen::Matrix3d> >();
 
   expose_template_type< std::vector<Eigen::Matrix4f> >();
   expose_template_type< std::vector<Eigen::Matrix4d> >();
+
+  converter_exported = true;
 }
 
-} // namespace eigen
-} // namespace pybot
-
-
-
-
+}  // namespace eigen_numpy

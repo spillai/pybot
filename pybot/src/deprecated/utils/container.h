@@ -22,7 +22,7 @@ template<typename containedType>
 struct custom_list_to_list{
   static PyObject* convert(const std::list<containedType>& v){
     py::list ret; BOOST_FOREACH(const containedType& e, v) ret.append(e);
-    return incref(ret.ptr());
+    return py::incref(ret.ptr());
   }
 };
 
