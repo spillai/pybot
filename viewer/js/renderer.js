@@ -19,7 +19,8 @@ var reconstruction_groups = [];
 
 var obj_axes_geom = null;
 var obj_collections = {};
-var obj_collections_lut = {};
+var pc_collections = {};
+var pc_obj_lut = {};
 
 var point_clouds = [];
 var camera_lines = [];
@@ -626,6 +627,24 @@ function update_camera_pose(msg) {
 }
 
 function add_points_to_scene_group(msg) {
+    // Note: All points from the same channel are associated with the
+    // same frame_id (i.e. collection_id=uuid(pose_channel), element_id=0,...n)
+    
+    // Clean up point clouds for corresponding channel (indexed by msg.id)
+    if (msg.reset && msg.id in pc_obj_lut) {
+
+        // Tuple (element_group, point_cloud)
+        for (var key in pc_obj_lut[msg.id]) {
+            gp_pc = pc_obj_lut[msg.id][key];
+            gp_pc[0].remove(gp_pc[1]);
+        }
+        delete pc_obj_lut[msg.id];
+    }
+
+    // Initialize pc-obj LUT
+    if (!(msg.id in pc_obj_lut)) {
+        pc_obj_lut[msg.id] = [];
+    }
     
     // Render points
     for (var i = 0; i < msg.pointLists.length; ++i) {
@@ -634,8 +653,7 @@ function add_points_to_scene_group(msg) {
         // Find collection_id, and element_id pose
         try {
             cid = pc.collection, eid = pc.elementId;
-            element_group = obj_collections[cid][eid];
-            element_lut = obj_collections_lut[cid][eid];
+            var element_group = obj_collections[cid][eid];
         } catch (err) {
             console.log('Error finding collection, and element_id ' +
                         cid + ':' + eid);
@@ -654,25 +672,20 @@ function add_points_to_scene_group(msg) {
         geom.addAttribute(
             'color',
             new THREE.BufferAttribute(colorsf, 3));
-        
+
+        var item; 
+
         // Render points
         switch (msg.type) {
         case point3d_list_collection_t.getEnum('point_type').POINT:
-            var point_cloud = new THREE.Points(
+            item = new THREE.Points(
                 geom, pointCloudMaterial);
-            point_clouds.push(point_cloud);
-            element_group.add(point_cloud);
             break;
             
         // Render lines
         case point3d_list_collection_t.getEnum('point_type').LINES:
-            var lines = new THREE.LineSegments(
+            item = new THREE.LineSegments(
                 geom, lineMaterial, THREE.LinePieces);
-            lines.visible = true;
-            // line.reconstruction = reconstruction;
-            // line.shot_id = shot_id;
-            // lines.push(line);
-            element_group.add(lines)
             break;
             
         // Render triangles
@@ -686,22 +699,24 @@ function add_points_to_scene_group(msg) {
             mesh_material = new THREE.MeshBasicMaterial({
                 color: 0xFFFF00,
             });
-            var mesh = new THREE.Mesh(geom, mesh_material);
-            
-            element_group.add(mesh);
+            item = new THREE.Mesh(geom, mesh_material);
             break;
 
         default:
             console.log('Unknown type ' + msg.type);
         }
 
+        // For every point cloud added, maintain the corresponding
+        // element_group it belongs to (for future removal purposes)
+        pc_obj_lut[msg.id].push([element_group, item]);
+        element_group.add(item);
+        
         // Element group culling
         element_group.frustumCulled = true;
         
         // Add group to scene
         scene_group.add(element_group);
         scene_group.frustumCulled = true;
-
         
     }
     
@@ -762,37 +777,40 @@ function add_points_to_scene_group(msg) {
 
 function add_objects_to_scene_group(msg) {
 
+    // Clean up poses for corresponding channel (indexed by msg.id)
+    if (msg.reset && msg.id in obj_collections) {
+        for (var obj_id in obj_collections[msg.id]) {
+            // Reomve obj from scene_group
+            scene_group.remove(obj_collections[msg.id][obj_id]);
+        }
+        delete obj_collections[msg.id];
+    }
 
     // Retreive object collection
     // Object.keys(obj_collections_lut).length == 0
-    if (msg.reset || !(msg.id in obj_collections_lut)) {
+    if (!(msg.id in obj_collections)) {
         obj_collections[msg.id] = {};
-        obj_collections_lut[msg.id] = {};
     }
-    collection = obj_collections[msg.id];
-    collection_lut = obj_collections_lut[msg.id];
     
     // Render poses
     for (var i = 0; i < msg.objs.length; ++i) {
         var obj = msg.objs[i];
-        var mat = new THREE.Matrix4().makeRotationFromEuler(
-            new THREE.Euler(obj.roll, obj.pitch, obj.yaw, 'ZYX'));
-        mat.setPosition(new THREE.Vector3(obj.x, obj.y, obj.z));
 
         // Create object group for obj_id
         var update = false;
-        if (msg.reset || !(obj.id in collection)) { 
-            collection[obj.id] = new THREE.Object3D();
-            collection_lut[obj.id] = msg;
-            // console.log('adding element ' + msg.id + ':' + obj.id);
+        if (!(obj.id in obj_collections[msg.id])) { 
+            obj_collections[msg.id][obj.id] = new THREE.Object3D();
+            console.log('adding element ' + msg.id + ':' + obj.id);
         } else {
             update = true;
             console.log('updating element ' + msg.id + ':' + obj.id);
         }
         
         // Transform obj_id
-        var obj_group = collection[obj.id];
-        obj_group.applyMatrix(mat);
+        var obj_group = obj_collections[msg.id][obj.id];
+        obj_group.setRotationFromEuler(
+            new THREE.Euler(obj.roll, obj.pitch, obj.yaw, 'ZYX'));
+        obj_group.position.copy(new THREE.Vector3(obj.x, obj.y, obj.z));
 
         // First time add
         if (!update) {
@@ -933,7 +951,6 @@ function init() {
             // Split channel, and data
             msg_buf = split_channel_data(buf);
             ch_str = String.fromCharCode.apply(null, msg_buf.channel);
-            // console.log('<' + ch_str + '>');
 
             // Decode based on channel 
             switch(ch_str) {
@@ -953,9 +970,29 @@ function init() {
                 break;
                 
             case 'RESET_COLLECTIONS':
-                obj_collections = {};
-                obj_collections_lut = {};
+                console.log('<' + ch_str + '>');
                 
+                // // Clean up point clouds
+                // // Tuple (element_group, point_cloud)
+                // for (var msg_id in obj_collections) {
+                //     for (var key in pc_obj_lut[msg_id]) {
+                //         gp_pc = pc_obj_lut[msg_id][key];
+                //         gp_pc[0].remove(gp_pc[1]);
+                //     }
+                //     delete pc_obj_lut[msg_id];
+                // }
+                pc_obj_lut = {};
+                obj_collections = {};
+                
+                // Recursively delete all objects in the scene graph
+                scene_group.traverse(function(child){
+                    if (child.geometry != undefined) {
+                        child.material.dispose();
+                        child.geometry.dispose();
+                    }
+                });
+
+                // Remove scene group
                 scene.remove(scene_group);
                 addEmptyScene();
                 
