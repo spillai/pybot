@@ -23,13 +23,13 @@ def read_image(conn):
         length = int(recvall(conn, 16))
     except:
         import sys
-        print "Unexpected error:", sys.exc_info()[0]
+        print("Unexpected error:", sys.exc_info()[0])
         return False, None
 
     stringData = recvall(conn, length)
     data = np.fromstring(stringData, dtype='uint8')
     decimg = cv2.imdecode(data, 1)
-    print 'Image received ', decimg.shape
+    print('Image received ', decimg.shape)
     return True, decimg
 
 

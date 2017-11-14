@@ -26,7 +26,7 @@ class Decoder(object):
     def decode(self, data): 
         try: 
             return self.decode_cb_(data)
-        except Exception, e:
+        except Exception as e:
             raise ValueError('\nError decoding channel: {} with {}\n'
                              'Data: {}, Can decode: {}\n'
                              'Error: {}\n'\
@@ -115,8 +115,8 @@ class LogFile(object):
                           map(lambda l: l.replace('\n','').split('\t'), 
                               filter(lambda l: '\n' in l, f.readlines())))
 
-            ts = map(lambda (t,ch, data): float(t) * 1e-9, data)
-            topics = map(lambda (t,ch,data): ch, data)
+            ts = map(lambda t,ch,data: float(t) * 1e-9, data)
+            topics = map(lambda t,ch,data: ch, data)
 
         return ts, topics
 
@@ -400,13 +400,13 @@ class LogDB(object):
     def __getitem__(self, basename): 
         try: 
             return self.frame_index_[basename]
-        except KeyError, e: 
+        except KeyError as e: 
             raise KeyError('Missing key in LogDB {}'.format(basename))
 
     def find(self, basename): 
         try: 
             return self.frame_name2idx_[basename]
-        except KeyError, e: 
+        except KeyError as e: 
             raise KeyError('Missing key in LogDB {}'.format(basename))
 
     @staticmethod

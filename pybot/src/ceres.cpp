@@ -1,11 +1,21 @@
+
+// Author(s): Igor Babuschkin
+// License: BSD-3
+
+// #include "pybot_types.hpp"
+
 #include <iostream>
 #include <ceres/ceres.h>
-#include <pybind11/pybind11.h>
-#include <pybind11/numpy.h>
+// #include <pybind11/pybind11.h>
+// #include <pybind11/numpy.h>
 #include <glog/logging.h>
 
-using namespace pybind11::literals;
-namespace py = pybind11;
+namespace py = boost::python;
+
+namespace pybot {
+
+  // using namespace pybind11::literals;
+  // namespace py = pybind11;
 
 class CustomFunction : public ceres::FirstOrderFunction {
     public:
@@ -108,3 +118,10 @@ py::object optimize(py::function func, py::function grad, py::buffer x0) {
 
     return OptimizeResult(out);
 }
+
+BOOST_PYTHON_MODULE(pybot_types)
+{
+  
+}
+
+}  // namespace pybot

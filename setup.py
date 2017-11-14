@@ -1,13 +1,13 @@
 #!/usr/bin/env python
 
-from distutils.core import setup
 import sys
 import os
 import errno
 import subprocess
 
-# from setuptools import setup
-# from setuptools import find_packages
+from distutils.core import setup
+from setuptools import find_packages
+from setuptools import Command
 
 def mkdir_p(path):
     try:
@@ -37,7 +37,15 @@ setup(
     author_email='spillai@csail.mit.edu',
     url=GITHUB_URL,
     download_url=DOWNLOAD_URL,
-    packages=['pybot'],
+    packages=find_packages(exclude=('pybot.mapping',
+                                    'pybot.vision',
+                                    'pybot.externals.ros',
+                                    # 'pybot.externals.lcm',
+                                    'pybot.utils.dataset',
+                                    'pybot.vision.recognition',
+                                    'pybot.vision.trackers',
+                                    'pybot.vision.calib',
+                                    'pybot.vision.caffe')),
     scripts=[],
     package_data={
         'pybot': ['pybot_types.so']
