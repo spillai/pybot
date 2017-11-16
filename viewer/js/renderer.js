@@ -26,28 +26,6 @@ var savedOptions = {
 };
 
 var options = {
-    // record: function() {
-    //     if (capturer == null) { 
-    //         // Create a capturer that exports a WebM video
-    //         capturer = new CCapture(
-    //             { framerate: 30,
-    //               format: 'webm',
-    //               // quality: 90,
-    //               display: true, 
-    //               // workersPath: 'js/',
-    //               verbose: false }
-    //         );
-    //         capturer.start();
-    //         console.log('Start recording ...');
-    //         rec_button.name('Recording ...');
-    //     } else {
-    //         capturer.stop();
-    //         capturer.save();
-    //         capturer = null;
-    //         console.log('Stop recording ...');
-    //         rec_button.name('Record');
-    //     }    
-    // }, 
     pointSize: 0.02,
     drawGrid: true,
     followCamera: true,
@@ -90,12 +68,11 @@ function addDatGui(){
         .listen()
 				.onChange(function(value) {
 						options.followCamera = value;
+						render();
 				});				
     f1.open();
 
     f2 = gui.addFolder('Collections');
-    // rec_button = f2.add(options, 'record').name('Record');
-    // rec_button.name('Record');
     f2.open();
     gui.close();
 }
@@ -262,10 +239,10 @@ function add_objects_to_scene_group(msg) {
         var update = false;
         if (!(obj.id in obj_collections[msg.id])) { 
             obj_collections[msg.id][obj.id] = new THREE.Object3D();
-            console.log('adding element ' + msg.id + ':' + obj.id);
+            // console.log('adding element ' + msg.id + ':' + obj.id);
         } else {
             update = true;
-            console.log('updating element ' + msg.id + ':' + obj.id);
+            // console.log('updating element ' + msg.id + ':' + obj.id);
         }
         
         // Transform obj_id
@@ -395,14 +372,14 @@ function init() {
             ch_str = String.fromCharCode.apply(null, msg_buf.channel);
 
 						var msg_id = null;
+						var msg_name = null;
+						var msg_collection = null;
 						
             // Decode based on channel 
             switch(ch_str) {
             case 'CAMERA_POSE':
                 msg = pose_t.decode(msg_buf.data);
                 update_camera_pose(msg);
-								msg_id = msg.id;
-								msg_name = msg.name;
                 break;
                 
             case 'POINTS_COLLECTION':
@@ -410,7 +387,7 @@ function init() {
                 add_points_to_scene_group(msg);
 								msg_id = msg.id;
 								msg_name = msg.name;
-                break;
+								break;
                 
             case 'OBJ_COLLECTION':
                 msg = obj_collection_t.decode(msg_buf.data);
@@ -447,23 +424,6 @@ function init() {
                 
                 break;
                 
-            case 'RECORD_START':
-                // location = msg_buf.data;
-                
-                // Create a capturer that exports a WebM video
-                capturer = new CCapture(
-                    { framerate: 30, format: 'webm', verbose: true }
-                );
-                capturer.start();
-                break;
-
-            case 'RECORD_STOP':
-                // location = msg_buf.data;
-                capturer.stop();
-                capturer.save();
-                capturer = null;
-                break;
-                
             default:
                 console.log('Unknown channel / decoder ' + ch_str);
             }
@@ -474,12 +434,30 @@ function init() {
 								collections_visibles_lut[msg_id] = f2
 										.add(collections_visibles, msg_id)
 										.name(msg_name)
-										// .listen()
+										.listen()
 										.onChange(function(value) {
-												for (var key in pc_obj_lut[msg_id]) {
-														gp_pc = pc_obj_lut[msg_id][key];
-														gp_pc[0].visible = value;
+
+												switch(ch_str) {
+												case 'OBJ_COLLECTION':
+														for (var key in obj_collections[msg_id]) {
+																obj_collections[msg_id][key].visible = value;
+														}
+														break;
+
+												case 'POINTS_COLLECTION':
+														for (var key in pc_obj_lut[msg_id]) {
+																// tuple = (element_group, point_cloud)
+																tuple = pc_obj_lut[msg_id][key];
+																tuple[0].visible = value;
+														}
+														break;
+														
+												default:
+														break
+														
 												}
+												render();
+												
 										});
 
 						}
