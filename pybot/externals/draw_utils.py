@@ -3,6 +3,8 @@
 # Author: Sudeep Pillai <spillai@csail.mit.edu>
 # License: MIT
 
+from __future__ import division
+
 import time
 from copy import deepcopy
 from collections import deque

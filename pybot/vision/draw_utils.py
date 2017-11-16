@@ -33,7 +33,7 @@ def draw_features(im, pts, colors=None, size=2):
     for col, pt in zip(cols, pts): 
         tl = np.int32(pt - size)
         br = np.int32(pt + size)
-        cv2.rectangle(out, (tl[0], tl[1]), (br[0], br[1]), tuple(col), -1)
+        cv2.rectangle(out, (tl[0], tl[1]), (br[0], br[1]), tuple(map(int, col)), -1)
         # cv2.circle(out, tuple(map(int, pt)), size, tuple(col), -1, lineType=cv2.CV_AA)
     return out
 

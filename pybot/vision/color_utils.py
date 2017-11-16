@@ -1,6 +1,8 @@
 # Author: Sudeep Pillai <spillai@csail.mit.edu>
 # License: MIT
 
+from __future__ import division
+
 import cv2
 import numpy as np
 

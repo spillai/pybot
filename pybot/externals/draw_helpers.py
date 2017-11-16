@@ -5,6 +5,8 @@ Helper functions for plotting
 # Author: Sudeep Pillai <spillai@csail.mit.edu>
 # License: MIT
 
+from __future__ import division
+
 from copy import deepcopy
 import numpy as np
 from matplotlib.colors import colorConverter
