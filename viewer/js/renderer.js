@@ -4,7 +4,7 @@ var container, camera, controls, scene, renderer;
 var ws;
 
 var mouse = new THREE.Vector2();
-var hoverCamera, raycaster, parentTransform;
+var raycaster;
 // var capturer = null;
 // var rec_button; 
 var scene_group, grid_group;
@@ -27,6 +27,8 @@ var savedOptions = {
 
 var options = {
     pointSize: 0.02,
+		sceneScale: 1.0,
+		axisSize: 0.2, 
     drawGrid: true,
     followCamera: true,
     animationSpeed: 1.0,
@@ -43,12 +45,37 @@ function addDatGui(){
 
     f1 = gui.addFolder('Options');
 
+		// Scene scale 
+    f1.add(options, 'sceneScale', 0.1, 1)
+				.name('Scene Scale')
+        .listen()
+        .onChange(function(value) {
+						scene_group.scale.setScalar(value);
+						render();
+				});
+
 		// Point Size 
     f1.add(options, 'pointSize', 0, 0.25)
 				.name('Point Size')
         .listen()
         .onChange(function(value) {
 						pointCloudMaterial.size = value;
+						render();
+				});
+
+		// Axis Size 
+    f1.add(options, 'axisSize', 0, 1)
+				.name('Axis Size')
+        .listen()
+        .onChange(function(value) {
+						if (obj_axes_geom == null)
+								return;
+						// for (var msg_id in obj_collections) {
+						// 		coll = obj_collections[msg_id];
+						// 		for (var key in coll) {
+						// 				v = coll[key].scale.setScalar(value / 0.2);
+						// 		}
+						// }
 						render();
 				});
 
@@ -504,17 +531,19 @@ function initRenderer() {
     container = document.getElementById( 'ThreeJS' );
     container.appendChild(renderer.domElement);
 
+		var fov = 70, near = 0.03, far = 10000;
     camera = new THREE.PerspectiveCamera(
-        70, window.innerWidth / window.innerHeight, 0.03, 10000);
-    camera.position.x = 50;
-    camera.position.y = 50;
-    camera.position.z = 50;
-    camera.far = 200; // Setting far frustum (for culling)
+        fov, window.innerWidth / window.innerHeight, near, far);
+		camera.position.x = 10;
+		camera.position.y = 10;
+		camera.position.z = 10;		
     camera.up = new THREE.Vector3(0,0,1);
 
+		// Controls
     controls = new THREE.OrbitControls(camera, renderer.domElement);
     controls.addEventListener('change', render);
-
+		
+		// Callbacks
     window
         .addEventListener(
             'resize', onWindowResize, false);
@@ -537,8 +566,8 @@ function initRenderer() {
 
     // Axis
     grid_group = new THREE.Object3D();
-    addGridAxes(); // grid_group.add(getAxes(1));
-
+    addGridAxes();
+		
     // Ground grid
     {
         var linegeo = new THREE.Geometry();
@@ -572,6 +601,7 @@ function initRenderer() {
     // Add controls
     addDatGui();
 
+		// Initial render
     render();
 }
 
