@@ -1,7 +1,7 @@
 import multiprocessing as mp
 from threading import Lock, RLock
 
-from websocket_server import WebsocketServer
+from pybot.viewer.websocket_server import WebsocketServer
 
 from pybot.externals import marshalling_backend
 from pybot.externals import unpack, pack

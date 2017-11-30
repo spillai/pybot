@@ -28,6 +28,9 @@ subprocess.Popen(['make','-j4'], cwd='cmake_build').wait()
 print('Building package')
 GITHUB_URL = 'https://github.com/spillai/pybot'
 DOWNLOAD_URL = GITHUB_URL + '/archive/pybot-v0.1.tar.gz'
+
+print('Found: {}'.format(find_packages()))
+
 setup(
     name='pybot',
     version='0.2',
@@ -39,7 +42,9 @@ setup(
     download_url='', 
     packages=find_packages(),
     scripts=[],
+    package_dir={'pybot': 'pybot'},
     package_data={
-        'pybot': ['pybot_types.so']
+        'pybot': ['pybot_types.so', 'viewer/*.*', 'viewer/**/*', 'viewer/**/**/*']
     },
+    zip_safe=False
 )
