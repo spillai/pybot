@@ -240,9 +240,9 @@ class BoWVectorizer(object):
         # Setup codebook for closest center lookup
         self.codebook = self.gmm.means_
 
-        print 'Vocab construction from data %s (%s KB, %s) => GMM %s took %5.3f s' % \
-            (data.shape, data.nbytes / 1024, data.dtype, self.gmm.means_.shape, time.time() - st)
-        print 'GMM: %s' % ('GOOD' if np.isfinite(self.gmm.means_).all() else 'BAD')
+        print('Vocab construction from data %s (%s KB, %s) => GMM %s took %5.3f s' % \
+            (data.shape, data.nbytes / 1024, data.dtype, self.gmm.means_.shape, time.time() - st))
+        print ('GMM: %s' % ('GOOD' if np.isfinite(self.gmm.means_).all() else 'BAD'))
 
         # Save codebook, and index
         self.index_codebook()

@@ -161,10 +161,8 @@ class PoseSampler(Sampler):
         self.displacement_ = displacement
         self.theta_ = theta
 
-    @classmethod
-    def from_items(cls, items, theta=np.deg2rad(20), displacement=0.25, lookup_history=10, return_indices=False):
-        c = cls(theta=theta, displacement=displacement, lookup_history=lookup_history)
-        items = [(c.latest_sample, idx) for idx, item in enumerate(items) if c.append(item)]
+    def from_items(self, items, return_indices=False):
+        items = [(self.latest_sample, idx) for idx, item in enumerate(items) if self.append(item)]
 
         # Unzip returns tuples: inds and poses must be lists
         poses, inds = map(list, zip(*items))

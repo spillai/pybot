@@ -30,26 +30,16 @@ GITHUB_URL = 'https://github.com/spillai/pybot'
 DOWNLOAD_URL = GITHUB_URL + '/archive/pybot-v0.1.tar.gz'
 setup(
     name='pybot',
-    version='0.1',
+    version='0.2',
     description='Research tools for mobile robots',
     author='Sudeep Pillai',
     license='MIT',    
     author_email='spillai@csail.mit.edu',
     url=GITHUB_URL,
-    download_url=DOWNLOAD_URL,
-    packages=find_packages(exclude=('pybot.mapping',
-                                    'pybot.vision',
-                                    'pybot.externals.ros',
-                                    # 'pybot.externals.lcm',
-                                    'pybot.utils.dataset',
-                                    'pybot.vision.recognition',
-                                    'pybot.vision.trackers',
-                                    'pybot.vision.calib',
-                                    'pybot.vision.caffe')),
+    download_url='', 
+    packages=find_packages(),
     scripts=[],
     package_data={
         'pybot': ['pybot_types.so']
     },
-    # packages=find_packages())
 )
-      
