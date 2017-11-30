@@ -8,15 +8,15 @@ if __name__ == "__main__":
 
     print('Reset')
     time.sleep(1)
-    
+
     print('Create new sensor frame')
     draw_utils.publish_sensor_frame('new_frame', RigidTransform(tvec=[0,0,1]))
-    
-    # poses = [RigidTransform.from_roll_pitch_yaw_x_y_z(np.pi/180 * 10*j, 0, 0, j * 1.0, 0, 0)
-    #          for j in xrange(10)]
-    # draw_utils.publish_pose_list('poses', poses, frame_id='origin')
-    # draw_utils.publish_pose_list('poses_new_frame', poses, frame_id='new_frame')
-    
+
+    poses = [RigidTransform.from_rpyxyz(np.pi/180 * 10*j, 0, 0, j * 1.0, 0, 0)
+             for j in range(10)]
+    draw_utils.publish_pose_list('poses', poses, frame_id='origin')
+    draw_utils.publish_pose_list('poses_new_frame', poses, frame_id='new_frame')
+
     print('Create point cloud with colors')
     X = np.random.rand(1000, 3)
     C = np.hstack((np.random.rand(1000, 1), np.zeros((1000,2))))
@@ -24,19 +24,16 @@ if __name__ == "__main__":
                              frame_id='new_frame', reset=True)
     draw_utils.publish_line_segments('lines', X[:-1], X[1:],
                                      c='y', frame_id='new_frame')
-
     time.sleep(2)
-    
+
     print('Overwriting point cloud')
     X = np.random.rand(1000, 3) + np.float32([5, 0, 0])
     C = np.hstack((np.random.rand(1000, 1), np.zeros((1000,2))))
     draw_utils.publish_cloud('cloud', X, c='r',
                              frame_id='new_frame', reset=True)
-    # draw_utils.publish_line_segments('lines', X[:-1], X[1:],
-    #                                  c='r', frame_id='new_frame')
+    draw_utils.publish_line_segments('lines', X[:-1], X[1:],
+                                     c='r', frame_id='new_frame')
 
-
-    
     print('Create 3 poses with ids 0, 1, and 2')
     for j in range(5):
         time.sleep(0.1)
@@ -53,24 +50,12 @@ if __name__ == "__main__":
         p = Pose.from_rigid_transform(0, RigidTransform(tvec=[j,j,0]))
         draw_utils.publish_pose_list('poses', [p], frame_id='origin', reset=False)
 
-    # # Publish cloud with respect to pose 0
-    # Xs = [X + 3, X + 4, X + 6]
-    # ids = [0, 1, 2]
-    # draw_utils.publish_cloud('cloud_with_poses', Xs, c=[C, 'r', 'g'], frame_id='poses', element_id=ids)
-    # for j in range(3):
-    #     time.sleep(1)
-    #     p = Pose.from_rigid_transform(0, RigidTransform(tvec=[1,j,0]))
-    #     draw_utils.publish_pose_list('poses', [p],
-    #                                  frame_id='origin', reset=False)
-
-    # draw_utils.publish_cloud('cloud', Xs, c='b', frame_id='poses', element_id=ids)
-
-
-
-    # for j in range(10):
-    #     p = Pose.from_rigid_transform(j,
-    #                                   RigidTransform.from_roll_pitch_yaw_x_y_z(
-    #             np.pi/180 * 10*j, 0, 0, j * 1.0, 0, 0))
-    #     draw_utils.publish_pose_list('poses_new_frame_with_ids', [p],
-    #                       frame_id='new_frame_with_ids', reset=False)
-    #     time.sleep(1)
+    # Publish cloud with respect to pose 0
+    Xs = [X + 3, X + 4, X + 6]
+    ids = [0, 1, 2]
+    draw_utils.publish_cloud('cloud_with_poses', Xs, c=[C, 'r', 'g'], frame_id='poses', element_id=ids)
+    for j in range(3):
+        time.sleep(1)
+        p = Pose.from_rigid_transform(0, RigidTransform(tvec=[1,j,0]))
+        draw_utils.publish_pose_list('poses', [p],
+                                     frame_id='origin', reset=False)

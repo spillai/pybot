@@ -5,6 +5,9 @@ package:
 source:
     git_url: https://github.com/spillai/pybot.git
     git_branch: py35
+
+# source:
+#     path: <source_path>
   
 build:
     number: 0
@@ -12,18 +15,33 @@ build:
 requirements:
     build:
         - cmake
-        - numpy
         - python
+        - numpy
         - pip
-        - numpy
-        - six
         - wheel
+
     run:
-        - numpy
         - python
-        - pandas
-    imports:
+        - numpy
+        - scipy
+        - protobuf ==3.4.1
+        - pyzmq
+        - opencv3 >=3.1
+        - matplotlib
+        - pytables
+        - pandas            
+    
+    test: 
+      imports:
         - pybot
+        - pybot.vision
+        - pybot.utils
+        - pybot.geometry
+        - pybot.externals
+        
+    commands:
+        - python -c "import pybot.vision; import pybot.utils; import
+          pybot.externals; import pybot.geometry;"
 
 about:
     license: MIT
