@@ -43,3 +43,16 @@ setup(
         'pybot': ['pybot_types.so']
     },
 )
+<<<<<<< HEAD
+=======
+
+# exclude=('pybot.mapping',
+#          'pybot.externals.ros',
+#          'pybot.externals.lcm',
+#          'pybot.utils.dataset',
+#          'pybot.vision.recognition',
+#          'pybot.vision.trackers',
+#          'pybot.vision.calib',
+#          'pybot.vision.caffe'
+# )
+>>>>>>> 9f91f9d8a9aaa0a1c7d654deffc84e0ae954db98
