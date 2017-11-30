@@ -1,11 +1,11 @@
 package:
     name: pybot
-    version: 0.1
+    version: 0.2
 
 source:
     git_url: https://github.com/spillai/pybot.git
     git_branch: py35
-    
+  
 build:
     number: 0
 
@@ -14,11 +14,17 @@ requirements:
         - cmake
         - numpy
         - python
-
+        - pip
+        - numpy
+        - six
+        - wheel
     run:
         - numpy
         - python
+        - pandas
+    imports:
+        - pybot
 
 about:
-    home: http://spillai.github.io/pybot/
     license: MIT
+    summary: Research tools for autonomous systems using Python

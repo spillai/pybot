@@ -265,7 +265,7 @@ class LaserScanDecoder(Decoder):
 
             return np.hstack([(ranges * self.cos_sin_map_).T, zeros])
         except Exception as e:
-            print e
+            print(e)
 
 
 class TfDecoderAndPublisher(Decoder): 
@@ -503,7 +503,7 @@ class ROSBagReader(LogReader):
                 res, (t, ch, data) = self.decode_msg(channel, msg, t)
                 if res: 
                     yield (t, ch, data)
-            except Exception, e: 
+            except Exception as e: 
                 print('ROSBagReader.iteritems() :: {:}'.format(e))
 
     def iterframes(self):
@@ -573,7 +573,7 @@ class BagDB(LogDB):
         try: 
             meta_directory = os.path.expanduser(dataset.filename).replace('.bag','')
             meta = SUN3DAnnotationDB.load(meta_directory, shape=None)
-        except Exception, e: 
+        except Exception as e: 
             raise RuntimeError('Failed to open {}, Error: {}'.format(meta_directory, e))
             meta = None
         LogDB.__init__(self, dataset, meta=meta)
