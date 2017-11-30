@@ -10,6 +10,7 @@ def get_environment(env_str, default, choices=None):
 
     if choices is not None:
         if var not in set(choices):
-            raise RuntimeError('{}: {} not in choices {}'.format(env_str, var, choices))
+            raise RuntimeError('{}: {} not in choices {}'
+                               .format(env_str, var, choices))
         
     return var
