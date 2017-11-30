@@ -4,7 +4,7 @@
 # a zeromq-based server that relays data to a websocket
 # that the client browser can connect to.
 
-echo "Go to localhost:8000/viewer.html";
+echo "\033[92mGo to localhost:8000/viewer.html\033[00m";
 trap "exit" INT TERM ERR
 trap "kill 0" EXIT
 

@@ -7,20 +7,22 @@ not globally install, in which case I can not provide much support).
 
 1) Install miniconda and setup path in `~/.bashrc`
 ```sh
-wget --no-check-certificate https://repo.continuum.io/miniconda/Miniconda2-latest-Linux-x86_64.sh
-bash Miniconda2-latest-Linux-x86_64.sh -b -p $HOME/anaconda
+wget --no-check-certificate https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh
+bash Miniconda3-latest-Linux-x86_64.sh -b -p $HOME/anaconda
 ```
 
-2) Install dependencies into a new conda environment
+2) Install pybot and its dependencies into a new conda environment
 ```sh
 conda config --add channels menpo
-conda create --name pybot --file conda_requirements.txt
+conda create --name pybot python=3.5
+source activate pybot
+conda install -c s_pillai pybot
 ```
 Alternatively, if you'd like to add **pybot** to an already existing
 environment,
 ```sh
 conda config --add channels menpo
-conda install --name pybot --file conda_requirements.txt
+conda install --name <existing_environment> -c s_pillai pybot
 ```
 
 3) (Optional) ROS dependencies (reading bag files etc) into the same
@@ -29,18 +31,6 @@ environment.
 ```sh
 source activate pybot
 pip install catkin_pkg rospkg
-```
-
-Dependencies
----
-1) OpenCV
-
-**pybot** heavily relies on OpenCV 2.4.11 for most of the computationally
-expensive computer vision procedures. We rely on the
-[menpo](https://anaconda.org/menpo/opencv) conda channel for the
-specific version of OpenCV (that is pre-compiled for your platform).
-```sh
-conda install -c https://conda.anaconda.org/menpo opencv=2.4.11 -y
 ```
  
  **Use at your own risk**
