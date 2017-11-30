@@ -8,7 +8,7 @@ source:
 
 # source:
 #     path: <source_path>
-  
+
 build:
     number: 0
 
@@ -19,7 +19,8 @@ requirements:
         - numpy
         - pip
         - wheel
-
+        - opencv3 >=3.1
+        - eigen
     run:
         - python
         - numpy
@@ -27,18 +28,19 @@ requirements:
         - protobuf ==3.4.1
         - pyzmq
         - opencv3 >=3.1
+        - eigen
         - matplotlib
         - pytables
-        - pandas            
-    
-    test: 
+        - pandas
+
+    test:
       imports:
         - pybot
         - pybot.vision
         - pybot.utils
         - pybot.geometry
         - pybot.externals
-        
+
     commands:
         - python -c "import pybot.vision; import pybot.utils; import
           pybot.externals; import pybot.geometry;"

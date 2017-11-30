@@ -1,4 +1,4 @@
-.PHONY: build
+all: clean build
 
 clean:
 	-$(RM) -rf dist
@@ -25,8 +25,6 @@ wheel:
 
 conda-build:
 	conda build tools/conda
-
-all: clean build
 
 dev-build:
 	python setup.py build_ext --inplace
