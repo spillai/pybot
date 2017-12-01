@@ -30,6 +30,12 @@ GITHUB_URL = 'https://github.com/spillai/pybot'
 DOWNLOAD_URL = GITHUB_URL + '/archive/pybot-v0.1.tar.gz'
 
 print('Found: {}'.format(find_packages()))
+def copy_dir(dir_path):
+    base_dir = os.path.join('pybot', dir_path)
+    for (dirpath, dirnames, files) in os.walk(base_dir):
+        for f in files:
+            if '.pyc' in f: continue
+            yield os.path.join(dirpath.split('/', 1)[1], f)
 
 setup(
     name='pybot',
@@ -44,7 +50,8 @@ setup(
     scripts=[],
     package_dir={'pybot': 'pybot'},
     package_data={
-        'pybot': ['pybot_types.so', 'viewer/*.*', 'viewer/**/*', 'viewer/**/**/*']
+        'pybot': ['pybot_types.so'],
+        '': [f for f in copy_dir('externals/viewer')]
     },
     zip_safe=False
 )
