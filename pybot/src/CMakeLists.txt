@@ -9,17 +9,31 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 
 set(CMAKE_MODULE_PATH ${PYBOT_SOURCE_DIR}/cmake)
-set(CMAKE_MACOSX_RPATH 1)
 
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC -std=c++11 -fpermissive")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS}")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -fpermissive")
+
+if(CMAKE_COMPILER_IS_GNUCXX)
+    if("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "x86_64")
+        set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -fPIC"  )
+        set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fPIC"  )    
+    endif()
+endif()
+
+if(APPLE)
+    set(CMAKE_XCODE_ATTRIBUTE_CLANG_CXX_LANGUAGE_STANDARD "c++11")
+    set(CMAKE_XCODE_ATTRIBUTE_CLANG_CXX_LIBRARY "libc++")
+    set(CMAKE_XCODE_ATTRIBUTE_GCC_VERSION "com.apple.compilers.llvm.clang.1_0")
+    set(CMAKE_MACOSX_RPATH 1)
+    set(CMAKE_OSX_ARCHITECTURES "x86_64")
+endif()
 
 # Check the architecture and set CMAKE_LIBRARY_ARCHITECTURE accordingly
-if(UNIX)
-  if(CMAKE_SIZEOF_VOID_P EQUAL 8)
-    set(CMAKE_LIBRARY_ARCHITECTURE "x86_64-linux-gnu")
-  endif()
-endif()
+# if(UNIX)
+#   if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+#     set(CMAKE_LIBRARY_ARCHITECTURE "x86_64-linux-gnu")
+#   endif()
+# endif()
 
 # cmake Dependencies
 include(cmake/FindNumPy.cmake)
@@ -27,8 +41,8 @@ include(cmake/FindEigen3.cmake)
 include(cmake/FindGlog.cmake)
 include(cmake/boost-python.cmake)
 
-find_package(Ceres REQUIRED)
-include_directories(${CERES_INCLUDE_DIR})
+# find_package(Ceres REQUIRED)
+# include_directories(${CERES_INCLUDE_DIR})
 
 find_package(Gflags REQUIRED)
 include_directories(${GFLAGS_INCLUDE_DIR})
