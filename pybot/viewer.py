@@ -5,7 +5,9 @@
 import os
 from subprocess import Popen, PIPE, STDOUT
 
-cwd = os.path.dirname(os.path.realpath(__file__))
+cwd = os.path.join(os.path.dirname(os.path.realpath(__file__)),
+                   'externals', 'viewer')
+print('Current working directory: {}'.format(cwd))
 print('\033[92m{}\033[00m'
       .format('Go to localhost:8000/viewer.html'))
 p1 = Popen(['python3 -m http.server'],
