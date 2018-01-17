@@ -206,6 +206,12 @@ function add_points_to_scene_group(msg) {
             item = new THREE.LineSegments(
                 geom, lineMaterial, THREE.LinePieces);
             break;
+
+				// // Render line loops
+        // case point3d_list_collection_t.getEnum('point_type').LINE_LOOP:
+        //     item = new THREE.LineLoop(
+        //         geom, lineMaterial, THREE.LinePieces);
+        //     break;
             
         // Render triangles
         case point3d_list_collection_t.getEnum('point_type').TRIANGLES:
