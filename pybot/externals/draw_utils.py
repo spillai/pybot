@@ -442,8 +442,8 @@ def publish_cameras(pub_channel, poses, c='y', texts=[], covars=[], frame_id='ca
 def publish_laser_frustums(pub_channel, poses, c='y', texts=[], frame_id='camera', 
                     draw_faces=True, draw_edges=True, size=1, zmin=0.01, zmax=5, reset=True):
     cam_feats = [draw_laser_frustum(pose, zmax=zmax * size, fov=np.deg2rad(80)) for pose in poses]
-    cam_faces = map(lambda x: x[0], cam_feats)
-    cam_edges = map(lambda x: x[1], cam_feats)
+    cam_faces = list(map(lambda x: x[0], cam_feats))
+    cam_edges = list(map(lambda x: x[1], cam_feats))
 
     # Publish pose, and corresponding texts
     publish_pose_list(pub_channel, poses, texts=texts, frame_id=frame_id, reset=reset)

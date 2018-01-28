@@ -3,11 +3,13 @@ import time
 import argparse
 import numpy as np
 
-from pybot.utils.test_utils import test_dataset
-from pybot.utils.dataset.kitti import KITTIDatasetReader
-from pybot.vision.imshow_utils import imshow_cv
 from pybot.geometry.rigid_transform import RigidTransform, Pose
+from pybot.utils.dataset.kitti import KITTIDatasetReader
+from pybot.utils.test_utils import test_dataset
 from pybot.utils.timer import SimpleTimer
+from pybot.vision.imshow_utils import imshow_cv
+
+import pybot.externals.draw_utils as draw_utils
 
 if __name__ == "__main__": 
 
@@ -18,28 +20,22 @@ if __name__ == "__main__":
         help="Process Velodyne data")
     args = parser.parse_args()
 
-    import pybot.externals.draw_utils as draw_utils
 
     # KITTI params
     dataset = test_dataset(sequence='00', scale=1.0)
 
-    # try: 
-    #     # Publish ground truth poses
-    #     draw_utils.publish_pose_list('ground_truth_poses', dataset.poses, frame_id='camera')
+    try: 
+        # Publish ground truth poses
+        draw_utils.publish_pose_list('ground_truth_poses', dataset.poses, frame_id='camera')
 
-    #     # # Publish line segments
-    #     # pts = np.vstack([map(lambda p: p.tvec, dataset.poses)])
-    #     # draw_utils.publish_line_segments('ground_truth_trace', pts[:-1], pts[1:], frame_id='camera')
+        # Publish line segments
+        pts = np.vstack([map(lambda p: p.tvec, dataset.poses)])
+        draw_utils.publish_line_segments(
+            'ground_truth_trace',
+            pts[:-1], pts[1:], frame_id='camera')
 
-    #     # # Reduce dim. to (x,y,theta)
-    #     # axes = 'szxy' # YRP
-    #     # poses_reduced = map(lambda (roll,pitch,yaw,x,y,z): 
-    #     #                     RigidTransform.from_rpyxyz(0,0,yaw, x, y, z, axes=axes), 
-    #     #                     map(lambda p: p.to_rpyxyz(axes=axes), dataset.poses))
-    #     # draw_utils.publish_pose_list('ground_truth_poses', poses_reduced, frame_id='camera')
-
-    # except Exception, e:
-    #     print('Failed to publish poses, {}'.format(e))
+    except Exception as e:
+        print('Failed to publish poses, {}'.format(e))
         
     # Iterate through the dataset
     p_bc = KITTIDatasetReader.camera2body
