@@ -73,7 +73,7 @@ if __name__ == "__main__":
         if args.velodyne and idx % 5 == 0:
 
             # Collect velodyne point clouds (+ve x axis)
-            X_v = f.velodyne[::10,:3]
+            X_v = f.velodyne[::4,:3]
             # carr = f.velodyne[::10,3]
             # carr = np.tile(carr.reshape(-1,1), [1,3])
 
@@ -87,5 +87,5 @@ if __name__ == "__main__":
             X_c = p_cv * X_v
             draw_utils.publish_cloud(
                 'cloud', X_c, c=carr, frame_id='poses',
-                element_id=idx)
+                element_id=idx, reset=False)
             

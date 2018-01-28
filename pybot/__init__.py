@@ -14,3 +14,5 @@ def get_environment(env_str, default, choices=None):
                                .format(env_str, var, choices))
         
     return var
+
+IMSHOW_FLAG = bool(get_environment('PYBOT_IMSHOW_FLAG', True))

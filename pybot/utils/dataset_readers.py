@@ -312,13 +312,3 @@ class StereoDatasetReader(object):
 
     def iter_stereo_frames(self, *args, **kwargs):
         return self.iteritems(*args, **kwargs)
-
-# class BumblebeeStereoDatasetReader:
-#     def __init__(self, directory):
-#         bfiles = read_dir(directory, pattern='*.bumblebee', recursive=False)
-#         self.dataset = DatasetReader(process_cb=lambda x: read_bumblebee(x), files=bfiles)
-#         self.iter_stereo_frames = lambda : imap(lambda x: self.split_stereo(x), self.dataset.iteritems())
-
-#     def split_stereo(self, im):
-#          h = im.shape[0]/2
-#          return im[:h], im[h:]
