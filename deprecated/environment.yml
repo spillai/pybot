@@ -1,4 +1,4 @@
-name: test-environment
+name: pybot-py35
 channels:
 - s_pillai
 - menpo
@@ -12,17 +12,16 @@ dependencies:
 - freetype=2.8=h12048fb_1
 - hdf5=1.8.18=h017327d_1
 - intel-openmp=2018.0.0=h8158457_8
-- kiwisolver=1.0.1=py35h219a9d8_0
 - libcxx=4.0.1=h579ed51_0
 - libcxxabi=4.0.1=hebd6815_0
 - libedit=3.1=hb4e282d_0
 - libffi=3.2.1=h475c297_4
 - libgfortran=3.0.1=h93005f0_2
-- libpng=1.6.34=he12f830_0
+- libpng=1.6.32=hd1e8b91_4
 - libprotobuf=3.4.1=h326466f_0
 - libsodium=1.0.15=hd9e47c5_0
 - lzo=2.10=h362108e_2
-- matplotlib=2.2.0=py35hfa7797c_0
+- matplotlib=2.1.1=py35h2fb3e9e_0
 - mkl=2018.0.1=hfbd8650_4
 - ncurses=6.0=hd04f020_2
 - numexpr=2.6.4=py35hcf51bc4_0
@@ -51,6 +50,7 @@ dependencies:
 - eigen=3.2.7=0
 - opencv3=3.1.0=py35_0
 - tbb=4.3_20141023=0
+- pybot=0.2=py35hd10c2e8_0
 - pip:
   - tables==3.4.2
 

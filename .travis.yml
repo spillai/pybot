@@ -1,15 +1,58 @@
 sudo: false
 language: python
-python:
-    - "2.7"
 notifications:
     email: false
+python:
+  # We don't actually use the Travis Python, but this keeps it organized.
+  # - "2.7"
+  - "3.5"
+  # - "3.6"
 before_install:
-  - wget http://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh -O miniconda.sh
+  - sudo apt-get update
+  # We do this conditionally because it saves us some downloading if the
+  # version is the same.
+  - if [[ "$TRAVIS_PYTHON_VERSION" == "2.7" ]]; then
+      wget https://repo.continuum.io/miniconda/Miniconda2-latest-Linux-x86_64.sh -O miniconda.sh;
+    else
+      wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh;
+    fi
   - bash miniconda.sh -b -p $HOME/miniconda
   - export PATH="$HOME/miniconda/bin:$PATH"
-  - conda update --yes conda
-  - conda install --yes python=$TRAVIS_PYTHON_VERSION pip numpy scipy matplotlib cython nose future
+  - hash -r
+  - conda config --set always_yes yes --set changeps1 no
+  - conda update --yes -q conda
+  - conda config --set always_yes true
+  - conda config --set anaconda_upload no
+
+  # Useful for debugging any issues with conda
+  - conda info -a
+
 install:
-  - python setup.py build_ext --inplace
-script: nosetests tests -A 'not slow and not random'
+  - conda install -q python=$TRAVIS_PYTHON_VERSION pip requests conda-build jinja2 anaconda-client 
+  # install additional packages with conda and pip
+  # - conda build conda-recipe # this assumes that the conda recipe folder is called conda-recipe and is at the current workind dir
+  # - conda install --use-local $PACKAGENAME
+
+  # Create test-environment with conda requirements
+  # - conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION
+  # -f environment.yml
+  - conda env create -f environment.yml -n test-environment
+  - source activate test-environment
+  - python setup.py install
+  # - python setup.py build_ext --inplace
+
+# script:
+#   # Your test script goes here
+# script: nosetests tests -A 'not slow and not random'
+  
+# after_success:
+# # Change permissions for Anaconda deployment script
+#   - chmod +x scripts/deploy_anaconda.sh
+
+# deploy:
+#  # Deploy to Anaconda.org
+#   - provider: script
+#     script: scripts/deploy_anaconda.sh
+#     on:
+#       tags: true
+#     skip_cleanup: true
