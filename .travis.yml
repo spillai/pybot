@@ -1,5 +1,8 @@
 sudo: false
 language: python
+branches:
+    only:
+        - py35
 python:
     - "2.7"
 notifications:
