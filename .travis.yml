@@ -37,7 +37,8 @@ install:
   # - conda install --use-local $PACKAGENAME
 
   # Create test-environment with conda requirements
-  - conda create -n test-environment python=$TRAVIS_PYTHON_VERSION --file requirements.txt
+  - conda env create -f environment.yml -n test-environment
+  # - conda create -n test-environment python=$TRAVIS_PYTHON_VERSION --file requirements.txt
   # - conda env create -f environment.yml -n test-environment
   - source activate test-environment
   - python setup.py install
