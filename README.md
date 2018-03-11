@@ -5,7 +5,7 @@ Research tools for autonomous systems using Python
 Author: [Sudeep Pillai](http://people.csail.mit.edu/spillai) [(spillai@csail.mit.edu)](mailto:spillai@csail.mit.edu)  
 License: MIT
 
-[![Build Status][build-img]][build-url]
+[![Build Status](https://travis-ci.org/spillai/pybot.svg?branch=py35)](https://travis-ci.org/spillai/pybot)
 
 Modules
 ---
