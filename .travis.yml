@@ -6,7 +6,6 @@ branches:
 notifications:
     email: false
 python:
-  # We don't actually use the Travis Python, but this keeps it organized.
   # - "2.7"
   - "3.5"
   # - "3.6"
@@ -26,25 +25,28 @@ before_install:
   - conda update --yes -q conda
   - conda config --set always_yes true
   - conda config --set anaconda_upload no
-  - conda config --add channels anaconda
-  - conda config --add channels conda-forge
-  - conda config --add channels menpo
 
   # Useful for debugging any issues with conda
   - conda info -a
 
 install:
-  - conda install -q python=$TRAVIS_PYTHON_VERSION pip requests conda-build anaconda-client
-  # install additional packages with conda and pip
+  - conda config --add channels anaconda
+  - conda config --add channels conda-forge
+  - conda config --add channels menpo
+
+  - conda config --show-sources
+  - conda install -q pip requests conda-build anaconda-client
+  - conda env create -f environment.yml -n test-environment
+  - source activate test-environment
+  - python setup.py install
+  
   # - conda build conda-recipe # this assumes that the conda recipe folder is called conda-recipe and is at the current workind dir
   # - conda install --use-local $PACKAGENAME
 
   # Create test-environment with conda requirements
-  - conda env create -f environment.yml -n test-environment
+
   # - conda create -n test-environment python=$TRAVIS_PYTHON_VERSION --file requirements.txt
   # - conda env create -f environment.yml -n test-environment
-  - source activate test-environment
-  - python setup.py install
   # - python setup.py build_ext --inplace
 
 # script:
