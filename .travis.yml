@@ -1,5 +1,8 @@
 sudo: false
 language: python
+branches:
+  only:
+  - py35
 notifications:
     email: false
 python:
