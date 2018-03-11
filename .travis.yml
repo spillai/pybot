@@ -26,6 +26,9 @@ before_install:
   - conda update --yes -q conda
   - conda config --set always_yes true
   - conda config --set anaconda_upload no
+  - conda config --add channels anaconda
+  - conda config --add channels conda-forge
+  - conda config --add channels menpo
 
   # Useful for debugging any issues with conda
   - conda info -a

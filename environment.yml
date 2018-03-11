@@ -1,6 +1,7 @@
 name: test-environment
 channels:
 - s_pillai
+- conda-forge
 - menpo
 - anaconda
 - defaults
