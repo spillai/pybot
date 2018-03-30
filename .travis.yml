@@ -20,9 +20,9 @@ before_install:
     fi
   - bash miniconda.sh -b -p $HOME/miniconda
   - export PATH="$HOME/miniconda/bin:$PATH"
-  - hash -r
-  - conda config --set always_yes yes --set changeps1 no
-  - conda update --yes -q conda
+  # - hash -r
+  # - conda config --set always_yes yes --set changeps1 no
+  # - conda update --yes -q conda
   - conda config --set always_yes true
   - conda config --set anaconda_upload no
 
@@ -30,13 +30,12 @@ before_install:
   - conda info -a
 
 install:
-  - conda config --add channels anaconda
-  - conda config --add channels menpo
+  - conda config --add channels conda-forge
   - conda config --show-sources
-  - conda install -q pip requests conda-build anaconda-client
+  - conda install -y pip requests conda-build anaconda-client
   - conda env create -f environment.yml -n test-environment
   - source activate test-environment
-  - python setup.py install
+  # - python setup.py install
   
   # - conda build conda-recipe # this assumes that the conda recipe folder is called conda-recipe and is at the current workind dir
   # - conda install --use-local $PACKAGENAME
