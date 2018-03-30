@@ -32,7 +32,7 @@ before_install:
 install:
   - conda config --add channels conda-forge
   - conda config --show-sources
-  - conda install -y pip requests conda-build anaconda-client
+  # - conda install -y pip requests conda-build anaconda-client
   - conda env create -f environment.yml -n test-environment
   - source activate test-environment
   # - python setup.py install
