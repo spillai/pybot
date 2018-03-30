@@ -6,13 +6,9 @@ branches:
 notifications:
     email: false
 python:
-  # - "2.7"
-  - "3.5"
-  # - "3.6"
+  - 3.5
 before_install:
   - sudo apt-get update
-  # We do this conditionally because it saves us some downloading if the
-  # version is the same.
   - if [[ "$TRAVIS_PYTHON_VERSION" == "2.7" ]]; then
       wget https://repo.continuum.io/miniconda/Miniconda2-latest-Linux-x86_64.sh -O miniconda.sh;
     else
@@ -20,21 +16,21 @@ before_install:
     fi
   - bash miniconda.sh -b -p $HOME/miniconda
   - export PATH="$HOME/miniconda/bin:$PATH"
-  # - hash -r
-  # - conda config --set always_yes yes --set changeps1 no
-  # - conda update --yes -q conda
+  - hash -r
+  - conda config --set always_yes yes --set changeps1 no
+  - conda update --yes -q conda
   - conda config --set always_yes true
   - conda config --set anaconda_upload no
-
-  # Useful for debugging any issues with conda
   - conda info -a
-
-install:
   - conda config --add channels conda-forge
   - conda config --show-sources
   # - conda install -y pip requests conda-build anaconda-client
   - conda env create -f environment.yml -n test-environment
   - source activate test-environment
+  
+install:
+  - export PYTHONPATH=$PYTHONPATH:$PWD
+
   # - python setup.py install
   
   # - conda build conda-recipe # this assumes that the conda recipe folder is called conda-recipe and is at the current workind dir
