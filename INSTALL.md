@@ -7,7 +7,7 @@ not globally install, in which case I can not provide much support).
 
 1) Install miniconda and setup path in `~/.bashrc`
 ```sh
-wget --no-check-certificate https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh
+curl -o ~/miniconda.sh -O https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh
 bash Miniconda3-latest-Linux-x86_64.sh -b -p $HOME/anaconda
 ```
 

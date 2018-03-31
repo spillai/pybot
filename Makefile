@@ -26,5 +26,17 @@ wheel:
 conda-build:
 	conda build tools/conda
 
+anaconda-push:
+	./scripts/deploy_anaconda.sh
+
 dev-build:
 	python setup.py build_ext --inplace
+
+docker-build:
+	docker build docker/
+
+docker-push:
+	docker tag pybot:latest
+	docker push pybot:latest
+
+
