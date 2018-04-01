@@ -5,8 +5,6 @@ var ws;
 
 var mouse = new THREE.Vector2();
 var raycaster;
-// var capturer = null;
-// var rec_button;
 var scene_group, grid_group;
 var pointCloudMaterial, lineMaterial;
 
@@ -20,630 +18,658 @@ var collections_visibles_lut = {};
 var collections_material = {};
 
 var savedOptions = {
-		pointSize: 0,
-		drawGrid: false,
-		followCamera: false
+    pointSize: 0,
+    drawGrid: false,
+    followCamera: false
 };
 
 var options = {
-		pointSize: 0.02,
-		sceneScale: 1.0,
-		axisSize: 0.2,
-		drawGrid: true,
-		followCamera: true,
-		animationSpeed: 1.0,
+    pointSize: 0.1,
+    sceneScale: 1.0,
+    axisSize: 0.2,
+    drawGrid: true,
+    followCamera: true,
+    animationSpeed: 1.0,
 };
 
 
 $('#loading').remove();
 init();
 animate();
-// getData();
 
 function addDatGui(){
-		var gui = new dat.GUI();
+    var gui = new dat.GUI();
 
-		f1 = gui.addFolder('Options');
+    f1 = gui.addFolder('Options');
 
-		// Scene scale
-		f1.add(options, 'sceneScale', 0.1, 1)
-				.name('Scene Scale')
-				.listen()
-				.onChange(function(value) {
-						scene_group.scale.setScalar(value);
-						render();
-				});
+    // Scene scale
+    f1.add(options, 'sceneScale', 0.1, 1)
+	.name('Scene Scale')
+	.listen()
+	.onChange(function(value) {
+	    scene_group.scale.setScalar(value);
+	    render();
+	});
 
-		// Point Size
-		f1.add(options, 'pointSize', 0, 0.25)
-				.name('Point Size')
-				.listen()
-				.onChange(function(value) {
-						pointCloudMaterial.size = value;
-						render();
-				});
+    // Point Size
+    f1.add(options, 'pointSize', 0, 0.25)
+	.name('Point Size')
+	.listen()
+	.onChange(function(value) {
+	    pointCloudMaterial.size = value;
+	    render();
+	});
 
-		// Axis Size
-		f1.add(options, 'axisSize', 0, 1)
-				.name('Axis Size')
-				.listen()
-				.onChange(function(value) {
-						if (obj_axes_geom == null)
-								return;
-						// for (var msg_id in obj_collections) {
-						//		coll = obj_collections[msg_id];
-						//		for (var key in coll) {
-						//				v = coll[key].scale.setScalar(value / 0.2);
-						//		}
-						// }
-						render();
-				});
+    // Axis Size
+    f1.add(options, 'axisSize', 0, 1)
+	.name('Axis Size')
+	.listen()
+	.onChange(function(value) {
+	    if (obj_axes_geom == null)
+		return;
+	    // for (var msg_id in obj_collections) {
+	    //		coll = obj_collections[msg_id];
+	    //		for (var key in coll) {
+	    //				v = coll[key].scale.setScalar(value / 0.2);
+	    //		}
+	    // }
+	    render();
+	});
 
-		// Draw grid
-		f1.add(options, 'drawGrid')
-				.name('Show Grid')
-				.listen()
-				.onChange(function(value) {
-						options.drawGrid = value;
-						grid_group.visible = value;
-						render();
-				});
+    // Draw grid
+    f1.add(options, 'drawGrid')
+	.name('Show Grid')
+	.listen()
+	.onChange(function(value) {
+	    options.drawGrid = value;
+	    grid_group.visible = value;
+	    render();
+	});
 
-		// Follow camera
-		f1.add(options, 'followCamera')
-				.name('Follow Camera')
-				.listen()
-				.onChange(function(value) {
-						options.followCamera = value;
-						render();
-				});
-		f1.open();
+    // Follow camera
+    f1.add(options, 'followCamera')
+	.name('Follow Camera')
+	.listen()
+	.onChange(function(value) {
+	    options.followCamera = value;
+	    render();
+	});
+    f1.open();
 
-		f2 = gui.addFolder('Collections');
-		f2.open();
-		gui.close();
+    f2 = gui.addFolder('Collections');
+    f2.open();
+    gui.close();
 }
 
 function convertTypedArray(src, type) {
-		var buffer = new ArrayBuffer(src.byteLength);
-		var baseView = new src.constructor(buffer).set(src);
-		return new type(buffer);
+    var buffer = new ArrayBuffer(src.byteLength);
+    var baseView = new src.constructor(buffer).set(src);
+    return new type(buffer);
 }
 
 function split_channel_data(ch_data) {
-		val = ' '.charCodeAt(0);
-		for (var i=0, L=ch_data.length; i < L; i++) {
-				if (ch_data[i] == val) {
-						return { channel: ch_data.slice(0,i),
-										 data: ch_data.slice(i+1) }
-				}
-		}
-		return {channel: -1, data: -1};
+    val = ' '.charCodeAt(0);
+    for (var i=0, L=ch_data.length; i < L; i++) {
+	if (ch_data[i] == val) {
+	    return { channel: ch_data.slice(0,i),
+		     data: ch_data.slice(i+1) }
+	}
+    }
+    return {channel: -1, data: -1};
 }
 
 function update_camera_pose(msg) {
-		if (!options.followCamera)
-				return;
+    if (!options.followCamera)
+	return;
 
-		// Place camera
-		var mat = new THREE.Matrix4().makeRotationFromQuaternion(
-				new THREE.Quaternion(msg.orientation[1],
-														 msg.orientation[2],
-														 msg.orientation[3],
-														 msg.orientation[0])).transpose();
+    // Place camera
+    var mat = new THREE.Matrix4().makeRotationFromQuaternion(
+	new THREE.Quaternion(msg.orientation[1],
+			     msg.orientation[2],
+			     msg.orientation[3],
+			     msg.orientation[0])).transpose();
 
-		var d = mat.elements;
-		var ya = new THREE.Vector3(d[1], d[5], d[9]).negate();
-		var za = new THREE.Vector3(d[2], d[6], d[10]);
-		controls.goto_up(
-				new THREE.Vector3(msg.pos[0], msg.pos[1], msg.pos[2]),
-				new THREE.Vector3(za.x * 1 + msg.pos[0],
-																		za.y * 1 + msg.pos[1],
-													za.z * 1 + msg.pos[2]),
-				new THREE.Vector3(ya.x, ya.y, ya.z)
-		);
+    var d = mat.elements;
+    var ya = new THREE.Vector3(d[1], d[5], d[9]).negate();
+    var za = new THREE.Vector3(d[2], d[6], d[10]);
+    controls.goto_up(
+	new THREE.Vector3(msg.pos[0], msg.pos[1], msg.pos[2]),
+	new THREE.Vector3(za.x * 1 + msg.pos[0],
+			  za.y * 1 + msg.pos[1],
+			  za.z * 1 + msg.pos[2]),
+	new THREE.Vector3(ya.x, ya.y, ya.z)
+    );
 
 }
 
 function add_points_to_scene_group(msg) {
-		// Note: All points from the same channel are associated with the
-		// same frame_id (i.e. collection_id=uuid(pose_channel), element_id=0,...n)
+    // Note: All points from the same channel are associated with the
+    // same frame_id (i.e. collection_id=uuid(pose_channel), element_id=0,...n)
 
-		// Clean up point clouds for corresponding channel (indexed by msg.id)
-		var reset_required = msg.reset && msg.id in pc_obj_lut;
-		if (reset_required) {
-				// Tuple (element_group, point_cloud)
-				for (var key in pc_obj_lut[msg.id]) {
-						gp_pc = pc_obj_lut[msg.id][key];
+    // Clean up point clouds for corresponding channel (indexed by msg.id)
+    var reset_required = msg.reset && msg.id in pc_obj_lut;
+    if (reset_required) {
+	// Tuple (element_group, point_cloud)
+	for (var key in pc_obj_lut[msg.id]) {
+	    gp_pc = pc_obj_lut[msg.id][key];
 
-						// Recursively delete all objects in the item
-						gp_pc[1].traverse(function(child){
-								if (child.geometry != undefined) {
-										child.material.dispose();
-										child.geometry.dispose();
-								}
-						});
-
-						// Remove item from element_group
-						gp_pc[0].remove(gp_pc[1]);
-
-						// Remove all instances of geometry attached to msg.id
-						delete pc_obj_lut[msg.id][key];
-				}
-				delete pc_obj_lut[msg.id];
+	    // Recursively delete all objects in the item
+	    gp_pc[1].traverse(function(child){
+		if (child.geometry != undefined) {
+		    child.material.dispose();
+		    child.geometry.dispose();
 		}
+	    });
 
-		// Initialize pc-obj LUT
-		if (!(msg.id in pc_obj_lut)) {
-				pc_obj_lut[msg.id] = [];
-		}
+	    // Remove item from element_group
+	    gp_pc[0].remove(gp_pc[1]);
 
-		// Render points
-		for (var i = 0; i < msg.pointLists.length; ++i) {
-				var pc = msg.pointLists[i];
+	    // Remove all instances of geometry attached to msg.id
+	    delete pc_obj_lut[msg.id][key];
+	}
+	delete pc_obj_lut[msg.id];
+    }
 
-				// Find collection_id, and element_id pose
-				try {
-						cid = pc.collection, eid = pc.elementId;
-						var element_group = obj_collections[cid][eid];
-				} catch (err) {
-						console.log('Error finding collection, and element_id ' +
-												cid + ':' + eid);
-						return;
-				}
+    // Initialize pc-obj LUT
+    if (!(msg.id in pc_obj_lut)) {
+	pc_obj_lut[msg.id] = [];
+    }
 
-				// Convert bytes to float32array
-				var pointsf = convertTypedArray(pc.points, Float32Array);
-				var colorsf = convertTypedArray(pc.colors, Float32Array);
+    // Render points
+    for (var i = 0; i < msg.pointLists.length; ++i) {
+	var pc = msg.pointLists[i];
 
-				// Add points into buffer geometry
-				var geom = new THREE.BufferGeometry();
-				geom.addAttribute(
-						'position',
-						new THREE.BufferAttribute(pointsf, 3));
-				geom.addAttribute(
-						'color',
-						new THREE.BufferAttribute(colorsf, 3));
+	// Find collection_id, and element_id pose
+	try {
+	    cid = pc.collection, eid = pc.elementId;
+	    var element_group = obj_collections[cid][eid];
+	} catch (err) {
+	    console.log('Error finding collection, and element_id ' +
+			cid + ':' + eid);
+	    return;
+	}
 
-				var item;
+	// Convert bytes to float32array
+	var pointsf = convertTypedArray(pc.points, Float32Array);
+	var colorsf = convertTypedArray(pc.colors, Float32Array);
 
-				// Render points
-				switch (msg.type) {
-				case point3d_list_collection_t.getEnum('point_type').POINT:
-						item = new THREE.Points(
-								geom, pointCloudMaterial);
-						break;
+	// Add points into buffer geometry
+	var geom = new THREE.BufferGeometry();
+	geom.addAttribute(
+	    'position',
+	    new THREE.BufferAttribute(pointsf, 3));
+	geom.addAttribute(
+	    'color',
+	    new THREE.BufferAttribute(colorsf, 3));
 
-				// Render lines
-				case point3d_list_collection_t.getEnum('point_type').LINES:
-						item = new THREE.LineSegments(
-								geom, lineMaterial, THREE.LinePieces);
-						break;
+	var item;
 
-				// // Render line loops
-				// case point3d_list_collection_t.getEnum('point_type').LINE_LOOP:
-				//     item = new THREE.LineLoop(
-				//         geom, lineMaterial, THREE.LinePieces);
-				//     break;
+	// Render points
+	switch (msg.type) {
+	case point3d_list_collection_t.getEnum('point_type').POINT:
+	    item = new THREE.Points(
+		geom, pointCloudMaterial);
+	    break;
 
-				// Render triangles
-				case point3d_list_collection_t.getEnum('point_type').TRIANGLES:
-						// Create triangles and compute normals
-						for (var j = 0, pc_sz = pc.points.length / 3;
-								 j < pc_sz; ++j) {
-								geom.faces.push(
-										new THREE.Face3( 3*j, 3*j+1, 3*j+2 ));
-						}
-						mesh_material = new THREE.MeshBasicMaterial({
-								color: 0xFFFF00,
-						});
-						item = new THREE.Mesh(geom, mesh_material);
-						break;
+	// Render lines
+	case point3d_list_collection_t.getEnum('point_type').LINES:
+	    item = new THREE.LineSegments(
+		geom, lineMaterial, THREE.LinePieces);
+	    break;
 
-				default:
-						console.log('Unknown type ' + msg.type);
-				}
+	// Render line loops
+	case point3d_list_collection_t.getEnum('point_type').LINE_LOOP:
+	        item = new THREE.LineLoop(
+	            geom, lineMaterial, THREE.LinePieces);
+	        break;
 
-				// Add point cloud material
+	    // Render triangles
+	case point3d_list_collection_t.getEnum('point_type').TRIANGLES:
+	    // Create triangles and compute normals
+	    for (var j = 0, pc_sz = pc.points.length / 3;
+		 j < pc_sz; ++j) {
+		geom.faces.push(
+		    new THREE.Face3( 3*j, 3*j+1, 3*j+2 ));
+	    }
+	    mesh_material = new THREE.MeshBasicMaterial({
+		color: 0xFFFF00,
+	    });
+	    item = new THREE.Mesh(geom, mesh_material);
+	    break;
 
-				// For every point cloud added, maintain the corresponding
-				// element_group it belongs to (for future removal purposes)
-				pc_obj_lut[msg.id].push([element_group, item]);
-				element_group.add(item);
+	default:
+	    console.log('Unknown type ' + msg.type);
+	}
 
-				// Element group culling
-				element_group.frustumCulled = true;
+	// Add point cloud material
 
-				// Add group to scene
-				scene_group.add(element_group);
+	// For every point cloud added, maintain the corresponding
+	// element_group it belongs to (for future removal purposes)
+	pc_obj_lut[msg.id].push([element_group, item]);
+	element_group.add(item);
 
-		}
+	// Element group culling
+	element_group.frustumCulled = true;
+
+	// Add group to scene
+	scene_group.add(element_group);
+
+    }
 }
 
 function add_objects_to_scene_group(msg) {
 
-		// Clean up poses for corresponding channel (indexed by msg.id)
-		if (msg.reset && msg.id in obj_collections) {
-				for (var obj_id in obj_collections[msg.id]) {
-						// Reomve obj from scene_group
-						scene_group.remove(obj_collections[msg.id][obj_id]);
-				}
-				delete obj_collections[msg.id];
-		}
+    // Clean up poses for corresponding channel (indexed by msg.id)
+    if (msg.reset && msg.id in obj_collections) {
+	for (var obj_id in obj_collections[msg.id]) {
+	    // Reomve obj from scene_group
+	    scene_group.remove(obj_collections[msg.id][obj_id]);
+	}
+	delete obj_collections[msg.id];
+    }
 
-		// Retreive object collection
-		// Object.keys(obj_collections_lut).length == 0
-		if (!(msg.id in obj_collections)) {
-				obj_collections[msg.id] = {};
-		}
+    // Retreive object collection
+    // Object.keys(obj_collections_lut).length == 0
+    if (!(msg.id in obj_collections)) {
+	obj_collections[msg.id] = {};
+    }
 
-		// Render poses
-		for (var i = 0; i < msg.objs.length; ++i) {
-				var obj = msg.objs[i];
+    // Render poses
+    for (var i = 0; i < msg.objs.length; ++i) {
+	var obj = msg.objs[i];
 
-				// Create object group for obj_id
-				var update = false;
-				if (!(obj.id in obj_collections[msg.id])) {
-						obj_collections[msg.id][obj.id] = new THREE.Object3D();
-						// console.log('adding element ' + msg.id + ':' + obj.id);
-				} else {
-						update = true;
-						// console.log('updating element ' + msg.id + ':' + obj.id);
-				}
+	// Create object group for obj_id
+	var update = false;
+	if (!(obj.id in obj_collections[msg.id])) {
+	    obj_collections[msg.id][obj.id] = new THREE.Object3D();
+	    // console.log('adding element ' + msg.id + ':' + obj.id);
+	} else {
+	    update = true;
+	    // console.log('updating element ' + msg.id + ':' + obj.id);
+	}
 
-				// Transform obj_id
-				var obj_group = obj_collections[msg.id][obj.id];
-				obj_group.setRotationFromEuler(
-						new THREE.Euler(obj.roll, obj.pitch, obj.yaw, 'ZYX'));
-				obj_group.position.copy(new THREE.Vector3(obj.x, obj.y, obj.z));
+	// Transform obj_id
+	var obj_group = obj_collections[msg.id][obj.id];
+	obj_group.setRotationFromEuler(
+	    new THREE.Euler(obj.roll, obj.pitch, obj.yaw, 'ZYX'));
+	obj_group.position.copy(new THREE.Vector3(obj.x, obj.y, obj.z));
 
-				// First time add
-				if (!update) {
-						// Add axes to obj_id
-						obj_group.add(getAxes(0.2));
+	// First time add
+	if (!update) {
+	    // Add axes to obj_id
+	    obj_group.add(getAxes(0.2));
 
-						// Add obj_id to scene
-						scene_group.add(obj_group);
-				}
-		}
-		scene_group.frustumCulled = true;
+	    // Add obj_id to scene
+	    scene_group.add(obj_group);
+	}
+    }
+    scene_group.frustumCulled = true;
 }
 
 function addGridAxes() {
-		// add the three markers to the axes
-		addAxis(new THREE.Vector3(1, 0, 0));
-		addAxis(new THREE.Vector3(0, 1, 0));
-		addAxis(new THREE.Vector3(0, 0, 1));
+    // add the three markers to the axes
+    addAxis(new THREE.Vector3(1, 0, 0));
+    addAxis(new THREE.Vector3(0, 1, 0));
+    addAxis(new THREE.Vector3(0, 0, 1));
 }
 
 function addAxis(axis) {
-		// create the cylinders for the objects
-		var shaftRadius = 0.02;
-		var headRadius = 0.04;
-		var headLength = 0.1;
+    // create the cylinders for the objects
+    var shaftRadius = 0.02;
+    var headRadius = 0.04;
+    var headLength = 0.1;
 
-		var lineGeom = new THREE.CylinderGeometry(
-				shaftRadius, shaftRadius, 1);
-		var headGeom = new THREE.CylinderGeometry(
-				0, headRadius, headLength);
+    var lineGeom = new THREE.CylinderGeometry(
+	shaftRadius, shaftRadius, 1);
+    var headGeom = new THREE.CylinderGeometry(
+	0, headRadius, headLength);
 
-		// set the color of the axis
-		var color = new THREE.Color();
-		color.setRGB(axis.x, axis.y, axis.z);
-		var material = new THREE.MeshBasicMaterial({
-			color : color.getHex()
-		});
+    // set the color of the axis
+    var color = new THREE.Color();
+    color.setRGB(axis.x, axis.y, axis.z);
+    var material = new THREE.MeshBasicMaterial({
+	color : color.getHex()
+    });
 
-		var axis_group = new THREE.Object3D();
+    var axis_group = new THREE.Object3D();
 
-		// setup the rotation information
-		var rotAxis = new THREE.Vector3();
-		rotAxis.crossVectors(axis, new THREE.Vector3(0, -1, 0));
-		var rot = new THREE.Quaternion();
-		rot.setFromAxisAngle(rotAxis, 0.5 * Math.PI);
+    // setup the rotation information
+    var rotAxis = new THREE.Vector3();
+    rotAxis.crossVectors(axis, new THREE.Vector3(0, -1, 0));
+    var rot = new THREE.Quaternion();
+    rot.setFromAxisAngle(rotAxis, 0.5 * Math.PI);
 
-		// create the arrow
-		var arrow = new THREE.Mesh(headGeom, material);
-		arrow.matrix.makeRotationFromQuaternion(rot);
-		arrow.matrix.setPosition(axis.multiplyScalar(1).clone());
-		arrow.matrixAutoUpdate = false;
-		axis_group.add(arrow);
+    // create the arrow
+    var arrow = new THREE.Mesh(headGeom, material);
+    arrow.matrix.makeRotationFromQuaternion(rot);
+    arrow.matrix.setPosition(axis.multiplyScalar(1).clone());
+    arrow.matrixAutoUpdate = false;
+    axis_group.add(arrow);
 
-		// create the line
-		var line = new THREE.Mesh(lineGeom, material);
-		line.matrix.makeRotationFromQuaternion(rot);
-		line.matrix.setPosition(axis.multiplyScalar(0.5).clone());
-		line.matrixAutoUpdate = false;
-		axis_group.add(line);
+    // create the line
+    var line = new THREE.Mesh(lineGeom, material);
+    line.matrix.makeRotationFromQuaternion(rot);
+    line.matrix.setPosition(axis.multiplyScalar(0.5).clone());
+    line.matrixAutoUpdate = false;
+    axis_group.add(line);
 
-		// add axis to group
-		grid_group.add(axis_group);
+    // add axis to group
+    grid_group.add(axis_group);
 }
 
 function getAxes(sz) {
-		if (!obj_axes_geom) {
-				obj_axes_geom = new THREE.Geometry();
-				obj_axes_geom.vertices = [
-						new THREE.Vector3(0, 0, 0),
-						new THREE.Vector3(sz, 0, 0),
-						new THREE.Vector3(0, 0, 0),
-						new THREE.Vector3(0, sz, 0),
-						new THREE.Vector3(0, 0, 0),
-						new THREE.Vector3(0, 0, sz)
-				];
-				obj_axes_geom.colors = [
-						new THREE.Color( 0xff0000 ),
-						new THREE.Color( 0xff0000 ),
-						new THREE.Color( 0x00ff00 ),
-						new THREE.Color( 0x00ff00 ),
-						new THREE.Color( 0x0000ff ),
-						new THREE.Color( 0x0000ff )
-				];
-		}
+    if (!obj_axes_geom) {
+	obj_axes_geom = new THREE.Geometry();
+	obj_axes_geom.vertices = [
+	    new THREE.Vector3(0, 0, 0),
+	    new THREE.Vector3(sz, 0, 0),
+	    new THREE.Vector3(0, 0, 0),
+	    new THREE.Vector3(0, sz, 0),
+	    new THREE.Vector3(0, 0, 0),
+	    new THREE.Vector3(0, 0, sz)
+	];
+	obj_axes_geom.colors = [
+	    new THREE.Color( 0xff0000 ),
+	    new THREE.Color( 0xff0000 ),
+	    new THREE.Color( 0x00ff00 ),
+	    new THREE.Color( 0x00ff00 ),
+	    new THREE.Color( 0x0000ff ),
+	    new THREE.Color( 0x0000ff )
+	];
+    }
 
-		// Return new axis with cached geometry
-		var axis = new THREE.LineSegments(
-				obj_axes_geom, lineMaterial, THREE.LinePieces);
-		return axis;
+    // Return new axis with cached geometry
+    var axis = new THREE.LineSegments(
+	obj_axes_geom, lineMaterial, THREE.LinePieces);
+    return axis;
 }
 
 function init() {
 
-		// -------------------------------------------
-		// Load vs proto
-		protobuf.load("vs.proto", function(err, root) {
-				if (err)
-						throw err;
+    // -------------------------------------------
+    // Load vs proto
+    protobuf.load("vs.proto", function(err, root) {
+	if (err)
+	    throw err;
 
-				// Obtain a message type
-				message_t = root.lookupType("vs.message_t");
-				pose_t = root.lookupType("vs.pose_t");
-				obj_collection_t = root.lookupType("vs.obj_collection_t");
-				point3d_list_collection_t = root.lookupType("vs.point3d_list_collection_t");
+	// Obtain a message type
+	message_t = root.lookupType("vs.message_t");
+	pose_t = root.lookupType("vs.pose_t");
+	obj_collection_t = root.lookupType("vs.obj_collection_t");
+	point3d_list_collection_t = root.lookupType("vs.point3d_list_collection_t");
 
+    });
+
+    // -------------------------------------------
+    // Connect to Web Socket
+    ws = new WebSocket("ws://localhost:9001/");
+    ws.binaryType = 'arraybuffer';
+
+    ws.onmessage = function(e) {
+	if (e.data instanceof ArrayBuffer) {
+	    // Create buffer
+	    buf = new Uint8Array(e.data);
+
+	    // Split channel, and data
+	    msg_buf = split_channel_data(buf);
+	    ch_str = String.fromCharCode.apply(null, msg_buf.channel);
+
+	    var msg_id = null;
+	    var msg_name = null;
+	    var msg_collection = null;
+
+	    // Decode based on channel
+	    switch(ch_str) {
+	    case 'CAMERA_POSE':
+		msg = pose_t.decode(msg_buf.data);
+		update_camera_pose(msg);
+		break;
+
+	    case 'POINTS_COLLECTION':
+		msg = point3d_list_collection_t.decode(msg_buf.data);
+		add_points_to_scene_group(msg);
+		msg_id = msg.id;
+		msg_name = msg.name;
+		break;
+
+	    case 'OBJ_COLLECTION':
+		msg = obj_collection_t.decode(msg_buf.data);
+		add_objects_to_scene_group(msg);
+		msg_id = msg.id;
+		msg_name = msg.name;
+		break;
+
+	    case 'RESET_COLLECTIONS':
+		console.log('<' + ch_str + '>');
+
+		// Clean up point clouds
+		pc_obj_lut = {};
+		obj_collections = {};
+
+		// Clean up collections folder
+		for (var key in collections_visibles_lut) {
+		    f2.remove(collections_visibles_lut[key]);
+		}
+		collections_visibles = {};
+		collections_visibles_lut = {};
+
+		// Recursively delete all objects in the scene graph
+		scene_group.traverse(function(child){
+		    if (child.geometry != undefined) {
+			child.material.dispose();
+			child.geometry.dispose();
+		    }
 		});
 
-		// -------------------------------------------
-		// Connect to Web Socket
-		ws = new WebSocket("ws://localhost:9001/");
-		ws.binaryType = 'arraybuffer';
+		// Remove scene group
+		scene.remove(scene_group);
+		addEmptyScene();
 
-		ws.onmessage = function(e) {
-				if (e.data instanceof ArrayBuffer) {
-						// Create buffer
-						buf = new Uint8Array(e.data);
+		break;
 
-						// Split channel, and data
-						msg_buf = split_channel_data(buf);
-						ch_str = String.fromCharCode.apply(null, msg_buf.channel);
+	    default:
+		console.log('Unknown channel / decoder ' + ch_str);
+	    }
 
-						var msg_id = null;
-						var msg_name = null;
-						var msg_collection = null;
+	    // Add checkbox for relevant collections
+	    if (msg_id != null && !(msg_id in collections_visibles_lut)) {
+		collections_visibles[msg_id] = true;
+		collections_visibles_lut[msg_id] = f2
+		    .add(collections_visibles, msg_id)
+		    .name(msg_name)
+		    .listen()
+		    .onChange(function(value) {
 
-						// Decode based on channel
-						switch(ch_str) {
-						case 'CAMERA_POSE':
-								msg = pose_t.decode(msg_buf.data);
-								update_camera_pose(msg);
-								break;
+			switch(ch_str) {
+			case 'OBJ_COLLECTION':
+			    for (var key in obj_collections[msg_id]) {
+				obj_collections[msg_id][key].visible = value;
+			    }
+			    break;
 
-						case 'POINTS_COLLECTION':
-								msg = point3d_list_collection_t.decode(msg_buf.data);
-								add_points_to_scene_group(msg);
-								msg_id = msg.id;
-								msg_name = msg.name;
-								break;
+			case 'POINTS_COLLECTION':
+			    for (var key in pc_obj_lut[msg_id]) {
+				// tuple = (element_group, point_cloud)
+				tuple = pc_obj_lut[msg_id][key];
+				tuple[0].visible = value;
+			    }
+			    break;
 
-						case 'OBJ_COLLECTION':
-								msg = obj_collection_t.decode(msg_buf.data);
-								add_objects_to_scene_group(msg);
-								msg_id = msg.id;
-								msg_name = msg.name;
-								break;
+			default:
+			    break
 
-						case 'RESET_COLLECTIONS':
-								console.log('<' + ch_str + '>');
+			}
+			render();
 
-								// Clean up point clouds
-								pc_obj_lut = {};
-								obj_collections = {};
+		    });
 
-								// Clean up collections folder
-								for (var key in collections_visibles_lut) {
-										f2.remove(collections_visibles_lut[key]);
-								}
-								collections_visibles = {};
-								collections_visibles_lut = {};
+	    }
 
-								// Recursively delete all objects in the scene graph
-								scene_group.traverse(function(child){
-										if (child.geometry != undefined) {
-												child.material.dispose();
-												child.geometry.dispose();
-										}
-								});
+	    // Re-render scene
+	    render();
 
-								// Remove scene group
-								scene.remove(scene_group);
-								addEmptyScene();
+	}
+    };
 
-								break;
+    ws.onclose = function() {
+	// output("onclose");
+    };
 
-						default:
-								console.log('Unknown channel / decoder ' + ch_str);
-						}
+    ws.onerror = function(e) {
+	// output("onerror");
+	console.log(e)
+    };
 
-						// Add checkbox for relevant collections
-						if (msg_id != null && !(msg_id in collections_visibles_lut)) {
-								collections_visibles[msg_id] = true;
-								collections_visibles_lut[msg_id] = f2
-										.add(collections_visibles, msg_id)
-										.name(msg_name)
-										.listen()
-										.onChange(function(value) {
+    // initialize renderer
+    initRenderer();
 
-												switch(ch_str) {
-												case 'OBJ_COLLECTION':
-														for (var key in obj_collections[msg_id]) {
-																obj_collections[msg_id][key].visible = value;
-														}
-														break;
-
-												case 'POINTS_COLLECTION':
-														for (var key in pc_obj_lut[msg_id]) {
-																// tuple = (element_group, point_cloud)
-																tuple = pc_obj_lut[msg_id][key];
-																tuple[0].visible = value;
-														}
-														break;
-
-												default:
-														break
-
-												}
-												render();
-
-										});
-
-						}
-
-						// Re-render scene
-						render();
-
-				}
-		};
-
-		ws.onclose = function() {
-				// output("onclose");
-		};
-
-		ws.onerror = function(e) {
-				// output("onerror");
-				console.log(e)
-		};
-
-		// initialize renderer
-		initRenderer();
-
-		// TODO: Image viewer (see onionmaps reference)
+    // TODO: Image viewer (see onionmaps reference)
 
 }
 
 function addEmptyScene() {
-		// Create scene group
-		scene_group = new THREE.Object3D();
-		scene_group.name = 'collections_scene';
-		scene.add(scene_group);
+    // Create scene group
+    scene_group = new THREE.Object3D();
+    scene_group.name = 'collections_scene';
+    scene.add(scene_group);
 }
 
 function initRenderer() {
-		raycaster = new THREE.Raycaster();
-		raycaster.precision = 0.01;
+    raycaster = new THREE.Raycaster();
+    raycaster.precision = 0.001;
 
-		// TODO: optional preserveDrawingBuffer: true
-		renderer = new THREE.WebGLRenderer({ antialias: true });
-		renderer.setSize(window.innerWidth, window.innerHeight);
-		renderer.setClearColor( 0x202020, 0.0);
-		// renderer.sortObjects = false;
+    // TODO: optional preserveDrawingBuffer: true
+    renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setClearColor( 0x202020, 0.0);
+    // renderer.sortObjects = false;
 
-		container = document.getElementById( 'ThreeJS' );
-		container.appendChild(renderer.domElement);
+    container = document.getElementById( 'ThreeJS' );
+    container.appendChild(renderer.domElement);
 
-		var fov = 70, near = 0.03, far = 10000;
-		camera = new THREE.PerspectiveCamera(
-				fov, window.innerWidth / window.innerHeight, near, far);
-		camera.position.x = 10;
-		camera.position.y = 10;
-		camera.position.z = 10;
-		camera.up = new THREE.Vector3(0,0,1);
+    var fov = 70, near = 0.03, far = 10000;
+    camera = new THREE.PerspectiveCamera(
+	fov, window.innerWidth / window.innerHeight, near, far);
+    camera.position.x = 10;
+    camera.position.y = 10;
+    camera.position.z = 10;
+    camera.up = new THREE.Vector3(0,0,1);
 
-		// Controls
-		controls = new THREE.OrbitControls(camera, renderer.domElement);
-		controls.addEventListener('change', render);
+    // Controls
+    controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.addEventListener('change', render);
 
-		// Callbacks
-		window
-				.addEventListener(
-						'resize', onWindowResize, false);
-		renderer.domElement
-				.addEventListener(
-						'mousemove', onDocumentMouseMove, false);
+    // Callbacks
+    window
+	.addEventListener(
+	    'resize', onWindowResize, false);
+    // window.addEventListener( 'mousemove', onMouseMove, false );
 
-		// Set materials
-		pointCloudMaterial = new THREE.PointsMaterial({
-				size: options.pointSize,
-				vertexColors: true,
-		});
-		lineMaterial = new THREE.LineBasicMaterial({
-				color: 0xffffff,
-				opacity: 1,
-				linewidth: 3,
-				vertexColors: THREE.VertexColors
-		});
+    renderer.domElement
+	.addEventListener(
+	    'mousemove', onDocumentMouseMove, false);
+    renderer.domElement
+        .addEventListener(
+            'dblclick', onDocumentMouseDoubleClick, false);
+    // renderer.domElement
+    //     .addEventListener(
+    //         'click', onDocumentMouseClick, false);
+
+    // Set materials
+    pointCloudMaterial = new THREE.PointsMaterial({
+	size: options.pointSize,
+	vertexColors: true,
+    });
+    lineMaterial = new THREE.LineBasicMaterial({
+	color: 0xffffff,
+	opacity: 1,
+	linewidth: 3,
+	vertexColors: THREE.VertexColors
+    });
 
 
-		// Axis
-		grid_group = new THREE.Object3D();
-		addGridAxes();
+    // Axis
+    grid_group = new THREE.Object3D();
+    addGridAxes();
 
-		// Ground grid
-		{
-				var linegeo = new THREE.Geometry();
-				var N = 50;
-				var scale = 5;
-				for (var i = 0; i <= 2 * N; ++i) {
-						linegeo.vertices.push(
-								new THREE.Vector3(scale * (i - N), scale * (-N), 0),
-								new THREE.Vector3(scale * (i - N), scale * ( N), 0),
-								new THREE.Vector3(scale * (-N), scale * (i - N), 0),
-								new THREE.Vector3(scale * ( N), scale * (i - N), 0)
-						);
-				}
-				var lmaterial = new THREE.LineBasicMaterial({color:
-																												0x555555});
-				var line = new THREE.LineSegments(
-						linegeo, lmaterial,
-						THREE.LinePieces);
-				// line.receiveShadow = true;
-				grid_group.add(line);
-		}
-		grid_group.name = 'grid';
-		// grid_group.frustumCulled = true;
+    // Ground grid
+    {
+	var linegeo = new THREE.Geometry();
+	var N = 50;
+	var scale = 5;
+	for (var i = 0; i <= 2 * N; ++i) {
+	    linegeo.vertices.push(
+		new THREE.Vector3(scale * (i - N), scale * (-N), 0),
+		new THREE.Vector3(scale * (i - N), scale * ( N), 0),
+		new THREE.Vector3(scale * (-N), scale * (i - N), 0),
+		new THREE.Vector3(scale * ( N), scale * (i - N), 0)
+	    );
+	}
+	var lmaterial = new THREE.LineBasicMaterial({color:
+						     0x555555});
+	var line = new THREE.LineSegments(
+	    linegeo, lmaterial,
+	    THREE.LinePieces);
+	// line.receiveShadow = true;
+	grid_group.add(line);
+    }
+    grid_group.name = 'grid';
+    // grid_group.frustumCulled = true;
 
-		scene = new THREE.Scene();
-		scene.add(grid_group);
+    scene = new THREE.Scene();
+    scene.add(grid_group);
 
-		// Create empty scene
-		addEmptyScene();
+    // Create empty scene
+    addEmptyScene();
 
-		// Add controls
-		addDatGui();
+    // Add controls
+    addDatGui();
 
-		// Initial render
-		render();
+    // Initial render
+    render();
 }
 
 function onWindowResize() {
-		camera.aspect = window.innerWidth / window.innerHeight;
-		camera.updateProjectionMatrix();
-		renderer.setSize(window.innerWidth, window.innerHeight);
-		render();
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    render();
 }
 
 function onDocumentMouseMove(event) {
-		event.preventDefault();
-		mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-		mouse.y = - (event.clientY / window.innerHeight) * 2 + 1;
-		render();
+    event.preventDefault();
+    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = - (event.clientY / window.innerHeight) * 2 + 1;
+    render();
+}
+
+function onDocumentMouseDoubleClick(event) {
+    event.preventDefault();
+    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = - (event.clientY / window.innerHeight) * 2 + 1;
+
+    // update the picking ray with the camera and mouse position
+    raycaster.setFromCamera( mouse, camera );
+
+    // calculate objects intersecting the picking ray
+    var intersects = raycaster.intersectObjects( scene.children, true );
+
+    // Find object with least distanceToRay
+    // TODO (sudeep.pillai): Min, instead of sort
+    intersects.sort(function(a, b){return a.distanceToRay - b.distanceToRay});
+
+    // Go to target
+    if (intersects.length > 0) {
+        controls.goto_target(intersects[0].point);
+    }
+    render();
 }
 
 function animate() {
-		requestAnimationFrame(animate);
-		controls.update();
+    requestAnimationFrame(animate);
+    controls.update();
 }
 
 function render() {
-		// Render.
-		renderer.render(scene, camera);
+    renderer.render(scene, camera);
 }
