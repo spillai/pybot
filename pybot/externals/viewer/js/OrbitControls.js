@@ -280,13 +280,9 @@ THREE.OrbitControls = function ( object, domElement ) {
     // };
 
     this.goto_target = function(target) {
-        var dview = new THREE.Vector3(this.animationPosition.x - this.animationTarget.x,
-                                this.animationPosition.y - this.animationTarget.y,
-                                this.animationPosition.z - this.animationTarget.z);
-        var newPosition = new THREE.Vector3(target.x + dview.x,
-                                      target.y + dview.y,
-                                      target.z + dview.z);
-	this.animationPosition.copy(newPosition);
+        var newPosition = this.animationPosition.clone().sub(this.animationTarget);
+        newPosition.add(target);
+        this.animationPosition.copy(newPosition);
         this.animationTarget.copy(target);
     };
 

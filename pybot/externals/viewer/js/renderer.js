@@ -547,7 +547,7 @@ function initRenderer() {
     container = document.getElementById( 'ThreeJS' );
     container.appendChild(renderer.domElement);
 
-    var fov = 70, near = 0.03, far = 10000;
+    var fov = 70, near = 0.03, far = 300;
     camera = new THREE.PerspectiveCamera(
 	fov, window.innerWidth / window.innerHeight, near, far);
     camera.position.x = 10;
