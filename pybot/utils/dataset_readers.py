@@ -142,8 +142,7 @@ class DatasetReader(object):
                  files=None):
         template = os.path.expanduser(template)
         self.process_cb = process_cb
-        print(template)
-        
+
         if files is None:
             # Index starts at 0
             # Find files with matching patterns within
@@ -202,7 +201,10 @@ class DatasetReader(object):
 
     def __getitem__(self, index):
         return self.process_cb(self.files[index])
-            
+
+    def __len__(self):
+        return len(self.files)
+
     @property
     def length(self):
         return len(self.files)
@@ -297,7 +299,7 @@ class StereoDatasetReader(object):
     def iteritems(self, *args, **kwargs):
         return izip(self.left.iteritems(*args, **kwargs),
                     self.right.iteritems(*args, **kwargs))
-    
+
     def iterinds(self, inds, reverse=False):
         fnos = inds.astype(int)
         if reverse:
@@ -308,7 +310,10 @@ class StereoDatasetReader(object):
     def __getitem__(self, index):
         return (self.left[index], self.right[index])
 
+    def __len__(self):
+        return len(self.left)
+
     @property
     def length(self):
-        assert(self.left.length == self.right.length)
-        return self.left.length
+        assert(len(self.left) == len(self.right))
+        return len(self.left)

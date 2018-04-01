@@ -22,7 +22,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description='KITTI test dataset')
     parser.add_argument(
-        '-s', '--sequence', type=str,
+        '-s', '--sequence', type=int,
         required=True, help='KITTI sequence')
     parser.add_argument(
         '-d', '--dir', dest='directory',
@@ -49,7 +49,8 @@ if __name__ == "__main__":
     else:
         kwargs = dict()
     dataset = KITTIDatasetReader(directory=args.directory,
-                                 sequence='00', scale=1.0, **kwargs)
+                                 sequence='{:02d}'.format(args.sequence),
+                                 scale=1.0, **kwargs)
 
     # Recover camera to velodyne extrinsics
     p_bc, p_bv = dataset.p_bc, dataset.p_bv

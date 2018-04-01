@@ -123,8 +123,10 @@ class KITTIDatasetReader(object):
     velo_height = 1.73
     cam_height = 1.65
 
+    # TODO (sudeep.pillai): Check validity
     p_bc = rpyxyz(-np.pi/2, 0, -np.pi/2, 0, 0, 0, axes='sxyz').inverse()
     p_bv = rpyxyz(0, 0, 0, -0.27, 0, 0, axes='sxyz')
+    p_cv = (p_bc.inverse() * p_bv).inverse()
 
     velodyne2body = p_bv
     camera2body = p_bc
