@@ -23,10 +23,13 @@ before_install:
   - conda config --set anaconda_upload no
   - conda info -a
   - conda config --add channels conda-forge
+  - conda config --add channels menpo
   - conda config --show-sources
-  # - conda install -y pip requests conda-build anaconda-client
-  - conda env create -f environment.yml -n test-environment
+  - conda install -y pip requests conda-build anaconda-client
+  # - conda env create -f environment.yml -n test-environment
+  - conda env create -n test-environment -p python=$TRAVIS_PYTHON_VERSION
   - source activate test-environment
+  - conda build tools/conda.recipe/
   
 install:
   - export PYTHONPATH=$PYTHONPATH:$PWD
