@@ -18,3 +18,6 @@ before_install:
   
 install:
   - python setup.py install
+
+script:
+  - python -c 'import pybot'
