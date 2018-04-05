@@ -32,11 +32,14 @@ before_install:
   - conda update -q conda
   # Useful for debugging any issues with conda
   - conda info -a
+  - conda install -y pip requests conda-build anaconda-client
   - conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION
   # - pip install -r requirements.txt
 
 install:
-  - python setup.py install
+  - conda build tools/conda.recipe
+  - conda install pybot --use-local
+  # - python setup.py install
 
 script:
   - python -c 'import pybot'
