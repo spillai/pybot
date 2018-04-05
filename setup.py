@@ -138,9 +138,9 @@ setup(
     # cmdclass=dict(build_ext=CMakeBuild),
     scripts=[],
     package_dir={'pybot': 'pybot'},
-    package_data={
-        'pybot': ['pybot_types.so'],
-        '': [f for f in copy_dir('externals/viewer')]
-    },
+    # package_data={
+    #     'pybot': ['pybot_types.so'],
+    #     '': [f for f in copy_dir('externals/viewer')]
+    # },
     zip_safe=False
 )
