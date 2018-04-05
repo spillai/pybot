@@ -2,12 +2,12 @@ package:
     name: pybot
     version: 0.2
 
-# source:
-#     git_url: https://github.com/spillai/pybot.git
-#     git_branch: py35
-
 source:
-    path: /Users/spillai/pybot
+    git_url: https://github.com/spillai/pybot.git
+    git_branch: py35
+
+# source:
+#     path: /Users/spillai/pybot
 
 build:
     number: 0
