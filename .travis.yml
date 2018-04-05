@@ -33,7 +33,7 @@ before_install:
   
 install:
   - export PYTHONPATH=$PYTHONPATH:$PWD
-  - pip install -f requirements.txt
+  - pip install -r requirements.txt
   # - conda env create -f environment.yml -n test-environment
   # - python setup.py install
   
