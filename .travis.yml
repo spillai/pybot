@@ -2,15 +2,32 @@ sudo: false
 language: python
 
 cache:
-  apt: true
   directories:
   - $HOME/.cache/pip
   - $HOME/.ccache
 
-os:
-  - linux
-  - osx
+# os:
+#   - linux
+#   - osx
 
+# python:
+#   - 2.7
+#   - 3.5
+#   - 3.6
+
+matrix:
+  include:
+    # - os: osx
+    #   python: 2.7
+    - os: osx
+      python: 3.5
+    - os: linux
+      python: 2.7
+    - os: linux
+      python: 3.5
+    - os: linux
+      python: 3.6
+  
 dist: trusty
 
 branches:
@@ -19,11 +36,6 @@ branches:
 
 notifications:
     email: true
-
-python:
-  - 2.7
-  - 3.5
-  - 3.6
 
 before_install:
   - if [ "${TRAVIS_OS_NAME}" = "linux" ]; then
