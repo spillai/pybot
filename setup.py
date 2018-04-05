@@ -18,21 +18,21 @@ from setuptools.command.build_ext import build_ext
 from setuptools.command.test import test as TestCommand
 from shutil import copyfile, copymode
 
-# def mkdir_p(path):
-#     try:
-#         os.makedirs(path)
-#     except os.error as exc:
-#         if exc.errno != errno.EEXIST or \
-#            not os.path.isdir(path):
-#             raise
+def mkdir_p(path):
+    try:
+        os.makedirs(path)
+    except os.error as exc:
+        if exc.errno != errno.EEXIST or \
+           not os.path.isdir(path):
+            raise
 
-# print('Configuring...')
-# mkdir_p('cmake_build')
-# subprocess.Popen(['cmake','../pybot/src'],
-#                  cwd='cmake_build').wait()
+print('Configuring...')
+mkdir_p('cmake_build')
+subprocess.Popen(['cmake','../pybot/src'],
+                 cwd='cmake_build').wait()
 
-# print('Compiling extension...')
-# subprocess.Popen(['make','-j4'], cwd='cmake_build').wait()
+print('Compiling extension...')
+subprocess.Popen(['make','-j4'], cwd='cmake_build').wait()
 
 # class CMakeExtension(Extension):
 #     def __init__(self, name, sourcedir=''):
@@ -138,9 +138,9 @@ setup(
     # cmdclass=dict(build_ext=CMakeBuild),
     scripts=[],
     package_dir={'pybot': 'pybot'},
-    # package_data={
-    #     'pybot': ['pybot_types.so'],
-    #     '': [f for f in copy_dir('externals/viewer')]
-    # },
+    package_data={
+        'pybot': ['pybot_types.so'],
+        '': [f for f in copy_dir('externals/viewer')]
+    },
     zip_safe=False
 )
