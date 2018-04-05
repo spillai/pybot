@@ -65,6 +65,7 @@ before_install:
   - hash -r
   - conda config --set always_yes yes --set changeps1 no
   - conda config --set anaconda_upload yes
+  - conda config --add channels menpo
   - conda update -q conda
   - conda info -a
   - conda install -y pip requests conda-build anaconda-client
