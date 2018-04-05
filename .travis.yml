@@ -6,16 +6,18 @@ branches:
   - py35
 
 notifications:
-    email: false
+    email: true
 
 python:
+  - 2.7
   - 3.5
+  - 3.6
 
 before_install:
   - sudo apt-get update
   - pip install --upgrade pip
   - pip install -r requirements.txt
-  
+
 install:
   - python setup.py install
 
