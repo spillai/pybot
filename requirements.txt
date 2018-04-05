@@ -3,9 +3,6 @@ beautifulsoup4==4.6.0
 certifi==2017.11.5
 cffi==1.11.5
 chardet==3.0.4
-conda==4.3.34
-conda-build==3.8.0
-conda-verify==2.0.0
 cryptography==2.2.1
 cycler==0.10.0
 filelock==3.0.4
@@ -19,7 +16,6 @@ numexpr==2.6.4
 numpy==1.14.0
 pandas==0.22.0
 pkginfo==1.4.2
-protobuf==3.4.1
 psutil==5.4.3
 pycosat==0.6.3
 pycparser==2.18
@@ -31,7 +27,6 @@ pytz==2017.3
 PyYAML==3.12
 pyzmq==16.0.3
 requests==2.18.4
-ruamel-yaml==0.15.35
 scipy==1.0.0
 six==1.11.0
 tables==3.4.2
