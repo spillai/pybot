@@ -35,6 +35,7 @@ before_install:
   - conda info -a
   - conda install -y pip requests conda-build anaconda-client
   - conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION
+  - source activate test-environment
   # - pip install -r requirements.txt
 
 install:
