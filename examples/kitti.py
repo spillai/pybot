@@ -75,7 +75,7 @@ if __name__ == "__main__":
     timer = SimpleTimer('KITTI-example')
     for idx, f in enumerate(dataset.iterframes()):
         timer.poll()
-        imshow_cv('frame', np.vstack([f.left,f.right]))
+        # imshow_cv('frame', np.vstack([f.left,f.right]))
 
         # Publish keyframes every 5 frames
         if idx % args.publish_velodyne_every == 0: 

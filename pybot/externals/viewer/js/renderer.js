@@ -17,6 +17,9 @@ var collections_visibles = {};
 var collections_visibles_lut = {};
 var collections_material = {};
 
+var voxel_geom, voxel_material;
+var stats;
+
 var savedOptions = {
     pointSize: 0,
     drawGrid: false,
@@ -26,6 +29,7 @@ var savedOptions = {
 var options = {
     pointSize: 0.1,
     sceneScale: 1.0,
+    voxelSize: 0.5, 
     axisSize: 0.2,
     drawGrid: true,
     followCamera: true,
@@ -57,6 +61,24 @@ function addDatGui(){
 	.listen()
 	.onChange(function(value) {
 	    pointCloudMaterial.size = value;
+	    render();
+	});
+
+    // Voxel Size
+    f1.add(options, 'voxelSize', 0.01, 1.0)
+	.name('Voxel Size')
+	.listen()
+	.onChange(function(value) {
+            if (voxel_geom == null) {
+	        voxel_geom = new THREE.BoxGeometry( value, value, value );
+                voxel_material = new THREE.MeshBasicMaterial( {color: 0x00ff00} );
+                voxel_cube = new THREE.Mesh( voxel_geom, voxel_material );
+            } else {
+                voxel_geom.parameters.width = value;
+                voxel_geom.parameters.height = value;
+                voxel_geom.parameters.depth = value;
+            }
+
 	    render();
 	});
 
@@ -565,6 +587,11 @@ function initRenderer() {
 	    'resize', onWindowResize, false);
     // window.addEventListener( 'mousemove', onMouseMove, false );
 
+    // Stats
+    // stats = new Stats();
+    // stats.showPanel( 2 );
+    // document.body.appendChild( stats.dom );
+
     renderer.domElement
 	.addEventListener(
 	    'mousemove', onDocumentMouseMove, false);
@@ -586,7 +613,6 @@ function initRenderer() {
 	linewidth: 3,
 	vertexColors: THREE.VertexColors
     });
-
 
     // Axis
     grid_group = new THREE.Object3D();
@@ -666,8 +692,10 @@ function onDocumentMouseDoubleClick(event) {
 }
 
 function animate() {
+    // stats.begin();
     requestAnimationFrame(animate);
     controls.update();
+    // stats.end();
 }
 
 function render() {
