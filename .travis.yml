@@ -9,31 +9,32 @@ python:
   - 3.5
 before_install:
   - sudo apt-get update
-  - if [[ "$TRAVIS_PYTHON_VERSION" == "2.7" ]]; then
-      wget https://repo.continuum.io/miniconda/Miniconda2-latest-Linux-x86_64.sh -O miniconda.sh;
-    else
-      wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh;
-    fi
-  - bash miniconda.sh -b -p $HOME/miniconda
-  - export PATH="$HOME/miniconda/bin:$PATH"
-  - hash -r
-  - conda config --set always_yes yes --set changeps1 no
-  - conda update --yes -q conda
-  - conda config --set always_yes true
-  - conda config --set anaconda_upload no
-  - conda info -a
-  - conda config --add channels conda-forge
-  - conda config --add channels menpo
-  - conda config --show-sources
-  - conda install -y pip requests conda-build anaconda-client
-  # - conda env create -f environment.yml -n test-environment
-  - conda env create -n test-environment -p python=$TRAVIS_PYTHON_VERSION
-  - source activate test-environment
-  - conda build tools/conda.recipe/
+  - pip install --upgrade pip
+  # - if [[ "$TRAVIS_PYTHON_VERSION" == "2.7" ]]; then
+  #     wget https://repo.continuum.io/miniconda/Miniconda2-latest-Linux-x86_64.sh -O miniconda.sh;
+  #   else
+  #     wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh;
+  #   fi
+  # - bash miniconda.sh -b -p $HOME/miniconda
+  # - export PATH="$HOME/miniconda/bin:$PATH"
+  # - hash -r
+  # - conda config --set always_yes yes --set changeps1 no
+  # - conda update --yes -q conda
+  # - conda config --set always_yes true
+  # - conda config --set anaconda_upload no
+  # - conda info -a
+  # - conda config --add channels conda-forge
+  # - conda config --add channels menpo
+  # - conda config --show-sources
+  # - conda install -y pip requests conda-build anaconda-client
+  # - conda env create -n test-environment -p python=$TRAVIS_PYTHON_VERSION
+  # - source activate test-environment
+  # - conda build tools/conda.recipe/
   
 install:
   - export PYTHONPATH=$PYTHONPATH:$PWD
-
+  - pip install requirements.txt
+  # - conda env create -f environment.yml -n test-environment
   # - python setup.py install
   
   # - conda build conda-recipe # this assumes that the conda recipe folder is called conda-recipe and is at the current workind dir
