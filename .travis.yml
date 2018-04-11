@@ -74,7 +74,7 @@ before_install:
 
 install:
   - source activate test-environment
-  - conda build tools/conda.recipe
+  - conda build tools/conda.recipe --python $TRAVIS_PYTHON_VERSION
   - conda install pybot --use-local
 
 script:
