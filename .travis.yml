@@ -69,8 +69,8 @@ before_install:
   - conda update -q conda
   - conda info -a
   - conda install -y pip requests conda-build anaconda-client
-  - conda remove -y python=3.6
   - conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION
+  - export PYTHON="$TRAVIS_PYTHON_VERSION"
 
 install:
   - source activate test-environment

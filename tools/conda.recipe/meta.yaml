@@ -15,7 +15,6 @@ build:
 requirements:
     build:
         - cmake
-        - python
         - numpy
         - pip
         - wheel
@@ -25,7 +24,6 @@ requirements:
         - glog
         - boost ==1.59.0
     run:
-        - python
         - numpy
         - scipy
         - protobuf ==3.4.1
