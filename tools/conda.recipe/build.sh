@@ -5,5 +5,5 @@
 
 # Install 
 $PYTHON setup.py install
-$PYTHON setup.py bdist_wheel sdist
+$PYTHON setup.py bdist bdist_wheel
 
