@@ -32,7 +32,7 @@ matrix:
       python: 3.5
     - os: linux
       python: 3.6
-  
+
 dist: trusty
 
 branches:
@@ -45,7 +45,7 @@ notifications:
 before_install:
   - if [ "${TRAVIS_OS_NAME}" = "linux" ]; then
       sudo apt-get update;
-    fi; 
+    fi;
   - if [[ "$TRAVIS_PYTHON_VERSION" == "2.7" ]]; then
       if [ "${TRAVIS_OS_NAME}" = "linux" ]; then
         wget https://repo.continuum.io/miniconda/Miniconda2-latest-Linux-x86_64.sh -O miniconda.sh;
@@ -69,6 +69,7 @@ before_install:
   - conda update -q conda
   - conda info -a
   - conda install -y pip requests conda-build anaconda-client
+  - conda remove -y python=3.6
   - conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION
 
 install:
