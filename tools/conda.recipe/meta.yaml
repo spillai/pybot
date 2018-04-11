@@ -18,7 +18,7 @@ requirements:
         - numpy
         - pip
         - wheel
-        - opencv3 >=3.1.0 # [py35 and py36]
+        - opencv3 ==3.1.0
         - eigen
         - gflags
         - glog
@@ -28,7 +28,7 @@ requirements:
         - scipy
         - protobuf ==3.4.1
         - pyzmq
-        - opencv3 >=3.1.0 # [py35 and py36]
+        - opencv3 ==3.1.0
         - eigen
         - matplotlib
         - pytables
