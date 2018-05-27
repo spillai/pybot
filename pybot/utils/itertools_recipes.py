@@ -1,7 +1,16 @@
 # Author: Sudeep Pillai <spillai@csail.mit.edu>
 # License: MIT
 
-from itertools import *
+import operator
+
+import random
+from collections import deque
+from six.moves import zip as izip
+from six.moves import map as imap
+from six.moves import zip_longest as izip_longest
+from six.moves import filterfalse as ifilterfalse
+from itertools import islice, chain, repeat, count, starmap, \
+    cycle, tee, combinations, groupby
 
 def take(iterable, n):
     "Return first n items of the iterable as a list"
@@ -16,7 +25,7 @@ def consume(iterator, n):
     # Use functions that consume iterators at C speed.
     if n is None:
         # feed the entire iterator into a zero-length deque
-        collections.deque(iterator, maxlen=0)
+        deque(iterator, maxlen=0)
     else:
         # advance to the empty slice starting at position n
         next(islice(iterator, n, n), None)
@@ -114,7 +123,7 @@ def unique_justseen(iterable, key=None):
     "List unique elements, preserving order. Remember only the element just seen."
     # unique_justseen('AAAABBBCCDAABBB') --> A B C D A B
     # unique_justseen('ABBCcAD', str.lower) --> A B C A D
-    return imap(next, imap(itemgetter(1), groupby(iterable, key)))
+    return imap(next, imap(operator.itemgetter(1), groupby(iterable, key)))
 
 def iter_except(func, exception, first=None):
     """ Call a function repeatedly until an exception is raised.
@@ -176,3 +185,45 @@ def tee_lookahead(t, i):
     for value in islice(t.__copy__(), i, None):
         return value
     raise IndexError(i)
+
+def accumulate(iterable, func=operator.add):
+    'Return running totals'
+    # accumulate([1,2,3,4,5]) --> 1 3 6 10 15
+    # accumulate([1,2,3,4,5], operator.mul) --> 1 2 6 24 120
+    it = iter(iterable)
+    try:
+        total = next(it)
+    except StopIteration:
+        return
+    yield total
+    for element in it:
+        total = func(total, element)
+        yield total
+
+def pick(iterable, inds):
+    from collections import deque
+    inds = list(inds)
+    assert(len(inds))
+    assert(sorted(inds) == inds)
+    qinds = deque(inds)
+    first = qinds.popleft()
+    for idx, item in enumerate(iterable):
+        if first is None: break
+        if idx == first:
+            yield item
+            try:
+                first = qinds.popleft()
+            except IndexError:
+                first = None
+
+def test_pick(): 
+    import numpy as np
+    it = np.arange(200)
+    inds = np.arange(7,100)[::20]
+    result = list(pick(it, inds))
+    print(result)
+    assert(result == [7,27,47,67,87])
+    
+if __name__ == "__main__":
+    test_pick()
+            

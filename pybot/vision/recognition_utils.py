@@ -12,20 +12,24 @@ import datetime
 import pandas as pd
 
 import numpy as np
-from itertools import izip, chain
+from itertools import chain
 
 import sklearn.metrics as metrics
 from sklearn.svm import LinearSVC, SVC
 from sklearn.linear_model import SGDClassifier
 from sklearn.grid_search import GridSearchCV
+from sklearn.calibration import CalibratedClassifierCV
 from sklearn.cross_validation import train_test_split, ShuffleSplit
 
-import matplotlib.pyplot as plt
+from pybot.utils.plot_utils import plt
+from pybot.utils.misc import print_yellow
 from pybot.vision.geom_utils import brute_force_match, intersection_over_union
 from pybot.vision.image_utils import im_resize, gaussian_blur, median_blur, box_blur
 from pybot.utils.io_utils import memory_usage_psutil, format_time
 from pybot.utils.db_utils import AttrDict, IterDB
 from pybot.utils.itertools_recipes import chunks
+
+from pybot.vision.feature_detection import get_dense_detector, get_detector
 
 # =====================================================================
 # Generic utility functions for object detection
@@ -92,7 +96,7 @@ def multilabel_precision_recall(y_score, y_test, clf_target_ids, clf_target_name
 
 
 def plot_confusion_matrix(cm, clf_target_names, title='Confusion matrix', cmap=plt.cm.jet):
-    target_names = map(lambda key: key.replace('_','-'), clf_target_names)
+    target_names = [key.replace('_','-') for key in clf_target_names]
 
     for idx in range(len(cm)): 
         cm[idx,:] = (cm[idx,:] * 100.0 / np.sum(cm[idx,:])).astype(np.int)
@@ -142,7 +146,6 @@ def plot_precision_recall(y_score, y_test, clf_target_ids, clf_target_names, tit
     plt.show(block=False)
 
 def plot_roc(y_score, y_test, target_map, title='ROC curve'): 
-    import matplotlib.pyplot as plt
     from sklearn.metrics import roc_curve, auc, precision_recall_curve
     from sklearn.preprocessing import label_binarize
 
@@ -151,9 +154,9 @@ def plot_roc(y_score, y_test, target_map, title='ROC curve'):
     tpr = dict()
     roc_auc = dict()
     
-    target_ids = target_map.keys()
-    target_names = target_map.values()
-    print target_names
+    target_ids = list(target_map.keys())
+    target_names = list(target_map.values())
+    print(target_names)
 
     y_test_multi = label_binarize(y_test, classes=target_ids)
     N, n_classes = y_score.shape[:2]
@@ -319,7 +322,7 @@ def im_detect_and_describe(img, mask=None, detector='dense', descriptor='SIFT', 
         return pts, desc
 
     except Exception as e: 
-        print 'im_detect_and_describe', e
+        print('im_detect_and_describe', e)
         return None, None
 
 def im_describe(*args, **kwargs): 
@@ -343,25 +346,51 @@ def im_describe(*args, **kwargs):
 # ---------------------------------------------------------------------
 
 class HistogramClassifier(object): 
-    def __init__(self, filename, target_map, classifier='svm'): 
+    def __init__(self, filename, target_map,
+                 classifier='svm',
+                 classifier_params=dict(), verbose=0): 
         
         self.seed_ = 0
         self.filename_ = filename
         self.target_map_ = target_map
-        self.target_ids_ = (np.unique(target_map.keys())).astype(np.int32)
+        self.target_ids_ = (np.unique(list(target_map.keys()))).astype(np.int32)
         self.epoch_no_ = 0
         self.st_time_ = time.time()
 
         # Setup classifier
-        print('-------------------------------')        
-        print('====> Building Classifier, setting class weights') 
+        print_yellow('-------------------------------')        
+        print_yellow('====> Building Classifier, setting class weights') 
         if classifier == 'svm': 
             self.clf_hyparams_ = {'C':[0.01, 0.1, 1.0, 10.0, 100.0], 'class_weight': ['balanced']}
             self.clf_base_ = LinearSVC(random_state=self.seed_)
+            
         elif classifier == 'sgd': 
             self.clf_hyparams_ = {'alpha':[0.0001, 0.001, 0.01, 0.1, 1.0, 10.0], 'class_weight':['auto']} # 'loss':['hinge'], 
-            self.clf_ = SGDClassifier(loss='log', penalty='l2', shuffle=False, random_state=self.seed_, 
-                                      warm_start=True, n_jobs=-1, n_iter=1, verbose=4)
+            self.clf_ = SGDClassifier(
+                loss='log', penalty='l2', alpha=0.01, 
+                shuffle=True, random_state=self.seed_, 
+                warm_start=True, n_jobs=-1, n_iter=1, verbose=verbose)
+            
+        elif classifier == 'keras':
+            # self.clf_hyparams_ = {'alpha':[0.0001, 0.001, 0.01, 0.1, 1.0, 10.0], 'class_weight':['auto']}
+
+            from pybot.ml.keras_utils import create_classifier_model
+            from keras.wrappers.scikit_learn import KerasClassifier
+
+            # optimizers = ['rmsprop', 'adam']
+            optimizers = ['rmsprop']
+            init = ['normal']
+            # init = ['glorot_uniform', 'normal', 'uniform']
+            epochs = [50] # , 100, 150]
+            # batches = [5, 10, 20]
+            batches = [20]
+            self.clf_hyparams_ = dict(optimizer=optimizers, epochs=epochs,
+                                      batch_size=batches, init=init)
+            self.clf_base_ = KerasClassifier(
+                build_fn=create_classifier_model,
+                input_dim=classifier_params['input_dim'], output_dim=len(self.target_ids_), verbose=1)
+            # , epochs=150, batch_size=10, verbose=0)
+
         else: 
             raise Exception('Unknown classifier type %s. Choose from [sgd, svm, gradient-boosting, extra-trees]' 
                             % classifier)
@@ -369,36 +398,35 @@ class HistogramClassifier(object):
     def fit(self, X, y, test_size=0.3):
         # Grid search cross-val (best C param)
         cv = ShuffleSplit(len(X), n_iter=1, test_size=0.3, random_state=self.seed_)
-        clf_cv = GridSearchCV(self.clf_base_, self.clf_hyparams_, cv=cv, n_jobs=-1, verbose=4)
-
-        print('====> Training Classifier (with grid search hyperparam tuning) .. ')
-        print('====> BATCH Training (in-memory): {:4.3f} MB'.format(X.nbytes / 1024.0 / 1024.0) )
+        
+        print_yellow('====> Training Classifier (with grid search hyperparam tuning) .. ')
+        print_yellow('====> BATCH Training (in-memory): {:4.3f} MB'.format(X.nbytes / 1024.0 / 1024.0) )
+        clf_cv = GridSearchCV(self.clf_base_, self.clf_hyparams_, cv=cv, n_jobs=-1, verbose=0)
         clf_cv.fit(X, y)
-        print('BEST: {}, {}'.format(clf_cv.best_score_, clf_cv.best_params_))
+        print_yellow('BEST: {}, {}'.format(clf_cv.best_score_, clf_cv.best_params_))
 
         # Setting clf to best estimator
         self.clf_ = clf_cv.best_estimator_
         
-        # # Calibrating classifier
-        # print('Calibrating Classifier ... ')
-        # self.clf_prob_ = CalibratedClassifierCV(self.clf_, cv=cv, method='sigmoid')
-        # self.clf_prob_.fit(X, y)        
+        # Calibrating classifier
+        print('Calibrating Classifier ... ')
+        self.clf_ = CalibratedClassifierCV(self.clf_, cv=cv, method='sigmoid')
+        self.clf_.fit(X, y)        
         
         # # Setting clf to best estimator
         # self.clf_ = clf_cv.best_estimator_
         # pred_targets = self.clf_.predict(X)
 
         if self.epoch_no_ % 10 == 0: 
-            self.save(self.filename_.replace('.h5', '_iter_{}.h5'.format(self.epoch_no_)))
-        self.save(self.filename_)
+            self._save(self.filename_.replace('.h5', '_iter_{}.h5'.format(self.epoch_no_)))
+        self._save(self.filename_)
         self.epoch_no_ += 1
 
     def partial_fit(self, X, y): 
         self.clf_.partial_fit(X, y, classes=self.target_ids_, sample_weight=None)
 
-        if self.epoch_no_ % 10 == 0: 
-            self.save(self.filename_.replace('.h5', '_iter_{}.h5'.format(self.epoch_no_)))
-        self.save(self.filename_)
+        if self.epoch_no_ % 50 == 0: 
+            self._save(self.filename_.replace('.h5', '_iter_{}.h5'.format(self.epoch_no_)))
         self.epoch_no_ += 1
 
     def predict(self, X): 
@@ -407,30 +435,36 @@ class HistogramClassifier(object):
     def decision_function(self, X): 
         return self.clf_.decision_function(X)
 
+    def predict_proba(self, X): 
+        return self.clf_.predict_proba(X)
+
+    def predict_log_proba(self, X): 
+        return self.clf_.predict_log_proba(X)
+
     def report(self, y, y_pred, background=None): 
-        print('-------------------------------')
-        print(' Accuracy score (Training): {:4.3f}'.format((metrics.accuracy_score(y, y_pred))))
-        print(' Report (Training):\n {}'.format(
+        print_yellow('-------------------------------')
+        print_yellow(' Accuracy score (Training): {:4.3f}'.format((metrics.accuracy_score(y, y_pred))))
+        print_yellow(' Report (Training):\n {}'.format(
             classification_report(y, y_pred, 
-                                  labels=self.target_map_.keys(), 
-                                  target_names=self.target_map_.values())))
-        cmatrix = metrics.confusion_matrix(y, y_pred, labels=self.target_map_.keys())
+                                  labels=list(self.target_map_.keys()), 
+                                  target_names=list(self.target_map_.values()))))
+        cmatrix = metrics.confusion_matrix(y, y_pred, labels=list(self.target_map_.keys()))
 
         N = len(cmatrix)
-        xs, ys = np.meshgrid(range(N), range(N))
+        xs, ys = np.meshgrid(list(range(N)), list(range(N)))
         xyc = np.dstack([xs, ys, cmatrix]).reshape(-1,3)
 
         inds = np.argsort(xyc[:,2])[-20:]
         xyc_top = xyc[inds,:]
 
-        print('-------------------------------')
-        print('{} :: Confusion table (top 20 entries)'.format(self.__class__.__name__))
+        print_yellow('-------------------------------')
+        print_yellow('{} :: Confusion table (top 20 entries)'.format(self.__class__.__name__))
         for xyct in xyc_top: 
             if xyct[0] != xyct[1]: 
-                print('confusion: {}\t{}\t{}'.format(xyct[2], 
-                                                     self.target_map_.values()[xyct[0]], 
-                                                     self.target_map_.values()[xyct[1]]))        
-        print('\n')
+                print_yellow('confusion: {}\t{}\t{}'.format(xyct[2], 
+                                                     list(self.target_map_.values())[xyct[0]], 
+                                                     list(self.target_map_.values())[xyct[1]]))        
+        print_yellow('\n')
 
         # import ipdb; ipdb.set_trace()
 
@@ -447,22 +481,25 @@ class HistogramClassifier(object):
             target_map = self.target_map_
             if background in target_map: 
                 del target_map[background]
-            print(' Report (Training without background):\n {}'.format(
+            print_yellow(' Report (Training without background):\n {}'.format(
                 classification_report(y[inds], y_pred[inds], 
-                                      labels=target_map.keys(),
-                                      target_names=target_map.values())))
-            cmatrix = metrics.confusion_matrix(y[inds], y_pred[inds], labels=target_map.keys())
+                                      labels=list(target_map.keys()),
+                                      target_names=list(target_map.values()))))
+            cmatrix = metrics.confusion_matrix(y[inds], y_pred[inds], labels=list(target_map.keys()))
             # print ' Confusion matrix (Test): \n%s' % (pd.DataFrame(cmatrix, 
             #                                                        columns=target_map.values(), 
             #                                                        index=target_map.values()))
 
-        print('Training Classifier took {}'.format(format_time(time.time() - self.st_time_)))              
+        print_yellow('Training Classifier took {}'.format(format_time(time.time() - self.st_time_)))              
 
     def get_categories(self): 
         return self.clf_.classes_
 
-    def save(self, filename): 
-        print('====> Saving classifier ')
+    def save(self): 
+        self._save(self.filename_)
+    
+    def _save(self, filename): 
+        print_yellow('====> Saving classifier ')
         db = AttrDict(clf=self.clf_, target_map=self.target_map_)
 
         # db = AttrDict(params=self.params_, 
@@ -471,15 +508,15 @@ class HistogramClassifier(object):
         #               clf_prob=self.clf_prob_, target_map=self.target_map_)
 
         db.save(filename)
-        print('-------------------------------')
+        print_yellow('-------------------------------')
 
     @classmethod
     def load(cls, path): 
-        print('====> Loading classifier {}'.format(path))
+        print_yellow('====> Loading classifier {}'.format(path))
         db = AttrDict.load(path)
-        c = cls(path, target_map=dict((int(key), item) for key,item in db.target_map.iteritems()))
+        c = cls(path, target_map=dict((int(key), item) for key,item in db.target_map.items()))
         c.clf_ = db.clf
-        print('-------------------------------')
+        print_yellow('-------------------------------')
         return c
 
 class NegativeMiningGenerator(object): 
@@ -488,10 +525,10 @@ class NegativeMiningGenerator(object):
     and object proposal technique
     """
     def __init__(self, dataset, proposer, target, num_proposals=50):
-        print('NegativeMiningGenerator: '
+        print_yellow('NegativeMiningGenerator: '
               'Generating negative samples with {}, num_proposals: {}'
               .format(proposer, num_proposals))
-        print('-------------------------------')
+        print_yellow('-------------------------------')
 
         self.dataset_ = dataset
         self.proposer_ = proposer
@@ -546,7 +583,7 @@ class NegativeMiningGenerator(object):
 # from sklearn.preprocessing import normalize
 # from sklearn.decomposition import PCA, RandomizedPCA
 # from sklearn.svm import LinearSVC, SVC
-# from sklearn.calibration import CalibratedClassifierCV
+
 # from sklearn.ensemble import GradientBoostingClassifier, ExtraTreesClassifier
 # from sklearn.linear_model import SGDClassifier
 # from sklearn.grid_search import GridSearchCV

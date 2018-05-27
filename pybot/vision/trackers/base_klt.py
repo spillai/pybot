@@ -30,7 +30,7 @@ from pybot.utils.db_utils import AttrDict
 from pybot.utils.timer import timeitmethod
 from pybot.utils.plot_utils import colormap
 
-from pybot.vision.imshow_utils import imshow_cv
+from pybot.vision.imshow_utils import imshow_cv, print_status
 from pybot.vision.image_utils import to_color, to_gray, gaussian_blur
 from pybot.vision.draw_utils import draw_features, draw_lines
 
@@ -154,7 +154,7 @@ class BaseKLT(object):
         for tid, pt in izip(self.latest_ids[valid], self.latest_pts[valid]): 
             cv2.rectangle(out, tuple(map(int, pt-2)), tuple(map(int, pt+2)), 
                           tuple(map(int, cols[tid % N])) if colored else (0,240,0), -1)
-
+        print_status(out, 'Tracked Features: {}'.format(len(self.latest_pts)))
         return out
 
     def matches(self, index1=-2, index2=-1): 
@@ -173,8 +173,16 @@ class BaseKLT(object):
         raise NotImplementedError()
 
     @property
+    def tm(self):
+        return self.tm_
+    
+    @property
     def latest_ids(self): 
         return self.tm_.ids
+
+    @property
+    def latest_age(self): 
+        return self.tm_.lengths
 
     @property
     def latest_pts(self): 
@@ -202,6 +210,7 @@ class OpenCVKLT(BaseKLT):
     def reset(self): 
         self.add_features_ = True
 
+    @timeitmethod
     def process(self, im, detected_pts=None):
 
         # Preprocess
@@ -224,16 +233,16 @@ class OpenCVKLT(BaseKLT):
         # Initialize or add more features
         if self.add_features_: 
             # Extract features
-            mask = self.create_mask(im.shape[:2], ppts)            
+            mask = self.create_mask(im.shape[:2], ppts)
             # imshow_cv('mask', mask)
 
             if detected_pts is None: 
-
                 # Detect features
                 new_kpts = self.detector_.process(self.ims_[-1], mask=mask, return_keypoints=True)
                 newlen = max(0, self.min_tracks_ - len(ppts))
                 new_pts = to_pts(sorted(new_kpts, key=lambda kpt: kpt.response, reverse=True)[:newlen])
-            else: 
+            else:
+                # Use pre-detected features instead
                 xy = detected_pts.astype(np.int32)
                 valid = mask[xy[:,1], xy[:,0]] > 0
                 new_pts = detected_pts[valid]

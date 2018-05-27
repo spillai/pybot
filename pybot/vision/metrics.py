@@ -3,7 +3,7 @@
 
 import numpy as np
 
-import matplotlib.pyplot as plt
+from pybot.utils.plot_utils import plt
 import sklearn.metrics as metrics
 
 def plot_confusion_matrix(cm, target_names, title='Confusion matrix', cmap=plt.cm.Greys):
@@ -77,9 +77,9 @@ if __name__ == "__main__":
 
     cm = metrics.confusion_matrix(cinfo.test_target, cinfo.pred_target)
     # print ' Confusion matrix (Test): %s' % (cm)
-    print ' Accuracy score (Test): %4.3f' % (metrics.accuracy_score(cinfo.test_target, cinfo.pred_target))
-    print ' Report (Test):\n %s' % (metrics.classification_report(cinfo.test_target, cinfo.pred_target, 
-                                                                  target_names=cinfo.target_names))
+    print(' Accuracy score (Test): %4.3f' % (metrics.accuracy_score(cinfo.test_target, cinfo.pred_target)))
+    print(' Report (Test):\n %s' % (metrics.classification_report(cinfo.test_target, cinfo.pred_target, 
+                                                                  target_names=cinfo.target_names)))
 
     # plot_roc_curve(cinfo.test_target, cinfo.pred_score)
 

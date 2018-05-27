@@ -8,7 +8,7 @@ from collections import deque
 def flip_rb(im): 
     return cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
 
-def im_resize(im, shape=None, scale=0.5, interpolation=cv2.INTER_AREA): 
+def im_resize(im, shape=None, scale=1.0, interpolation=cv2.INTER_AREA): 
     if shape is not None: 
         return cv2.resize(im, dsize=shape, fx=0., fy=0., interpolation=interpolation)
     else:
@@ -26,14 +26,13 @@ def im_pad(im, pad=3, value=0):
 def im_sample(im, sample=2): 
     return im[::2,::2]
 
-def im_mosaic_list(items, scale=1.0, shape=None, pad=0): 
+def im_mosaic_list(items, scale=1.0, shape=None, pad=0, width=None): 
     N = len(items)
-
-    # print 'Items: ', N, items
     assert N>0, 'No items to mosaic!'
 
-    sz = np.ceil(np.sqrt(N)).astype(int)
-    for j in range(sz * sz): 
+    W = width if width else np.ceil(np.sqrt(N)).astype(int)
+    H = np.ceil(N * 1. / W).astype(np.int)
+    for j in range(W * H): 
         if j < N: 
             if shape is not None: 
                 items[j] = to_color(im_resize(items[j], shape=shape))
@@ -43,48 +42,17 @@ def im_mosaic_list(items, scale=1.0, shape=None, pad=0):
         else: 
             items.append(np.zeros_like(items[-1]))
 
-    chunks = lambda l, n: [l[x: x+n] for x in xrange(0, len(l), n)]
-    # print len(items)
-    # print [len(chunk) for chunk in chunks(items, sz)]
-    # print [map(lambda ch: ch.shape, chunk) for chunk in chunks(items, sz)]
-    # print [(np.hstack(chunk)).shape for chunk in chunks(items, sz)]
-        
-    mosaic = im_pad(np.vstack([np.hstack(chunk) for chunk in chunks(items, sz)]), pad=3)
+    chunks = lambda l, n: [l[x: x+n] for x in range(0, len(l), n)]
+    hstack = [np.hstack(chunk) for chunk in chunks(items, W)]
+    mosaic = im_pad(np.vstack(hstack), pad=3) if len(hstack) > 1 \
+             else im_pad(hstack[0], pad=3)
     
     return im_resize(mosaic, scale=scale)
 
 
 def im_mosaic(*args, **kwargs): 
-    scale = kwargs.get('scale', 1.0)
-    shape = kwargs.get('shape', None)
-    pad = kwargs.get('pad', 0)
-
     items = list(args)
-    N = len(items)
-
-    # print 'Items: ', N, items
-    assert N>0, 'No items to mosaic!'
-
-    sz = np.ceil(np.sqrt(N)).astype(int)
-    for j in range(sz * sz): 
-        if j < N: 
-            if shape is not None: 
-                items[j] = to_color(im_resize(items[j], shape=shape))
-            else: 
-                items[j] = to_color(im_resize(items[j], scale=scale))
-
-        else: 
-            items.append(np.zeros_like(items[-1]))
-
-    chunks = lambda l, n: [l[x: x+n] for x in xrange(0, len(l), n)]
-    # print len(items)
-    # print [len(chunk) for chunk in chunks(items, sz)]
-    # print [map(lambda ch: ch.shape, chunk) for chunk in chunks(items, sz)]
-    # print [(np.hstack(chunk)).shape for chunk in chunks(items, sz)]
-        
-    mosaic = im_pad(np.vstack([np.hstack(chunk) for chunk in chunks(items, sz)]), pad=3)
-    
-    return im_resize(mosaic, scale=scale)
+    return im_mosaic_list(items, **kwargs)
         
 
 def to_color(im, flip_rb=False): 

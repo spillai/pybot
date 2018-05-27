@@ -1,6 +1,6 @@
 # Author: Sudeep Pillai <spillai@csail.mit.edu>
 # License: MIT
-
+from __future__ import print_function
 from pybot.vision.image_utils import to_color, to_gray
 from pybot.utils.dataset.kitti import KITTIDatasetReader, KITTIStereoGroundTruthDatasetReader
 
@@ -22,12 +22,13 @@ def kitti_stereo_2015_training_dataset(*args, **kwargs):
     return KITTIStereoGroundTruthDatasetReader(directory='~/HD1/data/KITTI/2015/data_scene_flow/training', is_2015=True, **kwargs)
     
 def test_color_dataset(*args, **kwargs): 
-    return KITTIDatasetReader(directory='~/data/dataset/', sequence='08', 
+    return KITTIDatasetReader(directory='~/data/dataset/', 
                               left_template='image_2/%06i.png', right_template='image_3/%06i.png', 
                               start_idx=0, **kwargs)
 
-def test_dataset(*args, **kwargs): 
-    return KITTIDatasetReader(directory='~/data/dataset/', sequence='08', **kwargs)
+def test_dataset(*args, **kwargs):
+    sequence = kwargs.pop('sequence', '08')
+    return KITTIDatasetReader(directory='~/data/dataset/', sequence=sequence, **kwargs)
 
 def test_image(color=True, scale=1.0, stereo=False): 
     for l,r in test_dataset().iter_stereo_frames(): 
@@ -61,7 +62,7 @@ if __name__ == "__main__":
 
     # Test video
     for im in test_video(color=True): 
-        print im.shape, im.dtype
+        print(im.shape, im.dtype)
         imshow_cv('video', im)
 
     cv2.waitKey(0)

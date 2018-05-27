@@ -1,17 +1,20 @@
 # Author: Sudeep Pillai <spillai@csail.mit.edu>
 # License: MIT
-
+from __future__ import print_function
 import sys
-from collections import deque
+from collections import deque, OrderedDict
 
-def color_red(prt): return "\033[91m {}\033[00m" .format(prt)
-def color_green(prt): return "\033[92m {}\033[00m" .format(prt)
-def color_yellow(prt): return "\033[93m {}\033[00m" .format(prt)
-def color_lightpurple(prt): return "\033[94m {}\033[00m" .format(prt)
-def color_purple(prt): return "\033[95m {}\033[00m" .format(prt)
-def color_cyan(prt): return "\033[96m {}\033[00m" .format(prt)
-def color_lightgray(prt): return "\033[97m {}\033[00m" .format(prt)
-def color_black(prt): return "\033[98m {}\033[00m" .format(prt)
+import functools
+import multiprocessing
+
+def color_red(prt): return "\033[91m{}\033[00m" .format(prt)
+def color_green(prt): return "\033[92m{}\033[00m" .format(prt)
+def color_yellow(prt): return "\033[93m{}\033[00m" .format(prt)
+def color_lightpurple(prt): return "\033[94m{}\033[00m" .format(prt)
+def color_purple(prt): return "\033[95m{}\033[00m" .format(prt)
+def color_cyan(prt): return "\033[96m{}\033[00m" .format(prt)
+def color_lightgray(prt): return "\033[97m{}\033[00m" .format(prt)
+def color_black(prt): return "\033[98m{}\033[00m" .format(prt)
 
 def print_red(prt): print(color_red(prt))
 def print_green(prt): print(color_green(prt))
@@ -32,7 +35,7 @@ def print_color(prt, color='green'):
     except: 
         raise KeyError('print_color lookup failed, use from {:}'.format(cols_lut.keys()))
 
-def progressbar(it, prefix = "", size=100, verbose=True, width=100):
+def progressbar(it, prefix = "", size=100, verbose=True, width=40):
     """
     Optional progress bar, if verbose == True
     """
@@ -51,6 +54,32 @@ def progressbar(it, prefix = "", size=100, verbose=True, width=100):
     sys.stdout.write("\n")
     sys.stdout.flush()
 
+def background(func):
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        p = multiprocessing.Process(target=func, args=args, kwargs=kwargs)
+        p.start()
+    return wrapper
+    
+class dequedict(OrderedDict):
+    """
+    Dictionary with fixed length (~ Deque + OrderedDict)
+    popitem ensures (FIFO) similar to deque
+    """
+    def __init__(self, maxlen=None):
+        self.maxlen_ = maxlen
+        OrderedDict.__init__(self)
+        self._check_size()
+
+    def __setitem__(self, key, value):
+        OrderedDict.__setitem__(self, key, value)
+        self._check_size()
+        
+    def _check_size(self):
+        if self.maxlen_ is not None: 
+            while len(self) > self.maxlen_:
+                self.popitem(last=False)
+                        
 class OneHotLabeler(dict):
     def __init__(self, *args, **kwargs):
         dict.__init__(self, *args, **kwargs)
@@ -111,7 +140,9 @@ class Accumulator(Counter):
     def __init__(self, maxlen=100): 
         Counter.__init__(self)
         self.items_ = deque(maxlen=maxlen)
-
+        self.append = self.accumulate
+        self.extend = self.accumulate_list
+        
     def __repr__(self): 
         return '{}: index: {}, items: {}, length: {}'.format(
             self.__class__.__name__, self.index, len(self.items_), self.length
@@ -124,12 +155,6 @@ class Accumulator(Counter):
     def accumulate_list(self, items): 
         for item in items: 
             self.accumulate(item)
-
-    def append(self, item): 
-        self.accumulate(item)
-
-    def extend(self, items): 
-        self.accumulate_list(items)
 
     def __len__(self): 
         return len(self.items_)
@@ -241,7 +266,7 @@ class CounterWithPeriodicCallback(Counter):
         try:
             orig_func = getattr(cls_instance, function_name)
             function_cb = setattr(cls_instance, function_name, polled_function_cb(orig_func))
-        except Exception, e:
+        except Exception as e:
             raise AttributeError('function %s has not been defined in instance {:}'.format(function_name, e))
         
         print('Setting new polled callback for %s.%s' % (type(cls_instance).__name__, function_name))

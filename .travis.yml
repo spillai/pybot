@@ -1,15 +1,64 @@
 sudo: false
 language: python
-python:
-    - "2.7"
+
+cache:
+  directories:
+  - $HOME/.cache/pip
+  - $HOME/.ccache
+
+matrix:
+  include:
+    - os: linux
+      python: 2.7
+    - os: linux
+      python: 3.5
+    - os: linux
+      python: 3.6
+
+dist: trusty
+
+branches:
+  only:
+  - py35
+
 notifications:
-    email: false
-before_install:
-  - wget http://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh -O miniconda.sh
+    email: true
+
+install:
+  - if [ "${TRAVIS_OS_NAME}" = "linux" ]; then
+      sudo apt-get update;
+    fi;
+  - if [[ "$TRAVIS_PYTHON_VERSION" == "2.7" ]]; then
+      if [ "${TRAVIS_OS_NAME}" = "linux" ]; then
+        wget https://repo.continuum.io/miniconda/Miniconda2-latest-Linux-x86_64.sh -O miniconda.sh;
+      else
+        wget https://repo.continuum.io/miniconda/Miniconda2-latest-MacOSX-x86_64.sh -O miniconda.sh;
+      fi;
+    else
+      if [ "${TRAVIS_OS_NAME}" = "linux" ]; then
+        wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh;
+      else
+        wget https://repo.continuum.io/miniconda/Miniconda3-latest-MacOSX-x86_64.sh -O miniconda.sh;
+      fi;
+    fi;
+  - pip install --upgrade pip
   - bash miniconda.sh -b -p $HOME/miniconda
   - export PATH="$HOME/miniconda/bin:$PATH"
-  - conda update --yes conda
-  - conda install --yes python=$TRAVIS_PYTHON_VERSION pip numpy scipy matplotlib cython nose future
-install:
-  - python setup.py build_ext --inplace
-script: nosetests tests -A 'not slow and not random'
+  - hash -r
+  - conda config --set always_yes yes --set changeps1 no
+  - conda config --set anaconda_upload yes
+  - conda config --add channels menpo
+  - conda update -q conda
+  - conda info -a
+  - conda install -y pip requests conda-build anaconda-client
+  - conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION
+  - conda install -c menpo opencv3
+  - export PYTHON="$TRAVIS_PYTHON_VERSION"
+
+  # Install pybot
+  - source activate test-environment
+  - conda build tools/conda.recipe --python $TRAVIS_PYTHON_VERSION
+  - conda install pybot --use-local -y
+
+script:
+  - python -c 'import pybot'

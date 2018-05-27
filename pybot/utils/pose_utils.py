@@ -1,20 +1,46 @@
 # Author: Sudeep Pillai <spillai@csail.mit.edu>
 # License: MIT
-
-import numpy as np
 from collections import deque, namedtuple
 from abc import ABCMeta, abstractmethod
 
-from itertools import imap
+import numpy as np
+
 from pybot.utils.misc import print_green, print_red
 from pybot.utils.misc import Counter, Accumulator, CounterWithPeriodicCallback 
+from pybot.geometry.rigid_transform import RigidTransform
 
-import matplotlib as mpl
-import matplotlib.pyplot as plt
-mpl.rcParams.update({'font.size':11, 
-                     # 'font.family':'sans-serif', 
-                     # 'font.sans-serif': 'Helvetica', 
-                     'image.cmap':'autumn', 'text.usetex':False})
+def inject_noise(poses_iterable, noise=[0,0]):
+
+    np.random.seed(1)
+    noise = np.float32(noise)
+    def get_noise():
+        if len(noise) == 6:
+            xyz = np.random.normal(0, noise[:3])
+            rpy = np.random.normal(0, noise[3:])
+        elif len(noise) == 2: 
+            xyz = np.random.normal(0, noise[0], size=3) \
+                  if noise[0] > 0 else np.zeros(3)
+            rpy = np.random.normal(0, noise[1], size=3) \
+                  if noise[1] > 0 else np.zeros(3)
+        else:
+            raise ValueError('Unknown noise length, either 2, or 6')
+        
+        return RigidTransform.from_rpyxyz(
+            rpy[0], rpy[1], rpy[2], xyz[0], xyz[1], xyz[2])
+    
+    p_accumulator = deque(maxlen=2)
+    p_accumulator_noisy = deque(maxlen=2)
+    
+    for p in poses_iterable:
+        p_accumulator.append(p)
+        if len(p_accumulator) == 1:
+            p_accumulator_noisy.append(p_accumulator[-1])
+        else: 
+            p21 = get_noise() * \
+                  (p_accumulator[-2].inverse() * p_accumulator[-1])
+            last = p_accumulator_noisy[-1]
+            p_accumulator_noisy.append(last.oplus(p21))
+        yield p_accumulator_noisy[-1]
 
 class Sampler(object): 
     __metaclass__ = ABCMeta
@@ -40,7 +66,7 @@ class Sampler(object):
 
         self.q_ = deque(maxlen=lookup_history)
         self.on_sampled_cb_ = on_sampled_cb
-        self.force_sample_ = False
+        # self.force_sample_ = False
         
         # Maintain total items pushed and sampled
         self.all_items_ = Counter()
@@ -56,18 +82,22 @@ class Sampler(object):
             self.verbose_all_ = deque()
             self.verbose_index_ = deque()
 
-    def force_check(self): 
-        sample = self.force_sample_
-        self.force_sample_ = False
-        return sample
+    # def force_check(self): 
+    #     sample = self.force_sample_
+    #     self.force_sample_ = False
+    #     return sample
             
-    def force_sample(self): 
-        self.force_sample_ = True
-
+    # def force_sample(self): 
+    #     self.force_sample_ = True
+    
     def length(self, type='samples'): 
         if type=='samples': 
             return self.sampled_items_.length
-
+        elif type == 'all':
+            return self.all_items_.length
+        else:
+            raise ValueError('Request for unknown length attribute')
+        
     def print_stats(self, finish=False): 
         print_green('Sampler: Total: {:}, Samples: {:}, Ratio: {:3.2f} %'
                     .format(self.all_items_.index, self.sampled_items_.index, 
@@ -87,7 +117,7 @@ class Sampler(object):
             if self.append(item): 
                 yield self.latest_sample
     
-    def append(self, item): 
+    def append(self, item, force=False): 
         """
         Add item to the sampler, returns the 
         index of the sampled item and the 
@@ -97,7 +127,7 @@ class Sampler(object):
             self.verbose_all_.append(item)
 
         self.all_items_.count()                    
-        ret = self.check_sample(item) 
+        ret = self.check_sample(item, force=force) 
 
         if ret: 
             self.q_.append(item)
@@ -113,6 +143,9 @@ class Sampler(object):
     def latest_sample(self): 
         return self.q_[-1]
 
+    def item(self, idx):
+        return self.q_[idx]
+    
     @classmethod
     def from_items(cls, items, lookup_history=10):
         raise NotImplementedError()
@@ -128,17 +161,18 @@ class PoseSampler(Sampler):
         self.displacement_ = displacement
         self.theta_ = theta
 
-    @classmethod
-    def from_items(cls, items, theta=np.deg2rad(20), displacement=0.25, lookup_history=10, return_indices=False):
-        c = cls(theta=theta, displacement=displacement, lookup_history=lookup_history)
-        items = [(c.latest_sample, idx) for idx, item in enumerate(items) if c.append(item)]
-        poses, inds = zip(*items)
+    def from_items(self, items, return_indices=False):
+        items = [(self.latest_sample, idx) for idx, item in enumerate(items) if self.append(item)]
+
+        # Unzip returns tuples: inds and poses must be lists
+        poses, inds = map(list, zip(*items))
         if return_indices: 
             return poses, inds
+        
         return poses
 
-    def check_sample(self, item):
-        if self.force_check(): 
+    def check_sample(self, item, force=False):
+        if force: 
             return True
 
         pose = self.get_sample(item)

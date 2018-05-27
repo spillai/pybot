@@ -16,3 +16,6 @@ recipes, timing/profiling tools, io utils
 other misc tools including pretty prints, progressbars, colored
 prints, counters, accumulators (indexed deques), accumulators with
 periodic callbacks etc.
+
+
+- FFMPEG video writer

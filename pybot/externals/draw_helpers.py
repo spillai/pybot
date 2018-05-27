@@ -1,11 +1,17 @@
+"""
+Helper functions for plotting
+"""
+
 # Author: Sudeep Pillai <spillai@csail.mit.edu>
 # License: MIT
 
-# Helper functions for plotting
-import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib.colors import colorConverter
+from __future__ import division
+
 from copy import deepcopy
+import numpy as np
+from matplotlib.colors import colorConverter
+from pybot.utils.plot_utils import plt
+from pybot.utils.timer import timeitmethod
 
 def height_map(hX, hmin=-0.20, hmax=5.0): 
     return np.array(plt.cm.hsv((hX-hmin)/(hmax-hmin)))[:,:3]
@@ -46,14 +52,11 @@ def get_color_arr(c, n, flip_rb=False):
     # return floating point with values in [0,1]
     return carr.astype(np.float32) / 255.0 if carr.dtype == np.uint8 else carr.astype(np.float32)
 
-
 def copy_pointcloud_data(_arr, _carr, flip_rb=False): 
-    arr, carr = deepcopy(_arr), deepcopy(_carr)
-    arr = arr.reshape(-1,3)
+    arr = _arr.reshape(-1,3)
     N, D = arr.shape[:2]
-    carr = get_color_arr(carr, N, flip_rb=flip_rb);
+    carr = get_color_arr(_carr, N, flip_rb=flip_rb);
     return arr, carr
-
 
 class Frustum(object): 
     """

@@ -6,7 +6,7 @@ General-purpose class for quaternion / rotation transformations.
 
 import math
 import numpy as np
-import transformations as tf
+from . import transformations as tf
 
 ###############################################################################
 class Quaternion(object):
@@ -32,6 +32,9 @@ class Quaternion(object):
     def __getitem__ (self, i):
         return self.q[i]
 
+    def copy(self):
+        return Quaternion(self.q.copy())
+    
     # Basic operations
 
     def __mul__(self, other):
@@ -64,7 +67,7 @@ class Quaternion(object):
         return Quaternion(tf.quaternion_conjugate(self.q))
 
     def rotate(self, v):
-        """ Rotate a vector with this quaternion in reverse """
+        """ Rotate a vector with this quaternion """
         qx, qy, qz, qw = self.q
 
         ab  =  qw*qx
@@ -220,7 +223,6 @@ class Quaternion(object):
     def xyzw(self):
         return self.to_xyzw()
 
-
     @property
     def rpy(self):
         return self.to_rpy()
@@ -232,7 +234,7 @@ if __name__ == "__main__":
     import random
     q = Quaternion.from_rpy (0, 0, 2 * math.pi / 16)
     v = [ 1, 0, 0 ]
-    print 'init: ', v
+    print('init: ', v)
     for i in range (16):
         t = np.dot(q.R, v)
         v = q.rotate (v)
@@ -245,7 +247,7 @@ if __name__ == "__main__":
     q2 = Quaternion.from_rpy(0, 0, 0)
     rpy_start = np.array(q.to_rpy())
     rpy_goal = np.array(q2.to_rpy())
-    print "interpolate from ", q2.to_rpy(), " to ", q.to_rpy()
+    print("interpolate from ", q2.to_rpy(), " to ", q.to_rpy())
     for i in range(101):
         alpha = i / 100.
         qinterp = q2.interpolate(q, alpha)
@@ -253,7 +255,7 @@ if __name__ == "__main__":
         rpy_expected = (rpy_goal * alpha + rpy_start * (1 - alpha))
         err = rpy_expected - rpy_interp
         for k in [ 0, 1, 2 ]:
-            print 'err: ', err[k]
+            print('err: ', err[k])
             assert abs(err[k]) < 1e-12
 
     def mod2pi_positive(vin):
@@ -269,7 +271,7 @@ if __name__ == "__main__":
     def mod2pi_ref(ref, vin):
         return ref + mod2pi(vin - ref)
 
-    print "testing angle-axis conversion"
+    print("testing angle-axis conversion")
     for unused in range(100):
         theta = random.uniform(-np.pi, np.pi)
         axis = np.array([ random.random(), random.random(), random.random() ])
@@ -292,17 +294,17 @@ if __name__ == "__main__":
         q_wxyz = [ x / qmag for x in q_wxyz ]
         return Quaternion.from_wxyz(q_wxyz)
 
-    print 'rotate by random matrix'
+    print('rotate by random matrix')
     for _ in range(100): 
         q = make_random_quaternion()
         t = np.dot(q.R, v)
         v = q.rotate (v)    
         assert(np.all(v - t < 1e-12))
 
-    print 'Check inverse'
+    print('Check inverse')
     for _ in range(100): 
         q = make_random_quaternion()
         t = q.to_matrix()
         assert(tf.is_same_transform(q.inverse().to_matrix(), t.T))
 
-    print "OK"
+    print("OK")

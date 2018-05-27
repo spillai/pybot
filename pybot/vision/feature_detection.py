@@ -4,6 +4,7 @@
 import cv2
 import numpy as np
 from pybot.utils.db_utils import AttrDict
+from functools import reduce
 
 def finite_and_within_bounds(xys, shape): 
     H, W = shape[:2]
@@ -12,6 +13,7 @@ def finite_and_within_bounds(xys, shape):
     return np.bitwise_and(np.isfinite(xys).all(axis=1), 
                           reduce(lambda x,y: np.bitwise_and(x,y), [xys[:,0] >= 0, xys[:,0] < W, 
                                                                    xys[:,1] >= 0, xys[:,1] < H]))
+
 def to_kpt(pt, size=1): 
     return cv2.KeyPoint(pt[0], pt[1], size)
 
@@ -119,8 +121,8 @@ class FeatureDetector(object):
         # Determine detector type that implements detect
         try: 
             self.detector_ = FeatureDetector.detectors[method](**params)
-        except Exception,e:
-            raise RuntimeError('Unknown detector type: %s! Use from {:}, {:}'.format(FeatureDetector.detectors.keys(), e))
+        except Exception as e:
+            raise RuntimeError('Unknown detector type: %s! Use from {:}, {:}'.format(list(FeatureDetector.detectors.keys()), e))
 
         # Only support grid and pyramid with gftt and fast
         if (method == 'gftt' or method == 'fast'): 

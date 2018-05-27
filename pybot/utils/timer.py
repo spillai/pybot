@@ -1,5 +1,6 @@
 # Author: Sudeep Pillai <spillai@csail.mit.edu>
 # License: MIT
+from __future__ import print_function
 
 import time
 from collections import OrderedDict
@@ -17,7 +18,7 @@ def named_timer(name):
         g_timers[name] = SimpleTimer(name, header=header)
     try: 
         return g_timers[name] 
-    except KeyError, e: 
+    except KeyError as e: 
         raise RuntimeError('Failed to retrieve timer {:}'.format(e))
 
 def timeitmethod(func):
@@ -61,6 +62,14 @@ class SimpleTimer:
         self.last_print_ = time.time()        
         self.last_fps_ = 0
 
+    def __enter__(self):
+        self.start()
+        return self
+    
+    def __exit__(self, *args):
+        self.stop(force_print=True)
+        return self
+        
     def poll(self): 
         self.counter_ += 1
         now = time.time()
@@ -76,13 +85,13 @@ class SimpleTimer:
             self.last_print_ = now
             self.counter_ = 0
 
-    def poll_piecemeal(self): 
+    def poll_piecemeal(self, force_print=False): 
         self.counter_ += 1
         now = time.time()
         dt = (now - self.last_)
         self.period_ += dt
 
-        if (now-self.last_print_) > 1.0 / self.hz_:
+        if (now-self.last_print_) > 1.0 / self.hz_ or force_print:
             T = self.period_ / self.counter_
             fps = 1.0 / T
             self.calls_ += self.counter_
@@ -97,8 +106,8 @@ class SimpleTimer:
     def start(self): 
         self.last_ = time.time()
 
-    def stop(self): 
-        self.poll_piecemeal()
+    def stop(self, force_print=False): 
+        self.poll_piecemeal(force_print=force_print)
 
     @property
     def fps(self): 

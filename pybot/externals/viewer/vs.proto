@@ -1,0 +1,139 @@
+syntax = "proto2";
+
+package vs;
+
+// msg
+message message_t {
+  required string channel = 1;
+  required bytes data = 2; 
+}
+
+// Pose
+message pose_t {
+  required int64 utime = 1;
+  repeated double pos = 2;
+  repeated double vel = 3;
+  repeated double orientation = 4;
+  repeated double rotation_rate = 5;
+  repeated double accel = 6;
+}
+
+// Objects
+message obj_t {
+  required int64 id = 1;
+  required double x = 2;
+  required double y = 3;
+  required double z = 4;
+  required double yaw = 5;
+  required double pitch = 6;
+  required double roll = 7;
+}
+
+message obj_collection_t {
+  required int32 id = 1;
+  required string name = 2;
+  required bool reset = 3;
+
+  enum obj_type {
+    POSE = 0;
+    TREE = 1;
+    SQUARE = 2;
+    POSE3D = 3;
+    AXIS3D = 4;
+    TAG = 5;
+    CAMERA = 6;
+    TRIANGLE = 7;
+    HEXAGON = 8;
+    SONARCONE = 9;
+  }
+
+  required obj_type type = 4;
+  repeated obj_t objs = 5;
+  optional int32 nobjs = 6;
+  
+}
+
+// Reset 
+message reset_collections_t {
+}
+
+// PointClouds
+message point3d_t {
+  required double x = 1;
+  required double y = 2;
+  required double z = 3; 
+}
+
+message color_t {
+  required float r = 1;
+  required float g = 2;
+  required float b = 3;
+}
+
+message point3d_list_t {
+  required int64 id = 1;
+  required int32 collection = 2;
+  required int64 element_id = 3;
+  required bytes points = 4;
+  required bytes colors = 5;
+  optional bytes normals = 6;
+  repeated int64 pointids = 7 [packed = true];
+  optional int32 npoints = 8;
+  optional int32 ncolors = 9;
+  optional int32 nnormals = 10;
+  optional int32 npointids = 11;
+}
+
+message point3d_list_collection_t {
+  required int32 id = 1;
+  required string name = 2;
+
+  enum point_type {
+    POINT = 0;
+    LINE_STRIP = 1;
+    LINE_LOOP = 2;
+    LINES = 3;
+    TRIANGLE_STRIP = 4;
+    TRIANGLE_FAN = 5;
+    TRIANGLES = 6;
+    QUAD_STRIP = 7;
+    QUADS = 8;
+    POLYGON = 9;
+  }
+  required point_type type = 3;
+  required bool reset = 4;
+  repeated point3d_list_t point_lists = 5;
+  required int32 nlists = 6;
+}
+
+// Cov
+message cov_t {
+  required int64 id = 1;
+  required int32 collection = 2;
+  required int64 element_id = 3;
+  repeated double entries = 4; 
+}
+
+message cov_collection_t {
+  required int32 id = 1;
+  required string name = 2;
+  required bool reset = 3;
+  repeated cov_t covs = 4;
+}
+
+// Text 
+
+message text_t {
+  required int64 id = 1;
+  required int32 collection_id = 2;
+  required int64 object_id = 3;
+  required string text = 4; 
+}
+
+message text_collection_t {
+  required int32 id = 1;
+  required string name = 2;
+  // int16 type = 3; // not required
+  required bool reset = 4;
+  repeated text_t texts = 5; 
+}

@@ -99,3 +99,9 @@ def match_targets(bboxes_truth, bboxes_test, intersection_th=0.5):
 def match_bboxes(bboxes_truth, bboxes_test, intersection_th=0.5): 
     A = brute_force_match_coords(bboxes_truth, bboxes_test)
     return A > intersection_th
+
+def match_bboxes_and_targets(bboxes_truth, bboxes_test, targets_truth, targets_test, intersection_th=0.5):
+    A = brute_force_match(bboxes_truth, bboxes_test, match_func=intersection_over_union)
+    B = brute_force_match(targets_truth, targets_test, match_func=lambda x,y: x==y, dtype=np.bool)
+    return np.bitwise_and(A > intersection_th, B)
+    

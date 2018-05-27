@@ -35,7 +35,7 @@ def init():
 
         global viz_pub_
         viz_pub_ = VisualizationMsgsPub()
-        print 'Inited ROS node'
+        print('Inited ROS node')
     except: 
         pass
 
@@ -158,7 +158,7 @@ def publish_cloud_markers(pub_ns, _arr, c='b', stamp=None, flip_rb=False, frame_
          
     marker.lifetime = rospy.Duration()
     _publish_marker(marker)
-    print 'Publishing marker', N
+    print ('Publishing marker', N)
 
 
 @run_async    

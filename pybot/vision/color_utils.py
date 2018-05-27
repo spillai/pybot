@@ -1,15 +1,18 @@
 # Author: Sudeep Pillai <spillai@csail.mit.edu>
 # License: MIT
 
+from __future__ import division
+
 import cv2
 import numpy as np
-import matplotlib.pylab as plt
+
+from pybot.utils.plot_utils import plt
 from matplotlib.colors import colorConverter, ListedColormap
+from pybot.vision.image_utils import im_normalize
 
 def colormap(im, min_threshold=0.01):
     mask = im<min_threshold
     if im.ndim == 1: 
-        print im
         hsv = np.zeros((len(im), 3), dtype=np.uint8)
         hsv[:,0] = (im * 180).astype(np.uint8)
         hsv[:,1] = 255
@@ -50,3 +53,7 @@ def get_random_colors(n, colormap='random'):
 
 def color_from_string(c, n): 
     return np.tile(np.array(colorConverter.to_rgb(c)), [n,1])
+
+def color_by_lut(labels, colors):
+    dlabels = np.dstack([labels, labels, labels])
+    return cv2.LUT(dlabels, colors)
