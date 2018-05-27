@@ -15,6 +15,9 @@ from setuptools.command.build_ext import build_ext
 from setuptools.command.test import test as TestCommand
 from shutil import copyfile, copymode
 
+GITHUB_URL = 'https://github.com/spillai/pybot'
+README = open('README.md').read()
+
 def mkdir_p(path):
     try:
         os.makedirs(path)
@@ -48,8 +51,6 @@ print('Compiling extension...')
 subprocess.Popen(['make','-j4'], cwd='cmake_build').wait()
 
 print('Building package')
-GITHUB_URL = 'https://github.com/spillai/pybot'
-
 print('Found: {}'.format(find_packages()))
 def copy_dir(dir_path):
     base_dir = os.path.join('pybot', dir_path)
@@ -58,7 +59,6 @@ def copy_dir(dir_path):
             if '.pyc' in f: continue
             yield os.path.join(dirpath.split('/', 1)[1], f)
 
-README = open('README.md').read()
 VERSION = find_version('pybot', '__init__.py')
 setup(
     name='pybot',

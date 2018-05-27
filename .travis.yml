@@ -6,26 +6,8 @@ cache:
   - $HOME/.cache/pip
   - $HOME/.ccache
 
-# os:
-#   - linux
-#   - osx
-
-# python:
-#   - 2.7
-#   - 3.5
-#   - 3.6
-
 matrix:
   include:
-    # - os: osx
-    #   python: 2.7
-    # - os: osx
-    #   language: generic
-    #   before_install:
-    #     - brew update
-    #     - brew install python3
-    #     - virtualenv env -p python3
-    #     - source env/bin/activate
     - os: linux
       python: 2.7
     - os: linux
@@ -75,8 +57,9 @@ before_install:
 
 install:
   - source activate test-environment
-  - conda build tools/conda.recipe --python $TRAVIS_PYTHON_VERSION
-  - conda install pybot --use-local -y
+  - python setup.py install
+  # - conda build tools/conda.recipe --python $TRAVIS_PYTHON_VERSION
+  # - conda install pybot --use-local -y
 
 script:
   - python -c 'import pybot'
