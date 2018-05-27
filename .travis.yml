@@ -19,6 +19,7 @@ dist: trusty
 
 branches:
   only:
+  - master
   - py35
 
 notifications:
