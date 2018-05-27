@@ -62,7 +62,7 @@ setup(
     license='MIT',
     url=GITHUB_URL,
     download_url='',
-    packages=find_packages(),
+    packages=find_packages(exclude=('tests',)),
     scripts=[],
     package_dir={'pybot': 'pybot'},
     package_data={
