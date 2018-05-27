@@ -13,18 +13,21 @@ clean-wheel:
 	-$(RM) -rf build
 	-$(RM) -rf pybot.egg-info
 
-develop:
+python-develop:
 	python setup.py develop
 
-build:
+python-build:
 	python setup.py sdist
 	python setup.py bdist_wheel
 
-install:
+python-install:
 	python setup.py install
 
-wheel:
+python-wheel:
 	python setup.py bdist_wheel
+
+python-dev-build:
+	python setup.py build_ext --inplace
 
 conda-build:
 	conda build tools/conda.recipe
@@ -33,14 +36,8 @@ conda-install-runtime:
 	conda create -q -n pybot-runtime-env -y
 	conda install -c s_pillai pybot -n pybot-runtime-env -y
 
-anaconda-push:
-	./scripts/deploy_anaconda.sh
-
-dev-build:
-	python setup.py build_ext --inplace
-
 docker-build:
-	docker build docker/
+	docker build tools/docker
 
 docker-push:
 	docker tag pybot:latest
