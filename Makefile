@@ -20,11 +20,18 @@ build:
 	python setup.py sdist
 	python setup.py bdist_wheel
 
+install:
+	python setup.py install
+
 wheel:
 	python setup.py bdist_wheel
 
 conda-build:
 	conda build tools/conda.recipe
+
+conda-install-runtime:
+	conda create -q -n pybot-runtime-env -y
+	conda install -c s_pillai pybot -n pybot-runtime-env -y
 
 anaconda-push:
 	./scripts/deploy_anaconda.sh
