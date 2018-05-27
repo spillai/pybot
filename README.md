@@ -1,7 +1,7 @@
 pybot
----
+=============
 
-Research tools for autonomous systems using Python.
+Research tools for autonomous systems using Python<br>
 Author: [Sudeep Pillai](http://people.csail.mit.edu/spillai) [(spillai@csail.mit.edu)](mailto:spillai@csail.mit.edu)  
 License: MIT
 
