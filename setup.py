@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-
 import errno
 import io
 import platform
@@ -69,9 +68,7 @@ setup(
     author_email='spillai@csail.mit.edu',
     license='MIT',
     url=GITHUB_URL,
-    download_url='',
     packages=find_packages(exclude=('tests',)),
-    scripts=[],
     package_dir={'pybot': 'pybot'},
     package_data={
         'pybot': ['pybot_types.so'],

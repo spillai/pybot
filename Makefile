@@ -24,7 +24,7 @@ wheel:
 	python setup.py bdist_wheel	
 
 conda-build:
-	conda build tools/conda
+	conda build tools/conda.recipe
 
 anaconda-push:
 	./scripts/deploy_anaconda.sh

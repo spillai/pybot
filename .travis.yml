@@ -24,7 +24,7 @@ branches:
 notifications:
     email: true
 
-before_install:
+install:
   - if [ "${TRAVIS_OS_NAME}" = "linux" ]; then
       sudo apt-get update;
     fi;
@@ -55,11 +55,10 @@ before_install:
   - conda install -c menpo opencv3
   - export PYTHON="$TRAVIS_PYTHON_VERSION"
 
-install:
+  # Install pybot
   - source activate test-environment
-  - python setup.py install
-  # - conda build tools/conda.recipe --python $TRAVIS_PYTHON_VERSION
-  # - conda install pybot --use-local -y
+  - conda build tools/conda.recipe --python $TRAVIS_PYTHON_VERSION
+  - conda install pybot --use-local -y
 
 script:
   - python -c 'import pybot'
