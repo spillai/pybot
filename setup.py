@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import errno
+import io
 import platform
 import os
 import re
@@ -21,6 +22,13 @@ def mkdir_p(path):
         if exc.errno != errno.EEXIST or \
            not os.path.isdir(path):
             raise
+
+def read(*names, **kwargs):
+    with io.open(
+        os.path.join(os.path.dirname(__file__), *names),
+        encoding=kwargs.get("encoding", "utf8")
+    ) as fp:
+        return fp.read()
 
 def find_version(*file_paths):
     version_file = read(*file_paths)
