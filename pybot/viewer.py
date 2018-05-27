@@ -10,7 +10,7 @@ if __name__ == "__main__":
                        'externals', 'viewer')
     print('Current working directory: {}'.format(cwd))
     print('\033[92m{}\033[00m'
-          .format('Go to localhost:8000/viewer.html'))
+          .format('Go to http://localhost:8000/index.html'))
     p1 = Popen(['python3 -m http.server'],
                stdout=None, stderr=None,
                shell=True, cwd=cwd)
