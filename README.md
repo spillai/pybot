@@ -5,10 +5,10 @@ Research tools for autonomous systems using Python<br>
 Author: [Sudeep Pillai](http://people.csail.mit.edu/spillai) [(spillai@csail.mit.edu)](mailto:spillai@csail.mit.edu)  
 License: MIT
 
-[![Build Status](https://travis-ci.org/spillai/pybot.svg?branch=py35)](https://travis-ci.org/spillai/pybot)
+[![Build Status](https://travis-ci.org/spillai/pybot.svg?branch=master)](https://travis-ci.org/spillai/pybot)
 
-## Modules
-
+Modules
+---
 **geometry:** General-purpose tools for computing rigid-body
 transformations. This is a preliminary version that currently deals
 mostly with **SE(3)** or 6-DOF (3-DoF Rotational + 3-DoF translation)
