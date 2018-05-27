@@ -1,14 +1,14 @@
 pybot
 ---
 
-Research tools for autonomous systems using Python
+Research tools for autonomous systems using Python.
 Author: [Sudeep Pillai](http://people.csail.mit.edu/spillai) [(spillai@csail.mit.edu)](mailto:spillai@csail.mit.edu)  
 License: MIT
 
 [![Build Status](https://travis-ci.org/spillai/pybot.svg?branch=py35)](https://travis-ci.org/spillai/pybot)
 
-Modules
----
+## Modules
+
 **geometry:** General-purpose tools for computing rigid-body
 transformations. This is a preliminary version that currently deals
 mostly with **SE(3)** or 6-DOF (3-DoF Rotational + 3-DoF translation)
@@ -44,6 +44,6 @@ developments in CNN-based object recognition, localization (ROI
 pooling), and SLAM-aware recognition. See [references](REFERENCES.md) for more details
 about specific implementations. 
 
-Installation
----
+## Installation
+
 See [INSTALL](INSTALL.md)
