@@ -60,6 +60,8 @@ install:
   - source activate test-environment
   - conda build tools/conda.recipe --python $TRAVIS_PYTHON_VERSION
   - conda install pybot --use-local -y
-
+  - conda install pytest
+  
 script:
   - python -c 'import pybot'
+  - pytest tests verbosity=1
