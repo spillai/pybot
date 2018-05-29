@@ -37,7 +37,6 @@ class TestViewer(unittest.TestCase):
         draw_utils.publish_cloud('cloud_with_poses', Xs, c=[C, 'r', 'g'],
                                  frame_id='poses', element_id=ids)
         for j in range(3):
-            time.sleep(1)
             p = Pose.from_rigid_transform(0, RigidTransform(tvec=[1,j,0]))
             draw_utils.publish_pose_list('poses', [p], frame_id='origin',
                                          reset=False)
@@ -67,7 +66,6 @@ class TestViewer(unittest.TestCase):
         cpose = draw_utils.get_sensor_pose(frame_id='camera')
         poses.extend([cpose])
         for p in poses:
-            time.sleep(1)
             print('moving camera')
             draw_utils.publish_pose_t('CAMERA_POSE', p, frame_id='origin')
 
