@@ -23,19 +23,17 @@ def contrastive_loss(margin=10):
         '''Contrastive loss from Hadsell-et-al.'06
         http://yann.lecun.com/exdb/publis/pdf/hadsell-chopra-lecun-06.pdf
         '''
-        return K.mean(y_true * K.square(y_pred) + (1 - y_true) * K.square(K.maximum(margin - y_pred, 0)))
+        return K.mean(y_true * K.square(y_pred) +
+                      (1 - y_true) * K.square(K.maximum(margin - y_pred, 0)))
     return _contrastive_loss
 
 def triplet_loss(margin=100): 
     def _triplet_loss(y_true, y_pred):
         positive_distance, negative_distance = y_pred[:,0], y_pred[:,1]
-        return K.mean(K.maximum(0.0, positive_distance - negative_distance + margin)) 
-
-    # def _triplet_loss(y_true, y_pred):
-    #     positive_distance, negative_distance = y_pred[:,0], y_pred[:,1]
-    #     dist = K.sum(K.square(positive_distance) - K.square(negative_distance), axis=-1)
-    #     return K.mean(K.maximum(0.0, dist + margin))
-    
+        return K.mean(K.maximum(0.0,
+                                positive_distance -
+                                negative_distance +
+                                margin)) 
     return _triplet_loss
 
 def triplet_bpr_loss(): 
