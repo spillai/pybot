@@ -93,3 +93,6 @@ ENV/
 *.c
 *.so
 cmake_build/
+
+# Github language reporting
+pybot/externals/viewer/js/* linguist-vendored
