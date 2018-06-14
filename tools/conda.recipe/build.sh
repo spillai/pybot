@@ -7,5 +7,4 @@
 
 # Install
 $CONDA_PYTHON_EXE $SRC_DIR/setup.py install
-$CONDA_PYTHON_EXE $SRC_DIR/setup.py bdist bdist_wheel
 
