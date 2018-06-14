@@ -56,12 +56,13 @@ install:
   - conda install -c menpo opencv3
   - export PYTHON="$TRAVIS_PYTHON_VERSION"
 
-  # Install pybot
+  # Build pybot
   - source activate test-environment
   - conda build tools/conda.recipe --python $TRAVIS_PYTHON_VERSION
-  - conda install pybot --use-local -y
-  # - conda install pytest
+  # - conda install pybot --use-local -y
 
 script:
+  - conda create -q -n test-runtime-environment python=$TRAVIS_PYTHON_VERSION
+  - conda install -c s_pillai pybot -n test-runtime-environment
+  - source activate test-runtime-environment
   - python -c 'import pybot'
-  # - pytest tests/
