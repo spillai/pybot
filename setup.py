@@ -74,5 +74,6 @@ setup(
         'pybot': ['pybot_types.so'],
         '': [f for f in copy_dir('externals/viewer')]
     },
-    zip_safe=False
+    zip_safe=False,
+    include_package_data=True
 )

@@ -36,8 +36,24 @@ conda-install-runtime:
 	conda create -q -n pybot-runtime-env -y
 	conda install -c s_pillai pybot -n pybot-runtime-env -y
 
-docker-build:
-	docker build tools/docker
+docker-build-condaruntime:
+	docker build -t pybot-runtime:latest \
+				 -f tools/docker/Dockerfile.runtime .
+
+docker-run-condaruntime:
+	docker run -it --rm --name pybot-runtime \
+				 pybot-runtime:latest \
+				 /bin/bash
+
+docker-build-condabuild:
+	docker build -t pybot-build:latest \
+				 -f tools/docker/Dockerfile.build .
+
+docker-run-condabuild:
+	docker run -it --rm --name pybot-build \
+				 pybot-build:latest \
+				 /bin/bash
+
 
 docker-push:
 	docker tag pybot:latest
