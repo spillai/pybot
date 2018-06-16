@@ -72,7 +72,7 @@ setup(
     package_dir={'pybot': 'pybot'},
     package_data={
         'pybot': ['pybot_types.so'],
-        '': [f for f in copy_dir('externals/viewer')]
+        'externals': [f for f in copy_dir('externals/viewer')]
     },
     zip_safe=False,
     include_package_data=True

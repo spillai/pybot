@@ -51,15 +51,15 @@ install:
   - conda config --add channels menpo
   - conda update -q conda
   - conda info -a
-  - conda install -y pip requests conda-build anaconda-client
+  - conda install -q -y pip requests conda-build anaconda-client
   - conda create -q -n test-build-environment python=$TRAVIS_PYTHON_VERSION
-  - conda install -c menpo opencv3
+  - conda install -q -y -c menpo opencv3
   - export PYTHON="$TRAVIS_PYTHON_VERSION"
 
   # Build pybot
   - source activate test-build-environment
   - conda build tools/conda.recipe --python $TRAVIS_PYTHON_VERSION
-  - conda install pybot --use-local -y
+  - conda install -q -y pybot --use-local
 
 script:
   # - conda create -q -n test-runtime-environment python=$TRAVIS_PYTHON_VERSION
