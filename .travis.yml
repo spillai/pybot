@@ -52,17 +52,17 @@ install:
   - conda update -q conda
   - conda info -a
   - conda install -y pip requests conda-build anaconda-client
-  - conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION
+  - conda create -q -n test-build-environment python=$TRAVIS_PYTHON_VERSION
   - conda install -c menpo opencv3
   - export PYTHON="$TRAVIS_PYTHON_VERSION"
 
   # Build pybot
-  - source activate test-environment
+  - source activate test-build-environment
   - conda build tools/conda.recipe --python $TRAVIS_PYTHON_VERSION
-  # - conda install pybot --use-local -y
+  - conda install pybot --use-local -y
 
 script:
-  - conda create -q -n test-runtime-environment python=$TRAVIS_PYTHON_VERSION
-  - conda install -c s_pillai pybot -n test-runtime-environment
-  - source activate test-runtime-environment
+  # - conda create -q -n test-runtime-environment python=$TRAVIS_PYTHON_VERSION
+  # - conda install -c s_pillai pybot -n test-runtime-environment
+  # - source activate test-runtime-environment
   - python -c 'import pybot'
