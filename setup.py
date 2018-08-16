@@ -40,17 +40,6 @@ def find_version(*file_paths):
         return version_match.group(1)
     raise RuntimeError("Unable to find version string.")
 
-try:
-    print('Configuring...')
-    mkdir_p('cmake_build')
-    subprocess.Popen(['cmake','../pybot/src'],
-                     cwd='cmake_build').wait()
-
-    print('Compiling extension...')
-    subprocess.Popen(['make','-j4'], cwd='cmake_build').wait()
-except:
-    print('Failed to build C++ modules, proceeding build.')
-
 print('Building package')
 print('Found: {}'.format(find_packages()))
 def copy_dir(dir_path):
@@ -71,9 +60,8 @@ setup(
     license='MIT',
     url=GITHUB_URL,
     packages=find_packages(exclude=('tests',)),
-    package_dir={'pybot': 'pybot'},
     package_data={
-        'externals': [f for f in copy_dir('externals/viewer')],
+        'pybot': [f for f in copy_dir('externals/viewer')],
     },
     zip_safe=False,
     include_package_data=True
