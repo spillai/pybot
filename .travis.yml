@@ -65,12 +65,12 @@ install:
   - source activate test-build-environment
   - export PYBOT_CONDA_BLD_OUTPUT="$(conda build tools/conda.recipe --output)"
   - conda build tools/conda.recipe --python $TRAVIS_PYTHON_VERSION $CONDA_BUILD_ARGS_EXTRA
-  - conda convert -p osx-64 -o $CONDA_BLD_PATH $PYBOT_CONDA_BLD_OUTPUT
+  - conda convert -p all -o $CONDA_BLD_PATH $PYBOT_CONDA_BLD_OUTPUT
   - conda install -q -y pybot --use-local
 
 after_success:
  - if [[ "$BRANCH" == "master" ]]; then
-      anaconda -v -t $ANACONDA_API_TOKEN upload -u $ANACONDA_USER --force $CONDA_BLD_PATH/osx-64/*.tar.bz2;
+      anaconda -v -t $ANACONDA_API_TOKEN upload -u $ANACONDA_USER --force $CONDA_BLD_PATH/**/*.tar.bz2;
    fi;
 
 script:
