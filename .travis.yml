@@ -20,7 +20,6 @@ dist: trusty
 branches:
   only:
   - master
-  - py35
 
 notifications:
     email: true
@@ -42,10 +41,16 @@ install:
         wget https://repo.continuum.io/miniconda/Miniconda3-latest-MacOSX-x86_64.sh -O miniconda.sh;
       fi;
     fi;
+ - if [[ "$BRANCH" == "master" ]]; then
+      export CONDA_BUILD_ARGS_EXTRA=""
+    else
+      export CONDA_BUILD_ARGS_EXTRA="--no-anaconda-upload"
+    fi
   - pip install --upgrade pip
   - bash miniconda.sh -b -p $HOME/miniconda
   - export PATH="$HOME/miniconda/bin:$PATH"
   - hash -r
+  - export CONDA_BLD_PATH=$HOME/conda-bld
   - conda config --set always_yes yes --set changeps1 no
   - conda config --set anaconda_upload yes
   - conda config --add channels menpo
@@ -58,11 +63,15 @@ install:
 
   # Build pybot
   - source activate test-build-environment
-  - conda build tools/conda.recipe --python $TRAVIS_PYTHON_VERSION
+  - PYBOT_CONDA_BLD_OUTPUT=$(conda build tools/conda.recipe --output)
+  - conda build tools/conda.recipe --python $TRAVIS_PYTHON_VERSION $CONDA_BUILD_ARGS_EXTRA
   - conda install -q -y pybot --use-local
 
+after_success:
+  - conda convert -p osx-64 -o $CONDA_BLD_PATH $PYBOT_CONDA_BLD_OUTPUT
+ - if [[ "$BRANCH" == "master" ]]; then
+      anaconda -v -t $ANACONDA_API_TOKEN upload -u $ANACONDA_USER --force $CONDA_BLD_PATH/osx-64/*.tar.bz2
+   fi
+
 script:
-  # - conda create -q -n test-runtime-environment python=$TRAVIS_PYTHON_VERSION
-  # - conda install -c s_pillai pybot -n test-runtime-environment
-  # - source activate test-runtime-environment
   - python -c 'import pybot'

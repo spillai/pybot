@@ -15,17 +15,17 @@ requirements:
         - numpy
         - pip
         - wheel
-        - opencv3 ==3.1.0
+        - opencv3
         - eigen
         - gflags
         - glog
-        - boost  ==1.59.0
+        - boost
     run:
         - numpy
         - scipy
-        - protobuf ==3.4.1
+        - protobuf
         - pyzmq
-        - opencv3 ==3.1.0
+        - opencv3
         - eigen
         - matplotlib
         - pytables
