@@ -44,9 +44,9 @@ install:
   - export BRANCH=$(if [ "$TRAVIS_PULL_REQUEST" == "false" ]; then echo $TRAVIS_BRANCH; else echo $TRAVIS_PULL_REQUEST_BRANCH; fi)
   - echo "TRAVIS_BRANCH=$TRAVIS_BRANCH, PR=$PR, BRANCH=$BRANCH"
   - if [[ "$BRANCH" == "master" ]]; then
-      export CONDA_BUILD_ARGS_EXTRA=""
+      export CONDA_BUILD_ARGS_EXTRA="";
     else
-      export CONDA_BUILD_ARGS_EXTRA="--no-anaconda-upload"
+      export CONDA_BUILD_ARGS_EXTRA="--no-anaconda-upload";
     fi;
   - pip install --upgrade pip
   - bash miniconda.sh -b -p $HOME/miniconda
@@ -62,17 +62,15 @@ install:
   - conda create -q -n test-build-environment python=$TRAVIS_PYTHON_VERSION
   - conda install -q -y -c menpo opencv3
   - export PYTHON="$TRAVIS_PYTHON_VERSION"
-
-  # Build pybot
   - source activate test-build-environment
-  - PYBOT_CONDA_BLD_OUTPUT=$(conda build tools/conda.recipe --output)
+  - PYBOT_CONDA_BLD_OUTPUT="$(conda build tools/conda.recipe --output)"
   - conda build tools/conda.recipe --python $TRAVIS_PYTHON_VERSION $CONDA_BUILD_ARGS_EXTRA
   - conda install -q -y pybot --use-local
 
 after_success:
   - conda convert -p osx-64 -o $CONDA_BLD_PATH $PYBOT_CONDA_BLD_OUTPUT
  - if [[ "$BRANCH" == "master" ]]; then
-      anaconda -v -t $ANACONDA_API_TOKEN upload -u $ANACONDA_USER --force $CONDA_BLD_PATH/osx-64/*.tar.bz2
+      anaconda -v -t $ANACONDA_API_TOKEN upload -u $ANACONDA_USER --force $CONDA_BLD_PATH/osx-64/*.tar.bz2;
    fi;
 
 script:
