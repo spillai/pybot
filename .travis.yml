@@ -41,7 +41,9 @@ install:
         wget https://repo.continuum.io/miniconda/Miniconda3-latest-MacOSX-x86_64.sh -O miniconda.sh;
       fi;
     fi;
- - if [[ "$BRANCH" == "master" ]]; then
+  - export BRANCH=$(if [ "$TRAVIS_PULL_REQUEST" == "false" ]; then echo $TRAVIS_BRANCH; else echo $TRAVIS_PULL_REQUEST_BRANCH; fi)
+  - echo "TRAVIS_BRANCH=$TRAVIS_BRANCH, PR=$PR, BRANCH=$BRANCH"
+  - if [[ "$BRANCH" == "master" ]]; then
       export CONDA_BUILD_ARGS_EXTRA=""
     else
       export CONDA_BUILD_ARGS_EXTRA="--no-anaconda-upload"
