@@ -8,7 +8,7 @@ cycler==0.10.0
 filelock==3.0.4
 glob2==0.5
 idna==2.6
-Jinja2==2.10
+Jinja2==2.11.3
 kiwisolver==1.0.1
 MarkupSafe==1.0
 matplotlib==2.2.0
