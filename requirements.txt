@@ -13,7 +13,7 @@ kiwisolver==1.0.1
 MarkupSafe==1.0
 matplotlib==2.2.0
 numexpr==2.6.4
-numpy==1.14.0
+numpy==1.22.0
 pandas==0.22.0
 pkginfo==1.4.2
 psutil==5.4.3
